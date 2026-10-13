@@ -8,6 +8,12 @@ struct ContentView: View {
     @State private var selection: Set<UUID> = []
     @State private var newStyle = Style()
     @State private var newRouting: Routing = .straight
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Default stroke for new shapes, so drawings are visible on the canvas in either appearance.
+    private static func defaultStroke(_ scheme: ColorScheme) -> RGBA {
+        scheme == .dark ? RGBA(r: 0.93, g: 0.93, b: 0.94) : .black
+    }
 
     var body: some View {
         HSplitView {
@@ -28,6 +34,12 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 700, minHeight: 480)
+        .onChange(of: colorScheme, initial: true) { old, new in
+            // Only follow the appearance while the stroke is still an untouched default.
+            if newStyle.stroke == .black || newStyle.stroke == Self.defaultStroke(old) {
+                newStyle.stroke = Self.defaultStroke(new)
+            }
+        }
     }
 }
 
