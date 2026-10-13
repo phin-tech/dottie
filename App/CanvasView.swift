@@ -120,7 +120,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
         ctx.saveGState()
         ctx.translateBy(x: pan.x, y: pan.y)
         ctx.scaleBy(x: zoom, y: zoom)
-        Renderer.draw(model, in: ctx)
+        Renderer.draw(model.resolvingInk(to: isDark ? .inkOnDark : .black), in: ctx)
 
         let accent = NSColor.controlAccentColor
         ctx.setStrokeColor(accent.cgColor)
@@ -176,6 +176,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
             label.draw(at: CGPoint(x: bounds.maxX - size.width - 12, y: bounds.maxY - size.height - 8), withAttributes: attrs)
         }
     }
+
+    private var isDark: Bool { effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
+
+    override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
 
     private var singleSelectionID: UUID? { selection.count == 1 ? selection.first : nil }
 

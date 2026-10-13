@@ -16,6 +16,17 @@ final class DottieKitTests: XCTestCase {
         return doc
     }
 
+    func testResolvingInkOnlyTouchesAutomaticInk() {
+        var doc = sampleDoc()
+        var red = Style(); red.stroke = RGBA(r: 1, g: 0, b: 0)
+        doc.elements[1].style = red
+        let dark = doc.resolvingInk(to: .inkOnDark)
+        XCTAssertEqual(dark.elements[0].style.stroke, .inkOnDark)
+        XCTAssertEqual(dark.elements[1].style.stroke, RGBA(r: 1, g: 0, b: 0))
+        XCTAssertEqual(dark.resolvingInk(to: .black).elements[0].style.stroke, .black)
+        XCTAssertEqual(doc.elements[0].style.stroke, .black) // original untouched
+    }
+
     func testJSONRoundTrip() throws {
         let doc = sampleDoc()
         let back = try DottieDocument.decode(try doc.encoded())

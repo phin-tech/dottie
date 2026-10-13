@@ -8,12 +8,10 @@ struct ContentView: View {
     @State private var selection: Set<UUID> = []
     @State private var newStyle = Style()
     @State private var newRouting: Routing = .straight
-    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(Pref.roughness) private var prefRoughness = Pref.roughnessDefault
+    @AppStorage(Pref.strokeWidth) private var prefStrokeWidth = Pref.strokeWidthDefault
+    @AppStorage(Pref.routing) private var prefRouting = Pref.routingDefault
 
-    /// Default stroke for new shapes, so drawings are visible on the canvas in either appearance.
-    private static func defaultStroke(_ scheme: ColorScheme) -> RGBA {
-        scheme == .dark ? RGBA(r: 0.93, g: 0.93, b: 0.94) : .black
-    }
 
     var body: some View {
         HSplitView {
@@ -34,12 +32,9 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 700, minHeight: 480)
-        .onChange(of: colorScheme, initial: true) { old, new in
-            // Only follow the appearance while the stroke is still an untouched default.
-            if newStyle.stroke == .black || newStyle.stroke == Self.defaultStroke(old) {
-                newStyle.stroke = Self.defaultStroke(new)
-            }
-        }
+        .onChange(of: prefRoughness, initial: true) { _, v in newStyle.roughness = v }
+        .onChange(of: prefStrokeWidth, initial: true) { _, v in newStyle.strokeWidth = v }
+        .onChange(of: prefRouting, initial: true) { _, v in newRouting = Routing(rawValue: v) ?? .straight }
     }
 }
 
@@ -49,6 +44,7 @@ struct Inspector: View {
     @Binding var newStyle: Style
     @Binding var newRouting: Routing
     var undoManager: UndoManager?
+    @Environment(\.colorScheme) private var colorScheme
 
     private var selected: [Element] { document.model.elements.filter { selection.contains($0.id) } }
 
@@ -126,7 +122,9 @@ struct Inspector: View {
     private func colorBinding(_ kp: WritableKeyPath<Style, RGBA>, _ name: String) -> Binding<Color> {
         let raw = binding(kp, name)
         return Binding(
-            get: { let c = raw.wrappedValue; return Color(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: c.a) },
+            get: { var c = raw.wrappedValue
+                if c.isAutomaticInk { c = colorScheme == .dark ? .inkOnDark : .black }
+                return Color(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: c.a) },
             set: { color in
                 let ns = NSColor(color).usingColorSpace(.sRGB) ?? .black
                 raw.wrappedValue = RGBA(r: ns.redComponent, g: ns.greenComponent, b: ns.blueComponent, a: ns.alphaComponent)

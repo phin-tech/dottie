@@ -8,6 +8,9 @@ public struct RGBA: Codable, Equatable, Sendable {
     }
     public static let black = RGBA(r: 0.12, g: 0.12, b: 0.13)
     public static let clear = RGBA(r: 0, g: 0, b: 0, a: 0)
+    /// `black` is the automatic ink: shown as `inkOnDark` on a dark canvas, and always exported as black.
+    public static let inkOnDark = RGBA(r: 0.93, g: 0.93, b: 0.94)
+    public var isAutomaticInk: Bool { self == .black || self == .inkOnDark }
     public var cgColor: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: a) }
 }
 
@@ -92,6 +95,16 @@ public struct DottieDocument: Codable, Equatable, Sendable {
         }
         elements.removeAll { ids.contains($0.id) }
         // Drop connectors that lost both ends to deleted shapes? Keep them: they're free-floating arrows now.
+    }
+
+    /// Copy with every automatic-ink stroke replaced by `ink`, for display on a dark canvas or export.
+    /// Explicitly chosen colors are untouched.
+    public func resolvingInk(to ink: RGBA) -> DottieDocument {
+        var copy = self
+        for i in copy.elements.indices where copy.elements[i].style.stroke.isAutomaticInk {
+            copy.elements[i].style.stroke = ink
+        }
+        return copy
     }
 
     /// Copy with every element's roughness forced (e.g. 0 for a clean render of a sketchy drawing).
