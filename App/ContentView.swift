@@ -8,8 +8,7 @@ struct ContentView: View {
     @State var selection: Set<UUID> = []
     @State private var newStyle = Style()
     @State private var newRouting: Routing = .straight
-    @AppStorage(Pref.roughness) private var prefRoughness = Pref.roughnessDefault
-    @AppStorage(Pref.strokeWidth) private var prefStrokeWidth = Pref.strokeWidthDefault
+    @AppStorage(Pref.newStyle) private var storedStyle = ""
     @AppStorage(Pref.routing) private var prefRouting = Pref.routingDefault
     @State private var showInspector = true
 
@@ -33,7 +32,7 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { showInspector.toggle() } label: {
+                Button { withAnimation(.snappy) { showInspector.toggle() } } label: {
                     Label("Inspector", systemImage: "sidebar.trailing")
                 }
                 .help(showInspector ? "Hide Inspector" : "Show Inspector")
@@ -42,9 +41,14 @@ struct ContentView: View {
         .focusedSceneValue(\.tool, $tool)
         .focusedSceneValue(\.editor, editorActions)
         .frame(minWidth: 700, minHeight: 480)
-        .onChange(of: prefRoughness, initial: true) { _, v in newStyle.roughness = v }
-        .onChange(of: prefStrokeWidth, initial: true) { _, v in newStyle.strokeWidth = v }
+        // The inspector edits `newStyle`; remember it across launches, and pick up Settings' reset.
+        .onChange(of: storedStyle, initial: true) { _, json in
+            let style = Pref.decodeStyle(json) ?? Style()
+            if style != newStyle { newStyle = style }
+        }
+        .onChange(of: newStyle) { _, style in storedStyle = Pref.encode(style) }
         .onChange(of: prefRouting, initial: true) { _, v in newRouting = Routing(rawValue: v) ?? .straight }
+        .onChange(of: newRouting) { _, r in prefRouting = r.rawValue }
     }
 }
 

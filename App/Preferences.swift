@@ -1,71 +1,69 @@
 import SwiftUI
 import DottieKit
 
-/// UserDefaults keys and fallbacks for the Settings window. Read with `@AppStorage`.
+/// UserDefaults keys and fallbacks. Read with `@AppStorage`, or `Pref.bool` from AppKit code.
 enum Pref {
-    static let roughness = "defaultRoughness"
-    static let strokeWidth = "defaultStrokeWidth"
+    /// The inspector's "style for new shapes", persisted as JSON so it survives relaunch.
+    static let newStyle = "newShapeStyle"
     static let routing = "defaultRouting"
     static let snapToObjects = "snapToObjects"
     static let snapToGrid = "snapToGrid"
     static let gridSize = "gridSize"
     static let singleKeyShortcuts = "singleKeyToolShortcuts"
 
-    static let roughnessDefault = 1.0
-    static let strokeWidthDefault = 2.0
     static let routingDefault = Routing.straight.rawValue
     static let gridSizeDefault = 20.0
 
-    /// Read outside SwiftUI (the canvas is AppKit). Unset keys fall back to these defaults.
     static func bool(_ key: String, default value: Bool) -> Bool {
         UserDefaults.standard.object(forKey: key) as? Bool ?? value
     }
+
+    static func encode(_ style: Style) -> String {
+        (try? JSONEncoder().encode(style)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    static func decodeStyle(_ json: String) -> Style? {
+        try? JSONDecoder().decode(Style.self, from: Data(json.utf8))
+    }
 }
 
-/// Opened with ⌘, from the app menu (the `Settings` scene wires the menu item and shortcut).
+/// ⌘, window. Holds general, infrequently changed options; the style for new shapes lives in the
+/// inspector, next to the shapes it affects, and is remembered between launches.
 struct SettingsView: View {
-    @AppStorage(Pref.roughness) private var roughness = Pref.roughnessDefault
-    @AppStorage(Pref.strokeWidth) private var strokeWidth = Pref.strokeWidthDefault
+    @AppStorage(Pref.snapToObjects) private var snapToObjects = true
+    @AppStorage(Pref.snapToGrid) private var snapToGrid = false
+    @AppStorage(Pref.gridSize) private var gridSize = Pref.gridSizeDefault
+    @AppStorage(Pref.singleKeyShortcuts) private var singleKeyShortcuts = true
+    @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
 
     var body: some View {
         Form {
             Section {
-                Picker("Look", selection: lookBinding) {
-                    Text("Sketchy").tag(true)
-                    Text("Clean").tag(false)
+                Toggle("Snap to other shapes", isOn: $snapToObjects)
+                Toggle("Snap to grid", isOn: $snapToGrid)
+                Stepper(value: $gridSize, in: 4...100, step: 2) {
+                    LabeledContent("Grid size", value: "\(Int(gridSize)) pt")
                 }
-                .pickerStyle(.segmented)
-                Slider(value: $roughness, in: 0...3) { Text("Sketchiness") }
-                    .disabled(roughness == 0)
-                Slider(value: $strokeWidth, in: 1...12) { Text("Stroke width") }
-                Picker("Connector routing", selection: $routing) {
-                    Text("Straight").tag(Routing.straight.rawValue)
-                    Text("Curved").tag(Routing.curved.rawValue)
-                    Text("Elbow").tag(Routing.elbow.rawValue)
-                }
-                .pickerStyle(.segmented)
+                .disabled(!snapToGrid)
             } header: {
-                Text("New shapes")
+                Text("Snapping")
             } footer: {
-                Text("Applies to shapes you draw from now on. Existing shapes keep their style.")
-                    .foregroundStyle(.secondary)
+                Text("Hold ⌘ while dragging to bypass snapping.").foregroundStyle(.secondary)
+            }
+            Section("Keyboard") {
+                Toggle("Single-key tool shortcuts (V, R, O, D, T, C, P)", isOn: $singleKeyShortcuts)
             }
             Section {
-                Button("Reset to Defaults") {
-                    roughness = Pref.roughnessDefault
-                    strokeWidth = Pref.strokeWidthDefault
+                Button("Reset Style for New Shapes") {
+                    newStyle = ""
                     routing = Pref.routingDefault
                 }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
+        .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
-    }
-
-    /// Sketchy (roughness 1 unless already set) vs clean (0), mirroring the inspector.
-    private var lookBinding: Binding<Bool> {
-        Binding(get: { roughness > 0 }, set: { roughness = $0 ? max(Pref.roughnessDefault, 1) : 0 })
+        .navigationTitle("Dottie Settings")
     }
 }

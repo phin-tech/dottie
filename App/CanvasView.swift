@@ -592,7 +592,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if tool != .select { switchTool(.select) } else { selection = [] }
             return
         }
-        if plain, let ch = event.charactersIgnoringModifiers?.lowercased().first,
+        if plain, Pref.bool(Pref.singleKeyShortcuts, default: true),
+           let ch = event.charactersIgnoringModifiers?.lowercased().first,
            let t = Tool.allCases.first(where: { $0.shortcut == ch }) {
             switchTool(t)
             return
