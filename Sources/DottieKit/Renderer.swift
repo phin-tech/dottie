@@ -25,9 +25,46 @@ public enum Renderer {
         case .ellipse:
             if rough <= 0 { return CGPath(ellipseIn: r, transform: nil) }
             return Rough.ellipse(in: r, rng: &rng, roughness: rough)
-        case .text:
+        case .text, .connector:
             return CGPath(rect: r, transform: nil)
         }
+    }
+
+    /// Stroked path for a connector, including arrowheads. Sketchy when roughness > 0.
+    public static func connectorPath(for e: Element, in doc: DottieDocument) -> CGPath {
+        guard let c = e.connector else { return CGMutablePath() }
+        var rng = SeededRNG(seed: e.seed)
+        let rough = e.style.roughness
+        let path = CGMutablePath()
+        let route = Connector.route(of: e, in: doc)
+
+        switch route {
+        case .polyline(let pts):
+            for i in 0..<max(pts.count - 1, 0) {
+                if rough <= 0 { path.move(to: pts[i]); path.addLine(to: pts[i + 1]) }
+                else { Rough.line(pts[i], pts[i + 1], rng: &rng, roughness: rough, into: path) }
+            }
+        case .cubic(let a, let b, let c2, let d):
+            path.move(to: a)
+            let w = rough * 3
+            func j() -> CGFloat { CGFloat(rng.signed() * w) }
+            path.addCurve(to: d, control1: CGPoint(x: b.x + j(), y: b.y + j()), control2: CGPoint(x: c2.x + j(), y: c2.y + j()))
+        }
+
+        let pts = route.points
+        let size = max(10, e.style.strokeWidth * 5)
+        func head(tip: CGPoint, from: CGPoint) {
+            let (w1, w2) = Connector.arrowhead(tip: tip, from: from, size: size)
+            if rough <= 0 {
+                path.move(to: w1); path.addLine(to: tip); path.addLine(to: w2)
+            } else {
+                Rough.line(w1, tip, rng: &rng, roughness: rough * 0.5, into: path)
+                Rough.line(w2, tip, rng: &rng, roughness: rough * 0.5, into: path)
+            }
+        }
+        if c.endArrow, pts.count > 1 { head(tip: pts[pts.count - 1], from: pts[pts.count - 2]) }
+        if c.startArrow, pts.count > 1 { head(tip: pts[0], from: pts[1]) }
+        return path
     }
 
     /// Precise shape used for fills and hit areas.
@@ -48,12 +85,21 @@ public enum Renderer {
     public static func draw(_ doc: DottieDocument, in ctx: CGContext) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         for e in doc.elements where visible.contains(e.layerID) {
-            draw(e, in: ctx)
+            draw(e, in: ctx, document: doc)
         }
     }
 
-    public static func draw(_ e: Element, in ctx: CGContext) {
+    public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil) {
         ctx.saveGState(); defer { ctx.restoreGState() }
+        if e.kind == .connector {
+            guard let document else { return }
+            ctx.addPath(connectorPath(for: e, in: document))
+            ctx.setStrokeColor(e.style.stroke.cgColor)
+            ctx.setLineWidth(e.style.strokeWidth)
+            ctx.setLineCap(.round); ctx.setLineJoin(.round)
+            ctx.strokePath()
+            return
+        }
         if e.kind == .text {
             drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
             return

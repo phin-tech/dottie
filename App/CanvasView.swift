@@ -3,7 +3,7 @@ import SwiftUI
 import DottieKit
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text
+    case select, rectangle, ellipse, diamond, text, connector
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -12,6 +12,28 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "circle"
         case .diamond: "diamond"
         case .text: "textformat"
+        case .connector: "arrow.up.right"
+        }
+    }
+    var label: String {
+        switch self {
+        case .select: "Select"
+        case .rectangle: "Rectangle"
+        case .ellipse: "Ellipse"
+        case .diamond: "Diamond"
+        case .text: "Text"
+        case .connector: "Connector"
+        }
+    }
+    /// Single-key tool switch, Photoshop-style.
+    var shortcut: Character {
+        switch self {
+        case .select: "v"
+        case .rectangle: "r"
+        case .ellipse: "o"
+        case .diamond: "d"
+        case .text: "t"
+        case .connector: "c"
         }
     }
     var kind: ElementKind? {
@@ -21,6 +43,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: .ellipse
         case .diamond: .diamond
         case .text: .text
+        case .connector: nil
         }
     }
 }
@@ -48,28 +71,43 @@ private enum Gesture {
     case moving
     case resizing(id: UUID, handle: Handle, original: CGRect)
     case marquee
+    case connecting(id: UUID)
+    case endpoint(id: UUID, isStart: Bool)
+    case panning
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
 final class CanvasNSView: NSView, NSTextFieldDelegate {
     var model = DottieDocument() { didSet { needsDisplay = true } }
     var tool: Tool = .select
+    var onToolChange: ((Tool) -> Void)?
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
     var style = Style()
+    var routing: Routing = .straight
 
     var onPreview: ((DottieDocument) -> Void)?
     var onCommit: ((DottieDocument, String) -> Void)?
     var onSelectionChange: ((Set<UUID>) -> Void)?
 
+    /// Viewport offset in view points; model coordinates are unchanged by panning.
+    private var pan: CGPoint = .zero { didSet { viewportChanged() } }
+    /// view = model * zoom + pan
+    private var zoom: CGFloat = 1 { didSet { viewportChanged() } }
+    private let zoomRange: ClosedRange<CGFloat> = 0.1...8
+    private var spaceDown = false { didSet { window?.invalidateCursorRects(for: self) } }
+    private var panAnchor: (raw: CGPoint, pan: CGPoint) = (.zero, .zero)
     private var gesture: Gesture?
     private var dragStart: CGPoint = .zero
     private var baseline: DottieDocument?
     private var marqueeRect: CGRect?
+    private var hoverShapeID: UUID? { didSet { if oldValue != hoverShapeID { needsDisplay = true } } }
     private var editor: NSTextField?
     private var editingID: UUID?
     private var editBase: DottieDocument? // set for new text so undo removes the box entirely
 
     private let handleSize: CGFloat = 8
+    /// Handle size in model units so handles stay the same size on screen at any zoom.
+    private var hs: CGFloat { handleSize / zoom }
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -79,38 +117,168 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
         NSColor.textBackgroundColor.setFill(); dirtyRect.fill()
+        ctx.saveGState()
+        ctx.translateBy(x: pan.x, y: pan.y)
+        ctx.scaleBy(x: zoom, y: zoom)
         Renderer.draw(model, in: ctx)
 
         let accent = NSColor.controlAccentColor
         ctx.setStrokeColor(accent.cgColor)
-        ctx.setLineWidth(1.5)
+        ctx.setLineWidth(1.5 / zoom)
         for e in model.elements where selection.contains(e.id) {
-            ctx.stroke(e.frame.insetBy(dx: -4, dy: -4))
+            if e.kind == .connector {
+                ctx.addPath(Renderer.connectorPath(for: e, in: model))
+                ctx.setLineWidth(e.style.strokeWidth + 4)
+                ctx.setStrokeColor(accent.withAlphaComponent(0.3).cgColor)
+                ctx.strokePath()
+                ctx.setStrokeColor(accent.cgColor); ctx.setLineWidth(1.5 / zoom)
+            } else {
+                ctx.stroke(e.frame.insetBy(dx: -4, dy: -4))
+            }
         }
-        if let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
+        if let id = hoverShapeID, let e = model.elements.first(where: { $0.id == id }) {
+            ctx.setLineWidth(2.5 / zoom)
+            ctx.stroke(e.frame.insetBy(dx: -6, dy: -6))
+            ctx.setFillColor(accent.cgColor)
+            for port in Port.allCases {
+                let p = Connector.portPoint(e, port)
+                ctx.fillEllipse(in: CGRect(x: p.x - 3 / zoom, y: p.y - 3 / zoom, width: 6 / zoom, height: 6 / zoom))
+            }
+            ctx.setLineWidth(1.5 / zoom)
+        }
+        if let id = singleSelectionID, let c = model.elements.first(where: { $0.id == id }), c.kind == .connector {
+            ctx.setFillColor(NSColor.white.cgColor)
+            let (a, b) = Connector.endpoints(of: c, in: model)
+            for p in [a, b] {
+                let r = CGRect(x: p.x - 5 / zoom, y: p.y - 5 / zoom, width: 10 / zoom, height: 10 / zoom)
+                ctx.fillEllipse(in: r); ctx.strokeEllipse(in: r)
+            }
+        } else if let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
             ctx.setFillColor(NSColor.white.cgColor)
             for h in Handle.all {
                 let p = h.point(in: e.frame.insetBy(dx: -4, dy: -4))
-                let r = CGRect(x: p.x - handleSize / 2, y: p.y - handleSize / 2, width: handleSize, height: handleSize)
+                let r = CGRect(x: p.x - hs / 2, y: p.y - hs / 2, width: hs, height: hs)
                 ctx.fill(r); ctx.stroke(r)
             }
         }
         if let m = marqueeRect {
             ctx.setFillColor(accent.withAlphaComponent(0.08).cgColor)
             ctx.fill(m)
-            ctx.setLineWidth(1); ctx.stroke(m)
+            ctx.setLineWidth(1 / zoom); ctx.stroke(m)
+        }
+        ctx.restoreGState()
+
+        if zoom != 1 {
+            let label = "\(Int((zoom * 100).rounded()))%" as NSString
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
+                                                        .foregroundColor: NSColor.secondaryLabelColor]
+            let size = label.size(withAttributes: attrs)
+            label.draw(at: CGPoint(x: bounds.maxX - size.width - 12, y: bounds.maxY - size.height - 8), withAttributes: attrs)
         }
     }
 
     private var singleSelectionID: UUID? { selection.count == 1 ? selection.first : nil }
 
     private func handle(at p: CGPoint) -> (UUID, Handle, CGRect)? {
-        guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) else { return nil }
+        guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }), e.kind != .connector else { return nil }
         let box = e.frame.insetBy(dx: -4, dy: -4)
         for h in Handle.all {
             let c = h.point(in: box)
-            if abs(p.x - c.x) <= handleSize, abs(p.y - c.y) <= handleSize { return (id, h, e.frame) }
+            if abs(p.x - c.x) <= hs, abs(p.y - c.y) <= hs { return (id, h, e.frame) }
         }
+        return nil
+    }
+
+    // MARK: Viewport
+
+    private func point(_ event: NSEvent) -> CGPoint {
+        let raw = convert(event.locationInWindow, from: nil)
+        return CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom)
+    }
+
+    private func viewportChanged() {
+        needsDisplay = true
+        guard let f = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
+        f.frame = viewFrame(e.frame)
+        f.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
+    }
+
+    private func viewFrame(_ r: CGRect) -> CGRect {
+        CGRect(x: r.minX * zoom + pan.x, y: r.minY * zoom + pan.y, width: r.width * zoom, height: r.height * zoom)
+    }
+
+    /// Zooms keeping the model point under `anchor` (view coords) fixed.
+    private func zoom(by factor: CGFloat, at anchor: CGPoint) {
+        let new = min(max(zoom * factor, zoomRange.lowerBound), zoomRange.upperBound)
+        let m = CGPoint(x: (anchor.x - pan.x) / zoom, y: (anchor.y - pan.y) / zoom)
+        zoom = new
+        pan = CGPoint(x: anchor.x - m.x * new, y: anchor.y - m.y * new)
+    }
+
+    /// Selects everything on visible, unlocked layers. Also reachable from Edit ▸ Select All.
+    @objc override func selectAll(_ sender: Any?) {
+        let editable = Set(model.layers.filter { $0.visible && !$0.locked }.map(\.id))
+        selection = Set(model.elements.filter { editable.contains($0.layerID) }.map(\.id))
+    }
+
+    override func magnify(with event: NSEvent) {
+        zoom(by: 1 + event.magnification, at: convert(event.locationInWindow, from: nil))
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard event.modifierFlags.contains(.command), window?.firstResponder === self,
+              let ch = event.charactersIgnoringModifiers else { return super.performKeyEquivalent(with: event) }
+        let center = CGPoint(x: bounds.midX, y: bounds.midY)
+        switch ch {
+        case "=", "+": zoom(by: 1.25, at: center)
+        case "-": zoom(by: 0.8, at: center)
+        case "0": zoom = 1; pan = .zero
+        case "a" where !event.modifierFlags.contains(.shift): selectAll(nil)
+        default: return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
+    override func resetCursorRects() {
+        if spaceDown {
+            addCursorRect(bounds, cursor: gesture.map { if case .panning = $0 { return true } else { return false } } == true ? .closedHand : .openHand)
+        }
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) { // ⌘ + wheel zooms around the cursor
+            let dy = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.scrollingDeltaY * 8
+            zoom(by: exp(dy * 0.01), at: convert(event.locationInWindow, from: nil))
+            return
+        }
+        pan = CGPoint(x: pan.x + event.scrollingDeltaX, y: pan.y + event.scrollingDeltaY)
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if event.keyCode == 49 { spaceDown = false } else { super.keyUp(with: event) }
+    }
+
+    // MARK: Connector helpers
+
+    /// Topmost non-connector shape under `p`.
+    private func shape(at p: CGPoint, in doc: DottieDocument) -> Element? {
+        doc.elements.last { e in
+            e.kind != .connector && e.frame.insetBy(dx: -6, dy: -6).contains(p)
+                && doc.layers.first { $0.id == e.layerID }.map { $0.visible && !$0.locked } == true
+        }
+    }
+
+    /// Binds to the shape under the cursor (snapping to a port when close), otherwise stays free.
+    private func endpoint(at p: CGPoint, in doc: DottieDocument) -> Endpoint {
+        guard let s = shape(at: p, in: doc) else { return .free(p) }
+        return .bound(s.id, port: Connector.port(near: p, of: s))
+    }
+
+    private func connectorEndpointHit(_ p: CGPoint) -> (UUID, Bool)? {
+        guard let id = singleSelectionID, let c = model.elements.first(where: { $0.id == id }), c.kind == .connector else { return nil }
+        let (a, b) = Connector.endpoints(of: c, in: model)
+        if hypot(p.x - a.x, p.y - a.y) <= 8 / zoom { return (id, true) }
+        if hypot(p.x - b.x, p.y - b.y) <= 8 / zoom { return (id, false) }
         return nil
     }
 
@@ -119,7 +287,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     override func mouseDown(with event: NSEvent) {
         endEditing()
         window?.makeFirstResponder(self)
-        let p = convert(event.locationInWindow, from: nil)
+        if spaceDown {
+            gesture = .panning
+            panAnchor = (convert(event.locationInWindow, from: nil), pan)
+            window?.invalidateCursorRects(for: self)
+            return
+        }
+        let p = point(event)
         dragStart = p
         baseline = model
         guard let layer = model.layers.first(where: { !$0.locked && $0.visible }) else { return }
@@ -142,7 +316,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
             return
         }
 
-        if let kind = tool.kind {
+        if tool == .connector {
+            var st = style
+            st.fill = .clear
+            let c = ConnectorData(start: endpoint(at: p, in: model), end: .free(p), routing: routing)
+            let e = Element(kind: .connector, frame: .zero, style: st, layerID: layer.id, connector: c)
+            model.elements.append(e)
+            selection = [e.id]
+            hoverShapeID = shape(at: p, in: model)?.id
+            gesture = .connecting(id: e.id)
+            onPreview?(model)
+        } else if tool == .select, let (id, isStart) = connectorEndpointHit(p) {
+            gesture = .endpoint(id: id, isStart: isStart)
+        } else if let kind = tool.kind {
             let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: style, layerID: layer.id)
             gesture = .creating(e)
             model.elements.append(e)
@@ -164,8 +350,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if case .panning? = gesture {
+            let raw = convert(event.locationInWindow, from: nil)
+            pan = CGPoint(x: panAnchor.pan.x + raw.x - panAnchor.raw.x, y: panAnchor.pan.y + raw.y - panAnchor.raw.y)
+            return
+        }
         guard let g = gesture, var next = baseline else { return }
-        let p = convert(event.locationInWindow, from: nil)
+        let p = point(event)
         let d = CGPoint(x: p.x - dragStart.x, y: p.y - dragStart.y)
 
         switch g {
@@ -175,14 +366,35 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
             next.elements.append(e)
         case .moving:
             for i in next.elements.indices where selection.contains(next.elements[i].id) {
-                next.elements[i].x += d.x; next.elements[i].y += d.y
+                if var c = next.elements[i].connector {
+                    // Bound ends follow their shapes; only free ends move with the drag.
+                    if c.start.elementID == nil { c.start.x += d.x; c.start.y += d.y }
+                    if c.end.elementID == nil { c.end.x += d.x; c.end.y += d.y }
+                    next.elements[i].connector = c
+                } else {
+                    next.elements[i].x += d.x; next.elements[i].y += d.y
+                }
             }
+        case .connecting(let id), .endpoint(let id, _):
+            if let i = next.elements.firstIndex(where: { $0.id == id }) {
+                let ep = endpoint(at: p, in: next)
+                if case .endpoint(_, let isStart) = g, isStart { next.elements[i].connector?.start = ep }
+                else { next.elements[i].connector?.end = ep }
+            } else if let i = model.elements.firstIndex(where: { $0.id == id }) {
+                // Newly created connector isn't in the baseline yet.
+                var e = model.elements[i]
+                e.connector?.end = endpoint(at: p, in: next)
+                next.elements.append(e)
+            }
+            hoverShapeID = shape(at: p, in: next)?.id
         case .resizing(let id, let h, let original):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
                 var f = h.resized(original, by: d)
                 f.size.width = max(f.width, 4); f.size.height = max(f.height, 4)
                 next.elements[i].frame = f
             }
+        case .panning:
+            return
         case .marquee:
             let r = CGRect(x: min(dragStart.x, p.x), y: min(dragStart.y, p.y), width: abs(d.x), height: abs(d.y))
             marqueeRect = r
@@ -195,7 +407,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseUp(with event: NSEvent) {
-        defer { gesture = nil; baseline = nil; marqueeRect = nil; needsDisplay = true }
+        defer {
+            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; needsDisplay = true
+            if spaceDown { window?.invalidateCursorRects(for: self) }
+        }
         guard let base = baseline, let g = gesture else { return }
         switch g {
         case .creating(let e):
@@ -203,16 +418,44 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
                 model = base; selection = []; onPreview?(base); return
             }
             commit(base, "Add Shape")
+        case .connecting(let id):
+            if let e = model.elements.first(where: { $0.id == id }), let c = e.connector,
+               c.start.elementID == nil, c.end.elementID == nil,
+               hypot(c.end.x - c.start.x, c.end.y - c.start.y) < 6 { // accidental click
+                model = base; selection = []; onPreview?(base); return
+            }
+            commit(base, "Add Connector")
+        case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")
         case .resizing where model != base: commit(base, "Resize")
         default: break
         }
     }
 
+    private func switchTool(_ t: Tool) {
+        tool = t
+        onToolChange?(t)
+        if t != .select, t != .connector { hoverShapeID = nil }
+    }
+
     override func keyDown(with event: NSEvent) {
+        let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        if event.keyCode == 49, plain { // space: hold to pan
+            if !event.isARepeat { spaceDown = true }
+            return
+        }
+        if event.keyCode == 53 { // escape: back to the arrow; a second press clears the selection
+            if tool != .select { switchTool(.select) } else { selection = [] }
+            return
+        }
+        if plain, let ch = event.charactersIgnoringModifiers?.lowercased().first,
+           let t = Tool.allCases.first(where: { $0.shortcut == ch }) {
+            switchTool(t)
+            return
+        }
         if event.keyCode == 51 || event.keyCode == 117, !selection.isEmpty { // delete / forward delete
             var next = model
-            next.elements.removeAll { selection.contains($0.id) }
+            next.remove(selection)
             selection = []
             onCommit?(next, "Delete")
         } else if event.keyCode == 36, let id = singleSelectionID { // return edits text
@@ -234,9 +477,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     private func beginEditing(_ id: UUID, isNew: Bool = false) {
         guard let e = model.elements.first(where: { $0.id == id }) else { return }
         endEditing()
-        let field = NSTextField(frame: e.frame)
+        let field = NSTextField(frame: viewFrame(e.frame))
         field.stringValue = e.text ?? ""
-        field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize)
+        field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
         field.isBordered = false
         field.drawsBackground = false
         field.focusRingType = .none
@@ -273,6 +516,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endEditing() }
+
+    /// Escape inside the text editor finishes editing and returns to the arrow.
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        endEditing()
+        switchTool(.select)
+        return true
+    }
 }
 
 struct CanvasView: NSViewRepresentable {
@@ -280,11 +531,13 @@ struct CanvasView: NSViewRepresentable {
     @Binding var tool: Tool
     @Binding var selection: Set<UUID>
     var style: Style
+    var routing: Routing
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
         let v = CanvasNSView()
         v.onPreview = { [document] in document.preview($0) }
+        v.onToolChange = { t in DispatchQueue.main.async { tool = t } }
         v.onSelectionChange = { sel in DispatchQueue.main.async { selection = sel } }
         return v
     }
@@ -294,6 +547,7 @@ struct CanvasView: NSViewRepresentable {
         if v.model != document.model { v.model = document.model }
         v.tool = tool
         v.style = style
+        v.routing = routing
         if v.selection != selection { v.selection = selection }
     }
 }

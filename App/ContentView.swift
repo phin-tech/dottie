@@ -7,18 +7,22 @@ struct ContentView: View {
     @State private var tool: Tool = .select
     @State private var selection: Set<UUID> = []
     @State private var newStyle = Style()
+    @State private var newRouting: Routing = .straight
 
     var body: some View {
         HSplitView {
-            CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle)
+            CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting)
                 .frame(minWidth: 400)
-            Inspector(document: document, selection: selection, newStyle: $newStyle, undoManager: undoManager)
+            Inspector(document: document, selection: selection, newStyle: $newStyle, newRouting: $newRouting, undoManager: undoManager)
                 .frame(width: 220)
         }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("Tool", selection: $tool) {
-                    ForEach(Tool.allCases) { Image(systemName: $0.symbol).tag($0) }
+                    ForEach(Tool.allCases) { t in
+                        Image(systemName: t.symbol).tag(t)
+                            .help("\(t.label) (\(String(t.shortcut).uppercased()))")
+                    }
                 }
                 .pickerStyle(.segmented)
             }
@@ -31,6 +35,7 @@ struct Inspector: View {
     @ObservedObject var document: DrawingDocument
     var selection: Set<UUID>
     @Binding var newStyle: Style
+    @Binding var newRouting: Routing
     var undoManager: UndoManager?
 
     private var selected: [Element] { document.model.elements.filter { selection.contains($0.id) } }
@@ -64,11 +69,40 @@ struct Inspector: View {
                 ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
                 ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
             }
+            Section("Connector") {
+                Picker("Routing", selection: routingBinding) {
+                    Text("Straight").tag(Routing.straight)
+                    Text("Curved").tag(Routing.curved)
+                    Text("Elbow").tag(Routing.elbow)
+                }
+                .pickerStyle(.segmented)
+                Toggle("Arrowhead", isOn: arrowBinding)
+            }
             Section("Layers") {
                 ForEach(document.model.layers) { Text($0.name) }
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var selectedConnectors: [Element] { selected.filter { $0.kind == .connector } }
+
+    private func editConnectors(_ name: String, _ change: (inout ConnectorData) -> Void) {
+        var next = document.model
+        for i in next.elements.indices where selection.contains(next.elements[i].id) {
+            if var c = next.elements[i].connector { change(&c); next.elements[i].connector = c }
+        }
+        document.commit(next, actionName: name, undoManager: undoManager)
+    }
+
+    private var routingBinding: Binding<Routing> {
+        Binding(get: { selectedConnectors.first?.connector?.routing ?? newRouting },
+                set: { r in newRouting = r; if !selectedConnectors.isEmpty { editConnectors("Change Routing") { $0.routing = r } } })
+    }
+
+    private var arrowBinding: Binding<Bool> {
+        Binding(get: { selectedConnectors.first?.connector?.endArrow ?? true },
+                set: { v in editConnectors("Toggle Arrowhead") { $0.endArrow = v } })
     }
 
     /// Sketchy (roughness 1) vs clean (0); the slider fine-tunes sketchy.

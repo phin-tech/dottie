@@ -22,7 +22,7 @@ public struct Style: Codable, Equatable, Sendable {
 }
 
 public enum ElementKind: String, Codable, Sendable {
-    case rectangle, ellipse, diamond, text
+    case rectangle, ellipse, diamond, text, connector
 }
 
 public struct Layer: Codable, Equatable, Identifiable, Sendable {
@@ -44,13 +44,16 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var seed: UInt32
     public var layerID: UUID
     public var text: String?
+    /// Only set for `.connector`. Endpoints are bindings, never stored geometry.
+    public var connector: ConnectorData?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
-                seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil) {
+                seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,
+                connector: ConnectorData? = nil) {
         self.id = id; self.kind = kind
         self.x = frame.origin.x; self.y = frame.origin.y
         self.width = frame.width; self.height = frame.height
-        self.style = style; self.seed = seed; self.layerID = layerID; self.text = text
+        self.style = style; self.seed = seed; self.layerID = layerID; self.text = text; self.connector = connector
     }
 
     public var frame: CGRect {
@@ -73,8 +76,22 @@ public struct DottieDocument: Codable, Equatable, Sendable {
     public func element(at point: CGPoint) -> Element? {
         elements.last { e in
             guard let layer = layers.first(where: { $0.id == e.layerID }), layer.visible, !layer.locked else { return false }
+            if e.kind == .connector { return Connector.distance(from: point, to: e, in: self) <= 6 }
             return e.frame.insetBy(dx: -4, dy: -4).contains(point)
         }
+    }
+
+    /// Removes elements; connectors bound to a removed shape keep their last position as free points.
+    public mutating func remove(_ ids: Set<UUID>) {
+        for i in elements.indices where elements[i].kind == .connector && !ids.contains(elements[i].id) {
+            guard var c = elements[i].connector else { continue }
+            let (s, e) = Connector.endpoints(of: elements[i], in: self)
+            if let id = c.start.elementID, ids.contains(id) { c.start = .free(s) }
+            if let id = c.end.elementID, ids.contains(id) { c.end = .free(e) }
+            elements[i].connector = c
+        }
+        elements.removeAll { ids.contains($0.id) }
+        // Drop connectors that lost both ends to deleted shapes? Keep them: they're free-floating arrows now.
     }
 
     /// Copy with every element's roughness forced (e.g. 0 for a clean render of a sketchy drawing).
