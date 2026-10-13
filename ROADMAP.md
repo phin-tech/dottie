@@ -10,7 +10,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Document app: new/open/save, undo/redo, select/move/delete, rect/ellipse/diamond tools, inspector (sketchiness, stroke, colors)
 
 ## Next (in order)
-1. Resize handles, multi-select marquee, text tool with in-place editing
+1. ~~Resize handles, marquee, text~~ (done)
 2. Bound connectors (store bindings, compute endpoints at render time), arrowheads, elbow/curved routing
 3. Freehand pencil with smoothing
 4. Smart guides + grid snapping (modifier to bypass), alignment/distribute, layers panel (add/hide/lock/reorder)
