@@ -11,26 +11,35 @@ struct ContentView: View {
     @AppStorage(Pref.roughness) private var prefRoughness = Pref.roughnessDefault
     @AppStorage(Pref.strokeWidth) private var prefStrokeWidth = Pref.strokeWidthDefault
     @AppStorage(Pref.routing) private var prefRouting = Pref.routingDefault
-
+    @State private var showInspector = true
 
     var body: some View {
-        HSplitView {
-            CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting)
-                .frame(minWidth: 400)
-            Inspector(document: document, selection: selection, newStyle: $newStyle, newRouting: $newRouting, undoManager: undoManager)
-                .frame(width: 220)
-        }
+        CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting)
+            .frame(minWidth: 400)
+            .inspector(isPresented: $showInspector) {
+                Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, undoManager: undoManager)
+                    .inspectorColumnWidth(min: 200, ideal: 240, max: 320)
+            }
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("Tool", selection: $tool) {
                     ForEach(Tool.allCases) { t in
-                        Image(systemName: t.symbol).tag(t)
+                        Image(systemName: t.symbol)
+                            .accessibilityLabel(t.label)
+                            .tag(t)
                             .help("\(t.label) (\(String(t.shortcut).uppercased()))")
                     }
                 }
                 .pickerStyle(.segmented)
             }
+            ToolbarItem(placement: .primaryAction) {
+                Button { showInspector.toggle() } label: {
+                    Label("Inspector", systemImage: "sidebar.trailing")
+                }
+                .help(showInspector ? "Hide Inspector" : "Show Inspector")
+            }
         }
+        .focusedSceneValue(\.tool, $tool)
         .frame(minWidth: 700, minHeight: 480)
         .onChange(of: prefRoughness, initial: true) { _, v in newStyle.roughness = v }
         .onChange(of: prefStrokeWidth, initial: true) { _, v in newStyle.strokeWidth = v }
@@ -41,6 +50,7 @@ struct ContentView: View {
 struct Inspector: View {
     @ObservedObject var document: DrawingDocument
     var selection: Set<UUID>
+    var tool: Tool
     @Binding var newStyle: Style
     @Binding var newRouting: Routing
     var undoManager: UndoManager?
@@ -77,17 +87,16 @@ struct Inspector: View {
                 ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
                 ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
             }
-            Section("Connector") {
-                Picker("Routing", selection: routingBinding) {
-                    Text("Straight").tag(Routing.straight)
-                    Text("Curved").tag(Routing.curved)
-                    Text("Elbow").tag(Routing.elbow)
+            if tool == .connector || !selectedConnectors.isEmpty {
+                Section("Connector") {
+                    Picker("Routing", selection: routingBinding) {
+                        Text("Straight").tag(Routing.straight)
+                        Text("Curved").tag(Routing.curved)
+                        Text("Elbow").tag(Routing.elbow)
+                    }
+                    .pickerStyle(.segmented)
+                    Toggle("Arrowhead", isOn: arrowBinding)
                 }
-                .pickerStyle(.segmented)
-                Toggle("Arrowhead", isOn: arrowBinding)
-            }
-            Section("Layers") {
-                ForEach(document.model.layers) { Text($0.name) }
             }
         }
         .formStyle(.grouped)

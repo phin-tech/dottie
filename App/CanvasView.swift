@@ -77,7 +77,7 @@ private enum Gesture {
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
-final class CanvasNSView: NSView, NSTextFieldDelegate {
+final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var model = DottieDocument() { didSet { needsDisplay = true } }
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
@@ -232,15 +232,34 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.modifierFlags.contains(.command), window?.firstResponder === self,
               let ch = event.charactersIgnoringModifiers else { return super.performKeyEquivalent(with: event) }
-        let center = CGPoint(x: bounds.midX, y: bounds.midY)
         switch ch {
-        case "=", "+": zoom(by: 1.25, at: center)
-        case "-": zoom(by: 0.8, at: center)
-        case "0": zoom = 1; pan = .zero
         case "a" where !event.modifierFlags.contains(.shift): selectAll(nil)
         default: return super.performKeyEquivalent(with: event)
         }
         return true
+    }
+
+    // Menu commands (View ▸ Zoom, Edit ▸ Delete) arrive through the responder chain.
+
+    @objc func zoomIn(_ sender: Any?) { zoom(by: 1.25, at: CGPoint(x: bounds.midX, y: bounds.midY)) }
+    @objc func zoomOut(_ sender: Any?) { zoom(by: 0.8, at: CGPoint(x: bounds.midX, y: bounds.midY)) }
+    @objc func zoomActualSize(_ sender: Any?) { zoom = 1; pan = .zero }
+
+    @objc func delete(_ sender: Any?) { deleteSelection() }
+
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        switch item.action {
+        case #selector(delete(_:)): return !selection.isEmpty
+        default: return true
+        }
+    }
+
+    private func deleteSelection() {
+        guard !selection.isEmpty else { return }
+        var next = model
+        next.remove(selection)
+        selection = []
+        onCommit?(next, "Delete")
     }
 
     override func resetCursorRects() {
@@ -458,10 +477,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate {
             return
         }
         if event.keyCode == 51 || event.keyCode == 117, !selection.isEmpty { // delete / forward delete
-            var next = model
-            next.remove(selection)
-            selection = []
-            onCommit?(next, "Delete")
+            deleteSelection()
         } else if event.keyCode == 36, let id = singleSelectionID { // return edits text
             beginEditing(id)
         } else {

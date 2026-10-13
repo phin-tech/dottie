@@ -6,6 +6,7 @@ struct DottieApp: App {
         DocumentGroup(newDocument: { DrawingDocument() }) { file in
             ContentView(document: file.document)
         }
+        .commands { DottieCommands() }
         Settings {
             SettingsView()
         }
