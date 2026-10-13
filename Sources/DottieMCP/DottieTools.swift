@@ -63,6 +63,8 @@ private struct Args {
 /// Stateless: every call loads the file, edits, and saves atomically. The actor serializes calls
 /// so concurrent requests can't interleave read-modify-write on the same file.
 actor DottieTools {
+    private var currentTool = "edit"
+
     static let definitions: [Tool] = [
         Tool(name: "create_diagram",
              description: "Create a new empty .dottie file (fails if it already exists unless overwrite is true).",
@@ -180,6 +182,8 @@ actor DottieTools {
     }
 
     private func load(_ url: URL, createIfMissing: Bool = false) throws -> DottieDocument {
+        // Live mode: if the Dottie app has this file open, edit that copy instead of the file on disk.
+        if let live = LiveClient.get(path: url.path) { return live }
         guard FileManager.default.fileExists(atPath: url.path) else {
             if createIfMissing { return DottieDocument() }
             throw ToolFailure(message: "No such file: \(url.path). Call create_diagram or build_diagram first.")
@@ -189,6 +193,7 @@ actor DottieTools {
     }
 
     private func save(_ doc: DottieDocument, to url: URL) throws {
+        if LiveClient.put(doc, path: url.path, actionName: "Agent: \(currentTool)") { return }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try doc.encoded().write(to: url, options: .atomic)
     }
@@ -204,6 +209,7 @@ actor DottieTools {
     // MARK: Dispatch
 
     private func run(_ name: String, _ a: Args) throws -> CallTool.Result {
+        currentTool = name
         switch name {
         case "create_diagram":
             let url = try fileURL(a)

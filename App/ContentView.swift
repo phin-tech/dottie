@@ -3,6 +3,7 @@ import DottieKit
 
 struct ContentView: View {
     @ObservedObject var document: DrawingDocument
+    var fileURL: URL?
     @Environment(\.undoManager) var undoManager
     @State private var tool: Tool = .select
     @State var selection: Set<UUID> = []
@@ -37,6 +38,9 @@ struct ContentView: View {
                 }
                 .help(showInspector ? "Hide Inspector" : "Show Inspector")
             }
+        }
+        .onChange(of: fileURL, initial: true) { _, url in
+            LiveRegistry.shared.register(document, fileURL: url, undoManager: undoManager)
         }
         .focusedSceneValue(\.tool, $tool)
         .focusedSceneValue(\.editor, editorActions)
