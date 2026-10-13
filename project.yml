@@ -1,0 +1,37 @@
+name: Dottie
+options:
+  bundleIdPrefix: tech.phin
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  Dottie:
+    path: .
+targets:
+  Dottie:
+    type: application
+    platform: macOS
+    sources: [App]
+    dependencies:
+      - package: Dottie
+        product: DottieKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Dottie
+        CODE_SIGN_IDENTITY: "-"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Dottie Drawing
+            CFBundleTypeRole: Editor
+            LSHandlerRank: Owner
+            LSItemContentTypes: [tech.phin.dottie]
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: tech.phin.dottie
+            UTTypeDescription: Dottie Drawing
+            UTTypeConformsTo: [public.json, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [dottie]
