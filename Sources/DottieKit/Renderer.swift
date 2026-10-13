@@ -27,7 +27,26 @@ public enum Renderer {
             return Rough.ellipse(in: r, rng: &rng, roughness: rough)
         case .text, .connector:
             return CGPath(rect: r, transform: nil)
+        case .freehand:
+            return freehandPath(for: e)
         }
+    }
+
+    /// Smooth curve through the stroke's points (quadratic midpoint smoothing).
+    static func freehandPath(for e: Element) -> CGPath {
+        let r = e.frame
+        let pts = (e.points ?? []).map { CGPoint(x: r.minX + $0.x * r.width, y: r.minY + $0.y * r.height) }
+        let path = CGMutablePath()
+        guard let first = pts.first else { return path }
+        path.move(to: first)
+        if pts.count == 1 { path.addLine(to: first); return path }
+        if pts.count == 2 { path.addLine(to: pts[1]); return path }
+        for i in 1..<pts.count - 1 {
+            let mid = CGPoint(x: (pts[i].x + pts[i + 1].x) / 2, y: (pts[i].y + pts[i + 1].y) / 2)
+            path.addQuadCurve(to: mid, control: pts[i])
+        }
+        path.addLine(to: pts[pts.count - 1])
+        return path
     }
 
     /// Stroked path for a connector, including arrowheads. Sketchy when roughness > 0.
@@ -104,7 +123,7 @@ public enum Renderer {
             drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
             return
         }
-        if e.style.fill.a > 0 {
+        if e.style.fill.a > 0, e.kind != .freehand {
             ctx.addPath(fillPath(for: e))
             ctx.setFillColor(e.style.fill.cgColor)
             ctx.fillPath()

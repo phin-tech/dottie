@@ -27,6 +27,130 @@ final class DottieKitTests: XCTestCase {
         XCTAssertEqual(doc.elements[0].style.stroke, .black) // original untouched
     }
 
+    private func twoBoxesAndArrow() -> (DottieDocument, a: UUID, b: UUID, c: UUID) {
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        let a = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 50, height: 40), layerID: l)
+        let b = Element(kind: .rectangle, frame: CGRect(x: 200, y: 100, width: 80, height: 40), layerID: l)
+        let c = Element(kind: .connector, frame: .zero, layerID: l,
+                        connector: ConnectorData(start: .bound(a.id), end: .bound(b.id)))
+        doc.elements = [a, b, c]
+        return (doc, a.id, b.id, c.id)
+    }
+
+    func testDuplicateRemapsConnectorBindingsAndOffsets() {
+        var (doc, a, b, c) = twoBoxesAndArrow()
+        let new = doc.duplicate([a, b, c], offset: CGPoint(x: 10, y: 20))
+        XCTAssertEqual(new.count, 3)
+        XCTAssertEqual(doc.elements.count, 6)
+        let copies = doc.elements.filter { new.contains($0.id) }
+        let copyConn = copies.first { $0.kind == .connector }!
+        let copyShapeIDs = Set(copies.filter { $0.kind != .connector }.map(\.id))
+        XCTAssertTrue(copyShapeIDs.contains(copyConn.connector!.start.elementID!))
+        XCTAssertTrue(copyShapeIDs.contains(copyConn.connector!.end.elementID!))
+        XCTAssertEqual(copies.first { $0.kind != .connector }!.x, 10)
+        XCTAssertFalse(new.contains(c))
+    }
+
+    func testCopyingOnlyAConnectorFreezesItsEnds() throws {
+        let (doc, _, _, c) = twoBoxesAndArrow()
+        let data = try XCTUnwrap(doc.clipboardData(for: [c]))
+        var target = DottieDocument()
+        let ids = target.paste(data, offset: .zero)
+        let conn = try XCTUnwrap(target.elements.first { ids.contains($0.id) }?.connector)
+        XCTAssertNil(conn.start.elementID)
+        XCTAssertNil(conn.end.elementID)
+    }
+
+    func testGroupSelectsTogetherAndSurvivesPasteAsNewGroup() {
+        var (doc, a, b, _) = twoBoxesAndArrow()
+        XCTAssertNotNil(doc.group([a, b]))
+        XCTAssertEqual(doc.expandingGroups([a]), [a, b])
+        let new = doc.duplicate([a, b])
+        let groups = Set(doc.elements.filter { new.contains($0.id) }.compactMap(\.groupID))
+        XCTAssertEqual(groups.count, 1)
+        XCTAssertNotEqual(groups.first, doc.elements.first { $0.id == a }?.groupID)
+        doc.ungroup([a])
+        XCTAssertEqual(doc.expandingGroups([a]), [a])
+    }
+
+    func testAlignAndDistribute() {
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        let ids = (0..<3).map { _ in UUID() }
+        doc.elements = [
+            Element(id: ids[0], kind: .rectangle, frame: CGRect(x: 0, y: 5, width: 10, height: 10), layerID: l),
+            Element(id: ids[1], kind: .rectangle, frame: CGRect(x: 20, y: 30, width: 10, height: 10), layerID: l),
+            Element(id: ids[2], kind: .rectangle, frame: CGRect(x: 100, y: 50, width: 10, height: 10), layerID: l),
+        ]
+        doc.distribute(Set(ids), along: .horizontal)
+        XCTAssertEqual(doc.elements.map(\.x), [0, 50, 100])
+        doc.align(Set(ids), to: .top)
+        XCTAssertEqual(doc.elements.map(\.y), [5, 5, 5])
+    }
+
+    func testReorderKeepsRelativeOrder() {
+        var (doc, a, b, c) = twoBoxesAndArrow()
+        doc.reorder([a], .toFront)
+        XCTAssertEqual(doc.elements.map(\.id), [b, c, a])
+        doc.reorder([a], .toBack)
+        XCTAssertEqual(doc.elements.map(\.id), [a, b, c])
+        doc.reorder([a], .forward)
+        XCTAssertEqual(doc.elements.map(\.id), [b, a, c])
+    }
+
+    func testOldFilesWithoutNewFieldsStillDecode() throws {
+        let json = """
+        {"version":1,"layers":[{"id":"00000000-0000-0000-0000-000000000001","name":"L","visible":true,"locked":false}],
+         "elements":[{"id":"00000000-0000-0000-0000-000000000002","kind":"rectangle","x":1,"y":2,"width":3,"height":4,
+         "seed":7,"layerID":"00000000-0000-0000-0000-000000000001",
+         "style":{"stroke":{"r":0.12,"g":0.12,"b":0.13,"a":1},"fill":{"r":0,"g":0,"b":0,"a":0},"strokeWidth":2,"roughness":1,"fontSize":18}}]}
+        """
+        let doc = try DottieDocument.decode(Data(json.utf8))
+        XCTAssertNil(doc.elements[0].groupID)
+        XCTAssertNil(doc.elements[0].points)
+    }
+
+    func testSnapMovesToAlignedEdgeWithinThreshold() {
+        let other = CGRect(x: 100, y: 0, width: 50, height: 50)
+        let r = Snap.move(CGRect(x: 103, y: 80, width: 50, height: 40), others: [other], threshold: 6)
+        XCTAssertEqual(r.dx, -3)               // left edges line up at x = 100
+        XCTAssertEqual(r.dy, 0)                // nothing near on y
+        XCTAssertTrue(r.guides.contains { $0.axis == .vertical && $0.position == 100 })
+        let far = Snap.move(CGRect(x: 300, y: 80, width: 50, height: 40), others: [other], threshold: 6)
+        XCTAssertEqual(far.dx, 0)
+    }
+
+    func testSnapFallsBackToGrid() {
+        let r = Snap.move(CGRect(x: 23, y: 37, width: 10, height: 10), others: [], threshold: 6, gridSize: 20)
+        XCTAssertEqual(r.dx, -3)
+        XCTAssertEqual(r.dy, 3)
+    }
+
+    func testSVGUsesRendererPathsAndExportsInkAsBlack() {
+        var doc = sampleDoc()
+        doc.elements[0].style.stroke = .inkOnDark
+        let svg = Exporter.svg(doc)
+        XCTAssertTrue(svg.hasPrefix("<svg"))
+        XCTAssertTrue(svg.contains("stroke=\"#1f1f21\""))
+        XCTAssertFalse(svg.contains("#ededf0"))
+        XCTAssertTrue(svg.contains(">Hello</tspan>"))
+        XCTAssertTrue(svg.contains("<path d=\"M"))
+        XCTAssertFalse(Exporter.svg(doc, background: nil).contains("<rect"))
+    }
+
+    func testFreehandRendersThroughItsPoints() {
+        var doc = DottieDocument()
+        let pts = [StrokePoint(x: 0, y: 0), StrokePoint(x: 0.5, y: 1), StrokePoint(x: 1, y: 0)]
+        doc.elements = [Element(kind: .freehand, frame: CGRect(x: 10, y: 10, width: 100, height: 50), layerID: doc.layers[0].id, points: pts)]
+        let box = Renderer.outline(for: doc.elements[0]).boundingBoxOfPath
+        XCTAssertEqual(box.minX, 10, accuracy: 0.5)
+        XCTAssertEqual(box.maxX, 110, accuracy: 0.5)
+        XCTAssertNotNil(Exporter.png(doc))
+        let round = try? DottieDocument.decode(doc.encoded())
+        XCTAssertEqual(round?.elements[0].points, pts)
+    }
+
     func testJSONRoundTrip() throws {
         let doc = sampleDoc()
         let back = try DottieDocument.decode(try doc.encoded())

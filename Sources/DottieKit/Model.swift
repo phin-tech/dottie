@@ -25,7 +25,15 @@ public struct Style: Codable, Equatable, Sendable {
 }
 
 public enum ElementKind: String, Codable, Sendable {
-    case rectangle, ellipse, diamond, text, connector
+    case rectangle, ellipse, diamond, text, connector, freehand
+}
+
+/// A point inside a freehand stroke, normalized to the element's frame (0...1 on each axis),
+/// so moving and resizing the element needs no special handling.
+public struct StrokePoint: Codable, Equatable, Sendable {
+    public var x: Double
+    public var y: Double
+    public init(x: Double, y: Double) { self.x = x; self.y = y }
 }
 
 public struct Layer: Codable, Equatable, Identifiable, Sendable {
@@ -49,10 +57,15 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var text: String?
     /// Only set for `.connector`. Endpoints are bindings, never stored geometry.
     public var connector: ConnectorData?
+    /// Elements sharing a `groupID` select and move together. Groups are flat (no nesting).
+    public var groupID: UUID?
+    /// Only set for `.freehand`.
+    public var points: [StrokePoint]?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,
-                connector: ConnectorData? = nil) {
+                connector: ConnectorData? = nil, groupID: UUID? = nil, points: [StrokePoint]? = nil) {
+        self.groupID = groupID; self.points = points
         self.id = id; self.kind = kind
         self.x = frame.origin.x; self.y = frame.origin.y
         self.width = frame.width; self.height = frame.height

@@ -3,9 +3,9 @@ import DottieKit
 
 struct ContentView: View {
     @ObservedObject var document: DrawingDocument
-    @Environment(\.undoManager) private var undoManager
+    @Environment(\.undoManager) var undoManager
     @State private var tool: Tool = .select
-    @State private var selection: Set<UUID> = []
+    @State var selection: Set<UUID> = []
     @State private var newStyle = Style()
     @State private var newRouting: Routing = .straight
     @AppStorage(Pref.roughness) private var prefRoughness = Pref.roughnessDefault
@@ -18,7 +18,7 @@ struct ContentView: View {
             .frame(minWidth: 400)
             .inspector(isPresented: $showInspector) {
                 Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, undoManager: undoManager)
-                    .inspectorColumnWidth(min: 200, ideal: 240, max: 320)
+                    .inspectorColumnWidth(min: 250, ideal: 270, max: 360)
             }
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -40,6 +40,7 @@ struct ContentView: View {
             }
         }
         .focusedSceneValue(\.tool, $tool)
+        .focusedSceneValue(\.editor, editorActions)
         .frame(minWidth: 700, minHeight: 480)
         .onChange(of: prefRoughness, initial: true) { _, v in newStyle.roughness = v }
         .onChange(of: prefStrokeWidth, initial: true) { _, v in newStyle.strokeWidth = v }
@@ -81,9 +82,9 @@ struct Inspector: View {
                     Text("Clean").tag(false)
                 }
                 .pickerStyle(.segmented)
-                Slider(value: binding(\.roughness, "Change Roughness"), in: 0...3) { Text("Sketchiness") }
+                Slider(value: binding(\.roughness, "Change Roughness"), in: 0...3) { Text("Roughness") }
                     .disabled(binding(\.roughness, "").wrappedValue == 0)
-                Slider(value: binding(\.strokeWidth, "Change Stroke Width"), in: 1...12) { Text("Stroke") }
+                Slider(value: binding(\.strokeWidth, "Change Stroke Width"), in: 1...12) { Text("Width") }
                 ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
                 ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
             }

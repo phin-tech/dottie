@@ -3,7 +3,7 @@ import SwiftUI
 import DottieKit
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text, connector
+    case select, rectangle, ellipse, diamond, text, connector, pencil
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -13,6 +13,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .diamond: "diamond"
         case .text: "textformat"
         case .connector: "arrow.up.right"
+        case .pencil: "pencil.tip"
         }
     }
     var label: String {
@@ -23,6 +24,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .diamond: "Diamond"
         case .text: "Text"
         case .connector: "Connector"
+        case .pencil: "Pencil"
         }
     }
     /// Single-key tool switch, Photoshop-style.
@@ -34,6 +36,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .diamond: "d"
         case .text: "t"
         case .connector: "c"
+        case .pencil: "p"
         }
     }
     var kind: ElementKind? {
@@ -44,6 +47,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .diamond: .diamond
         case .text: .text
         case .connector: nil
+        case .pencil: .freehand
         }
     }
 }
@@ -74,6 +78,7 @@ private enum Gesture {
     case connecting(id: UUID)
     case endpoint(id: UUID, isStart: Bool)
     case panning
+    case drawing(id: UUID)
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
@@ -100,6 +105,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var dragStart: CGPoint = .zero
     private var baseline: DottieDocument?
     private var marqueeRect: CGRect?
+    private var guides: [Snap.Guide] = []
+    private var strokePoints: [CGPoint] = []
+    private var pasteStep = 0
+    private var lastPasteChangeCount = -1
+    static let pasteboardType = NSPasteboard.PasteboardType("tech.phin.dottie.elements")
     private var hoverShapeID: UUID? { didSet { if oldValue != hoverShapeID { needsDisplay = true } } }
     private var editor: NSTextField?
     private var editingID: UUID?
@@ -160,6 +170,18 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 let r = CGRect(x: p.x - hs / 2, y: p.y - hs / 2, width: hs, height: hs)
                 ctx.fill(r); ctx.stroke(r)
             }
+        }
+        if !guides.isEmpty {
+            ctx.setStrokeColor(NSColor.systemPink.cgColor)
+            ctx.setLineWidth(1 / zoom)
+            for g in guides {
+                switch g.axis {
+                case .vertical: ctx.move(to: CGPoint(x: g.position, y: g.from)); ctx.addLine(to: CGPoint(x: g.position, y: g.to))
+                case .horizontal: ctx.move(to: CGPoint(x: g.from, y: g.position)); ctx.addLine(to: CGPoint(x: g.to, y: g.position))
+                }
+            }
+            ctx.strokePath()
+            ctx.setStrokeColor(accent.cgColor)
         }
         if let m = marqueeRect {
             ctx.setFillColor(accent.withAlphaComponent(0.08).cgColor)
@@ -247,19 +269,55 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     @objc func delete(_ sender: Any?) { deleteSelection() }
 
+    @objc func copy(_ sender: Any?) {
+        guard let data = model.clipboardData(for: selection) else { return }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setData(data, forType: Self.pasteboardType)
+        pasteStep = 0
+        lastPasteChangeCount = pb.changeCount
+    }
+
+    @objc func cut(_ sender: Any?) { copy(sender); deleteSelection(actionName: "Cut") }
+
+    @objc func paste(_ sender: Any?) {
+        let pb = NSPasteboard.general
+        guard let data = pb.data(forType: Self.pasteboardType) else { return }
+        // Repeated pastes of the same clipboard step diagonally instead of stacking.
+        pasteStep = pb.changeCount == lastPasteChangeCount ? pasteStep + 1 : 1
+        lastPasteChangeCount = pb.changeCount
+        let step = Double(pasteStep) * 16
+        var next = model
+        let added = next.paste(data, offset: CGPoint(x: step, y: step))
+        guard !added.isEmpty else { return }
+        selection = added
+        onCommit?(next, "Paste")
+    }
+
+    @objc func duplicate(_ sender: Any?) {
+        guard !selection.isEmpty else { return }
+        var next = model
+        let added = next.duplicate(selection)
+        selection = added
+        onCommit?(next, "Duplicate")
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
-        case #selector(delete(_:)): return !selection.isEmpty
+        case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicate(_:)):
+            return !selection.isEmpty
+        case #selector(paste(_:)):
+            return NSPasteboard.general.data(forType: Self.pasteboardType) != nil
         default: return true
         }
     }
 
-    private func deleteSelection() {
+    private func deleteSelection(actionName: String = "Delete") {
         guard !selection.isEmpty else { return }
         var next = model
         next.remove(selection)
         selection = []
-        onCommit?(next, "Delete")
+        onCommit?(next, actionName)
     }
 
     override func resetCursorRects() {
@@ -279,6 +337,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func keyUp(with event: NSEvent) {
         if event.keyCode == 49 { spaceDown = false } else { super.keyUp(with: event) }
+    }
+
+    // MARK: Snapping
+
+    private var snapToObjects: Bool { Pref.bool(Pref.snapToObjects, default: true) }
+    private var gridSize: Double? {
+        Pref.bool(Pref.snapToGrid, default: false) ? (UserDefaults.standard.object(forKey: Pref.gridSize) as? Double ?? Pref.gridSizeDefault) : nil
+    }
+
+    /// Grid-snaps a point unless ⌘ is held.
+    private func snapped(_ p: CGPoint, _ event: NSEvent) -> CGPoint {
+        guard let g = gridSize, !event.modifierFlags.contains(.command) else { return p }
+        return CGPoint(x: Snap.grid(p.x, size: g), y: Snap.grid(p.y, size: g))
     }
 
     // MARK: Connector helpers
@@ -316,7 +387,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             window?.invalidateCursorRects(for: self)
             return
         }
-        let p = point(event)
+        var p = point(event)
+        if tool.kind != nil, tool != .text, tool != .pencil { p = snapped(p, event) }
         dragStart = p
         baseline = model
         guard let layer = model.layers.first(where: { !$0.locked && $0.visible }) else { return }
@@ -351,6 +423,17 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             onPreview?(model)
         } else if tool == .select, let (id, isStart) = connectorEndpointHit(p) {
             gesture = .endpoint(id: id, isStart: isStart)
+        } else if tool == .pencil {
+            var st = style
+            st.fill = .clear
+            st.roughness = 0
+            let e = Element(kind: .freehand, frame: CGRect(x: p.x, y: p.y, width: 1, height: 1), style: st, layerID: layer.id,
+                            points: [StrokePoint(x: 0, y: 0)])
+            strokePoints = [p]
+            model.elements.append(e)
+            selection = [e.id]
+            gesture = .drawing(id: e.id)
+            onPreview?(model)
         } else if let kind = tool.kind {
             let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: style, layerID: layer.id)
             gesture = .creating(e)
@@ -360,10 +443,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         } else if let (id, h, frame) = handle(at: p) {
             gesture = .resizing(id: id, handle: h, original: frame)
         } else if let hit = model.element(at: p) {
+            let hitSet = model.expandingGroups([hit.id])
             if event.modifierFlags.contains(.shift) {
-                selection.formSymmetricDifference([hit.id])
+                selection = selection.isSuperset(of: hitSet) ? selection.subtracting(hitSet) : selection.union(hitSet)
             } else if !selection.contains(hit.id) {
-                selection = [hit.id]
+                selection = hitSet
             }
             gesture = .moving
         } else {
@@ -379,8 +463,23 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         guard let g = gesture, var next = baseline else { return }
-        let p = point(event)
-        let d = CGPoint(x: p.x - dragStart.x, y: p.y - dragStart.y)
+        let p = snapped(point(event), event)
+        var d = CGPoint(x: p.x - dragStart.x, y: p.y - dragStart.y)
+        if case .moving = g {
+            // Moving snaps the whole selection's bounds (objects first, then grid); ⌘ bypasses.
+            d = CGPoint(x: point(event).x - dragStart.x, y: point(event).y - dragStart.y)
+            guides = []
+            let layersOK = Set(next.layers.filter { $0.visible && !$0.locked }.map(\.id))
+            let moving = next.elements.filter { selection.contains($0.id) && $0.kind != .connector }.map(\.frame)
+                .reduce(CGRect.null) { $0.union($1) }
+            if !moving.isNull, !event.modifierFlags.contains(.command) {
+                let others = next.elements.filter { !selection.contains($0.id) && $0.kind != .connector && layersOK.contains($0.layerID) }.map(\.frame)
+                let r = Snap.move(moving.offsetBy(dx: d.x, dy: d.y), others: snapToObjects ? others : [],
+                                  threshold: 6 / zoom, gridSize: gridSize)
+                d.x += r.dx; d.y += r.dy
+                guides = r.guides
+            }
+        }
 
         switch g {
         case .creating(var e):
@@ -412,16 +511,35 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             hoverShapeID = shape(at: p, in: next)?.id
         case .resizing(let id, let h, let original):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
+                if let grid = gridSize, !event.modifierFlags.contains(.command) {
+                    // Snap only the edges this handle moves.
+                    if h.hx < 0 { d.x = Snap.grid(original.minX + d.x, size: grid) - original.minX }
+                    if h.hx > 0 { d.x = Snap.grid(original.maxX + d.x, size: grid) - original.maxX }
+                    if h.hy < 0 { d.y = Snap.grid(original.minY + d.y, size: grid) - original.minY }
+                    if h.hy > 0 { d.y = Snap.grid(original.maxY + d.y, size: grid) - original.maxY }
+                }
                 var f = h.resized(original, by: d)
                 f.size.width = max(f.width, 4); f.size.height = max(f.height, 4)
                 next.elements[i].frame = f
             }
         case .panning:
             return
+        case .drawing(let id):
+            let p = point(event) // freehand never grid-snaps
+            if let last = strokePoints.last, hypot(p.x - last.x, p.y - last.y) < 1 / zoom { return }
+            strokePoints.append(p)
+            let xs = strokePoints.map(\.x), ys = strokePoints.map(\.y)
+            let frame = CGRect(x: xs.min()!, y: ys.min()!, width: max(xs.max()! - xs.min()!, 1), height: max(ys.max()! - ys.min()!, 1))
+            if let i = model.elements.firstIndex(where: { $0.id == id }) {
+                var e = model.elements[i]
+                e.frame = frame
+                e.points = strokePoints.map { StrokePoint(x: ($0.x - frame.minX) / frame.width, y: ($0.y - frame.minY) / frame.height) }
+                next.elements.append(e)
+            }
         case .marquee:
             let r = CGRect(x: min(dragStart.x, p.x), y: min(dragStart.y, p.y), width: abs(d.x), height: abs(d.y))
             marqueeRect = r
-            selection = Set(next.elements.filter { r.intersects($0.frame) }.map(\.id))
+            selection = next.expandingGroups(Set(next.elements.filter { r.intersects($0.frame) }.map(\.id)))
             needsDisplay = true
             return
         }
@@ -431,7 +549,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func mouseUp(with event: NSEvent) {
         defer {
-            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; needsDisplay = true
+            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; guides = []; strokePoints = []; needsDisplay = true
             if spaceDown { window?.invalidateCursorRects(for: self) }
         }
         guard let base = baseline, let g = gesture else { return }
@@ -448,6 +566,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 model = base; selection = []; onPreview?(base); return
             }
             commit(base, "Add Connector")
+        case .drawing:
+            if strokePoints.count < 2 { model = base; selection = []; onPreview?(base); return }
+            commit(base, "Draw")
         case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")
         case .resizing where model != base: commit(base, "Resize")

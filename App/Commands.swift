@@ -15,6 +15,7 @@ extension FocusedValues {
 /// equivalent would swallow typing in the text editor); the menu lists them in the item titles.
 struct DottieCommands: Commands {
     @FocusedBinding(\.tool) private var tool
+    @FocusedValue(\.editor) private var editor
 
     private func send(_ action: Selector) { NSApp.sendAction(action, to: nil, from: nil) }
 
@@ -29,6 +30,52 @@ struct DottieCommands: Commands {
             Divider()
         }
         InspectorCommands()
+        CommandGroup(after: .pasteboard) {
+            Button("Duplicate") { send(#selector(CanvasNSView.duplicate(_:))) }
+                .keyboardShortcut("d")
+        }
+        CommandGroup(replacing: .importExport) {
+            Menu("Export As") {
+                ForEach(ExportFormat.allCases, id: \.self) { f in
+                    Button("\(f.rawValue)…") { editor?.export(f) }
+                }
+            }
+            .disabled(editor == nil)
+        }
+        CommandMenu("Arrange") {
+            let n = editor?.selectionCount ?? 0
+            Button("Group") { editor?.group() }
+                .keyboardShortcut("g", modifiers: [.command, .option])
+                .disabled(n < 2)
+            Button("Ungroup") { editor?.ungroup() }
+                .keyboardShortcut("g", modifiers: [.command, .option, .shift])
+                .disabled(n < 1)
+            Divider()
+            Button("Bring to Front") { editor?.reorder(.toFront) }
+                .keyboardShortcut("f", modifiers: [.command, .option])
+                .disabled(n < 1)
+            Button("Bring Forward") { editor?.reorder(.forward) }.disabled(n < 1)
+            Button("Send Backward") { editor?.reorder(.backward) }.disabled(n < 1)
+            Button("Send to Back") { editor?.reorder(.toBack) }
+                .keyboardShortcut("b", modifiers: [.command, .option])
+                .disabled(n < 1)
+            Divider()
+            Menu("Align") {
+                Button("Left") { editor?.align(.left) }
+                Button("Center Horizontally") { editor?.align(.centerX) }
+                Button("Right") { editor?.align(.right) }
+                Divider()
+                Button("Top") { editor?.align(.top) }
+                Button("Center Vertically") { editor?.align(.centerY) }
+                Button("Bottom") { editor?.align(.bottom) }
+            }
+            .disabled(n < 2)
+            Menu("Distribute") {
+                Button("Horizontally") { editor?.distribute(.horizontal) }
+                Button("Vertically") { editor?.distribute(.vertical) }
+            }
+            .disabled(n < 3)
+        }
         CommandMenu("Tools") {
             Picker("Tool", selection: Binding(get: { tool ?? .select }, set: { tool = $0 })) {
                 ForEach(Tool.allCases) { t in

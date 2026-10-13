@@ -6,10 +6,20 @@ enum Pref {
     static let roughness = "defaultRoughness"
     static let strokeWidth = "defaultStrokeWidth"
     static let routing = "defaultRouting"
+    static let snapToObjects = "snapToObjects"
+    static let snapToGrid = "snapToGrid"
+    static let gridSize = "gridSize"
+    static let singleKeyShortcuts = "singleKeyToolShortcuts"
 
     static let roughnessDefault = 1.0
     static let strokeWidthDefault = 2.0
     static let routingDefault = Routing.straight.rawValue
+    static let gridSizeDefault = 20.0
+
+    /// Read outside SwiftUI (the canvas is AppKit). Unset keys fall back to these defaults.
+    static func bool(_ key: String, default value: Bool) -> Bool {
+        UserDefaults.standard.object(forKey: key) as? Bool ?? value
+    }
 }
 
 /// Opened with ⌘, from the app menu (the `Settings` scene wires the menu item and shortcut).

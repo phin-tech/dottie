@@ -148,6 +148,15 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Override the look for this render only"),
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
              ], required: ["path"])),
+        Tool(name: "export_svg",
+             description: "Export the diagram as SVG using the same sketchy paths as the app. Returns the SVG text, "
+                + "or writes it to out_path (preferred for large diagrams).",
+             inputSchema: schema([
+                "path": pathProp,
+                "sketchy": prop("boolean", "Override the look for this export only"),
+                "transparent": prop("boolean", "Omit the white page background"),
+                "out_path": prop("string", "Optional absolute path ending in .svg to write the file to"),
+             ], required: ["path"])),
     ]
 
     func call(name: String, arguments: [String: Value]) -> CallTool.Result {
@@ -293,6 +302,17 @@ actor DottieTools {
                 note += ", saved to \(out.path)"
             }
             return .init(content: [.image(data: png.base64EncodedString(), mimeType: "image/png", metadata: nil), .text(note)])
+
+        case "export_svg":
+            var doc = try load(try fileURL(a))
+            if let r = a.roughness { doc = doc.withRoughness(r) }
+            guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
+            let svg = Exporter.svg(doc, background: a.bool("transparent") == true ? nil : RGBA(r: 1, g: 1, b: 1))
+            guard a.string("out_path") != nil else { return text(svg) }
+            let out = try fileURL(a, key: "out_path", ext: "svg")
+            try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try svg.write(to: out, atomically: true, encoding: .utf8)
+            return text("Exported \(doc.elements.count) elements to \(out.path)")
 
         default:
             throw ToolFailure(message: "Unknown tool '\(name)'")
