@@ -147,4 +147,53 @@ extension DottieDocument {
             }
         }
     }
+
+    // MARK: Layers
+
+    /// Elements back to front: lower layers first, array order within a layer. This is what is drawn
+    /// and what a click hits, so reordering layers reorders the picture.
+    public var orderedElements: [Element] {
+        let rank = Dictionary(uniqueKeysWithValues: layers.enumerated().map { ($1.id, $0) })
+        return elements.enumerated()
+            .sorted { (rank[$0.element.layerID] ?? 0, $0.offset) < (rank[$1.element.layerID] ?? 0, $1.offset) }
+            .map(\.element)
+    }
+
+    /// Adds a layer above `above` (or on top). Returns its id.
+    @discardableResult
+    public mutating func addLayer(name: String? = nil, above: UUID? = nil) -> UUID {
+        let layer = Layer(name: name ?? "Layer \(layers.count + 1)")
+        let at = above.flatMap { id in layers.firstIndex { $0.id == id } }.map { $0 + 1 } ?? layers.count
+        layers.insert(layer, at: at)
+        return layer.id
+    }
+
+    /// Removes a layer; its elements move to the neighbouring layer so nothing is lost.
+    /// A document always keeps at least one layer.
+    @discardableResult
+    public mutating func removeLayer(_ id: UUID) -> Bool {
+        guard layers.count > 1, let i = layers.firstIndex(where: { $0.id == id }) else { return false }
+        let heir = layers[i > 0 ? i - 1 : i + 1].id
+        for k in elements.indices where elements[k].layerID == id { elements[k].layerID = heir }
+        layers.remove(at: i)
+        return true
+    }
+
+    /// Moves a layer one step toward the front (`+1`) or back (`-1`).
+    public mutating func moveLayer(_ id: UUID, by step: Int) {
+        guard let i = layers.firstIndex(where: { $0.id == id }) else { return }
+        let j = min(max(i + step, 0), layers.count - 1)
+        guard j != i else { return }
+        layers.swapAt(i, j)
+    }
+
+    public mutating func editLayer(_ id: UUID, _ change: (inout Layer) -> Void) {
+        guard let i = layers.firstIndex(where: { $0.id == id }) else { return }
+        change(&layers[i])
+    }
+
+    public mutating func move(_ ids: Set<UUID>, toLayer layer: UUID) {
+        guard layers.contains(where: { $0.id == layer }) else { return }
+        for k in elements.indices where ids.contains(elements[k].id) { elements[k].layerID = layer }
+    }
 }

@@ -13,12 +13,13 @@ struct ContentView: View {
     @AppStorage(Pref.newStyle) private var storedStyle = ""
     @AppStorage(Pref.routing) private var prefRouting = Pref.routingDefault
     @State private var showInspector = true
+    @State private var activeLayer: UUID?
 
     var body: some View {
-        CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting)
+        CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting, activeLayerID: activeLayer)
             .frame(minWidth: 400)
             .inspector(isPresented: $showInspector) {
-                Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, undoManager: undoManager)
+                Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager)
                     .inspectorColumnWidth(min: 250, ideal: 270, max: 360)
             }
         .toolbar {
@@ -68,6 +69,7 @@ struct Inspector: View {
     var tool: Tool
     @Binding var newStyle: Style
     @Binding var newRouting: Routing
+    @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
     @Environment(\.colorScheme) private var colorScheme
 
@@ -90,6 +92,7 @@ struct Inspector: View {
 
     var body: some View {
         Form {
+            LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager)
             Section("Style") {
                 Picker("Look", selection: lookBinding) {
                     Text("Sketchy").tag(true)
@@ -177,5 +180,84 @@ struct Inspector: View {
                 let ns = NSColor(color).usingColorSpace(.sRGB) ?? .black
                 raw.wrappedValue = RGBA(r: ns.redComponent, g: ns.greenComponent, b: ns.blueComponent, a: ns.alphaComponent)
             })
+    }
+}
+
+/// Add / hide / lock / rename / reorder layers. The highlighted layer receives new shapes.
+struct LayersSection: View {
+    @ObservedObject var document: DrawingDocument
+    var selection: Set<UUID>
+    @Binding var activeLayer: UUID?
+    var undoManager: UndoManager?
+
+    private var layers: [Layer] { document.model.layers }
+    private var current: UUID { activeLayer.flatMap { id in layers.first { $0.id == id }?.id } ?? layers.last?.id ?? UUID() }
+
+    private func edit(_ name: String, _ change: (inout DottieDocument) -> Void) {
+        var next = document.model
+        change(&next)
+        document.commit(next, actionName: name, undoManager: undoManager)
+    }
+
+    var body: some View {
+        Section("Layers") {
+            // Front-most layer first, like every layers panel.
+            ForEach(layers.reversed()) { layer in
+                LayerRow(layer: layer, isActive: layer.id == current,
+                         count: document.model.elements.filter { $0.layerID == layer.id }.count,
+                         select: { activeLayer = layer.id },
+                         rename: { n in edit("Rename Layer") { $0.editLayer(layer.id) { $0.name = n } } },
+                         toggleVisible: { edit("Toggle Layer Visibility") { $0.editLayer(layer.id) { $0.visible.toggle() } } },
+                         toggleLocked: { edit("Toggle Layer Lock") { $0.editLayer(layer.id) { $0.locked.toggle() } } })
+            }
+            HStack {
+                Button { edit("Add Layer") { activeLayer = $0.addLayer(above: current) } } label: { Image(systemName: "plus") }
+                    .help("Add layer")
+                Button { edit("Delete Layer") { if $0.removeLayer(current) { activeLayer = nil } } } label: { Image(systemName: "minus") }
+                    .help("Delete layer (its shapes move to the layer below)")
+                    .disabled(layers.count < 2)
+                Button { edit("Move Layer Up") { $0.moveLayer(current, by: 1) } } label: { Image(systemName: "arrow.up") }
+                    .help("Bring layer forward")
+                Button { edit("Move Layer Down") { $0.moveLayer(current, by: -1) } } label: { Image(systemName: "arrow.down") }
+                    .help("Send layer backward")
+                Spacer()
+                Button("Move selection here") { edit("Move to Layer") { $0.move(selection, toLayer: current) } }
+                    .disabled(selection.isEmpty)
+            }
+            .buttonStyle(.borderless)
+        }
+    }
+}
+
+private struct LayerRow: View {
+    var layer: Layer
+    var isActive: Bool
+    var count: Int
+    var select: () -> Void
+    var rename: (String) -> Void
+    var toggleVisible: () -> Void
+    var toggleLocked: () -> Void
+    @State private var name = ""
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Button(action: toggleVisible) { Image(systemName: layer.visible ? "eye" : "eye.slash") }
+                .help(layer.visible ? "Hide layer" : "Show layer")
+            Button(action: toggleLocked) { Image(systemName: layer.locked ? "lock.fill" : "lock.open") }
+                .help(layer.locked ? "Unlock layer" : "Lock layer")
+            TextField("Layer", text: $name)
+                .textFieldStyle(.plain)
+                .onSubmit { if name != layer.name, !name.isEmpty { rename(name) } else { name = layer.name } }
+            Text("\(count)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
+        }
+        .buttonStyle(.borderless)
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(isActive ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 5))
+        .contentShape(Rectangle())
+        .onTapGesture(perform: select)
+        .onAppear { name = layer.name }
+        .onChange(of: layer.name) { _, n in name = n }
+        .opacity(layer.visible ? 1 : 0.55)
     }
 }

@@ -505,3 +505,34 @@ final class PhaseOneTests: XCTestCase {
         XCTAssertEqual(round.elements[i].connector?.startHead, .dot)
     }
 }
+
+final class LayerTests: XCTestCase {
+    func testLayerOrderIsZOrderAndDeleteKeepsShapes() throws {
+        var doc = DottieDocument()
+        let bottom = doc.layers[0].id
+        let top = doc.addLayer(name: "Top")
+        func box(_ layer: UUID, x: Double) -> Element {
+            Element(kind: .rectangle, frame: CGRect(x: x, y: 0, width: 50, height: 50), layerID: layer)
+        }
+        // Array order says the top-layer box is first, but its layer is in front.
+        let a = box(top, x: 0), b = box(bottom, x: 0)
+        doc.elements = [a, b]
+        XCTAssertEqual(doc.orderedElements.map(\.id), [b.id, a.id])
+        XCTAssertEqual(doc.element(at: CGPoint(x: 25, y: 25))?.id, a.id)
+
+        doc.moveLayer(top, by: -1)
+        XCTAssertEqual(doc.orderedElements.map(\.id), [a.id, b.id])
+
+        doc.editLayer(bottom) { $0.locked = true }
+        XCTAssertEqual(doc.element(at: CGPoint(x: 25, y: 25))?.id, a.id) // locked layers are not hit
+
+        XCTAssertTrue(doc.removeLayer(top))
+        XCTAssertEqual(doc.layers.count, 1)
+        XCTAssertTrue(doc.elements.allSatisfy { $0.layerID == bottom })
+        XCTAssertFalse(doc.removeLayer(bottom)) // never the last layer
+
+        let other = doc.addLayer()
+        doc.move([a.id], toLayer: other)
+        XCTAssertEqual(doc.elements.first { $0.id == a.id }?.layerID, other)
+    }
+}

@@ -89,6 +89,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
     var style = Style()
     var routing: Routing = .straight
+    /// New elements go here when it is visible and unlocked; otherwise the first layer that is.
+    var activeLayerID: UUID?
 
     var onPreview: ((DottieDocument) -> Void)?
     var onCommit: ((DottieDocument, String) -> Void)?
@@ -361,7 +363,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// Topmost non-connector shape under `p`.
     private func shape(at p: CGPoint, in doc: DottieDocument) -> Element? {
-        doc.elements.last { e in
+        doc.orderedElements.last { e in
             e.kind != .connector && e.frame.insetBy(dx: -6, dy: -6).contains(p)
                 && doc.layers.first { $0.id == e.layerID }.map { $0.visible && !$0.locked } == true
         }
@@ -396,7 +398,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if tool.kind != nil, tool != .text, tool != .pencil { p = snapped(p, event) }
         dragStart = p
         baseline = model
-        guard let layer = model.layers.first(where: { !$0.locked && $0.visible }) else { return }
+        let usable = model.layers.filter { !$0.locked && $0.visible }
+        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return }
 
         if event.clickCount == 2, tool == .select, let hit = model.element(at: p) {
             selection = [hit.id]
@@ -681,6 +684,7 @@ struct CanvasView: NSViewRepresentable {
     @Binding var selection: Set<UUID>
     var style: Style
     var routing: Routing
+    var activeLayerID: UUID?
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
@@ -697,6 +701,7 @@ struct CanvasView: NSViewRepresentable {
         v.tool = tool
         v.style = style
         v.routing = routing
+        v.activeLayerID = activeLayerID
         if v.selection != selection { v.selection = selection }
     }
 }

@@ -16,7 +16,7 @@ extension Exporter {
         if let background {
             out += "<rect x=\"\(num(b.minX))\" y=\"\(num(b.minY))\" width=\"\(num(b.width))\" height=\"\(num(b.height))\" fill=\"\(color(background))\"/>\n"
         }
-        for e in d.elements where visible.contains(e.layerID) {
+        for e in d.orderedElements where visible.contains(e.layerID) {
             out += svgElement(e, in: d, labelBackground: background)
         }
         return out + "</svg>\n"

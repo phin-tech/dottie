@@ -115,7 +115,7 @@ public struct DottieDocument: Codable, Equatable, Sendable {
     }
 
     public func element(at point: CGPoint) -> Element? {
-        elements.last { e in
+        orderedElements.last { e in
             guard let layer = layers.first(where: { $0.id == e.layerID }), layer.visible, !layer.locked else { return false }
             if e.kind == .connector { return Connector.distance(from: point, to: e, in: self) <= 6 }
             return e.frame.insetBy(dx: -4, dy: -4).contains(point)

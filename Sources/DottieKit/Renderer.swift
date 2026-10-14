@@ -234,7 +234,7 @@ public enum Renderer {
     /// `background` is painted behind connector labels so the line doesn't strike through the text.
     public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
-        for e in doc.elements where visible.contains(e.layerID) {
+        for e in doc.orderedElements where visible.contains(e.layerID) {
             draw(e, in: ctx, document: doc, background: background)
         }
     }
