@@ -102,6 +102,15 @@ final class PerformanceTests: XCTestCase {
         let (_, hit) = time("indexed click x100") {
             for i in 0..<100 { _ = spatial.element(at: CGPoint(x: Double(i) * 37, y: Double(i) * 23), in: doc) }
         }
+        // An edit while dragging: three shapes moved. Fold it in vs rebuilding from scratch.
+        var dragged = doc
+        let movable = dragged.elements.indices.filter { dragged.elements[$0].kind == .rectangle }.prefix(3)
+        for i in movable { dragged.elements[i].x += 25; dragged.elements[i].y += 10 }
+        var live = spatial
+        let (ok, updMs) = time("index update after a 3-shape drag") { live.update(to: dragged) }
+        let (_, rebuildMs) = time("index rebuild (same edit)") { SpatialIndex(dragged) }
+        XCTAssertTrue(ok)
+        XCTAssertLessThan(updMs, rebuildMs)
         print("PERF cache: \(Renderer.pathCacheStats)")
         XCTAssertLessThan(warm, cold)
         XCTAssertLessThan(hit / 100, 20)

@@ -92,14 +92,21 @@ private enum Gesture {
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
 final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var model = DottieDocument() {
-        didSet { needsDisplay = true; spatialCache = nil }
+        didSet { needsDisplay = true; spatialStale = true }
     }
-    /// Built lazily for the current `model`; panning and zooming reuse it, any edit drops it.
+    /// Built lazily for the current `model`. Panning and zooming reuse it; an edit marks it stale and
+    /// the next use folds the changed elements in (or rebuilds when the structure changed).
     private var spatialCache: SpatialIndex?
+    private var spatialStale = true
     private var spatial: SpatialIndex {
-        if let s = spatialCache { return s }
+        if var s = spatialCache {
+            if !spatialStale { return s }
+            spatialCache = nil // drop our reference so the update mutates in place instead of copying
+            if s.update(to: model) { spatialCache = s; spatialStale = false; return s }
+        }
         let s = SpatialIndex(model)
         spatialCache = s
+        spatialStale = false
         return s
     }
     var tool: Tool = .select

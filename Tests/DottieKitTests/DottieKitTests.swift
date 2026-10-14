@@ -829,3 +829,76 @@ final class CullingTests: XCTestCase {
         XCTAssertTrue(Data(bytes: ctx.data!, count: ctx.bytesPerRow * ctx.height).contains { $0 != 0 })
     }
 }
+
+final class IncrementalIndexTests: XCTestCase {
+    /// An updated index must answer exactly like one built from scratch.
+    private func assertEquivalent(_ updated: SpatialIndex, _ doc: DottieDocument, file: StaticString = #filePath, line: UInt = #line) {
+        let fresh = SpatialIndex(doc)
+        XCTAssertEqual(updated.ordered, fresh.ordered, file: file, line: line)
+        for rect in [CGRect(x: 0, y: 0, width: 300, height: 200), CGRect(x: 500, y: 100, width: 400, height: 400),
+                     CGRect(x: -100, y: -100, width: 5000, height: 5000), CGRect(x: 1200, y: 800, width: 40, height: 40)] {
+            XCTAssertEqual(updated.candidates(in: rect), fresh.candidates(in: rect), "rect \(rect)", file: file, line: line)
+        }
+        for p in stride(from: 0.0, to: 1500.0, by: 97) {
+            let pt = CGPoint(x: p, y: p * 0.6)
+            XCTAssertEqual(updated.element(at: pt, in: doc)?.id, fresh.element(at: pt, in: doc)?.id, file: file, line: line)
+        }
+    }
+
+    func testEditsAreFoldedInAndMatchARebuild() throws {
+        var doc = PerformanceTests.bigDocument(shapes: 300, strokes: 4)
+        var index = SpatialIndex(doc)
+        let shapes = doc.elements.indices.filter { doc.elements[$0].kind != .connector && doc.elements[$0].kind != .freehand }
+        var rng = SeededRNG(seed: 11)
+
+        for step in 0..<25 {
+            // A drag: move a few shapes (their bound connectors must follow).
+            for _ in 0..<3 {
+                let i = shapes[Int(rng.unit() * Double(shapes.count))]
+                doc.elements[i].x += rng.signed() * 400
+                doc.elements[i].y += rng.signed() * 300
+            }
+            if step % 4 == 0 { doc.elements[shapes[0]].style.fillStyle = .crossHatch }   // look only
+            if step % 5 == 0 { doc.elements[shapes[1]].rotation = rng.signed() * 2 }     // rotation
+            if step % 6 == 0 { // resize into oversize territory and back
+                doc.elements[shapes[2]].width = step % 12 == 0 ? 9000 : 120
+            }
+            XCTAssertTrue(index.update(to: doc), "step \(step) should be incremental")
+            assertEquivalent(index, doc)
+        }
+        // Rebinding a connector to a different shape is also a plain edit.
+        let ci = try XCTUnwrap(doc.elements.firstIndex { $0.kind == .connector })
+        let target = doc.elements[shapes[7]].id
+        doc.elements[ci].connector?.end = .bound(target)
+        XCTAssertTrue(index.update(to: doc))
+        assertEquivalent(index, doc)
+        doc.elements[shapes[7]].x += 700
+        XCTAssertTrue(index.update(to: doc))
+        assertEquivalent(index, doc)
+    }
+
+    func testStructuralChangesAskForARebuildAndLeaveTheIndexAlone() {
+        var doc = PerformanceTests.bigDocument(shapes: 60, strokes: 0)
+        var index = SpatialIndex(doc)
+        let before = index.ordered
+
+        var added = doc; added.elements.append(Element(kind: .rectangle, frame: .zero, layerID: doc.layers[0].id))
+        XCTAssertFalse(index.update(to: added))
+
+        var removed = doc; removed.elements.removeLast()
+        XCTAssertFalse(index.update(to: removed))
+
+        var reordered = doc; reordered.reorder([doc.elements[0].id], .toFront)
+        XCTAssertFalse(index.update(to: reordered))
+
+        var relayered = doc; relayered.moveLayer(doc.layers[0].id, by: 1)
+        XCTAssertFalse(index.update(to: relayered))
+
+        var moved = doc; moved.move([doc.elements[3].id], toLayer: doc.layers[1].id)
+        XCTAssertFalse(index.update(to: moved))
+
+        XCTAssertEqual(index.ordered, before) // untouched by the refusals
+        doc.elements[1].x += 5
+        XCTAssertTrue(index.update(to: doc))
+    }
+}
