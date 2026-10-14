@@ -333,4 +333,19 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertLessThan(c.redComponent, 0.3)            // dark blue, not the system's white or black
         XCTAssertGreaterThan(c.blueComponent, c.redComponent + 0.15)
     }
+
+    func testLockedGuidesStaySnappableButCannotBeDraggedOrCreated() {
+        view.showRulers = true
+        var doc = view.model
+        doc.guidesX = [500]; doc.guidesLocked = true
+        view.model = doc
+        drag(CGPoint(x: 500, y: 300), CGPoint(x: 600, y: 300))          // would have moved the guide
+        XCTAssertEqual(view.model.guidesX, [500])
+        drag(CGPoint(x: 10, y: 300), CGPoint(x: 250, y: 300))           // would have pulled a new one
+        XCTAssertEqual(view.model.guidesX, [500])
+        XCTAssertTrue(commits.isEmpty)
+        let e = add(.rectangle, CGRect(x: 300, y: 100, width: 100, height: 60))
+        drag(CGPoint(x: 350, y: 130), CGPoint(x: 447, y: 130))          // still snaps: right edge to 500
+        XCTAssertEqual(element(e.id).frame.maxX, 500, accuracy: 0.001)
+    }
 }

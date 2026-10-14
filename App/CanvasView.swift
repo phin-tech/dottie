@@ -396,6 +396,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// The guide under a model-space point (within a few screen pixels), if any.
     private func guideHit(_ p: CGPoint) -> (vertical: Bool, index: Int)? {
+        guard model.guidesLocked != true else { return nil }
         let tol = 4 / zoom
         if let i = (model.guidesX ?? []).firstIndex(where: { abs($0 - p.x) <= tol }) { return (true, i) }
         if let i = (model.guidesY ?? []).firstIndex(where: { abs($0 - p.y) <= tol }) { return (false, i) }
@@ -811,7 +812,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if showRulers {
             let raw = convert(event.locationInWindow, from: nil)
             let inTop = raw.y < rulerSize, inLeft = raw.x < rulerSize
-            if inTop != inLeft { // a drag from a ruler pulls out a guide (the corner does nothing)
+            if inTop != inLeft, model.guidesLocked != true { // a drag from a ruler pulls out a guide (the corner does nothing)
                 baseline = model
                 var next = model
                 let q = point(event)

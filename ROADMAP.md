@@ -29,10 +29,12 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Rulers (⇧⌘R) with guides you drag out of them: persisted in the file, snapped to by moves and resizes
 - [x] Layers panel unfolds to elements: drag to restack, or onto a layer to move
 
+- [x] Library viewer: `.dottielib` opens in its own window (Finder double-click or Library ▸ Open in Viewer); copy, export PNG/SVG, install
+- [x] Guides by number (type, add, remove) and lock; stencil items rename, tag, duplicate, reorder; library rename
+
 ## Next
 - Custom themes and a color palette per theme
-- Guides: lock, numeric entry, and a cursor-position marker on the rulers
-- Stencil libraries: rename items, reorder, tags editor, share via file association
+- Cursor-position marker on the rulers
 - Visio (`.vsdx`) import
 
 ## Agents (MCP)

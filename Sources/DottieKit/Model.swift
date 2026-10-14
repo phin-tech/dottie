@@ -177,6 +177,8 @@ public struct DottieDocument: Codable, Equatable, Sendable {
     /// Ruler guides: x positions of vertical guides and y positions of horizontal ones.
     public var guidesX: [Double]?
     public var guidesY: [Double]?
+    /// Locked guides still snap, but cannot be dragged or created from the rulers.
+    public var guidesLocked: Bool?
 
     public init(layers: [Layer]? = nil, elements: [Element] = []) {
         self.layers = layers ?? [Layer(name: "Layer 1")]

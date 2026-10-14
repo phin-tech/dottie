@@ -32,7 +32,7 @@ built-in and user stencil libraries).
 The Canvas section of the inspector sets a per-drawing theme (page color and ink; exports match) and shows
 rulers (⇧⌘R). Drag out of a ruler to pull a guide: moves and resizes snap to it, and dropping it back on the
 ruler removes it. The Layers section unfolds each layer to its elements; drag one onto another to restack,
-or onto a layer to move it there.
+or onto a layer to move it there. Guides can be typed in exactly, added at a position, and locked.
 
 ### Stencils
 
@@ -41,7 +41,8 @@ shapes) plus any `.dottielib` in `~/Library/Application Support/Dottie/Libraries
 it. **+ ▸ New Library from SVGs…** turns SVG files or folders into a library; **Add Selection to Library…** saves
 what you have selected. Items are stored at original fidelity and restyled to the drawing's look when placed
 (**Keep original colors** places them as drawn). Drop `.svg` files straight onto the canvas, or use
-File ▸ Import SVG….
+File ▸ Import SVG…. Right-click an item in one of your libraries to rename, tag, duplicate or reorder it.
+Double-click a `.dottielib` in Finder to browse it in the library viewer, copy or export items, or install it.
 
 `export_png` also returns each element's id, kind, text and pixel box in the image. Connectors take a `label`;
 shapes and connectors take `fill_style` (solid, hachure, crossHatch), `dash`, `stroke_width`, `bowing`,

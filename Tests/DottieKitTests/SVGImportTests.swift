@@ -418,3 +418,38 @@ final class LayerDragTests: XCTestCase {
         XCTAssertEqual(doc.elements.firstIndex { $0.id == id[1] }, 2) // went to the top of its layer; order preserved otherwise
     }
 }
+
+final class StencilEditingTests: XCTestCase {
+    func lib() -> StencilLibrary {
+        let e = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), layerID: UUID())
+        return StencilLibrary(name: "L", items: ["a", "b", "c"].map {
+            StencilItem(name: $0, width: 10, height: 10, elements: [e], imported: false)
+        })
+    }
+
+    func testRenameTagsMoveDuplicate() {
+        var l = lib()
+        let a = l.items[0].id, c = l.items[2].id
+        l.renameItem(a, to: "  Alpha ")
+        l.renameItem(a, to: "   ")                       // blank is ignored
+        XCTAssertEqual(l.items[0].name, "Alpha")
+        l.setTags(a, [" db ", "DB", "", "cloud"])
+        XCTAssertEqual(l.items[0].tags, ["db", "cloud"])
+        l.moveItem(c, to: 0)
+        XCTAssertEqual(l.items.map(\.name), ["c", "Alpha", "b"])
+        l.moveItem(c, to: .max)
+        XCTAssertEqual(l.items.map(\.name), ["Alpha", "b", "c"])
+        let copy = l.duplicateItem(a)
+        XCTAssertEqual(l.items.map(\.name), ["Alpha", "Alpha copy", "b", "c"])
+        XCTAssertNotEqual(copy, a)
+        XCTAssertNil(l.duplicateItem(UUID()))
+    }
+
+    func testGuideLockRoundTrips() throws {
+        var doc = DottieDocument()
+        doc.guidesLocked = true
+        XCTAssertEqual(try DottieDocument.decode(doc.encoded()).guidesLocked, true)
+        doc.guidesLocked = nil
+        XCTAssertFalse(String(decoding: try doc.encoded(), as: UTF8.self).contains("guidesLocked"))
+    }
+}

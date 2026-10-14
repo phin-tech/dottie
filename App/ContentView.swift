@@ -136,13 +136,7 @@ struct Inspector: View {
                     ForEach(Theme.all) { t in Text(t.name).tag(t.id) }
                 }
                 Toggle("Rulers and guides", isOn: $showRulers)
-                if document.model.guidesX != nil || document.model.guidesY != nil {
-                    Button("Clear Guides") {
-                        var next = document.model
-                        next.guidesX = nil; next.guidesY = nil
-                        document.commit(next, actionName: "Clear Guides", undoManager: undoManager)
-                    }
-                }
+                if showRulers { GuidesEditor(document: document, undoManager: undoManager) }
             }
             Section("Style") {
                 Picker("Look", selection: lookBinding) {
@@ -231,6 +225,55 @@ struct Inspector: View {
                 let ns = NSColor(color).usingColorSpace(.sRGB) ?? .black
                 raw.wrappedValue = RGBA(r: ns.redComponent, g: ns.greenComponent, b: ns.blueComponent, a: ns.alphaComponent)
             })
+    }
+}
+
+/// Guides by number: type a position, add one at an exact place, delete, or lock them all.
+struct GuidesEditor: View {
+    @ObservedObject var document: DrawingDocument
+    var undoManager: UndoManager?
+    @State private var newValue = 0.0
+
+    private func edit(_ name: String, _ change: (inout DottieDocument) -> Void) {
+        var next = document.model
+        change(&next)
+        if next.guidesX?.isEmpty == true { next.guidesX = nil }
+        if next.guidesY?.isEmpty == true { next.guidesY = nil }
+        document.commit(next, actionName: name, undoManager: undoManager)
+    }
+
+    private func row(_ title: String, vertical: Bool, index: Int, value: Double) -> some View {
+        HStack {
+            Text(title).foregroundStyle(.secondary).frame(width: 20, alignment: .leading)
+            TextField("", value: Binding(get: { value }, set: { v in
+                edit("Move Guide") { vertical ? ($0.guidesX?[index] = v) : ($0.guidesY?[index] = v) }
+            }), format: .number.precision(.fractionLength(0...2)))
+            .textFieldStyle(.roundedBorder)
+            .disabled(document.model.guidesLocked == true)
+            Button { edit("Remove Guide") { vertical ? ($0.guidesX?.remove(at: index)) : ($0.guidesY?.remove(at: index)) } } label: {
+                Image(systemName: "xmark.circle")
+            }
+            .buttonStyle(.borderless)
+            .help("Remove guide")
+        }
+    }
+
+    var body: some View {
+        let xs = document.model.guidesX ?? [], ys = document.model.guidesY ?? []
+        Toggle("Lock guides", isOn: Binding(get: { document.model.guidesLocked == true },
+                                            set: { on in edit(on ? "Lock Guides" : "Unlock Guides") { $0.guidesLocked = on ? true : nil } }))
+        ForEach(Array(xs.enumerated()), id: \.offset) { i, v in row("X", vertical: true, index: i, value: v) }
+        ForEach(Array(ys.enumerated()), id: \.offset) { i, v in row("Y", vertical: false, index: i, value: v) }
+        HStack {
+            TextField("Position", value: $newValue, format: .number).textFieldStyle(.roundedBorder)
+            Button("X") { edit("Add Guide") { $0.guidesX = ($0.guidesX ?? []) + [newValue] } }.help("Add a vertical guide at this x")
+            Button("Y") { edit("Add Guide") { $0.guidesY = ($0.guidesY ?? []) + [newValue] } }.help("Add a horizontal guide at this y")
+        }
+        .disabled(document.model.guidesLocked == true)
+        if !xs.isEmpty || !ys.isEmpty {
+            Button("Clear Guides") { edit("Clear Guides") { $0.guidesX = nil; $0.guidesY = nil } }
+                .disabled(document.model.guidesLocked == true)
+        }
     }
 }
 

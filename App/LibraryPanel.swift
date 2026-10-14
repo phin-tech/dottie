@@ -35,6 +35,12 @@ struct LibraryPanel: View {
                 }
                 .labelsHidden()
                 Menu {
+                    Button("Rename Library…") {
+                        if let e = entry, !e.isBuiltIn, let n = prompt("Rename library", value: e.library.name) {
+                            change(e.id) { $0.name = n }
+                        }
+                    }
+                    .disabled(entry?.isBuiltIn != false)
                     Button("Add Selection to Library…", action: addSelection)
                         .disabled(selection.isEmpty || entry?.isBuiltIn != false)
                     Divider()
@@ -71,6 +77,20 @@ struct LibraryPanel: View {
                             .contextMenu {
                                 Button("Place on Canvas") { place(item, keepColors) }
                                 if let e = entry, !e.isBuiltIn {
+                                    Divider()
+                                    Button("Rename…") {
+                                        if let n = prompt("Rename item", value: item.name) {
+                                            change(e.id) { $0.renameItem(item.id, to: n) }
+                                        }
+                                    }
+                                    Button("Edit Tags…") {
+                                        if let t = prompt("Tags, separated by commas", value: item.tags.joined(separator: ", ")) {
+                                            change(e.id) { $0.setTags(item.id, t.split(separator: ",").map(String.init)) }
+                                        }
+                                    }
+                                    Button("Duplicate") { change(e.id) { $0.duplicateItem(item.id) } }
+                                    Button("Move to Start") { change(e.id) { $0.moveItem(item.id, to: 0) } }
+                                    Button("Move to End") { change(e.id) { $0.moveItem(item.id, to: .max) } }
                                     Divider()
                                     Button("Remove from Library", role: .destructive) { remove(item, from: e.id) }
                                 }
@@ -168,6 +188,24 @@ struct LibraryPanel: View {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { selectedID = try store.importLibrary(file: url) } catch { NSAlert(error: error).runModal() }
+    }
+
+    /// A one-field text prompt; nil when cancelled or left blank.
+    private func prompt(_ title: String, value: String) -> String? {
+        let alert = NSAlert()
+        alert.messageText = title
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = value
+        alert.accessoryView = field
+        alert.addButton(withTitle: "OK"); alert.addButton(withTitle: "Cancel")
+        alert.window.initialFirstResponder = field
+        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
+        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty && !value.isEmpty && title.hasPrefix("Tags") ? "" : (text.isEmpty ? nil : text)
+    }
+
+    private func change(_ id: String, _ edit: (inout StencilLibrary) -> Void) {
+        do { try store.update(id, edit) } catch { NSAlert(error: error).runModal() }
     }
 
     private func remove(_ item: StencilItem, from id: String) {

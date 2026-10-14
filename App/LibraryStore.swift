@@ -83,6 +83,15 @@ final class LibraryStore: ObservableObject {
         reload()
     }
 
+    /// Applies `change` to a user library and saves it. The built-in library is never written.
+    func update(_ entryID: String, _ change: (inout StencilLibrary) -> Void) throws {
+        guard let e = entries.first(where: { $0.id == entryID }), let url = e.url else { return }
+        var lib = e.library
+        change(&lib)
+        try write(lib, to: url)
+        reload()
+    }
+
     func remove(_ item: StencilItem, from entryID: String) throws {
         guard let e = entries.first(where: { $0.id == entryID }), let url = e.url else { return }
         var lib = e.library

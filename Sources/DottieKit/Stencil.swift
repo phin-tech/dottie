@@ -123,6 +123,39 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
         return StencilItem(name: name, tags: tags, width: box.width, height: box.height, elements: items, imported: false)
     }
 
+    // MARK: Editing items
+
+    public mutating func renameItem(_ id: UUID, to name: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, let i = items.firstIndex(where: { $0.id == id }) else { return }
+        items[i].name = n
+    }
+
+    /// Replaces an item's tags; blanks and duplicates (ignoring case) are dropped, order kept.
+    public mutating func setTags(_ id: UUID, _ tags: [String]) {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return }
+        var seen = Set<String>()
+        items[i].tags = tags.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && seen.insert($0.lowercased()).inserted }
+    }
+
+    public mutating func moveItem(_ id: UUID, to index: Int) {
+        guard let from = items.firstIndex(where: { $0.id == id }) else { return }
+        let item = items.remove(at: from)
+        items.insert(item, at: min(max(index, 0), items.count))
+    }
+
+    /// Inserts a copy right after the original and returns its id.
+    @discardableResult
+    public mutating func duplicateItem(_ id: UUID) -> UUID? {
+        guard let i = items.firstIndex(where: { $0.id == id }) else { return nil }
+        var copy = items[i]
+        copy.id = UUID()
+        copy.name += " copy"
+        items.insert(copy, at: i + 1)
+        return copy.id
+    }
+
     /// A library from an Excalidraw library (or scene, as one item). Items keep their authored look.
     public static func fromExcalidraw(name: String, data: Data) throws -> StencilLibrary {
         let items = try ExcalidrawImporter.importItems(from: data, layerID: UUID())
