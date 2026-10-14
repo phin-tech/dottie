@@ -40,6 +40,7 @@ struct LibraryPanel: View {
                     Divider()
                     Button("New Library from SVGs…", action: importSVGs)
                     Button("New Library from Excalidraw Library…", action: importExcalidrawLibrary)
+                    Button("New Library from draw.io File…", action: importDrawio)
                     Button("Open Library File…", action: openLibraryFile)
                     Divider()
                     Button("Show Libraries in Finder") {
@@ -140,6 +141,20 @@ struct LibraryPanel: View {
             message = nil
         } catch {
             message = "That file is not an Excalidraw library, or it is empty."
+        }
+    }
+
+    private func importDrawio() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = ["drawio", "xml"].compactMap { UTType(filenameExtension: $0) } + [.xml]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a draw.io file; each page becomes one item"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            selectedID = try store.importDrawio(file: url)
+            message = nil
+        } catch {
+            message = "That file is not a draw.io diagram, or it is empty."
         }
     }
 

@@ -279,3 +279,70 @@ final class ExcalidrawLibraryTests: XCTestCase {
         XCTAssertEqual(doc.elements.first { ids.contains($0.id) }?.style.roughness, 0)  // not restyled
     }
 }
+
+final class DrawioImportTests: XCTestCase {
+    let xml = """
+    <mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/>
+      <mxCell id="a" value="Start &lt;b&gt;here&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+        <mxGeometry x="100" y="100" width="120" height="60" as="geometry"/></mxCell>
+      <mxCell id="b" value="DB" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=none;" vertex="1" parent="1">
+        <mxGeometry x="400" y="90" width="60" height="80" as="geometry"/></mxCell>
+      <mxCell id="d" value="ok?" style="rhombus;whiteSpace=wrap;html=1;rotation=90;" vertex="1" parent="1">
+        <mxGeometry x="250" y="300" width="80" height="80" as="geometry"/></mxCell>
+      <mxCell id="e1" value="yes" style="edgeStyle=orthogonalEdgeStyle;endArrow=open;dashed=1;" edge="1" parent="1" source="a" target="b">
+        <mxGeometry relative="1" as="geometry"/></mxCell>
+      <mxCell id="e2" value="" style="endArrow=none;" edge="1" parent="1" target="d">
+        <mxGeometry relative="1" as="geometry"><mxPoint x="50" y="50" as="sourcePoint"/></mxGeometry></mxCell>
+      <mxCell id="g" value="" style="group" vertex="1" parent="1"><mxGeometry x="500" y="500" width="100" height="100" as="geometry"/></mxCell>
+      <mxCell id="c" value="inner" style="text;" vertex="1" parent="g"><mxGeometry x="10" y="20" width="40" height="20" as="geometry"/></mxCell>
+    </root></mxGraphModel>
+    """
+
+    func check(_ items: [DrawioImporter.Item]) {
+        XCTAssertEqual(items.count, 1)
+        let els = items[0].elements
+        let byText = Dictionary(uniqueKeysWithValues: els.compactMap { e in e.text.map { ($0, e) } })
+        let a = els.first { $0.text?.hasPrefix("Start") == true }
+        XCTAssertEqual(a?.text, "Start here")                      // html stripped
+        XCTAssertEqual(a?.kind, .rectangle)
+        XCTAssertEqual(a?.style.fill, RGBA(r: 218.0 / 255, g: 232.0 / 255, b: 252.0 / 255))
+        XCTAssertEqual(els.first { $0.kind == .diamond }?.rotation ?? 0, .pi / 2, accuracy: 0.001)
+        XCTAssertEqual(els.filter { $0.kind == .path }.count, 2, "cylinder maps to the built-in database")
+        let db = els.first { $0.kind == .path && $0.text == "DB" }
+        XCTAssertNotNil(db)
+        XCTAssertEqual(db?.width ?? 0, 60, accuracy: 0.5)
+        let yes = byText["yes"]
+        XCTAssertEqual(yes?.kind, .connector)
+        XCTAssertEqual(yes?.connector?.routing, .elbow)
+        XCTAssertEqual(yes?.connector?.endHead, .arrow)
+        XCTAssertEqual(yes?.style.dash, .dashed)
+        XCTAssertEqual(yes?.connector?.start.elementID, a?.id)
+        let free = els.first { $0.kind == .connector && $0.text == nil }
+        XCTAssertNil(free?.connector?.start.elementID)             // sourcePoint, not bound
+        XCTAssertEqual(free?.connector?.endHead, Arrowhead.none)
+        let inner = byText["inner"]
+        XCTAssertEqual(inner?.kind, .text)
+        XCTAssertEqual((inner?.x ?? 0) - (a?.x ?? 0), 410, accuracy: 0.5)   // group origin 500 + 10 vs a at 100
+    }
+
+    func testPlainXML() throws {
+        check(try DrawioImporter.importItems(from: Data(xml.utf8), layerID: UUID()))
+    }
+
+    func testCompressedDiagramInsideMxfile() throws {
+        let encoded = xml.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
+        let deflated = try (Data(encoded.utf8) as NSData).compressed(using: .zlib) as Data
+        let file = "<mxfile><diagram name=\"Flow\" id=\"x\">\(deflated.base64EncodedString())</diagram></mxfile>"
+        let items = try DrawioImporter.importItems(from: Data(file.utf8), layerID: UUID())
+        XCTAssertEqual(items[0].name, "Flow")
+        check(items)
+    }
+
+    func testRejectsOtherXMLAndPlacesAsLibrary() throws {
+        XCTAssertThrowsError(try DrawioImporter.importItems(from: Data("<svg/>".utf8), layerID: UUID()))
+        let lib = try StencilLibrary.fromDrawio(name: "D", data: Data(xml.utf8))
+        var doc = DottieDocument()
+        let ids = doc.place(lib.items[0], center: .zero, layerID: doc.layers[0].id, keepOriginalColors: false)
+        XCTAssertTrue(doc.elements.filter { ids.contains($0.id) && $0.kind != .text }.allSatisfy { $0.style.roughness > 0 })
+    }
+}

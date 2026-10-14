@@ -123,6 +123,13 @@ final class LibraryStore: ObservableObject {
         return try create(lib)
     }
 
+    /// Imports a draw.io file as a library with one item per page.
+    func importDrawio(file: URL) throws -> String {
+        let lib = try StencilLibrary.fromDrawio(name: file.deletingPathExtension().lastPathComponent,
+                                                data: Data(contentsOf: file))
+        return try create(lib)
+    }
+
     func importLibrary(file: URL) throws -> String {
         let lib = try StencilLibrary.decode(Data(contentsOf: file))
         return try create(lib)

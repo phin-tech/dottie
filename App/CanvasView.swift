@@ -497,25 +497,50 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         importSVGs(files, at: CGPoint(x: viewportCenter.x - half, y: viewportCenter.y), keepOriginalColors: keep.state == .on)
     }
 
-    /// Places an Excalidraw scene (or the first item of a library) as authored, in one undo step.
+    /// Places a whole imported scene at its own size (no readable-icon scaling), as one undo step.
     @discardableResult
-    func importExcalidraw(_ data: Data, at center: CGPoint) -> Bool {
-        guard let items = try? ExcalidrawImporter.importItems(from: data, layerID: UUID()), let first = items.first else {
-            NSSound.beep(); return false
-        }
-        let item = StencilItem(name: "Excalidraw", width: first.size.width, height: first.size.height,
-                               elements: first.elements, imported: false)
-        // Authored scenes keep their own size; only the readable-icon scaling is skipped.
+    private func placeScene(_ item: StencilItem, keepOriginalColors: Bool, actionName: String, at center: CGPoint) -> Bool {
         let usable = model.layers.filter { !$0.locked && $0.visible }
         guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
         var next = model
-        let added = next.insert(item.elements, size: item.size, center: center, layerID: layer.id)
-        guard !added.isEmpty else { return false }
+        let added = next.insert(item.placed(keepOriginalColors: keepOriginalColors), size: item.size, center: center, layerID: layer.id)
+        guard !added.isEmpty else { NSSound.beep(); return false }
         selection = added
         tool = .select
         onToolChange?(.select)
-        onCommit?(next, "Import Excalidraw")
+        onCommit?(next, actionName)
         return true
+    }
+
+    /// Places an Excalidraw scene as authored.
+    @discardableResult
+    func importExcalidraw(_ data: Data, at center: CGPoint) -> Bool {
+        guard let first = try? ExcalidrawImporter.importItems(from: data, layerID: UUID()).first else { NSSound.beep(); return false }
+        let item = StencilItem(name: "Excalidraw", width: first.size.width, height: first.size.height,
+                               elements: first.elements, imported: false)
+        return placeScene(item, keepOriginalColors: true, actionName: "Import Excalidraw", at: center)
+    }
+
+    /// Places the first page of a draw.io file, restyled to this drawing's look unless `keepOriginalColors`.
+    @discardableResult
+    func importDrawio(_ data: Data, at center: CGPoint, keepOriginalColors: Bool) -> Bool {
+        guard let first = try? DrawioImporter.importItems(from: data, layerID: UUID()).first else { NSSound.beep(); return false }
+        let item = StencilItem(name: first.name, width: first.size.width, height: first.size.height,
+                               elements: first.elements, imported: true)
+        return placeScene(item, keepOriginalColors: keepOriginalColors, actionName: "Import draw.io", at: center)
+    }
+
+    @objc func importDrawioFile(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = ["drawio", "xml"].compactMap { UTType(filenameExtension: $0) } + [.xml]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a draw.io diagram (.drawio)"
+        let keep = NSButton(checkboxWithTitle: "Keep original colors and clean lines", target: nil, action: nil)
+        keep.state = .off
+        panel.accessoryView = keep
+        panel.isAccessoryViewDisclosed = true
+        guard panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) else { return }
+        importDrawio(data, at: viewportCenter, keepOriginalColors: keep.state == .on)
     }
 
     @objc func importExcalidrawScene(_ sender: Any?) {
@@ -565,7 +590,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         draggedStencil(sender) != nil || !droppedSVGs(sender).isEmpty || !droppedFiles(sender, ext: "excalidraw").isEmpty
-            ? .copy : []
+            || !droppedFiles(sender, ext: "drawio").isEmpty ? .copy : []
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
@@ -577,6 +602,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if let scene = droppedFiles(sender, ext: "excalidraw").first, let data = try? Data(contentsOf: scene) {
             let raw = convert(sender.draggingLocation, from: nil)
             return importExcalidraw(data, at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom))
+        }
+        if let scene = droppedFiles(sender, ext: "drawio").first, let data = try? Data(contentsOf: scene) {
+            let raw = convert(sender.draggingLocation, from: nil)
+            return importDrawio(data, at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom),
+                                keepOriginalColors: NSEvent.modifierFlags.contains(.option))
         }
         let files = droppedSVGs(sender).compactMap { try? Data(contentsOf: $0) }
         guard !files.isEmpty else { return false }

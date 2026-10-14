@@ -264,4 +264,21 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertTrue(view.model.elements.allSatisfy { $0.style.roughness > 0 }, "restyled to the sketchy default")
         XCTAssertEqual(view.selection.count, item.elements.count)
     }
+
+    func testImportingDrawioAndExcalidrawScenesAreOneUndoStepEach() {
+        let drawio = Data(##"<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="a" value="A" style="rounded=1;" vertex="1" parent="1"><mxGeometry x="10" y="10" width="100" height="50" as="geometry"/></mxCell><mxCell id="b" value="B" vertex="1" parent="1"><mxGeometry x="200" y="10" width="100" height="50" as="geometry"/></mxCell><mxCell id="e" edge="1" parent="1" source="a" target="b"><mxGeometry relative="1" as="geometry"/></mxCell></root></mxGraphModel>"##.utf8)
+        XCTAssertTrue(view.importDrawio(drawio, at: CGPoint(x: 300, y: 300), keepOriginalColors: false))
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(commits[0].name, "Import draw.io")
+        XCTAssertEqual(view.model.elements.count, 3)
+        let link = view.model.elements.first { $0.kind == .connector }
+        XCTAssertNotNil(link?.connector?.start.elementID)
+        XCTAssertTrue(view.model.elements.contains { $0.id == link?.connector?.start.elementID }, "bound to the placed copy")
+
+        let exc = Data(##"{"type":"excalidraw","elements":[{"id":"r","type":"rectangle","x":0,"y":0,"width":50,"height":30}]}"##.utf8)
+        XCTAssertTrue(view.importExcalidraw(exc, at: CGPoint(x: 100, y: 100)))
+        XCTAssertEqual(commits.count, 2)
+        XCTAssertFalse(view.importDrawio(Data("<nope/>".utf8), at: .zero, keepOriginalColors: false))
+        XCTAssertEqual(commits.count, 2)
+    }
 }

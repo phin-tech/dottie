@@ -23,9 +23,9 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] `path` element kind: compound Bézier shapes with holes (even-odd or nonzero), sketchy and hatched like the rest
 - [x] SVG import (File ▸ Import SVG…, or drop `.svg` files; ⌥-drop keeps original colors): paths, shapes, transforms, `<use>`, CSS classes, gradients flattened to their first stop
 - [x] Stencil libraries: `.dottielib` files, built-in Basics set, Library sidebar tab (search, click/drag to place, SVG folders to library, add selection), `list_stencils` / `add_stencil` over MCP
+- [x] Excalidraw (`.excalidraw`, `.excalidrawlib`) and draw.io (`.drawio`, compressed or not) import: File menu, drop, or into a library
 
 ## Next
-1. Excalidraw and draw.io importers
 2. Rulers, themes
 3. Per-element layer drag-and-drop in the layers panel
 

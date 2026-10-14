@@ -36,7 +36,9 @@ public struct StencilItem: Codable, Equatable, Identifiable, Sendable {
     public func placed(keepOriginalColors: Bool, roughness: Double = Style().roughness, scale: Double = 1) -> [Element] {
         elements.map { src in
             var e = src
-            if imported, !keepOriginalColors, e.kind != .connector, e.kind != .text {
+            if imported, !keepOriginalColors, e.kind == .connector {
+                e.style.roughness = roughness // connectors keep their color, but share the drawing's look
+            } else if imported, !keepOriginalColors, e.kind != .text {
                 e.style.roughness = roughness
                 e.style.stroke = .black
                 let w = e.style.strokeWidth
@@ -127,6 +129,15 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
         return StencilLibrary(name: name, items: items.enumerated().map { i, it in
             StencilItem(name: it.name ?? "Item \(i + 1)", width: it.size.width, height: it.size.height,
                         elements: it.elements, imported: false)
+        })
+    }
+
+    /// A library with one item per page of a draw.io file. Items are restyled to the drawing's look when
+    /// placed, like SVGs.
+    public static func fromDrawio(name: String, data: Data) throws -> StencilLibrary {
+        let items = try DrawioImporter.importItems(from: data, layerID: UUID())
+        return StencilLibrary(name: name, items: items.map {
+            StencilItem(name: $0.name, width: $0.size.width, height: $0.size.height, elements: $0.elements, imported: true)
         })
     }
 
