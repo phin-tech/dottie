@@ -176,11 +176,11 @@ struct Inspector: View {
             }
             if selected.count == 1, let e = selected.first {
                 Section("Element") {
-                    NameField(element: e) { name in
+                    AnchorField(element: e) { anchor in
                         var next = document.model
                         guard let i = next.elements.firstIndex(where: { $0.id == e.id }) else { return }
-                        next.elements[i].name = name.isEmpty ? nil : name
-                        document.commit(next, actionName: "Rename", undoManager: undoManager)
+                        next.elements[i].anchor = anchor.isEmpty ? nil : anchor
+                        document.commit(next, actionName: "Set Anchor", undoManager: undoManager)
                     }
                 }
             }
@@ -225,10 +225,10 @@ struct Inspector: View {
         return first
     }
 
-    /// Named or labelled shapes outside the selection, by name: what a link can point at.
+    /// Shapes with an anchor or text, outside the selection, by title: what a link can point at.
     private var linkTargets: [Element] {
         Array(document.model.elements
-            .filter { $0.kind != .connector && !selection.contains($0.id) && !(($0.name ?? $0.text) ?? "").isEmpty }
+            .filter { $0.kind != .connector && !selection.contains($0.id) && !(($0.anchor ?? $0.text) ?? "").isEmpty }
             .sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
             .prefix(Self.linkTargetLimit))
     }
@@ -430,34 +430,34 @@ struct LayersSection: View {
     }
 }
 
-/// The selected element's hidden name. Committed on Return or when the field loses focus, so typing is one undo step.
-private struct NameField: View {
+/// The selected element's anchor. Committed on Return or when the field loses focus, so typing is one undo step.
+private struct AnchorField: View {
     var element: Element
     var commit: (String) -> Void
     @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextField("Name", text: $text, prompt: Text("Not shown on the canvas"))
+        TextField("Anchor", text: $text, prompt: Text("Not shown on the canvas"))
             .focused($focused)
             .onSubmit(save)
             .onChange(of: focused) { _, now in if !now { save() } }
-            .onAppear { text = element.name ?? "" }
-            .onChange(of: element.id) { _, _ in text = element.name ?? "" }
-            .onChange(of: element.name) { _, n in if !focused { text = n ?? "" } }
-            .help("A name for finding this element in the Layers panel and the Link list")
+            .onAppear { text = element.anchor ?? "" }
+            .onChange(of: element.id) { _, _ in text = element.anchor ?? "" }
+            .onChange(of: element.anchor) { _, n in if !focused { text = n ?? "" } }
+            .help("A hidden label for finding this element in the Layers panel and the Link list")
     }
 
     private func save() {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed != (element.name ?? "") { commit(trimmed) }
+        if trimmed != (element.anchor ?? "") { commit(trimmed) }
     }
 }
 
 extension Element {
-    /// How an element is named in lists: its hidden name, the first line of its text, or its kind.
+    /// How an element is named in lists: its anchor, the first line of its text, or its kind.
     var displayTitle: String {
-        if let n = name, !n.isEmpty { return String(n.prefix(28)) }
+        if let n = anchor, !n.isEmpty { return String(n.prefix(28)) }
         if let t = text?.split(separator: "\n").first, !t.isEmpty { return String(t.prefix(28)) }
         switch kind {
         case .path: return "Shape"

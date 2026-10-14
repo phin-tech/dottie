@@ -239,13 +239,13 @@ final class ScriptTests: XCTestCase {
         XCTAssertNotNil(run("dottie.update(dottie.elements()[0], {link: 'nope'})", &doc).error)
     }
 
-    func testNamesFilterAndClear() {
+    func testAnchorsFilterAndClear() {
         var doc = DottieDocument()
         let r = run("""
-            const a = dottie.rect({x: 0, y: 0, name: "Intro"}); dottie.rect({x: 0, y: 200});
-            const found = dottie.elements({name: "intro"}).map(e => e.id);
-            dottie.update(a, {name: ""});
-            return [found.length === 1 && found[0] === a.id, a.name, dottie.get(a).name === undefined];
+            const a = dottie.rect({x: 0, y: 0, anchor: "Intro"}); dottie.rect({x: 0, y: 200});
+            const found = dottie.elements({anchor: "intro"}).map(e => e.id);
+            dottie.update(a, {anchor: ""});
+            return [found.length === 1 && found[0] === a.id, a.anchor, dottie.get(a).anchor === undefined];
             """, &doc)
         XCTAssertNil(r.error)
         XCTAssertEqual(r.value, "[true,\"Intro\",true]")

@@ -288,7 +288,7 @@ public enum DottieScript {
             if let r = e.rotation { d["rotation"] = round1(r * 180 / .pi) }
             if let g = e.groupID { d["group"] = g.uuidString }
             if let l = e.link { d["link"] = l.uuidString }
-            if let n = e.name { d["name"] = n }
+            if let n = e.anchor { d["anchor"] = n }
             if let layer = doc.layers.first(where: { $0.id == e.layerID }) { d["layer"] = layer.name }
             if let c = e.connector {
                 d["routing"] = c.routing.rawValue
@@ -306,10 +306,10 @@ public enum DottieScript {
             switch name {
             case "elements":
                 let index = doc.elements.contains { $0.kind == .connector } ? doc.elementIndex : nil
-                let kind = a.string("kind"), text = a.string("text")?.lowercased(), name = a.string("name")?.lowercased()
+                let kind = a.string("kind"), text = a.string("text")?.lowercased(), anchor = a.string("anchor")?.lowercased()
                 return doc.elements
                     .filter { kind == nil || $0.kind.rawValue == kind }
-                    .filter { name == nil || ($0.name ?? "").lowercased().contains(name!) }
+                    .filter { anchor == nil || ($0.anchor ?? "").lowercased().contains(anchor!) }
                     .filter { text == nil || ($0.text ?? "").lowercased().contains(text!) }
                     .map { describe($0, index: index) }
 
@@ -327,7 +327,7 @@ public enum DottieScript {
                 let e = try DiagramOps.addShape(&doc, kind: kind, frame: frame, at: CGPoint(x: x, y: y), text: a.string("text"),
                                                 fill: try a.color("fill"), stroke: try a.color("stroke"),
                                                 roughness: a.roughness, look: try a.look())
-                if let n = a.string("name"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].name = n }
+                if let n = a.string("anchor"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].anchor = n }
                 return describe(try element(e.id))
 
             case "connector":
@@ -346,7 +346,7 @@ public enum DottieScript {
                                       width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
                                       routing: try a.enumValue("routing", as: Routing.self), look: try a.look(),
-                                      link: link, name: a.has("name") ? .some(a.string("name")) : nil)
+                                      link: link, anchor: a.has("anchor") ? .some(a.string("anchor")) : nil)
                 return describe(try element(id))
 
             case "remove":
@@ -517,7 +517,7 @@ public enum DottieScript {
     element object returned by another call. Colors are hex strings like "#ffcc00". Units are canvas points, y down.
 
     Reading
-      dottie.elements({kind?, text?, name?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
+      dottie.elements({kind?, text?, anchor?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
       dottie.get(id)                   one element
       dottie.selection                 ids selected in the app (empty when run from an agent)
       dottie.bounds()                  {x, y, width, height} of all content
@@ -532,9 +532,9 @@ public enum DottieScript {
     direction?: "TB"|"LR", sketchy?})   laid out below existing content; returns {key: id}
 
     Changing
-      dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, link?, ...look})  returns the element
+      dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, link?, anchor?, ...look})  returns the element
       link: another shape (id or element) this one jumps to when its badge is clicked in the app; null removes it
-      name: a hidden name for finding and linking to the element (never drawn); "" removes it
+      anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
       dottie.layout({direction?})      re-arranges all shapes into ranks along their connectors
 

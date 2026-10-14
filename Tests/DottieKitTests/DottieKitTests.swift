@@ -1068,12 +1068,12 @@ extension DottieKitTests {
         XCTAssertThrowsError(try DiagramOps.update(&doc, id: a, link: .some(a)))
     }
 
-    func testNamesAreHiddenAndSetThroughUpdate() throws {
+    func testAnchorsAreHiddenAndSetThroughUpdate() throws {
         var (doc, a, _, _) = twoBoxesAndArrow()
-        try DiagramOps.update(&doc, id: a, name: .some("Billing section"))
-        XCTAssertEqual(DiagramOps.summarize(doc).first { $0.id == a.uuidString }?.name, "Billing section")
+        try DiagramOps.update(&doc, id: a, anchor: .some("Billing section"))
+        XCTAssertEqual(DiagramOps.summarize(doc).first { $0.id == a.uuidString }?.anchor, "Billing section")
         XCTAssertFalse(Exporter.svg(doc).contains("Billing section"))
-        try DiagramOps.update(&doc, id: a, name: .some(""))
-        XCTAssertNil(doc.elements.first { $0.id == a }!.name)
+        try DiagramOps.update(&doc, id: a, anchor: .some(""))
+        XCTAssertNil(doc.elements.first { $0.id == a }!.anchor)
     }
 }

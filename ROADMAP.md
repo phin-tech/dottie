@@ -32,7 +32,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Library viewer: `.dottielib` opens in its own window (Finder double-click or Library ▸ Open in Viewer); copy, export PNG/SVG, install
 - [x] Guides by number (type, add, remove) and lock; stencil items rename, tag, duplicate, reorder; library rename
 - [x] Element links: pick a target in the inspector, follow by badge or ⌘-click, Back/Forward (⌘[ ⌘]); `link` over MCP and scripts
-- [x] Canvas context menu (edit, link, arrange); hidden element names (`name`)
+- [x] Canvas context menu (edit, link, arrange); hidden element anchors (`anchor`)
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 
 ## Next

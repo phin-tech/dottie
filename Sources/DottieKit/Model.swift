@@ -106,8 +106,8 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Another element this one jumps to when its link badge is clicked. May name an element that has since
     /// been deleted; such a link is shown as broken and comes back if the delete is undone.
     public var link: UUID?
-    /// A name for finding and linking to the element. Never drawn or exported.
-    public var name: String?
+    /// A hidden label for finding and linking to the element. Never drawn or exported.
+    public var anchor: String?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,
