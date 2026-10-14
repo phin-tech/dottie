@@ -11,7 +11,31 @@ public struct DottieFile: Codable, Equatable, Sendable {
         self.pages = pages.isEmpty ? [DottieDocument()] : pages
     }
 
-    private enum CodingKeys: String, CodingKey { case version, pages }
+    private enum CodingKeys: String, CodingKey { case version, pages, images }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(version, forKey: .version)
+        try c.encode(pages, forKey: .pages)
+        // Each distinct picture once, keyed by digest; elements refer to it (see `EmbeddedImage`).
+        if encoder.userInfo[.dottieImages] != nil {
+            var table: [String: EmbeddedImage] = [:]
+            for p in pages { for e in p.elements { if let img = e.image { table[img.digest] = img } } }
+            if !table.isEmpty { try c.encode(table.mapValues(InlineImage.init), forKey: .images) }
+        }
+    }
+
+    /// A picture as stored in the file's `images` table.
+    private struct InlineImage: Codable {
+        var data: Data
+        var format: String
+        init(_ i: EmbeddedImage) { data = i.data; format = i.format }
+    }
+
+    /// Reads the `images` table ahead of the pages, so their references can be resolved.
+    private struct ImagesOnly: Decodable {
+        var images: [String: InlineImage]?
+    }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -148,10 +172,16 @@ public struct DottieFile: Codable, Equatable, Sendable {
         copy.pages = pages.map(\.rounded)
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys, .prettyPrinted]
+        enc.userInfo[.dottieImages] = ImageTable()
         return try enc.encode(copy)
     }
 
     public static func decode(_ data: Data) throws -> DottieFile {
-        try JSONDecoder().decode(DottieFile.self, from: data)
+        let dec = JSONDecoder()
+        // References resolve by the key written in the file; each picture's digest is recomputed from its bytes,
+        // and every element showing it shares one buffer.
+        let stored = try dec.decode(ImagesOnly.self, from: data).images ?? [:]
+        dec.userInfo[.dottieImages] = ImageTable(stored.mapValues { EmbeddedImage(data: $0.data, format: $0.format) })
+        return try dec.decode(DottieFile.self, from: data)
     }
 }

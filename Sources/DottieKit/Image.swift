@@ -11,8 +11,8 @@ public struct EmbeddedImage: Codable, Equatable, Sendable {
     public var data: Data
     /// "png" or "jpeg".
     public var format: String
-    /// SHA-256 of `data`, for caching decoded images. Worked out on load, never saved, so a hand-edited file
-    /// cannot carry a hash that disagrees with its bytes.
+    /// SHA-256 of `data`: the picture's key in a file's `images` table and in the decode cache. Always worked
+    /// out from the bytes, never read from a file, so it cannot disagree with them.
     public let digest: String
 
     public init(data: Data, format: String) {
@@ -21,16 +21,28 @@ public struct EmbeddedImage: Codable, Equatable, Sendable {
         self.digest = Self.hash(data)
     }
 
-    private enum CodingKeys: String, CodingKey { case data, format }
+    private enum CodingKeys: String, CodingKey { case data, format, ref }
 
+    /// In a `.dottie` file a picture is saved once, in the file's `images` table, and each element holds
+    /// `{"ref": digest}`. Everywhere else (clipboard, live mode, libraries) it is inline: `{"data", "format"}`.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let ref = try c.decodeIfPresent(String.self, forKey: .ref) {
+            // A dangling reference decodes as an empty picture, drawn as a crossed-out box, so the rest of
+            // the drawing still opens.
+            self = (decoder.userInfo[.dottieImages] as? ImageTable)?.images[ref] ?? EmbeddedImage(data: Data(), format: "png")
+            return
+        }
         let data = try c.decode(Data.self, forKey: .data)
         self.init(data: data, format: try c.decodeIfPresent(String.self, forKey: .format) ?? "png")
     }
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        if encoder.userInfo[.dottieImages] != nil {
+            try c.encode(digest, forKey: .ref)
+            return
+        }
         try c.encode(data, forKey: .data)
         try c.encode(format, forKey: .format)
     }
@@ -45,6 +57,17 @@ public struct EmbeddedImage: Codable, Equatable, Sendable {
     static func hash(_ data: Data) -> String {
         SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }
+}
+
+extension CodingUserInfoKey {
+    /// An `ImageTable`: set while reading or writing a `.dottie` file, so pictures are saved by reference.
+    static let dottieImages = CodingUserInfoKey(rawValue: "tech.phin.dottie.images")!
+}
+
+/// A file's pictures by digest, shared by every element that shows the same one.
+final class ImageTable: @unchecked Sendable {
+    var images: [String: EmbeddedImage]
+    init(_ images: [String: EmbeddedImage] = [:]) { self.images = images }
 }
 
 final class ImageCache: @unchecked Sendable {

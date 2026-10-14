@@ -50,11 +50,13 @@ A `note` element is a sticky note whose `text` is GitHub Flavored Markdown; `Not
 [swift-markdown](https://github.com/swiftlang/swift-markdown) (cmark-gfm), DottieKit's only dependency, and lays
 it out with CoreText, and the renderer and SVG export share that layout. A single newline is a line break, as in
 GitHub comments, and bare URLs are underlined by `Note` itself (swift-markdown leaves cmark's autolink extension off). Dottie 0.1.1 and earlier cannot open a file containing a note.
-An `image` element carries its picture in `image` (`data`, base64, and `format`, `png` or `jpeg`). Every picture
+An `image` element's picture is saved once per file, in a top-level `images` table keyed by its SHA-256 (`data`,
+base64, and `format`, `png` or `jpeg`); the element holds `"image": {"ref": "<sha256>"}`, so copies cost nothing.
+In memory and everywhere outside a `.dottie` file (clipboard, live mode, libraries) the element carries the
+picture inline, and copies share one buffer. A reference with no table entry opens as a crossed-out box. Every picture
 is normalized on the way in by `ImageImport` (EXIF rotation applied, longest side capped at 2048 px, re-encoded
 as PNG, or JPEG for large opaque photos) so SVG and HTML exports can embed the bytes as a `data:` URI. Decoded
-images are cached by a SHA-256 of the bytes that is computed on load and never saved. Each element stores its own
-copy, so duplicating a picture duplicates its bytes. Versions before pictures cannot open a file containing one.
+images are cached by that digest, always recomputed from the bytes. Versions before pictures cannot open a file containing one.
 
 ## MCP server
 

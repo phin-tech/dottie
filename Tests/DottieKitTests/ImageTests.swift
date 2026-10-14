@@ -113,6 +113,38 @@ final class ImageTests: XCTestCase {
         XCTAssertNotNil(back.image?.cgImage)
     }
 
+    func testFileStoresEachPictureOnceAndElementsByReference() throws {
+        var doc = DottieDocument()
+        let e = try DiagramOps.addImage(&doc, data: redOverBlue(), at: .zero)
+        let copies = doc.duplicate([e.id]).union(doc.duplicate([e.id]))
+        XCTAssertEqual(copies.count, 2)
+        var other = DottieDocument(name: "Page 2")
+        other.elements = doc.elements.map { var c = $0; c.id = UUID(); return c }
+        let data = try DottieFile(pages: [doc, other]).encoded()
+        let json = String(decoding: data, as: UTF8.self)
+        let table = try XCTUnwrap((JSONSerialization.jsonObject(with: data) as? [String: Any])?["images"] as? [String: Any])
+        XCTAssertEqual(Array(table.keys), [e.image!.digest], "six elements, one copy of the bytes")
+        XCTAssertEqual(json.components(separatedBy: "\"ref\" : \"\(e.image!.digest)\"").count - 1, 6)
+
+        let back = try DottieFile.decode(data)
+        let images = back.pages.flatMap(\.elements).compactMap(\.image)
+        XCTAssertEqual(images.count, 6)
+        XCTAssertTrue(images.allSatisfy { $0.data == e.image!.data && $0.digest == e.image!.digest })
+        XCTAssertEqual(try back.encoded(), data, "saving again is stable")
+    }
+
+    func testDanglingReferenceStillOpens() throws {
+        var doc = DottieDocument()
+        try DiagramOps.addImage(&doc, data: redOverBlue(), at: .zero)
+        try DiagramOps.addShape(&doc, kind: .rectangle, frame: nil, at: CGPoint(x: 100, y: 0), text: "Box", fill: nil, stroke: nil, roughness: nil)
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: DottieFile(pages: [doc]).encoded()) as? [String: Any])
+        json["images"] = nil
+        let back = try DottieFile.decode(JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(back.pages[0].elements.count, 2)
+        XCTAssertNil(back.pages[0].elements.first { $0.kind == .image }?.image?.cgImage)
+        XCTAssertNotNil(Exporter.png(back.pages[0]), "the broken picture draws as a placeholder")
+    }
+
     func testCopyPasteCarriesTheImage() throws {
         var doc = DottieDocument()
         let e = try DiagramOps.addImage(&doc, data: redOverBlue(), at: .zero)
