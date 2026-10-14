@@ -368,6 +368,29 @@ final class DottieKitTests: XCTestCase {
         XCTAssertEqual(doc.element(at: CGPoint(x: 200, y: 50))?.id, cID)
         XCTAssertNotNil(Exporter.png(doc))
     }
+
+    func testHTMLExportIsSelfContainedAndEscapesTitle() {
+        var doc = sampleDoc()
+        doc.elements[0].text = "A & B"
+        let html = Exporter.html(doc, title: "R&D <plan>")
+        XCTAssertTrue(html.hasPrefix("<!doctype html>"))
+        XCTAssertTrue(html.contains("<title>R&amp;D &lt;plan&gt;</title>"))
+        XCTAssertTrue(html.contains("<svg xmlns"))
+        XCTAssertTrue(html.contains(">A &amp; B</tspan>"))
+        XCTAssertTrue(html.contains("background:#ffffff"))
+        XCTAssertFalse(Exporter.html(doc, background: nil).contains("background:#"))
+    }
+
+    func testLibraryInstallNumbersInsteadOfOverwriting() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dottie-lib-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let lib = StencilLibrary(name: "My/Shapes")
+        let first = try lib.install(into: dir)
+        let second = try lib.install(into: dir)
+        XCTAssertEqual(first.lastPathComponent, "My-Shapes.dottielib")
+        XCTAssertEqual(second.lastPathComponent, "My-Shapes 2.dottielib")
+        XCTAssertEqual(StencilLibrary.load(directory: dir).count, 2)
+    }
 }
 
 final class OpsTests: XCTestCase {

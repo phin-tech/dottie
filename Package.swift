@@ -7,6 +7,7 @@ let package = Package(
     products: [
         .library(name: "DottieKit", targets: ["DottieKit"]),
         .executable(name: "dottie-mcp", targets: ["DottieMCP"]),
+        .executable(name: "dottie", targets: ["DottieCLI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", revision: "a0ae212ebf6eab5f754c3129608bc5557637e605"),
@@ -17,6 +18,7 @@ let package = Package(
             "DottieKit",
             .product(name: "MCP", package: "swift-sdk"),
         ]),
+        .executableTarget(name: "DottieCLI", dependencies: ["DottieKit"]),
         .testTarget(name: "DottieKitTests", dependencies: ["DottieKit"]),
     ]
 )

@@ -49,4 +49,35 @@ public enum Exporter {
         ctx.endPDFPage(); ctx.closePDF()
         return data as Data
     }
+
+    /// A self-contained web page: the SVG inline on the drawing's page color, scaling to the window.
+    public static func html(_ doc: DottieDocument, title: String = "Dottie drawing",
+                            background: RGBA? = RGBA(r: 1, g: 1, b: 1)) -> String {
+        let page = background.map { plain in doc.resolvedTheme?.background ?? plain }
+        func hex(_ c: RGBA) -> String {
+            func h(_ v: Double) -> String { String(format: "%02x", Int((min(max(v, 0), 1) * 255).rounded())) }
+            return "#\(h(c.r))\(h(c.g))\(h(c.b))"
+        }
+        let bg = page.map { "background:\(hex($0));" } ?? ""
+        let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        return """
+        <!doctype html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>\(safeTitle)</title>
+        <style>
+        html, body { margin: 0; min-height: 100%; \(bg) }
+        body { display: flex; align-items: center; justify-content: center; }
+        svg { max-width: 100%; height: auto; display: block; }
+        </style>
+        </head>
+        <body>
+        \(svg(doc, background: nil))</body>
+        </html>
+
+        """
+    }
 }

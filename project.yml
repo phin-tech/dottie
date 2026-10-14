@@ -14,6 +14,12 @@ targets:
     dependencies:
       - package: Dottie
         product: DottieKit
+      - target: DottieCLI
+        embed: true
+        codeSign: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie
@@ -45,6 +51,20 @@ targets:
             UTTypeConformsTo: [public.json, public.data]
             UTTypeTagSpecification:
               public.filename-extension: [dottielib]
+  # The `dottie` command, embedded in the app at Contents/Helpers and linked onto the PATH from Settings.
+  DottieCLI:
+    type: tool
+    platform: macOS
+    sources: [Sources/DottieCLI]
+    dependencies:
+      - package: Dottie
+        product: DottieKit
+    settings:
+      base:
+        # Not `dottie`: that differs from the app's `Dottie` executable only by case.
+        PRODUCT_NAME: dottie-cli
+        SWIFT_VERSION: "6.0"
+        CODE_SIGN_IDENTITY: "-"
   # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
   # as a test host would take over the live socket of a running Dottie.
   CanvasTests:
@@ -55,6 +75,9 @@ targets:
       - App/CanvasView.swift
       - App/Preferences.swift
       - App/MCPSettings.swift
+      - App/CommandLineSettings.swift
+      - App/ScriptingSettings.swift
+      - App/OptionalLibraries.swift
       - App/LiveServer.swift
       - App/DrawingDocument.swift
     dependencies:

@@ -31,6 +31,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 
 - [x] Library viewer: `.dottielib` opens in its own window (Finder double-click or Library ▸ Open in Viewer); copy, export PNG/SVG, install
 - [x] Guides by number (type, add, remove) and lock; stencil items rename, tag, duplicate, reorder; library rename
+- [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 
 ## Next
 - Custom themes and a color palette per theme

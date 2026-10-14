@@ -107,6 +107,22 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
             .appendingPathComponent("Dottie/Libraries", isDirectory: true)
     }
 
+    /// Writes the library into `directory` as `<name>.dottielib`, numbering the file ("Name 2") rather than
+    /// replacing one that exists. Returns the file written.
+    @discardableResult
+    public func install(into directory: URL = StencilLibrary.defaultDirectory) throws -> URL {
+        let safe = name.replacingOccurrences(of: "/", with: "-").trimmingCharacters(in: .whitespacesAndNewlines)
+        let base = safe.isEmpty ? "Library" : safe
+        var url = directory.appendingPathComponent(base + ".dottielib")
+        var n = 2
+        while FileManager.default.fileExists(atPath: url.path) {
+            url = directory.appendingPathComponent("\(base) \(n).dottielib"); n += 1
+        }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try encoded().write(to: url, options: .atomic)
+        return url
+    }
+
     /// Every readable `.dottielib` in `directory`, sorted by file name.
     public static func load(directory: URL) -> [(url: URL, library: StencilLibrary)] {
         let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []

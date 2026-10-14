@@ -50,17 +50,6 @@ final class LibraryStore: ObservableObject {
         return image
     }
 
-    private func fileURL(forName name: String) -> URL {
-        let safe = name.replacingOccurrences(of: "/", with: "-").trimmingCharacters(in: .whitespacesAndNewlines)
-        let base = safe.isEmpty ? "Library" : safe
-        var url = Self.directory.appendingPathComponent(base + ".dottielib")
-        var n = 2
-        while FileManager.default.fileExists(atPath: url.path) {
-            url = Self.directory.appendingPathComponent("\(base) \(n).dottielib"); n += 1
-        }
-        return url
-    }
-
     private func write(_ lib: StencilLibrary, to url: URL) throws {
         try FileManager.default.createDirectory(at: Self.directory, withIntermediateDirectories: true)
         try lib.encoded().write(to: url, options: .atomic)
@@ -69,8 +58,7 @@ final class LibraryStore: ObservableObject {
     /// Creates a library file and returns its entry id.
     @discardableResult
     func create(_ lib: StencilLibrary) throws -> String {
-        let url = fileURL(forName: lib.name)
-        try write(lib, to: url)
+        let url = try lib.install(into: Self.directory)
         reload()
         return url.path
     }

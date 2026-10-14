@@ -13,6 +13,24 @@ xcodegen generate                  # regenerates Dottie.xcodeproj from project.y
 xcodebuild -project Dottie.xcodeproj -scheme Dottie build
 ```
 
+## Command line: `dottie`
+
+Render drawings and manage libraries without opening the app.
+
+```sh
+dottie render diagram.dottie                      # diagram.png next to it
+dottie render diagram.dottie -o diagram.svg       # png, svg, pdf or html, from the extension
+dottie render a.dottie b.dottie -f html -d out/   # several files into a directory
+dottie render diagram.dottie --clean --scale 3 -o - > clean.png
+dottie library list
+dottie library install shapes.dottielib
+```
+
+`--clean` / `--sketchy` override the look, `--transparent` drops the page background, and the HTML output is a
+single self-contained page. It reads the file on disk, not unsaved edits in the app. To install it, open
+Settings ▸ Command Line and link it into `/usr/local/bin` or `~/.local/bin` (the app carries the tool in
+`Contents/Helpers`), or from a checkout run `just cli-install`.
+
 ## Let agents draw: `dottie-mcp`
 
 A stdio MCP server that creates and edits `.dottie` files. Every tool takes an absolute `path`.

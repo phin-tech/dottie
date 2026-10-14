@@ -31,6 +31,15 @@ mcp:
 mcp-install: mcp
     claude mcp add dottie -- "$(swift build -c release --product dottie-mcp --show-bin-path)/dottie-mcp"
 
+# Build the dottie command-line tool (release)
+cli:
+    swift build -c release --product dottie
+
+# Link the built dottie tool into ~/.local/bin
+cli-install: cli
+    mkdir -p ~/.local/bin
+    ln -sf "$(swift build -c release --product dottie --show-bin-path)/dottie" ~/.local/bin/dottie
+
 # Remove build artifacts and the generated Xcode project
 clean:
     rm -rf .build DerivedData Dottie.xcodeproj
