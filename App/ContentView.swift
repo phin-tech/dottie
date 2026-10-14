@@ -33,7 +33,7 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
             }
             ToolbarItem(placement: .primaryAction) {
-                Button { withAnimation(.snappy) { showInspector.toggle() } } label: {
+                Button { showInspector.toggle() } label: {
                     Label("Inspector", systemImage: "sidebar.trailing")
                 }
                 .help(showInspector ? "Hide Inspector" : "Show Inspector")
