@@ -24,7 +24,17 @@ claude mcp add dottie -- "$(swift build -c release --product dottie-mcp --show-b
 
 Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its work),
-`export_svg`, `create_diagram`, `open_document`.
+`export_svg`, `create_diagram`, `open_document`, `list_stencils` and `add_stencil` (place shapes from the
+built-in and user stencil libraries).
+
+### Stencils
+
+The Library tab in the sidebar holds stencil libraries: the built-in Basics set (flowchart symbols and common
+shapes) plus any `.dottielib` in `~/Library/Application Support/Dottie/Libraries`. Click or drag an item to place
+it. **+ ▸ New Library from SVGs…** turns SVG files or folders into a library; **Add Selection to Library…** saves
+what you have selected. Items are stored at original fidelity and restyled to the drawing's look when placed
+(**Keep original colors** places them as drawn). Drop `.svg` files straight onto the canvas, or use
+File ▸ Import SVG….
 
 `export_png` also returns each element's id, kind, text and pixel box in the image. Connectors take a `label`;
 shapes and connectors take `fill_style` (solid, hachure, crossHatch), `dash`, `stroke_width`, `bowing`,

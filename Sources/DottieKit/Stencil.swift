@@ -99,6 +99,20 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
         try JSONDecoder().decode(StencilLibrary.self, from: data)
     }
 
+    /// ~/Library/Application Support/Dottie/Libraries, where the app keeps user libraries.
+    public static var defaultDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Dottie/Libraries", isDirectory: true)
+    }
+
+    /// Every readable `.dottielib` in `directory`, sorted by file name.
+    public static func load(directory: URL) -> [(url: URL, library: StencilLibrary)] {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        return urls.filter { $0.pathExtension == "dottielib" }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+            .compactMap { url in (try? Data(contentsOf: url)).flatMap { try? decode($0) }.map { (url, $0) } }
+    }
+
     /// An item holding `ids` of `doc`. Connectors bound to shapes outside the set are frozen in place.
     public static func item(from doc: DottieDocument, ids: Set<UUID>, name: String, tags: [String] = []) -> StencilItem? {
         guard let data = doc.clipboardData(for: ids),

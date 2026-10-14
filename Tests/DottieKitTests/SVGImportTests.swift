@@ -191,3 +191,17 @@ final class StencilLibraryTests: XCTestCase {
         XCTAssertEqual(native.placed(keepOriginalColors: false)[0].style.stroke, RGBA(r: 1, g: 0, b: 0))
     }
 }
+
+final class StencilFilesTests: XCTestCase {
+    func testLoadDirectoryReadsOnlyValidLibraries() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("dottielib-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        try StencilLibrary(name: "B", items: []).encoded().write(to: dir.appendingPathComponent("b.dottielib"))
+        try StencilLibrary(name: "A", items: []).encoded().write(to: dir.appendingPathComponent("a.dottielib"))
+        try Data("nope".utf8).write(to: dir.appendingPathComponent("bad.dottielib"))
+        try Data("x".utf8).write(to: dir.appendingPathComponent("readme.txt"))
+        XCTAssertEqual(StencilLibrary.load(directory: dir).map(\.library.name), ["A", "B"])
+        XCTAssertTrue(StencilLibrary.load(directory: dir.appendingPathComponent("missing")).isEmpty)
+    }
+}

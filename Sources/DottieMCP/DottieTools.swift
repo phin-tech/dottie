@@ -160,6 +160,25 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Hand-drawn look"),
                 "routing": prop("string", "Connector routing", enum: routingValues),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "list_stencils",
+             description: "List the stencil items (reusable shapes: flowchart symbols, icons, imported SVG sets) available "
+                + "to add_stencil, from the built-in Basics library and the user's libraries in Application Support/Dottie/Libraries.",
+             inputSchema: schema([
+                "library": prop("string", "Only this library (by name)"),
+                "query": prop("string", "Only items whose name or tags contain this text"),
+             ])),
+        Tool(name: "add_stencil",
+             description: "Place a stencil item (see list_stencils) with its top-left corner at x, y. Returns the new element ids; "
+                + "they are grouped, so they move together.",
+             inputSchema: schema([
+                "path": pathProp,
+                "name": prop("string", "Item name, as listed by list_stencils"),
+                "library": prop("string", "Library name, if several have an item with this name"),
+                "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
+                "scale": prop("number", "Size multiplier on top of the item's natural size (default 1; icons are enlarged to be readable)"),
+                "keep_original_colors": prop("boolean", "Keep the item's own colors and exact geometry (default false: drawn in the diagram's look)"),
+                "sketchy": prop("boolean", "Hand-drawn look when restyling (default true)"),
+             ], required: ["path", "name", "x", "y"])),
         Tool(name: "open_document",
              description: "Open a .dottie file in the Dottie app (launching it if needed) so edits show live and are undoable. "
                 + "Set create=true to make the file first if it does not exist. Reports whether live editing is available.",
@@ -206,6 +225,13 @@ actor DottieTools {
         } catch {
             return .init(content: [.text("\(error)")], isError: true)
         }
+    }
+
+    /// The built-in library plus the user's, optionally only the one called `name`.
+    private func stencilLibraries(named name: String? = nil) -> [StencilLibrary] {
+        let all = [StencilLibrary.starter] + StencilLibrary.load(directory: StencilLibrary.defaultDirectory).map(\.library)
+        guard let name else { return all }
+        return all.filter { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     // MARK: Files
@@ -329,6 +355,35 @@ actor DottieTools {
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(doc, to: url)
             return text("Updated")
+
+        case "list_stencils":
+            struct Row: Encodable { var library: String; var name: String; var tags: [String]; var width: Double; var height: Double }
+            let query = a.string("query")?.lowercased()
+            let rows = stencilLibraries(named: a.string("library"))
+                .flatMap { lib in lib.items.map { Row(library: lib.name, name: $0.name, tags: $0.tags, width: $0.width, height: $0.height) } }
+                .filter { r in
+                    guard let q = query else { return true }
+                    return r.name.lowercased().contains(q) || r.tags.contains { $0.lowercased().contains(q) }
+                }
+            return text(try json(rows))
+
+        case "add_stencil":
+            let url = try fileURL(a)
+            var doc = try load(url, createIfMissing: true)
+            guard let x = a.double("x"), let y = a.double("y") else { throw ToolFailure(message: "'x' and 'y' are required") }
+            let wanted = try a.require("name")
+            guard let item = stencilLibraries(named: a.string("library")).flatMap(\.items).first(where: { $0.name.caseInsensitiveCompare(wanted) == .orderedSame }) else {
+                throw ToolFailure(message: "No stencil named '\(wanted)'. Call list_stencils to see what is available.")
+            }
+            let k = item.readableScale * max(0.05, a.double("scale") ?? 1)
+            let size = CGSize(width: item.width * k, height: item.height * k)
+            let layer = doc.layers.first { !$0.locked && $0.visible }?.id ?? doc.layers[0].id
+            let art = item.placed(keepOriginalColors: a.bool("keep_original_colors") ?? false,
+                                  roughness: a.roughness ?? Style().roughness, scale: k)
+            let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer)
+            try save(doc, to: url)
+            return text("Placed '\(item.name)' (\(ids.count) elements) at x=\(x) y=\(y), \(Int(size.width))x\(Int(size.height)).\n"
+                + (try json(ids.map(\.uuidString).sorted())))
 
         case "open_document":
             let url = try fileURL(a)
