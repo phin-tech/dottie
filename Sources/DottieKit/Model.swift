@@ -99,6 +99,8 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var path: [Double]?
     /// Only set for `.path`. The shape's contours, filled together and stroked as one.
     public var subpaths: [PathSubpath]?
+    /// Only for `.path`: fill with the even-odd rule (SVG's `fill-rule: evenodd`) instead of nonzero.
+    public var evenOdd: Bool?
     /// Clockwise rotation in radians about the frame's center. nil is unrotated; connectors ignore it.
     public var rotation: Double?
 

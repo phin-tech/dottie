@@ -453,7 +453,7 @@ public enum Renderer {
                 var tint = e.style.fill
                 if e.style.fillStyle != .solid { tint.a *= 0.55 } // hatching read from afar is a lighter wash
                 ctx.setFillColor(tint.cgColor)
-                ctx.fillPath()
+                ctx.fillPath(using: e.evenOdd == true ? .evenOdd : .winding)
             } else {
                 ctx.saveGState()
                 ctx.addPath(hachurePath(for: e))

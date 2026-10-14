@@ -57,7 +57,7 @@ extension Exporter {
             var s = ""
             if e.style.fill.a > 0 {
                 if e.style.fillStyle == .solid {
-                    s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity")) stroke=\"none\"/>\n"
+                    s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity"))\(e.evenOdd == true ? " fill-rule=\"evenodd\"" : "") stroke=\"none\"/>\n"
                 } else {
                     s += "<path d=\"\(pathData(Renderer.hachurePath(for: e)))\" fill=\"none\" stroke=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "stroke-opacity")) stroke-width=\"\(num(max(1, e.style.strokeWidth / 2)))\" stroke-linecap=\"round\"/>\n"
                 }
