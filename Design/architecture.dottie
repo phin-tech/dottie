@@ -1,0 +1,1724 @@
+{
+  "elements" : [
+    {
+      "height" : 344,
+      "id" : "A774D414-2E25-4D9C-94F9-E7EF604E3474",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 436195558,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "dashed",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.4666666666666667,
+          "g" : 0.4666666666666667,
+          "r" : 0.4666666666666667
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 400,
+      "x" : 0,
+      "y" : 120
+    },
+    {
+      "height" : 31.2,
+      "id" : "A793652C-2C33-46EE-B06B-9DB54164320A",
+      "kind" : "text",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3269808750,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 0,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "dottie-mcp  ·  Sources\/DottieMCP",
+      "width" : 334.56,
+      "x" : 16,
+      "y" : 130
+    },
+    {
+      "height" : 644,
+      "id" : "48B13FEE-F471-4211-84EE-07C7CD9D4133",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 289923173,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "dashed",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.4666666666666667,
+          "g" : 0.4666666666666667,
+          "r" : 0.4666666666666667
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 720,
+      "x" : 480,
+      "y" : 120
+    },
+    {
+      "height" : 31.2,
+      "id" : "D4C7D722-57BF-4A9B-993A-F09B281F8D94",
+      "kind" : "text",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2778401780,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 0,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "DottieKit  ·  Sources\/DottieKit (no UI)",
+      "width" : 405.12,
+      "x" : 496,
+      "y" : 130
+    },
+    {
+      "height" : 544,
+      "id" : "222082E7-9954-40F1-B7F5-31263F68CB53",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3020104814,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "dashed",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.4666666666666667,
+          "g" : 0.4666666666666667,
+          "r" : 0.4666666666666667
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 700,
+      "x" : 1280,
+      "y" : 120
+    },
+    {
+      "height" : 31.2,
+      "id" : "6A3512A3-94A4-4E54-9311-E458537807EB",
+      "kind" : "text",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2940830116,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 0,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Dottie app  ·  App\/ (SwiftUI + AppKit)",
+      "width" : 395.04,
+      "x" : 1296,
+      "y" : 130
+    },
+    {
+      "height" : 64,
+      "id" : "A6B974C6-3F96-43EF-BBC7-5F7207BA0CC8",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2866716995,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 0.9098039215686274,
+          "r" : 0.8588235294117647
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "dottie-mcp\nstdio MCP server",
+      "width" : 340,
+      "x" : 30,
+      "y" : 170
+    },
+    {
+      "height" : 64,
+      "id" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3736629141,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 0.9098039215686274,
+          "r" : 0.8588235294117647
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "DottieTools\ntool calls, load \/ save",
+      "width" : 340,
+      "x" : 30,
+      "y" : 370
+    },
+    {
+      "height" : 64,
+      "id" : "E2FA0CCA-6812-49AC-90BB-F4221C4B2F2E",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 1807564927,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Live protocol\nsocket client + messages",
+      "width" : 320,
+      "x" : 500,
+      "y" : 170
+    },
+    {
+      "height" : 64,
+      "id" : "7C2B449A-0964-40D1-ADE1-6DECD2B9BB4C",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 4160178981,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "DiagramOps + Layout\nagent-level edits",
+      "width" : 320,
+      "x" : 500,
+      "y" : 270
+    },
+    {
+      "height" : 64,
+      "id" : "9AADA407-71AA-46F6-8A3D-5E8ACDBDE6DF",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 1720279920,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "DottieScript\nJavaScriptCore, require()",
+      "width" : 320,
+      "x" : 500,
+      "y" : 370
+    },
+    {
+      "height" : 64,
+      "id" : "1C7119B5-0F73-4C61-9B49-C49124CD107F",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2681663230,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Exporter\nPNG · SVG · PDF",
+      "width" : 320,
+      "x" : 500,
+      "y" : 470
+    },
+    {
+      "height" : 64,
+      "id" : "BB5B1B6C-0523-48C8-B601-78B198BC7686",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 969906129,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Stencil libraries\nstarter + .dottielib",
+      "width" : 320,
+      "x" : 500,
+      "y" : 570
+    },
+    {
+      "height" : 64,
+      "id" : "DCE11590-23E4-4768-A6F2-E4FB8CDDB7C6",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 978568834,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Model\nDottieDocument, Element",
+      "width" : 320,
+      "x" : 860,
+      "y" : 270
+    },
+    {
+      "height" : 64,
+      "id" : "5BBF8FA1-687A-44D9-BE62-B7254B94D637",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3198312859,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Renderer + Rough\nsketchy drawing",
+      "width" : 320,
+      "x" : 860,
+      "y" : 370
+    },
+    {
+      "height" : 64,
+      "id" : "BFCB45F9-D536-4184-999D-5E8E753BB419",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2999491051,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Snap + SpatialIndex\nguides, grid, hit tests",
+      "width" : 320,
+      "x" : 860,
+      "y" : 470
+    },
+    {
+      "height" : 64,
+      "id" : "CBB61E80-8055-4CD6-B75B-B68B3DF43397",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2200427874,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Connector\nrouting and ports",
+      "width" : 320,
+      "x" : 860,
+      "y" : 570
+    },
+    {
+      "height" : 60,
+      "id" : "E17F803E-A758-4BE3-9717-52791DA7CB38",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 1831915792,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8627450980392157,
+          "g" : 0.9529411764705882,
+          "r" : 0.8627450980392157
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Importers\nSVG · Excalidraw · draw.io",
+      "width" : 320,
+      "x" : 860,
+      "y" : 670
+    },
+    {
+      "height" : 64,
+      "id" : "43F72E3F-6E83-4EB1-AD51-14AE41598B19",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2207710799,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "LiveServer\nregistry of open windows",
+      "width" : 320,
+      "x" : 1300,
+      "y" : 170
+    },
+    {
+      "height" : 64,
+      "id" : "103E0708-F646-49D7-A09D-CA4C4D901EEC",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 453089089,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "DrawingDocument\nmodel + undo",
+      "width" : 320,
+      "x" : 1300,
+      "y" : 270
+    },
+    {
+      "height" : 64,
+      "id" : "3357ED9E-F973-4DAF-9447-06E07B4ECC17",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 1188669996,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "CanvasView\nAppKit canvas and tools",
+      "width" : 320,
+      "x" : 1300,
+      "y" : 370
+    },
+    {
+      "height" : 64,
+      "id" : "D9E8A460-56A3-4973-847A-39C9BC95767A",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 344478091,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "ContentView\ninspector, layers, library",
+      "width" : 320,
+      "x" : 1300,
+      "y" : 470
+    },
+    {
+      "height" : 64,
+      "id" : "3C637084-0D64-4CA8-84FE-0C221F310BDA",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3973912648,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "DottieApp\nwindows, menus, settings",
+      "width" : 300,
+      "x" : 1640,
+      "y" : 170
+    },
+    {
+      "height" : 64,
+      "id" : "EC137AC9-ADE1-41B0-83F3-7AD70FE5BAD5",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 828310410,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "ScriptConsole\nruns DottieScript",
+      "width" : 300,
+      "x" : 1640,
+      "y" : 270
+    },
+    {
+      "height" : 64,
+      "id" : "857ABB3E-7858-4D11-9CE4-849E03A340FD",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 822709435,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Settings\nMCP, script libraries",
+      "width" : 300,
+      "x" : 1640,
+      "y" : 370
+    },
+    {
+      "height" : 64,
+      "id" : "CA177453-8ECA-4DC6-941B-2281081F6A2F",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2418663271,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 0.8,
+          "g" : 0.9098039215686274,
+          "r" : 1
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Library panel + viewer\n.dottielib stencils",
+      "width" : 300,
+      "x" : 1640,
+      "y" : 470
+    },
+    {
+      "height" : 80,
+      "id" : "66BC53A4-DB18-4D63-9C40-535A3DB3E1F5",
+      "kind" : "ellipse",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 246087463,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 0.8627450980392157,
+          "r" : 0.9176470588235294
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Claude \/ agent",
+      "width" : 220,
+      "x" : 100,
+      "y" : -80
+    },
+    {
+      "height" : 64,
+      "id" : "F0F76129-D480-41A3-88B5-8395967CDF8B",
+      "kind" : "rectangle",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 912287849,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 0.8627450980392157,
+          "r" : 0.9176470588235294
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : ".dottie file\n(JSON on disk)",
+      "width" : 260,
+      "x" : 100,
+      "y" : 820
+    },
+    {
+      "height" : 100,
+      "id" : "2FADBA53-CB1B-474B-A62F-32A3C2091226",
+      "kind" : "ellipse",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2328526112,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 1,
+          "b" : 1,
+          "g" : 0.8627450980392157,
+          "r" : 0.9176470588235294
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "jsDelivr\n(optional libs)",
+      "width" : 200,
+      "x" : 2020,
+      "y" : 350
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "A6B974C6-3F96-43EF-BBC7-5F7207BA0CC8",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "66BC53A4-DB18-4D63-9C40-535A3DB3E1F5",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "9679245F-67ED-4540-A8F8-D4C99BBAECD3",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3165848931,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "MCP over stdio",
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "A6B974C6-3F96-43EF-BBC7-5F7207BA0CC8",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "24E3FF30-7896-421C-81B4-5DE8A4549F7D",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 353383486,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "E2FA0CCA-6812-49AC-90BB-F4221C4B2F2E",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "55A7CAFE-5DB5-4900-96D5-CDADBD322348",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3806849140,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "7C2B449A-0964-40D1-ADE1-6DECD2B9BB4C",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "75107846-F7B7-4662-94A3-E56ECFA2F73C",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2885630245,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "9AADA407-71AA-46F6-8A3D-5E8ACDBDE6DF",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "E15908F3-34EB-4A38-8570-76C6C73C512A",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 4193290370,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "1C7119B5-0F73-4C61-9B49-C49124CD107F",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "DC212096-FC09-4A2F-B781-4609E409857D",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2381467407,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "BB5B1B6C-0523-48C8-B601-78B198BC7686",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "DF9FB4F7-E32C-4222-9C4F-A194168EE46D",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 4017371747,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "F0F76129-D480-41A3-88B5-8395967CDF8B",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "633CED3A-7897-410E-8C2A-02E4D80F3C75",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "FFA86826-BC67-4636-9935-FA22660BABEE",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3619133762,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "app not running",
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "43F72E3F-6E83-4EB1-AD51-14AE41598B19",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "E2FA0CCA-6812-49AC-90BB-F4221C4B2F2E",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "A1C3A9CC-51C2-4791-AED0-676DF0182040",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 178025562,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "Unix socket",
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "103E0708-F646-49D7-A09D-CA4C4D901EEC",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "43F72E3F-6E83-4EB1-AD51-14AE41598B19",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "E8BD691D-2256-4791-A296-FA0B1125CE55",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 1542234828,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "one undo step",
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "103E0708-F646-49D7-A09D-CA4C4D901EEC",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "3357ED9E-F973-4DAF-9447-06E07B4ECC17",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "ECCCAB8E-1CF2-4E5E-BEF6-790B0D665ABE",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3067515621,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "3357ED9E-F973-4DAF-9447-06E07B4ECC17",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "D9E8A460-56A3-4973-847A-39C9BC95767A",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "BCD41B67-1989-41A0-829A-E5F6E042D0D7",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 472752939,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "DCE11590-23E4-4768-A6F2-E4FB8CDDB7C6",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "103E0708-F646-49D7-A09D-CA4C4D901EEC",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "417817D3-AC99-4A57-A149-2C754ECB4E7B",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2798601572,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "5BBF8FA1-687A-44D9-BE62-B7254B94D637",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "3357ED9E-F973-4DAF-9447-06E07B4ECC17",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "B690E253-12C2-4831-93DF-3F1BA9722D30",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 3656825929,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "BFCB45F9-D536-4184-999D-5E8E753BB419",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "3357ED9E-F973-4DAF-9447-06E07B4ECC17",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "0583D385-9FBE-4584-8A07-B935F361FD16",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 27139720,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "DCE11590-23E4-4768-A6F2-E4FB8CDDB7C6",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "7C2B449A-0964-40D1-ADE1-6DECD2B9BB4C",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "2A10B502-FE83-4EEF-BD64-867A5CFFCD4E",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2221884226,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "5BBF8FA1-687A-44D9-BE62-B7254B94D637",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "1C7119B5-0F73-4C61-9B49-C49124CD107F",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "26D13319-A14F-4F3F-B8D5-07888E4C59FC",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 1934915834,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    },
+    {
+      "connector" : {
+        "end" : {
+          "elementID" : "2FADBA53-CB1B-474B-A62F-32A3C2091226",
+          "x" : 0,
+          "y" : 0
+        },
+        "endHead" : "arrow",
+        "routing" : "straight",
+        "start" : {
+          "elementID" : "857ABB3E-7858-4D11-9CE4-849E03A340FD",
+          "x" : 0,
+          "y" : 0
+        },
+        "startHead" : "none"
+      },
+      "height" : 0,
+      "id" : "58A1D5E3-F5CA-4683-B330-AFBFB2612BD0",
+      "kind" : "connector",
+      "layerID" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "seed" : 2123638539,
+      "style" : {
+        "bowing" : 1,
+        "dash" : "solid",
+        "fill" : {
+          "a" : 0,
+          "b" : 0,
+          "g" : 0,
+          "r" : 0
+        },
+        "fillStyle" : "solid",
+        "fontSize" : 18,
+        "roughness" : 1,
+        "stroke" : {
+          "a" : 1,
+          "b" : 0.13,
+          "g" : 0.12,
+          "r" : 0.12
+        },
+        "strokeWidth" : 2
+      },
+      "text" : "downloads",
+      "width" : 0,
+      "x" : 0,
+      "y" : 0
+    }
+  ],
+  "layers" : [
+    {
+      "id" : "1889C0F0-E6C2-44D9-807C-058AEDA1B16F",
+      "locked" : false,
+      "name" : "Layer 1",
+      "visible" : true
+    }
+  ],
+  "version" : 1
+}
