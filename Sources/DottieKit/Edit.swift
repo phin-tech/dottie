@@ -55,6 +55,16 @@ extension DottieDocument {
         return Set(added.map(\.id))
     }
 
+    /// Adds artwork positioned with its top-left at the origin (an import, a stencil), centered on
+    /// `center`, on `layerID`, with fresh ids and group ids. Returns the new element ids.
+    @discardableResult
+    public mutating func insert(_ art: [Element], size: CGSize, center: CGPoint, layerID: UUID) -> Set<UUID> {
+        var items = art
+        for i in items.indices { items[i].layerID = layerID }
+        guard let data = try? JSONEncoder().encode(items) else { return [] }
+        return paste(data, offset: CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2))
+    }
+
     /// Copy + paste in one step. Returns the new ids.
     @discardableResult
     public mutating func duplicate(_ ids: Set<UUID>, offset: CGPoint = CGPoint(x: 16, y: 16)) -> Set<UUID> {

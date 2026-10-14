@@ -105,3 +105,21 @@ final class SVGImportTests: XCTestCase {
         XCTAssertTrue(Exporter.svg(back).contains("<path"))
     }
 }
+
+final class InsertArtTests: XCTestCase {
+    func testInsertCentersAndRemapsGroups() throws {
+        var doc = DottieDocument()
+        let svg = ##"<svg viewBox="0 0 40 20"><rect width="10" height="10" fill="red"/><rect x="20" width="20" height="20" fill="blue"/></svg>"##
+        let art = try SVGImporter.importElements(from: Data(svg.utf8), layerID: UUID())
+        let a = doc.insert(art.elements, size: art.size, center: CGPoint(x: 100, y: 100), layerID: doc.layers[0].id)
+        let b = doc.insert(art.elements, size: art.size, center: CGPoint(x: 300, y: 100), layerID: doc.layers[0].id)
+        XCTAssertEqual(a.count, 2)
+        XCTAssertTrue(a.isDisjoint(with: b))
+        let first = doc.elements.filter { a.contains($0.id) }
+        XCTAssertEqual(first.map(\.frame.minX).min()!, 80, accuracy: 0.1)      // 100 - 40/2
+        XCTAssertEqual(Set(first.compactMap(\.groupID)).count, 1)
+        XCTAssertNotEqual(doc.elements.first { a.contains($0.id) }?.groupID,
+                          doc.elements.first { b.contains($0.id) }?.groupID)
+        XCTAssertTrue(doc.elements.allSatisfy { $0.layerID == doc.layers[0].id })
+    }
+}

@@ -20,10 +20,13 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Layers panel (add, hide, lock, rename, reorder; layer order is z-order)
 - [x] Rotation (single and multi-selection), resize with smart guides, equal-spacing guides while moving
 - [x] Large-document performance: id-indexed connector passes, viewport culling, linear layer ordering (see PerformanceTests)
+- [x] `path` element kind: compound Bézier shapes with holes (even-odd or nonzero), sketchy and hatched like the rest
+- [x] SVG import (File ▸ Import SVG…, or drop `.svg` files; ⌥-drop keeps original colors): paths, shapes, transforms, `<use>`, CSS classes, gradients flattened to their first stop
 
 ## Next
-1. Stencil/shape libraries, rulers, themes
-2. Per-element layer drag-and-drop in the layers panel
+1. Stencil libraries: `.dottielib` files and a sidebar panel; then Excalidraw and draw.io importers
+2. Rulers, themes
+3. Per-element layer drag-and-drop in the layers panel
 
 ## Agents (MCP)
 - [x] Live mode (see README); `export_svg`

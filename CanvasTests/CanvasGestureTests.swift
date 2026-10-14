@@ -234,4 +234,21 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertTrue(commits.isEmpty)
         XCTAssertEqual(element(e.id), e)
     }
+
+    // MARK: SVG import
+
+    func testImportingSVGsIsOneUndoStepSelectedAndScaledUp() {
+        let icon = Data(##"<svg viewBox="0 0 24 24"><path d="M2 2h20v20H2z" fill="#f00"/></svg>"##.utf8)
+        let two = Data(##"<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#00f"/></svg>"##.utf8)
+        XCTAssertTrue(view.importSVGs([icon, two], at: CGPoint(x: 200, y: 200), keepOriginalColors: true))
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(commits[0].name, "Import SVG")
+        let added = view.model.elements
+        XCTAssertEqual(added.count, 2)
+        XCTAssertEqual(view.selection, Set(added.map(\.id)))
+        XCTAssertEqual(added[0].frame.width, 96 * 20 / 24, accuracy: 0.5) // 24pt icon scaled to 96
+        XCTAssertLessThan(added[0].frame.maxX, added[1].frame.minX)       // laid out left to right
+        XCTAssertFalse(view.importSVGs([Data("nope".utf8)], at: .zero, keepOriginalColors: true))
+        XCTAssertEqual(commits.count, 1)
+    }
 }

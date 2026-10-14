@@ -425,6 +425,88 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         onCommit?(next, "Paste")
     }
 
+    // MARK: Importing SVG
+
+    /// Readable size for an import: small icons grow, huge exports shrink, anything else is untouched.
+    private func importScale(for size: CGSize) -> Double {
+        let longest = max(size.width, size.height)
+        guard longest > 0 else { return 1 }
+        if longest < 64 { return 96 / longest }
+        if longest > 480 { return 480 / longest }
+        return 1
+    }
+
+    /// Places each SVG, in a row starting at `center`, as one undo step. Returns false if none could be read.
+    @discardableResult
+    func importSVGs(_ files: [Data], at center: CGPoint, keepOriginalColors: Bool) -> Bool {
+        let usable = model.layers.filter { !$0.locked && $0.visible }
+        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
+        var next = model
+        var added = Set<UUID>()
+        var x = center.x
+        for data in files {
+            var options = SVGImporter.Options()
+            options.keepOriginalColors = keepOriginalColors
+            guard let probe = try? SVGImporter.importElements(from: data, layerID: layer.id, options: options) else { continue }
+            options.scale = importScale(for: probe.size)
+            guard let art = try? SVGImporter.importElements(from: data, layerID: layer.id, options: options) else { continue }
+            let at = CGPoint(x: x + art.size.width / 2, y: center.y)
+            added.formUnion(next.insert(art.elements, size: art.size, center: at, layerID: layer.id))
+            x += art.size.width + 24
+        }
+        guard !added.isEmpty else { NSSound.beep(); return false }
+        selection = added
+        tool = .select
+        onToolChange?(.select)
+        onCommit?(next, "Import SVG")
+        return true
+    }
+
+    /// Model coordinates of the middle of what is on screen.
+    private var viewportCenter: CGPoint {
+        CGPoint(x: (bounds.midX - pan.x) / zoom, y: (bounds.midY - pan.y) / zoom)
+    }
+
+    @objc func importSVG(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.svg]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose SVG files to place on the canvas"
+        let keep = NSButton(checkboxWithTitle: "Keep original colors", target: nil, action: nil)
+        keep.state = .off
+        panel.accessoryView = keep
+        panel.isAccessoryViewDisclosed = true
+        guard panel.runModal() == .OK else { return }
+        let files = panel.urls.compactMap { try? Data(contentsOf: $0) }
+        let half = files.count > 1 ? CGFloat(files.count - 1) * 120 : 0
+        importSVGs(files, at: CGPoint(x: viewportCenter.x - half, y: viewportCenter.y), keepOriginalColors: keep.state == .on)
+    }
+
+    // Dropping .svg files from Finder places them under the cursor; hold ⌥ to keep original colors.
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        registerForDraggedTypes([.fileURL])
+    }
+
+    private func droppedSVGs(_ info: NSDraggingInfo) -> [URL] {
+        let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                       options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return urls.filter { $0.pathExtension.lowercased() == "svg" }
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        droppedSVGs(sender).isEmpty ? [] : .copy
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let files = droppedSVGs(sender).compactMap { try? Data(contentsOf: $0) }
+        guard !files.isEmpty else { return false }
+        let raw = convert(sender.draggingLocation, from: nil)
+        let at = CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom)
+        return importSVGs(files, at: at, keepOriginalColors: NSEvent.modifierFlags.contains(.option))
+    }
+
     @objc func duplicate(_ sender: Any?) {
         guard editor == nil, !selection.isEmpty else { return } // ⌘D while typing a label must not clone the shape
         var next = model
