@@ -13,6 +13,10 @@ xcodegen generate                  # regenerates Dottie.xcodeproj from project.y
 xcodebuild -project Dottie.xcodeproj -scheme Dottie build
 ```
 
+Builds are signed to run locally unless a gitignored `Signing.local.xcconfig` sets `DEVELOPMENT_TEAM` and
+`CODE_SIGN_IDENTITY = Apple Development` (see `Signing.xcconfig`). Set the team there rather than in Xcode's
+Signing & Capabilities pane, which is lost when the project is regenerated.
+
 ## Command line: `dottie`
 
 Render drawings and manage libraries without opening the app.

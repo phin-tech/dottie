@@ -11,12 +11,15 @@ targets:
     type: application
     platform: macOS
     sources: [App]
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
     dependencies:
       - package: Dottie
         product: DottieKit
       - target: DottieCLI
         embed: true
-        codeSign: false
+        codeSign: true
         copy:
           destination: wrapper
           subpath: Contents/Helpers
@@ -26,7 +29,6 @@ targets:
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Dottie
-        CODE_SIGN_IDENTITY: "-"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     info:
       path: App/Info.plist
@@ -56,6 +58,9 @@ targets:
     type: tool
     platform: macOS
     sources: [Sources/DottieCLI]
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
     dependencies:
       - package: Dottie
         product: DottieKit
@@ -64,7 +69,6 @@ targets:
         # Not `dottie`: that differs from the app's `Dottie` executable only by case.
         PRODUCT_NAME: dottie-cli
         SWIFT_VERSION: "6.0"
-        CODE_SIGN_IDENTITY: "-"
   # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
   # as a test host would take over the live socket of a running Dottie.
   CanvasTests:
