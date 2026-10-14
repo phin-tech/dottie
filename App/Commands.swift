@@ -83,6 +83,23 @@ struct DottieCommands: Commands {
             }
             .disabled(n < 3)
         }
+        CommandMenu("Script") {
+            Button("Script Console…") { editor?.openScriptConsole() }
+                .keyboardShortcut("j", modifiers: [.command, .option])
+                .disabled(editor == nil)
+            Divider()
+            let scripts = ScriptLibrary.list()
+            if scripts.isEmpty {
+                Text("No Saved Scripts").foregroundStyle(.secondary)
+            } else {
+                ForEach(scripts, id: \.self) { url in
+                    Button(url.deletingPathExtension().lastPathComponent) { editor?.runScriptFile(url) }
+                        .disabled(editor == nil)
+                }
+            }
+            Divider()
+            Button("Show Scripts Folder") { ScriptLibrary.reveal() }
+        }
         CommandMenu("Tools") {
             Picker("Tool", selection: Binding(get: { tool ?? .select }, set: { tool = $0 })) {
                 ForEach(Tool.allCases) { t in

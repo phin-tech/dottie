@@ -25,7 +25,50 @@ claude mcp add dottie -- "$(swift build -c release --product dottie-mcp --show-b
 Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its work),
 `export_svg`, `create_diagram`, `open_document`, `list_stencils` and `add_stencil` (place shapes from the
-built-in and user stencil libraries).
+built-in and user stencil libraries), and `run_script` / `script_api` (see below).
+
+### Scripting
+
+Drawings can be scripted in JavaScript (JavaScriptCore, no dependencies). A script sees one global, `dottie`,
+with calls to read, draw and change elements; it has no file or network access, runs against a copy, and is
+applied as a single undo step only if it finishes without throwing. Runaway scripts are stopped after 10 s.
+
+```js
+const a = dottie.rect({ x: 0, y: 0, text: "Start", fill: "#d6f5d6" });
+const b = dottie.diamond({ x: 0, y: 140, text: "OK?" });
+dottie.connect(a, b, { routing: "elbow" });
+return dottie.elements().length;
+```
+
+- **In the app:** Script ▸ Script Console… (⌥⌘J) opens an editor with Run (⌘↩), Open/Save and an API
+  reference; `dottie.selection` is the selected elements. `.js` files in
+  `~/Library/Application Support/Dottie/Scripts` appear in the Script menu and run on the front drawing.
+- **From an agent (code mode):** the MCP tool `run_script` takes a `path` and `code`, so a loop or a computed
+  edit is one call instead of dozens, and returns `console.log` output, the script's value, and optionally a
+  PNG (`render`). The API is documented in the tool's description, the `script_api` tool, and the
+  `dottie://script-api` resource.
+
+Scripts can `require()` libraries. Bundled: `lodash`, `d3-array`, `d3-color`, `d3-hierarchy`, `dagre` (graph layout), `dayjs` (regenerate or bump
+with `scripts/update-script-modules.py`). The Settings ▸ Scripting tab has a checklist of optional libraries (`d3-scale`, `d3-shape`, `d3-force`, `chroma-js`,
+`seedrandom`, `simple-statistics`): checking one downloads its pinned, checksum-verified version into the modules
+folder, unchecking removes it. Timers never fire in scripts, so step `d3-force` by hand with `simulation.stop().tick(n)`.
+The same tab has an **Add a library** field: paste an npm name (`marked`, `lodash@4`) or an `https://` link to a
+`.js` file. Dottie resolves and pins the version via jsDelivr, loads the file in the script engine before keeping it
+(ES-module-only or Node-only packages are refused with the reason), fetches missing package dependencies the same
+way, and lists what you added so it can be removed. This is app-only; agents cannot install libraries.
+You can also drop any other single-file CommonJS/UMD bundle into
+`~/Library/Application Support/Dottie/Scripts/modules/` (Script ▸ Show Scripts Folder) and `require("name")` loads
+it; a file there overrides a bundled one. `./` and `../` work between your modules, and nothing outside that folder
+is reachable. Agents can also pass `modules: {name: source}` to `run_script`, and `script_api` lists what is
+installed. There is no npm, `import` syntax, or Node built-ins.
+
+```js
+const _ = require("lodash"), { hierarchy, tree } = require("d3-hierarchy");
+const root = tree().nodeSize([180, 120])(hierarchy({ name: "App", children: [{ name: "UI" }, { name: "API" }] }));
+const ids = {};
+root.each(n => { ids[n.data.name] = dottie.rect({ x: n.x + 300, y: n.y, text: n.data.name }); });
+root.links().forEach(l => dottie.connect(ids[l.source.data.name], ids[l.target.data.name]));
+```
 
 ### Themes, rulers, layers
 

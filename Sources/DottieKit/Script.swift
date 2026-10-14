@@ -1,0 +1,558 @@
+import Foundation
+import CoreGraphics
+import JavaScriptCore
+
+/// What a script run produced. `error` set means nothing was applied to the document.
+public struct ScriptResult: Sendable, Equatable {
+    /// Lines written with `console.log` (and friends), in order.
+    public var logs: [String]
+    /// The script's final value as JSON (a top-level `return` works too); nil when it is undefined.
+    public var value: String?
+    public var error: String?
+    /// Number of `dottie.*` calls the script made.
+    public var operations: Int
+    public var succeeded: Bool { error == nil }
+}
+
+/// Runs JavaScript against a document, in JavaScriptCore. One engine for the app's script console and
+/// the MCP server's `run_script` tool.
+///
+/// The context has no file system, network or timers: a script can only read and change the one
+/// document it is given. Edits are transactional: they are applied to a copy and written back only
+/// if the script finishes without throwing.
+public enum DottieScript {
+    public static let defaultTimeLimit: TimeInterval = 10
+    /// Upper bound on `dottie.*` calls, so a loop that edits forever stops even without a time limit.
+    /// ~/Library/Application Support/Dottie/Scripts: saved scripts, and `modules/` for `require`.
+    public static var scriptsDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Dottie/Scripts", isDirectory: true)
+    }
+    public static var modulesDirectory: URL { scriptsDirectory.appendingPathComponent("modules", isDirectory: true) }
+
+    /// Module names `require` can load from `directory`, for listing in the API reference.
+    public static func installedModules(in directory: URL = modulesDirectory) -> [String] {
+        var names = Set(BundledModules.sources.keys)
+        if let walker = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: nil,
+                                                       options: [.skipsHiddenFiles]) {
+            let base = directory.resolvingSymlinksInPath().path + "/"
+            for case let url as URL in walker {
+                let resolved = url.resolvingSymlinksInPath()
+                guard resolved.pathExtension == "js", resolved.path.hasPrefix(base) else { continue }
+                names.insert(String(resolved.path.dropFirst(base.count).dropLast(3)))
+            }
+        }
+        return names.sorted()
+    }
+
+    public enum ModuleCheck: Equatable, Sendable {
+        case ok
+        /// Loading it needs another module that is not available (a dependency, or a Node built-in).
+        case missing(String)
+        case failed(String)
+    }
+
+    /// Loads `module` from `directory` the way a script's `require` would, to vet a freshly downloaded file:
+    /// ES-module syntax, Node-only APIs and missing dependencies all show up here instead of in a user's script.
+    public static func check(module: String, in directory: URL) -> ModuleCheck {
+        var doc = DottieDocument()
+        let quoted = String(decoding: (try? JSONSerialization.data(withJSONObject: [module])) ?? Data("[\"\"]".utf8), as: UTF8.self)
+        let r = run("require(\(quoted)[0]); 0", on: &doc, libraries: [], modulesDirectory: directory, timeLimit: 5)
+        guard let error = r.error else { return .ok }
+        if let open = error.range(of: "Cannot find module '"), let close = error[open.upperBound...].firstIndex(of: "'") {
+            return .missing(String(error[open.upperBound..<close]))
+        }
+        return .failed(error)
+    }
+
+    static let operationLimit = 50_000
+    static let logLimit = 200_000
+
+    /// Runs `source`. `selection` is what `dottie.selection` returns (the app passes the selected ids).
+    /// `libraries` are the stencil libraries `dottie.stencils()` and `dottie.stencil()` see.
+    public static func run(_ source: String, on doc: inout DottieDocument, selection: [UUID] = [],
+                           libraries: [StencilLibrary]? = nil, modules: [String: String] = [:],
+                           modulesDirectory: URL? = DottieScript.modulesDirectory,
+                           timeLimit: TimeInterval = defaultTimeLimit) -> ScriptResult {
+        let host = Host(doc: doc, selection: selection, libraries: libraries,
+                        modules: modules, modulesDirectory: modulesDirectory)
+        guard let context = JSContext() else {
+            return ScriptResult(logs: [], value: nil, error: "JavaScript is unavailable", operations: 0)
+        }
+        host.install(in: context)
+        ExecutionLimit.apply(to: context, seconds: timeLimit)
+
+        var failure: String?
+        var json: String?
+        var result = context.evaluateScript(source)
+        // A top-level `return` is a syntax error for a plain script; nothing ran, so wrap and retry.
+        if let e = context.exception, isReturnSyntaxError(e) {
+            context.exception = nil
+            result = context.evaluateScript("(function () {\n" + source + "\n})()")
+        }
+        if let e = context.exception {
+            failure = describe(e)
+        } else if host.failure == nil, let result, !result.isUndefined {
+            json = jsonString(result, in: context)
+        }
+        failure = failure ?? host.failure
+        if failure == nil { doc = host.doc }
+        return ScriptResult(logs: host.logs, value: json, error: failure, operations: host.operations)
+    }
+
+    private static func isReturnSyntaxError(_ e: JSValue) -> Bool {
+        e.forProperty("name")?.toString() == "SyntaxError" && (e.forProperty("message")?.toString() ?? "").lowercased().contains("return")
+    }
+
+    private static func describe(_ e: JSValue) -> String {
+        var s = e.forProperty("message")?.isString == true ? (e.forProperty("name")?.toString() ?? "Error") + ": " + e.forProperty("message")!.toString() : e.toString() ?? "Error"
+        if let line = e.forProperty("line"), line.isNumber { s += " (line \(line.toInt32()))" }
+        return s
+    }
+
+    private static func jsonString(_ v: JSValue, in context: JSContext) -> String? {
+        if let s = context.objectForKeyedSubscript("JSON")?.invokeMethod("stringify", withArguments: [v]), s.isString {
+            return s.toString()
+        }
+        context.exception = nil
+        return v.toString()
+    }
+
+    // MARK: Host
+
+    /// Native half of the `dottie` object. Every bridge call is one string in, one string out.
+    final class Host: @unchecked Sendable {
+        var doc: DottieDocument
+        let selection: [UUID]
+        let libraries: [StencilLibrary]?
+        var logs: [String] = []
+        var logBytes = 0
+        var operations = 0
+        /// A native error raised while the script was running, kept in case the script swallows it.
+        var failure: String?
+
+        let modules: [String: String]
+        let modulesDirectory: URL?
+
+        init(doc: DottieDocument, selection: [UUID], libraries: [StencilLibrary]?,
+             modules: [String: String], modulesDirectory: URL?) {
+            self.doc = doc; self.selection = selection; self.libraries = libraries
+            self.modules = modules; self.modulesDirectory = modulesDirectory
+        }
+
+        /// Source for a module id already normalized by the JS shim (no `.`/`..`, no leading slash).
+        /// Inline modules win; files must stay inside the modules directory, symlinks included.
+        func moduleSource(_ id: String) throws -> (path: String, text: String) {
+            if let inline = modules[id] ?? modules[id + ".js"] { return (id, inline) }
+            guard !id.isEmpty, !id.hasPrefix("/"), !id.contains("\\"), !id.split(separator: "/").contains("..") else {
+                throw OpsError.invalid("Cannot load module '\(id)'")
+            }
+            guard let root = modulesDirectory?.resolvingSymlinksInPath() else {
+                if let bundled = BundledModules.sources[id] { return (id, bundled) }
+                throw OpsError.notFound("Cannot find module '\(id)'")
+            }
+            for candidate in [id + ".js", id, id + "/index.js"] {
+                let url = root.appendingPathComponent(candidate).resolvingSymlinksInPath()
+                var isDir: ObjCBool = false
+                guard url.path.hasPrefix(root.path + "/"),
+                      FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue,
+                      let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+                return (String(url.path.dropFirst(root.path.count + 1)), text)
+            }
+            if let bundled = BundledModules.sources[id] { return (id, bundled) }
+            throw OpsError.notFound("Cannot find module '\(id)'. Modules are .js files in \(DottieScript.modulesDirectory.path) "
+                + "or passed inline.")
+        }
+
+        func install(in context: JSContext) {
+            let call: @convention(block) (String, String) -> String = { [unowned self] name, args in
+                guard let ctx = JSContext.current() else { return "" }
+                do { return try self.dispatch(name, args) }
+                catch {
+                    let message = (error as? OpsError)?.description ?? "\(error)"
+                    ctx.exception = JSValue(newErrorFromMessage: message, in: ctx)
+                    return ""
+                }
+            }
+            let log: @convention(block) (String) -> Void = { [unowned self] line in
+                guard self.logBytes < DottieScript.logLimit else { return }
+                self.logBytes += line.utf8.count
+                self.logs.append(line)
+            }
+            let source: @convention(block) (String) -> String = { [unowned self] id in
+                guard let ctx = JSContext.current() else { return "" }
+                do { let m = try self.moduleSource(id); return m.path + "\n" + m.text }
+                catch {
+                    ctx.exception = JSValue(newErrorFromMessage: (error as? OpsError)?.description ?? "\(error)", in: ctx)
+                    return ""
+                }
+            }
+            context.setObject(unsafeBitCast(source, to: AnyObject.self), forKeyedSubscript: "__source" as NSString)
+            context.setObject(unsafeBitCast(call, to: AnyObject.self), forKeyedSubscript: "__dottie" as NSString)
+            context.setObject(unsafeBitCast(log, to: AnyObject.self), forKeyedSubscript: "__log" as NSString)
+            context.evaluateScript(DottieScript.prelude)
+        }
+
+        struct Args {
+            let raw: [String: Any]
+            /// Keys match regardless of case and underscores: `fillStyle`, `fill_style` and `fillstyle` are one key.
+            init(_ raw: [String: Any]) {
+                var norm: [String: Any] = [:]
+                for (k, v) in raw where !(v is NSNull) { norm[Args.normalize(k)] = v }
+                self.raw = norm
+            }
+            static func normalize(_ k: String) -> String { k.replacingOccurrences(of: "_", with: "").lowercased() }
+
+            func string(_ k: String) -> String? { raw[Args.normalize(k)] as? String }
+            func double(_ k: String) -> Double? { (raw[Args.normalize(k)] as? NSNumber).flatMap { $0.doubleValue } }
+            func bool(_ k: String) -> Bool? {
+                guard let n = raw[Args.normalize(k)] as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { return nil }
+                return n.boolValue
+            }
+            func list(_ k: String) -> [Args]? {
+                (raw[Args.normalize(k)] as? [Any])?.map { Args($0 as? [String: Any] ?? [:]) }
+            }
+            func has(_ k: String) -> Bool { raw[Args.normalize(k)] != nil }
+
+            func require(_ k: String) throws -> String {
+                guard let s = string(k), !s.isEmpty else { throw OpsError.invalid("Missing required argument '\(k)'") }
+                return s
+            }
+            func uuid(_ k: String) throws -> UUID {
+                let s = try require(k)
+                guard let u = UUID(uuidString: s) else { throw OpsError.invalid("'\(k)' is not an element id: \(s)") }
+                return u
+            }
+            func color(_ k: String) throws -> RGBA? {
+                guard let s = string(k) else { return nil }
+                guard let c = RGBA(hex: s) else { throw OpsError.invalid("'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                return c
+            }
+            func enumValue<T: RawRepresentable & CaseIterable>(_ k: String, as: T.Type) throws -> T? where T.RawValue == String {
+                guard let s = string(k) else { return nil }
+                guard let v = T(rawValue: s) else {
+                    throw OpsError.invalid("'\(k)' must be one of \(T.allCases.map(\.rawValue).joined(separator: ", ")), got '\(s)'")
+                }
+                return v
+            }
+            func look() throws -> DiagramOps.Look {
+                DiagramOps.Look(fillStyle: try enumValue("fillStyle", as: FillStyle.self),
+                                dash: try enumValue("dash", as: DashStyle.self),
+                                strokeWidth: double("strokeWidth"), bowing: double("bowing"),
+                                startHead: try enumValue("startHead", as: Arrowhead.self),
+                                endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"))
+            }
+            /// `sketchy: true|false` as a roughness override.
+            var roughness: Double? { bool("sketchy").map { $0 ? 1 : 0 } }
+        }
+
+        func dispatch(_ name: String, _ json: String) throws -> String {
+            operations += 1
+            guard operations <= DottieScript.operationLimit else {
+                throw OpsError.invalid("Script made more than \(DottieScript.operationLimit) dottie calls; stopping.")
+            }
+            let parsed = try JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])
+            let a = Args(parsed as? [String: Any] ?? [:])
+            let out: Any? = try run(name, a)
+            guard let out else { return "" }
+            return String(decoding: try JSONSerialization.data(withJSONObject: out, options: [.fragmentsAllowed]), as: UTF8.self)
+        }
+
+        // MARK: Operations
+
+        private func element(_ id: UUID) throws -> Element {
+            guard let e = doc.elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+            return e
+        }
+
+        private func hex(_ c: RGBA) -> String {
+            func b(_ v: Double) -> Int { Int((min(max(v, 0), 1) * 255).rounded()) }
+            let base = String(format: "#%02x%02x%02x", b(c.r), b(c.g), b(c.b))
+            return c.a < 1 ? base + String(format: "%02x", b(c.a)) : base
+        }
+
+        private func round1(_ v: Double) -> Double { (v * 10).rounded() / 10 }
+
+        private func describe(_ e: Element, index: [UUID: Element]? = nil) -> [String: Any] {
+            let b = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.frame
+            var d: [String: Any] = [
+                "id": e.id.uuidString, "kind": e.kind.rawValue,
+                "x": round1(b.minX), "y": round1(b.minY), "width": round1(b.width), "height": round1(b.height),
+                "stroke": hex(e.style.stroke), "sketchy": e.style.roughness > 0,
+                "strokeWidth": e.style.strokeWidth,
+            ]
+            if let t = e.text { d["text"] = t }
+            if e.style.fill.a > 0 { d["fill"] = hex(e.style.fill) }
+            if e.style.fillStyle != .solid { d["fillStyle"] = e.style.fillStyle.rawValue }
+            if e.style.dash != .solid { d["dash"] = e.style.dash.rawValue }
+            if let r = e.rotation { d["rotation"] = round1(r * 180 / .pi) }
+            if let g = e.groupID { d["group"] = g.uuidString }
+            if let layer = doc.layers.first(where: { $0.id == e.layerID }) { d["layer"] = layer.name }
+            if let c = e.connector {
+                d["routing"] = c.routing.rawValue
+                if let f = c.start.elementID { d["from"] = f.uuidString }
+                if let t = c.end.elementID { d["to"] = t.uuidString }
+            }
+            return d
+        }
+
+        private func libs() -> [StencilLibrary] {
+            libraries ?? ([StencilLibrary.starter] + StencilLibrary.load(directory: StencilLibrary.defaultDirectory).map(\.library))
+        }
+
+        private func run(_ name: String, _ a: Args) throws -> Any? {
+            switch name {
+            case "elements":
+                let index = doc.elements.contains { $0.kind == .connector } ? doc.elementIndex : nil
+                let kind = a.string("kind"), text = a.string("text")?.lowercased()
+                return doc.elements
+                    .filter { kind == nil || $0.kind.rawValue == kind }
+                    .filter { text == nil || ($0.text ?? "").lowercased().contains(text!) }
+                    .map { describe($0, index: index) }
+
+            case "get":
+                return describe(try element(try a.uuid("id")))
+
+            case "shape":
+                let kindName = a.string("kind") ?? "rectangle"
+                guard let kind = ElementKind(rawValue: kindName), kind != .connector, kind != .path, kind != .freehand else {
+                    throw OpsError.invalid("'kind' must be one of rectangle, ellipse, diamond, text, got '\(kindName)'")
+                }
+                let x = a.double("x") ?? 0, y = a.double("y") ?? 0
+                var frame: CGRect?
+                if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: x, y: y, width: w, height: h) }
+                let e = try DiagramOps.addShape(&doc, kind: kind, frame: frame, at: CGPoint(x: x, y: y), text: a.string("text"),
+                                                fill: try a.color("fill"), stroke: try a.color("stroke"),
+                                                roughness: a.roughness, look: try a.look())
+                return describe(e)
+
+            case "connector":
+                let routing = try a.enumValue("routing", as: Routing.self) ?? .straight
+                let c = try DiagramOps.addConnector(&doc, from: try a.uuid("from"), to: try a.uuid("to"), routing: routing,
+                                                    arrow: a.bool("arrow") ?? true, roughness: a.roughness,
+                                                    label: a.string("label"), look: try a.look())
+                return describe(c)
+
+            case "update":
+                let id = try a.uuid("id")
+                let text: String?? = a.has("text") ? .some(a.string("text").flatMap { $0.isEmpty ? nil : $0 }) : nil
+                try DiagramOps.update(&doc, id: id, text: text, x: a.double("x"), y: a.double("y"),
+                                      width: a.double("width"), height: a.double("height"),
+                                      fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
+                                      routing: try a.enumValue("routing", as: Routing.self), look: try a.look())
+                return describe(try element(id))
+
+            case "remove":
+                var ids: [UUID] = []
+                if let list = a.raw["ids"] as? [Any] {
+                    for v in list {
+                        guard let s = v as? String, let u = UUID(uuidString: s) else { throw OpsError.invalid("'ids' must be element ids") }
+                        ids.append(u)
+                    }
+                } else {
+                    ids = [try a.uuid("id")]
+                }
+                for id in ids { _ = try element(id) }
+                doc.remove(Set(ids))
+                return ids.count
+
+            case "build":
+                guard let nodeArgs = a.list("nodes"), !nodeArgs.isEmpty else { throw OpsError.invalid("'nodes' must be a non-empty array") }
+                let nodes = try nodeArgs.map { n -> DiagramOps.NodeSpec in
+                    let kindName = n.string("kind") ?? "rectangle"
+                    guard let kind = ElementKind(rawValue: kindName), [.rectangle, .ellipse, .diamond, .text].contains(kind) else {
+                        throw OpsError.invalid("node 'kind' must be one of rectangle, ellipse, diamond, text, got '\(kindName)'")
+                    }
+                    return DiagramOps.NodeSpec(key: try n.require("key"), text: n.string("text") ?? "", kind: kind,
+                                               fill: try n.color("fill"), width: n.double("width"), height: n.double("height"))
+                }
+                let edges = try (a.list("edges") ?? []).map { e in
+                    DiagramOps.EdgeSpec(from: try e.require("from"), to: try e.require("to"),
+                                        routing: try e.enumValue("routing", as: Routing.self),
+                                        arrow: e.bool("arrow") ?? true, label: e.string("label"))
+                }
+                let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
+                let ids = try DiagramOps.build(&doc, nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1)
+                return ids.mapValues(\.uuidString)
+
+            case "layout":
+                DiagramOps.autoLayout(&doc, direction: LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom)
+                return nil
+
+            case "bounds":
+                guard !doc.elements.isEmpty else { return ["x": 0, "y": 0, "width": 0, "height": 0] }
+                let b = Exporter.bounds(of: doc, padding: 0)
+                return ["x": round1(b.minX), "y": round1(b.minY), "width": round1(b.width), "height": round1(b.height)]
+
+            case "selection":
+                let live = Set(doc.elements.map(\.id))
+                return selection.filter(live.contains).map(\.uuidString)
+
+            case "stencils":
+                let query = a.string("query")?.lowercased(), library = a.string("library")
+                return libs()
+                    .filter { library == nil || $0.name.caseInsensitiveCompare(library!) == .orderedSame }
+                    .flatMap { lib in
+                        lib.items.map { (lib: lib.name, item: $0) }
+                    }
+                    .filter { row in
+                        guard let q = query else { return true }
+                        return row.item.name.lowercased().contains(q) || row.item.tags.contains { $0.lowercased().contains(q) }
+                    }
+                    .map { ["library": $0.lib, "name": $0.item.name, "tags": $0.item.tags,
+                            "width": $0.item.width, "height": $0.item.height] as [String: Any] }
+
+            case "stencil":
+                let wanted = try a.require("name"), library = a.string("library")
+                guard let item = libs()
+                    .filter({ library == nil || $0.name.caseInsensitiveCompare(library!) == .orderedSame })
+                    .flatMap(\.items).first(where: { $0.name.caseInsensitiveCompare(wanted) == .orderedSame }) else {
+                    throw OpsError.notFound("No stencil named '\(wanted)'. Call dottie.stencils() to see what is available.")
+                }
+                let placed = DiagramOps.addStencil(&doc, item: item, x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                   scale: a.double("scale") ?? 1,
+                                                   keepOriginalColors: a.bool("keepOriginalColors") ?? false,
+                                                   roughness: a.roughness)
+                return ["ids": doc.elements.map(\.id).filter(placed.ids.contains).map(\.uuidString),
+                        "width": round1(placed.size.width), "height": round1(placed.size.height)] as [String: Any]
+
+            default:
+                throw OpsError.invalid("Unknown dottie call '\(name)'")
+            }
+        }
+    }
+
+    // MARK: JavaScript side
+
+    /// The `dottie` object and `console`, defined over the native bridge.
+    static let prelude = #"""
+    (function (g) {
+      var call = function (name, args) {
+        var r = __dottie(name, JSON.stringify(args === undefined ? {} : args));
+        return r === "" ? undefined : JSON.parse(r);
+      };
+      var idOf = function (x) { return x !== null && typeof x === "object" ? x.id : x; };
+      var merge = function (a, b) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) o[k] = b[k]; return o; };
+      var kind = function (k) { return function (o) { return call("shape", merge(o, { kind: k })); }; };
+      g.dottie = {
+        elements: function (filter) { return call("elements", filter); },
+        get: function (id) { return call("get", { id: idOf(id) }); },
+        shape: function (o) { return call("shape", o); },
+        rect: kind("rectangle"), ellipse: kind("ellipse"), diamond: kind("diamond"), text: kind("text"),
+        connect: function (from, to, o) { return call("connector", merge(o, { from: idOf(from), to: idOf(to) })); },
+        update: function (id, changes) { return call("update", merge(changes, { id: idOf(id) })); },
+        remove: function (idOrIds) {
+          return Array.isArray(idOrIds) ? call("remove", { ids: idOrIds.map(idOf) }) : call("remove", { id: idOf(idOrIds) });
+        },
+        build: function (o) { return call("build", o); },
+        layout: function (o) { return call("layout", o); },
+        bounds: function () { return call("bounds"); },
+        stencils: function (o) { return call("stencils", o); },
+        stencil: function (o) { return call("stencil", o); },
+        selection: call("selection"),
+      };
+      var fmt = function (v) {
+        if (typeof v === "string") return v;
+        if (v instanceof Error) return String(v);
+        try { var s = JSON.stringify(v); return s === undefined ? String(v) : s; } catch (e) { return String(v); }
+      };
+      var write = function () { __log(Array.prototype.map.call(arguments, fmt).join(" ")); };
+      g.console = { log: write, info: write, warn: write, error: write };
+
+      // Scripts are synchronous, so there is no event loop: timers are accepted so libraries that schedule
+      // work (d3-timer, d3-force) load, but never fire. Drive them by hand, e.g. simulation.stop().tick(300).
+      var timerId = 0;
+      g.setTimeout = g.setInterval = function () { return ++timerId; };
+      g.clearTimeout = g.clearInterval = function () {};
+      var t0 = Date.now();
+      if (!g.performance) g.performance = { now: function () { return Date.now() - t0; } };
+
+      // CommonJS-style require over the host's module lookup. Ids are normalized here, so the host only
+      // ever sees paths inside the modules folder.
+      var cache = {};
+      var resolve = function (from, request) {
+        var parts = /^\.\.?(\/|$)/.test(request) ? from.concat(request.split("/")) : request.split("/");
+        var out = [];
+        parts.forEach(function (p) {
+          if (p === "" || p === ".") return;
+          if (p === "..") { if (!out.length) throw new Error("Cannot load module '" + request + "'"); out.pop(); } else out.push(p);
+        });
+        return out.join("/").replace(/\.js$/, "");
+      };
+      var makeRequire = function (dir) {
+        return function require(request) {
+          var id = resolve(dir, String(request));
+          if (cache[id]) return cache[id].exports;
+          var loaded = __source(id), nl = loaded.indexOf("\n");
+          var file = loaded.slice(0, nl), src = loaded.slice(nl + 1);
+          var module = { exports: {}, id: id };
+          cache[id] = module;
+          try {
+            var fn = new Function("module", "exports", "require", src + "\n//# sourceURL=" + id);
+            fn.call(module.exports, module, module.exports, makeRequire(file.split("/").slice(0, -1)));
+          } catch (e) { delete cache[id]; throw e; }
+          return module.exports;
+        };
+      };
+      g.require = makeRequire([]);
+    })(this);
+    """#
+
+    /// A short reference for people and agents writing scripts.
+    public static let apiReference = """
+    Runs in JavaScript with one global, `dottie`, which edits the document. There is no file or network access.
+    Edits apply only if the script finishes without throwing. The value of the last expression (or of a top-level `return`) \
+    is returned as JSON; console.log output is returned too. Ids are strings; any call that takes an id also takes an \
+    element object returned by another call. Colors are hex strings like "#ffcc00". Units are canvas points, y down.
+
+    Reading
+      dottie.elements({kind?, text?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
+      dottie.get(id)                   one element
+      dottie.selection                 ids selected in the app (empty when run from an agent)
+      dottie.bounds()                  {x, y, width, height} of all content
+      dottie.stencils({query?, library?})  stencil items: {library, name, tags, width, height}
+
+    Drawing (each returns the new element)
+      dottie.rect/ellipse/diamond/text({x, y, width?, height?, text?, fill?, stroke?, sketchy?, ...look})
+      dottie.shape({kind, ...})        same, with kind as a field
+      dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, ...look})   routing: straight | curved | elbow
+      dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}
+      dottie.build({nodes: [{key, text, kind?, fill?, width?, height?}], edges: [{from, to, routing?, arrow?, label?}], \
+    direction?: "TB"|"LR", sketchy?})   laid out below existing content; returns {key: id}
+
+    Changing
+      dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, ...look})  returns the element
+      dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
+      dottie.layout({direction?})      re-arranges all shapes into ranks along their connectors
+
+    Libraries
+      require("name")                  loads name.js (or name/index.js) CommonJS/UMD modules from the modules \
+      folder, or from the `modules` argument of run_script; ./ and ../ resolve relative to the requiring module. \
+      Bundled: lodash, d3-array, d3-color, d3-hierarchy, dagre (graph layout: dagre.graphlib.Graph, dagre.layout), dayjs. Other single-file bundles work (the Scripting settings tab installs more); timers never fire, so step d3-force by hand with simulation.stop().tick(n); there is no npm, import syntax or Node built-ins.
+
+    Look fields (any shape or connector): fillStyle solid|hachure|crossHatch, dash solid|dashed|dotted, \
+    strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors).
+
+    Example
+      const a = dottie.rect({x: 0, y: 0, text: "Start", fill: "#d6f5d6"});
+      const b = dottie.diamond({x: 0, y: 140, text: "OK?"});
+      dottie.connect(a, b, {routing: "elbow"});
+      return dottie.elements().length;
+    """
+}
+
+// MARK: Execution limit
+
+/// JavaScriptCore can terminate a runaway script, but only through a function it does not declare in
+/// its public headers. It is looked up at run time; if it is ever missing, scripts still run, they
+/// just aren't time-limited (the operation limit still bounds ones that edit in a loop).
+private enum ExecutionLimit {
+    private typealias ShouldTerminate = @convention(c) (JSContextRef?, UnsafeMutableRawPointer?) -> Bool
+    private typealias SetLimit = @convention(c) (JSContextGroupRef?, Double, ShouldTerminate?, UnsafeMutableRawPointer?) -> Void
+
+    static func apply(to context: JSContext, seconds: TimeInterval) {
+        guard seconds > 0, let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "JSContextGroupSetExecutionTimeLimit") else { return }
+        let set = unsafeBitCast(symbol, to: SetLimit.self)
+        set(JSContextGetGroup(context.jsGlobalContextRef), seconds, { _, _ in true }, nil)
+    }
+}

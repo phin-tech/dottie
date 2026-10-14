@@ -18,6 +18,8 @@ struct EditorActions {
     var distribute: (DistributeAxis) -> Void
     var reorder: (DottieDocument.ZMove) -> Void
     var export: (ExportFormat) -> Void
+    var openScriptConsole: () -> Void
+    var runScriptFile: (URL) -> Void
 }
 
 private struct EditorActionsKey: FocusedValueKey { typealias Value = EditorActions }
@@ -48,7 +50,9 @@ extension ContentView {
             align: { edge in edit("Align") { $0.align(ids, to: edge) } },
             distribute: { axis in edit("Distribute") { $0.distribute(ids, along: axis) } },
             reorder: { move in edit("Arrange") { $0.reorder(ids, move) } },
-            export: { format in exportDocument(format) })
+            export: { format in exportDocument(format) },
+            openScriptConsole: { openScriptConsole() },
+            runScriptFile: { openScriptConsole(running: $0) })
     }
 
     @MainActor

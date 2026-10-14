@@ -17,6 +17,10 @@ struct ContentView: View {
     @State private var activeLayer: UUID?
     @State private var placeRequest: PlaceRequest?
     @State private var sidebarTab: SidebarTab = .inspector
+    @State var showScriptConsole = false
+    @State var scriptOutput = ""
+    @State var scriptRunning = false
+    @AppStorage(Pref.scriptSource) var scriptSource = ""
 
     var body: some View {
         CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
@@ -68,6 +72,10 @@ struct ContentView: View {
         .onAppear { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
         .onChange(of: activeState) { _, state in
             if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
+        }
+        .sheet(isPresented: $showScriptConsole) {
+            ScriptConsole(source: $scriptSource, output: $scriptOutput, selectionCount: selection.count,
+                          running: scriptRunning, run: runScript)
         }
         .focusedSceneValue(\.tool, $tool)
         .focusedSceneValue(\.editor, editorActions)

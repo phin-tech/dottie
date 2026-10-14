@@ -146,6 +146,19 @@ public enum DiagramOps {
         return e
     }
 
+    /// Places a stencil item with its top-left corner at (`x`, `y`) on the first open layer.
+    /// Returns the new element ids and the size it was placed at.
+    @discardableResult
+    public static func addStencil(_ doc: inout DottieDocument, item: StencilItem, x: Double, y: Double, scale: Double = 1,
+                                  keepOriginalColors: Bool = false, roughness: Double? = nil) -> (ids: Set<UUID>, size: CGSize) {
+        let k = item.readableScale * max(0.05, scale)
+        let size = CGSize(width: item.width * k, height: item.height * k)
+        let layer = doc.layers.first { !$0.locked && $0.visible }?.id ?? doc.layers[0].id
+        let art = item.placed(keepOriginalColors: keepOriginalColors, roughness: roughness ?? Style().roughness, scale: k)
+        let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer)
+        return (ids, size)
+    }
+
     public static func update(_ doc: inout DottieDocument, id: UUID, text: String?? = nil, x: Double? = nil, y: Double? = nil,
                               width: Double? = nil, height: Double? = nil, fill: RGBA? = nil, stroke: RGBA? = nil,
                               roughness: Double? = nil, routing: Routing? = nil, look: Look = Look()) throws {

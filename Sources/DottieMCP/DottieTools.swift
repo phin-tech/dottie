@@ -160,6 +160,24 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Hand-drawn look"),
                 "routing": prop("string", "Connector routing", enum: routingValues),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "run_script",
+             description: "Code mode: run a JavaScript program that edits the diagram through a `dottie` object, in one call "
+                + "and one undo step. Use it for loops, conditionals and bulk or computed edits (grids, fan-outs, restyling "
+                + "everything matching a rule) that would take many tool calls. Nothing is applied if the script throws. "
+                + "Returns console.log output and the script's final value as JSON. Set render=true to also get a PNG.\n\n"
+                + DottieScript.apiReference,
+             inputSchema: schema([
+                "path": pathProp,
+                "code": prop("string", "JavaScript source. Use `return` or end with an expression to produce a result."),
+                "modules": .object(["type": "object", "description": "Extra modules for require(): name -> JavaScript source (CommonJS)",
+                                    "additionalProperties": .object(["type": "string"])]),
+                "render": prop("boolean", "Also return a PNG of the result (default false)"),
+                "scale": prop("number", "Pixel scale for render, default 2"),
+                "timeout": prop("number", "Seconds before the script is stopped, default 10, at most 60"),
+             ], required: ["path", "code"])),
+        Tool(name: "script_api",
+             description: "Reference for the JavaScript API available to run_script (also served as the resource dottie://script-api).",
+             inputSchema: schema([:])),
         Tool(name: "list_stencils",
              description: "List the stencil items (reusable shapes: flowchart symbols, icons, imported SVG sets) available "
                 + "to add_stencil, from the built-in Basics library and the user's libraries in Application Support/Dottie/Libraries.",
@@ -356,6 +374,38 @@ actor DottieTools {
             try save(doc, to: url)
             return text("Updated")
 
+        case "script_api":
+            let installed = DottieScript.installedModules()
+            return text(DottieScript.apiReference + "\n\nInstalled modules for require(): "
+                + (installed.isEmpty ? "none (add .js files to \(DottieScript.modulesDirectory.path))" : installed.joined(separator: ", ")))
+
+        case "run_script":
+            let url = try fileURL(a)
+            var doc = try load(url, createIfMissing: true)
+            let before = doc
+            let code = try a.require("code")
+            let limit = min(max(a.double("timeout") ?? DottieScript.defaultTimeLimit, 1), 60)
+            let modules = (a.raw["modules"]?.objectValue ?? [:]).compactMapValues(\.stringValue)
+            let result = DottieScript.run(code, on: &doc, modules: modules, timeLimit: limit)
+            var report = result.logs.joined(separator: "\n")
+            func append(_ line: String) { report += (report.isEmpty ? "" : "\n") + line }
+            if let error = result.error {
+                append("Script error: \(error)")
+                append("Nothing was changed.")
+                return .init(content: [.text(report)], isError: true)
+            }
+            if doc != before { try save(doc, to: url); append("Applied: \(doc.elements.count) elements now (was \(before.elements.count)).") }
+            else { append("No changes.") }
+            if let value = result.value { append("Result: \(value)") }
+            var content: [Tool.Content] = [.text(report)]
+            if a.bool("render") == true, !doc.elements.isEmpty {
+                let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
+                if let png = Exporter.png(doc, scale: scale) {
+                    content.insert(.image(data: png.base64EncodedString(), mimeType: "image/png", metadata: nil), at: 0)
+                }
+            }
+            return .init(content: content)
+
         case "list_stencils":
             struct Row: Encodable { var library: String; var name: String; var tags: [String]; var width: Double; var height: Double }
             let query = a.string("query")?.lowercased()
@@ -375,12 +425,9 @@ actor DottieTools {
             guard let item = stencilLibraries(named: a.string("library")).flatMap(\.items).first(where: { $0.name.caseInsensitiveCompare(wanted) == .orderedSame }) else {
                 throw ToolFailure(message: "No stencil named '\(wanted)'. Call list_stencils to see what is available.")
             }
-            let k = item.readableScale * max(0.05, a.double("scale") ?? 1)
-            let size = CGSize(width: item.width * k, height: item.height * k)
-            let layer = doc.layers.first { !$0.locked && $0.visible }?.id ?? doc.layers[0].id
-            let art = item.placed(keepOriginalColors: a.bool("keep_original_colors") ?? false,
-                                  roughness: a.roughness ?? Style().roughness, scale: k)
-            let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer)
+            let (ids, size) = DiagramOps.addStencil(&doc, item: item, x: x, y: y, scale: a.double("scale") ?? 1,
+                                                    keepOriginalColors: a.bool("keep_original_colors") ?? false,
+                                                    roughness: a.roughness)
             try save(doc, to: url)
             return text("Placed '\(item.name)' (\(ids.count) elements) at x=\(x) y=\(y), \(Int(size.width))x\(Int(size.height)).\n"
                 + (try json(ids.map(\.uuidString).sorted())))

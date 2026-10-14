@@ -14,6 +14,8 @@ enum Pref {
     static let settingsTab = "settingsTab"
     static let appearance = "appearance"
     static let showRulers = "showRulers"
+    /// The script console's text, kept across launches.
+    static let scriptSource = "scriptSource"
 
     static let routingDefault = Routing.straight.rawValue
     static let gridSizeDefault = 20.0
@@ -65,8 +67,11 @@ struct SettingsView: View {
             MCPSettings()
                 .tabItem { Label("MCP", systemImage: "point.3.connected.trianglepath.dotted") }
                 .tag("mcp")
+            ScriptingSettings()
+                .tabItem { Label("Scripting", systemImage: "curlybraces") }
+                .tag("scripting")
         }
-        .frame(width: 480)
+        .frame(width: 520)
     }
 }
 
