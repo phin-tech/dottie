@@ -36,6 +36,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Canvas context menu (edit, link, arrange); hidden element anchors (`anchor`)
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 - [x] Sticky notes (`note` kind, N): GitHub Flavored Markdown (swift-markdown) laid out with CoreText, tables included; click-to-tick task boxes, color swatches, identical in PNG, PDF and SVG; `note` over MCP and scripts
+- [x] Quick Look: Space in Finder previews a drawing (every page, as a PDF) or a stencil library; Finder thumbnails show the first page on its theme's color
 
 ## Next
 - Custom themes and a color palette per theme

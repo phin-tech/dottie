@@ -5,6 +5,12 @@ options:
   xcodeVersion: "26.6"
   deploymentTarget:
     macOS: "14.0"
+settings:
+  base:
+    # The release version (`just release` tags v<this>); bump both for each release. Project-wide because the
+    # Quick Look extensions must carry the app's version and build number.
+    MARKETING_VERSION: "0.1.2"
+    CURRENT_PROJECT_VERSION: "3"
 packages:
   Dottie:
     path: .
@@ -35,12 +41,16 @@ targets:
         copy:
           destination: wrapper
           subpath: Contents/Helpers
+      # Embedded in Contents/PlugIns.
+      - target: DottieQuickLookPreview
+        embed: true
+        codeSign: true
+      - target: DottieQuickLookThumbnail
+        embed: true
+        codeSign: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie
-        # The release version (`just release` tags v<this>); bump both for each release.
-        MARKETING_VERSION: "0.1.2"
-        CURRENT_PROJECT_VERSION: "3"
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Dottie
@@ -119,6 +129,77 @@ targets:
         ENABLE_HARDENED_RUNTIME: YES
         DEAD_CODE_STRIPPING: YES
         SKIP_INSTALL: YES
+  # Quick Look: Space in Finder previews a drawing (every page, as a PDF) or a stencil library.
+  DottieQuickLookPreview:
+    type: app-extension
+    platform: macOS
+    sources: [QuickLook/Preview]
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    dependencies:
+      - package: Dottie
+        product: DottieKit
+      - sdk: Quartz.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie.QuickLookPreview
+        SWIFT_VERSION: "6.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        DEAD_CODE_STRIPPING: YES
+        SKIP_INSTALL: YES
+    entitlements:
+      path: QuickLook/Preview/Preview.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+    info:
+      path: QuickLook/Preview/Info.plist
+      properties:
+        CFBundleDisplayName: Dottie Preview
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.preview
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).PreviewProvider
+          NSExtensionAttributes:
+            QLIsDataBasedPreview: true
+            QLSupportsSearchableItems: false
+            QLSupportedContentTypes: [tech.phin.dottie, tech.phin.dottielib]
+  # Finder thumbnails (icons) of drawings and stencil libraries.
+  DottieQuickLookThumbnail:
+    type: app-extension
+    platform: macOS
+    sources: [QuickLook/Thumbnail]
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    dependencies:
+      - package: Dottie
+        product: DottieKit
+      - sdk: QuickLookThumbnailing.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie.QuickLookThumbnail
+        SWIFT_VERSION: "6.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        DEAD_CODE_STRIPPING: YES
+        SKIP_INSTALL: YES
+    entitlements:
+      path: QuickLook/Thumbnail/Thumbnail.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+    info:
+      path: QuickLook/Thumbnail/Info.plist
+      properties:
+        CFBundleDisplayName: Dottie Thumbnail
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.quicklook.thumbnail
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ThumbnailProvider
+          NSExtensionAttributes:
+            QLThumbnailMinimumDimension: 0
+            QLSupportedContentTypes: [tech.phin.dottie, tech.phin.dottielib]
   # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
   # as a test host would take over the live socket of a running Dottie.
   CanvasTests:

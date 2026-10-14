@@ -87,6 +87,7 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 - **Layers, rulers and guides** for when things need to line up exactly (⇧⌘R shows the rulers).
 - **Bring diagrams in** from Excalidraw, draw.io or SVG files (File menu, or drop them on the canvas).
 - **Send diagrams out** as PNG, SVG or PDF with File ▸ Export As.
+- **Peek without opening.** Select a drawing in Finder and press Space to see every page; Finder icons show the drawing itself.
 
 ## Extras for power users
 
