@@ -432,6 +432,22 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(view.viewport.pan, .zero)
     }
 
+    // MARK: Text editing
+
+    func testEditingALabelIsCenteredAndInTheLabelsInk() throws {
+        window.appearance = NSAppearance(named: .darkAqua) // light canvas ink
+        var e = add(.rectangle, CGRect(x: 100, y: 100, width: 160, height: 120), text: "Hello")
+        e.style.fill = RGBA(r: 1, g: 0.95, b: 0.7) // a light fill: the label is drawn dark
+        view.model.elements[0] = e
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 180, y: 160), clicks: 2))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 180, y: 160), clicks: 2))
+        let field = try XCTUnwrap(view.textEditor)
+        XCTAssertEqual(field.frame.midY, e.frame.midY, accuracy: 1, "the editor sits where the label is drawn")
+        XCTAssertLessThan(field.frame.height, e.frame.height / 2)
+        let ink = try XCTUnwrap(field.textColor?.usingColorSpace(.sRGB))
+        XCTAssertLessThan(ink.brightnessComponent, 0.3, "dark text on a light fill, not the white canvas ink")
+    }
+
     // MARK: Context menu
 
     func testRightClickSelectsTheShapeAndOffersLinkItems() throws {

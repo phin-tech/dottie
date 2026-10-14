@@ -222,7 +222,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         // Only what the dirty rectangle shows, in model units, found through the spatial index.
         let visible = CGRect(x: (dirtyRect.minX - pan.x) / zoom, y: (dirtyRect.minY - pan.y) / zoom,
                              width: dirtyRect.width / zoom, height: dirtyRect.height / zoom)
-        Renderer.draw(model, in: ctx, background: canvasBackground.cgColor, clip: visible,
+        // The label being edited is drawn by the editor instead, so the old text does not show through.
+        var drawn = model
+        if let id = editingID, let i = drawn.elements.firstIndex(where: { $0.id == id }) { drawn.elements[i].text = nil }
+        Renderer.draw(drawn, in: ctx, background: canvasBackground.cgColor, clip: visible,
                       zoom: Double(zoom), ink: canvasInk, spatial: spatial)
 
         // Ruler guides sit over the drawing and under the selection.
@@ -570,6 +573,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.setStrokeColor(accent.cgColor)
     }
 
+    /// The in-place text editor while one is open, readable by tests.
+    var textEditor: NSTextField? { editor }
+
     /// Pan and zoom, readable by tests.
     var viewport: (pan: CGPoint, zoom: CGFloat) { (pan, zoom) }
 
@@ -719,15 +725,31 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     private func viewportChanged() {
         needsDisplay = true
-        guard let f = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
-        f.frame = viewFrame(editFrame(for: e))
-        f.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
+        layoutEditor()
     }
 
-    /// Where an element's text is edited: a connector's label sits at the middle of its route.
+    /// Where an element's text is edited, matching where the renderer draws it: a connector's label at the
+    /// middle of its route, a shape's label inside a 6pt inset, a text box's text across its frame.
     private func editFrame(for e: Element) -> CGRect {
-        e.kind == .connector ? Renderer.labelRect(for: e, in: model) : e.frame
+        switch e.kind {
+        case .connector: Renderer.labelRect(for: e, in: model)
+        case .text: e.frame
+        default: e.frame.insetBy(dx: 6, dy: 6)
+        }
     }
+
+    /// Sizes the text editor to its text and, except in a text box, centers it vertically in the edit
+    /// frame, so typing happens where the label will be drawn.
+    private func layoutEditor() {
+        guard let field = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
+        field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
+        let box = viewFrame(editFrame(for: e))
+        guard e.kind != .text, let cell = field.cell else { field.frame = box; return }
+        let height = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: box.width, height: .greatestFiniteMagnitude)).height
+        field.frame = NSRect(x: box.minX, y: box.midY - height / 2, width: box.width, height: height)
+    }
+
+    func controlTextDidChange(_ obj: Notification) { layoutEditor() }
 
     private func viewFrame(_ r: CGRect) -> CGRect {
         CGRect(x: r.minX * zoom + pan.x, y: r.minY * zoom + pan.y, width: r.width * zoom, height: r.height * zoom)
@@ -1513,19 +1535,27 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         endEditing()
         let field = NSTextField(frame: viewFrame(editFrame(for: e)))
         field.stringValue = e.text ?? ""
-        field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
         field.isBordered = false
         field.focusRingType = .none
         field.alignment = e.kind == .text ? .left : .center
+        field.usesSingleLineMode = false
+        field.cell?.wraps = true
+        field.cell?.isScrollable = false
+        field.lineBreakMode = .byWordWrapping
         field.backgroundColor = canvasBackground
-        field.textColor = nsColor(canvasInk)
+        // The ink the label is drawn in: a dark label on a light fill even when the canvas ink is light.
+        let ink = nsColor(e.resolvingInk(to: canvasInk).style.stroke)
+        field.textColor = ink
         field.drawsBackground = e.kind == .connector
         field.delegate = self
         addSubview(field)
-        window?.makeFirstResponder(field)
         editor = field
         editingID = id
         editBase = isNew ? baseline : nil
+        layoutEditor()
+        window?.makeFirstResponder(field)
+        (field.currentEditor() as? NSTextView)?.insertionPointColor = ink
+        needsDisplay = true
     }
 
     /// `deferCommit` is for a page switch, which happens during a SwiftUI update that must not change the document.
@@ -1534,6 +1564,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         let text = field.stringValue
         field.removeFromSuperview()
         editor = nil; editingID = nil
+        needsDisplay = true
         guard let i = model.elements.firstIndex(where: { $0.id == id }) else { return }
         var next = model
         if next.elements[i].kind == .text && text.isEmpty {
