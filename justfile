@@ -7,6 +7,10 @@ default:
 test:
     swift test
 
+# Drive the real canvas with synthesized mouse events (rotate, erase, stroke handles, resize)
+canvas-test: gen
+    xcodebuild -project Dottie.xcodeproj -scheme CanvasTests -destination 'platform=macOS' test
+
 # Regenerate Dottie.xcodeproj from project.yml
 gen:
     xcodegen generate

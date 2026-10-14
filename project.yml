@@ -35,3 +35,24 @@ targets:
             UTTypeConformsTo: [public.json, public.data]
             UTTypeTagSpecification:
               public.filename-extension: [dottie]
+  # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
+  # as a test host would take over the live socket of a running Dottie.
+  CanvasTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - CanvasTests
+      - App/CanvasView.swift
+      - App/Preferences.swift
+      - App/MCPSettings.swift
+      - App/LiveServer.swift
+      - App/DrawingDocument.swift
+    dependencies:
+      - package: Dottie
+        product: DottieKit
+    settings:
+      base:
+        SWIFT_VERSION: "6.0"
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
+        PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie.canvastests
