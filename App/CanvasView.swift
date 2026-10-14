@@ -566,8 +566,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 model = base; selection = []; onPreview?(base); return
             }
             commit(base, "Add Connector")
-        case .drawing:
+        case .drawing(let id):
             if strokePoints.count < 2 { model = base; selection = []; onPreview?(base); return }
+            if let i = model.elements.firstIndex(where: { $0.id == id }) { model.elements[i].fitStroke() }
             commit(base, "Draw")
         case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")

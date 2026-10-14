@@ -152,6 +152,73 @@ final class DottieKitTests: XCTestCase {
         XCTAssertEqual(round?.elements[0].points, pts)
     }
 
+    func testRoughLinePreservesEndsAndIsDeterministic() {
+        let a = CGPoint(x: 0, y: 0), b = CGPoint(x: 300, y: 40)
+        func make(preserve: Bool, bowing: Double = 1) -> CGPath {
+            var rng = SeededRNG(seed: 7)
+            let p = CGMutablePath()
+            Rough.line(a, b, rng: &rng, roughness: 2, bowing: bowing, preserveEnds: preserve, into: p)
+            return p
+        }
+        XCTAssertEqual(make(preserve: true), make(preserve: true))
+        var starts: [CGPoint] = [], ends: [CGPoint] = []
+        make(preserve: true).applyWithBlock { el in
+            let e = el.pointee
+            if e.type == .moveToPoint { starts.append(e.points[0]) }
+            if e.type == .addCurveToPoint { ends.append(e.points[2]) }
+        }
+        XCTAssertEqual(starts, [a, a])
+        XCTAssertEqual(ends, [b, b])
+        XCTAssertNotEqual(make(preserve: false), make(preserve: true))
+        XCTAssertNotEqual(make(preserve: true, bowing: 0), make(preserve: true, bowing: 1))
+    }
+
+    func testStrokeFitIsDeterministicAndCompact() {
+        // A noisy-free arc sampled densely, like a mouse drag.
+        let raw = (0...2000).map { i -> CGPoint in
+            let t = Double(i) / 2000 * .pi
+            return CGPoint(x: 100 + 80 * cos(t), y: 100 + 80 * sin(t))
+        }
+        let a = StrokeFit.fit(raw), b = StrokeFit.fit(raw)
+        XCTAssertEqual(a, b)
+        XCTAssertEqual((a.count - 1) % 3, 0)
+        XCTAssertLessThan(a.count, 40)
+        XCTAssertEqual(a.first, raw.first)
+        XCTAssertEqual(a.last, raw.last)
+        // Every sample stays within tolerance of the fitted chain.
+        var chain: [CGPoint] = []
+        for s in 0..<((a.count - 1) / 3) {
+            let seg = Array(a[(3 * s)...(3 * s + 3)])
+            chain += (0...200).map { StrokeFit.point(seg, Double($0) / 200) }
+        }
+        for p in raw {
+            let d = chain.map { hypot($0.x - p.x, $0.y - p.y) }.min()!
+            XCTAssertLessThan(d, StrokeFit.tolerance + 0.25)
+        }
+    }
+
+    func testCommittedStrokeStoresFlatPathAndRoundTrips() throws {
+        var doc = DottieDocument()
+        let raw = (0...400).map { i -> StrokePoint in
+            let t = Double(i) / 400
+            return StrokePoint(x: t, y: 0.5 + 0.4 * sin(t * 6))
+        }
+        var e = Element(kind: .freehand, frame: CGRect(x: 10, y: 10, width: 300, height: 100),
+                        layerID: doc.layers[0].id, points: raw)
+        e.fitStroke()
+        XCTAssertNil(e.points)
+        let flat = try XCTUnwrap(e.path)
+        XCTAssertEqual((flat.count - 2) % 6, 0)
+        XCTAssertLessThan(flat.count, 100)
+        doc.elements = [e]
+        let round = try DottieDocument.decode(doc.encoded())
+        XCTAssertEqual(round.elements[0].path, flat)
+        XCTAssertEqual(try doc.encoded(), try round.encoded())
+        let box = Renderer.outline(for: round.elements[0]).boundingBoxOfPath
+        XCTAssertEqual(box.minX, 10, accuracy: 1)
+        XCTAssertEqual(box.maxX, 310, accuracy: 1)
+    }
+
     func testLightInkKeepsDarkInkOnLightFills() {
         var doc = DottieDocument()
         let l = doc.layers[0].id

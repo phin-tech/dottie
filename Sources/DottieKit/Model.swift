@@ -61,8 +61,11 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var connector: ConnectorData?
     /// Elements sharing a `groupID` select and move together. Groups are flat (no nesting).
     public var groupID: UUID?
-    /// Only set for `.freehand`.
+    /// Only set for `.freehand`. Raw pen samples; superseded by `path` once the stroke is committed.
     public var points: [StrokePoint]?
+    /// Only set for `.freehand`. Fitted cubic Béziers as flat normalized `x, y` pairs:
+    /// the start point, then `c1, c2, end` per segment (`2 + 6n` numbers).
+    public var path: [Double]?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,

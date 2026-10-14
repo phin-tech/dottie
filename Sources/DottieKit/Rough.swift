@@ -24,20 +24,26 @@ public enum Rough {
         rng.signed() * amount * roughness
     }
 
-    public static func line(_ a: CGPoint, _ b: CGPoint, rng: inout SeededRNG, roughness: Double, into path: CGMutablePath) {
+    /// - Parameters:
+    ///   - bowing: scales the sideways bow of the stroke, independent of `roughness`. 0 is straight but shaky.
+    ///   - preserveEnds: keep both endpoints exact (jitter only the middle), so a connector still touches its shape.
+    public static func line(_ a: CGPoint, _ b: CGPoint, rng: inout SeededRNG, roughness: Double,
+                            bowing: Double = 1, preserveEnds: Bool = false, into path: CGMutablePath) {
         let length = hypot(b.x - a.x, b.y - a.y)
         guard length > 0.5 else { return }
-        let maxOff = min(2.0, max(0.6, length / 10))
-        // Two passes with different jitter give the characteristic doubled stroke.
+        // rough.js: jitter fades on long lines, and short ones never wobble by more than a tenth of their length.
+        let gain = length < 200 ? 1 : length > 500 ? 0.4 : -0.0016668 * length + 1.233334
+        let maxOff = length < 20 ? length / 10 : 2.0
+        // Two passes give the characteristic doubled stroke; the retrace stays tighter than the first pass.
         for pass in 0..<2 {
-            let spread = pass == 0 ? 1.0 : 1.4
+            let spread = (pass == 0 ? 1.0 : 0.5) * gain
             func j() -> CGFloat { CGFloat(offset(&rng, maxOff, roughness) * spread) }
             let mid = rng.unit() * 0.4 + 0.3
-            let bow = CGFloat(offset(&rng, length / 60, roughness))
+            let bow = CGFloat(offset(&rng, length / 60, roughness) * bowing * gain)
             let dx = b.x - a.x, dy = b.y - a.y
             let nx = -dy / length, ny = dx / length
-            let start = CGPoint(x: a.x + j(), y: a.y + j())
-            let end = CGPoint(x: b.x + j(), y: b.y + j())
+            let start = preserveEnds ? a : CGPoint(x: a.x + j(), y: a.y + j())
+            let end = preserveEnds ? b : CGPoint(x: b.x + j(), y: b.y + j())
             let c1 = CGPoint(x: a.x + dx * CGFloat(mid) * 0.66 + nx * bow + j() * 0.5,
                              y: a.y + dy * CGFloat(mid) * 0.66 + ny * bow + j() * 0.5)
             let c2 = CGPoint(x: a.x + dx * (0.5 + CGFloat(mid) * 0.5) + nx * bow + j() * 0.5,

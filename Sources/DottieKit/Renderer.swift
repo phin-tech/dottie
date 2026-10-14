@@ -32,9 +32,21 @@ public enum Renderer {
         }
     }
 
-    /// Smooth curve through the stroke's points (quadratic midpoint smoothing).
+    /// A committed stroke is its fitted Bézier chain; one still being drawn (or from an older file)
+    /// is smoothed through its raw points.
     static func freehandPath(for e: Element) -> CGPath {
         let r = e.frame
+        if let flat = e.path, flat.count >= 8, (flat.count - 2) % 6 == 0 {
+            func pt(_ i: Int) -> CGPoint {
+                CGPoint(x: r.minX + flat[2 * i] * r.width, y: r.minY + flat[2 * i + 1] * r.height)
+            }
+            let path = CGMutablePath()
+            path.move(to: pt(0))
+            for s in 0..<((flat.count / 2 - 1) / 3) {
+                path.addCurve(to: pt(3 * s + 3), control1: pt(3 * s + 1), control2: pt(3 * s + 2))
+            }
+            return path
+        }
         let pts = (e.points ?? []).map { CGPoint(x: r.minX + $0.x * r.width, y: r.minY + $0.y * r.height) }
         let path = CGMutablePath()
         guard let first = pts.first else { return path }
@@ -61,7 +73,7 @@ public enum Renderer {
         case .polyline(let pts):
             for i in 0..<max(pts.count - 1, 0) {
                 if rough <= 0 { path.move(to: pts[i]); path.addLine(to: pts[i + 1]) }
-                else { Rough.line(pts[i], pts[i + 1], rng: &rng, roughness: rough, into: path) }
+                else { Rough.line(pts[i], pts[i + 1], rng: &rng, roughness: rough, preserveEnds: true, into: path) }
             }
         case .cubic(let a, let b, let c2, let d):
             path.move(to: a)
