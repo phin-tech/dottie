@@ -157,7 +157,6 @@ public enum DrawioImporter {
         var uuids: [String: UUID] = [:]
         for id in order { uuids[id] = UUID() }
         let starter = StencilLibrary.starter
-        var groupFor: [String: UUID] = [:]
 
         // Labels of edges live in child cells.
         var edgeLabels: [String: String] = [:]
@@ -249,7 +248,6 @@ public enum DrawioImporter {
                     common(&e)
                     out.append(e)
                 }
-                _ = groupFor
                 continue
             }
             let kind: ElementKind

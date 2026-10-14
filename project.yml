@@ -1,6 +1,8 @@
 name: Dottie
 options:
   bundleIdPrefix: tech.phin
+  # Matches the Xcode in use, so it does not offer to "update to recommended settings" on every regenerate.
+  xcodeVersion: "26.6"
   deploymentTarget:
     macOS: "14.0"
 packages:
@@ -26,13 +28,26 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: tech.phin.dottie
+        # The release version (`just release` tags v<this>); bump both for each release.
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
         SWIFT_VERSION: "6.0"
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Dottie
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.graphics-design
+        ENABLE_HARDENED_RUNTIME: YES
+        DEAD_CODE_STRIPPING: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    entitlements:
+      path: App/Dottie.entitlements
+      properties:
+        # JavaScriptCore JIT for the scripting console and run_script; without it scripts run interpreted.
+        com.apple.security.cs.allow-jit: true
     info:
       path: App/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleDocumentTypes:
           - CFBundleTypeName: Dottie Drawing
             CFBundleTypeRole: Editor
@@ -69,6 +84,11 @@ targets:
         # Not `dottie`: that differs from the app's `Dottie` executable only by case.
         PRODUCT_NAME: dottie-cli
         SWIFT_VERSION: "6.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        DEAD_CODE_STRIPPING: YES
+        # Ships inside the app only; installing it on its own makes an archive a generic one Xcode cannot
+        # distribute as an app.
+        SKIP_INSTALL: YES
   # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
   # as a test host would take over the live socket of a running Dottie.
   CanvasTests:

@@ -63,7 +63,7 @@ public enum Renderer {
         var stats: (hits: Int, misses: Int) { lock.lock(); defer { lock.unlock() }; return (hits, misses) }
     }
 
-    nonisolated(unsafe) static let cache = PathCache()
+    static let cache = PathCache()
     /// Cache hit and miss counts since the last `resetPathCache()`; for tests and tuning.
     public static var pathCacheStats: (hits: Int, misses: Int) { cache.stats }
     public static func resetPathCache() { cache.reset() }

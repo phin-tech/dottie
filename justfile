@@ -43,3 +43,7 @@ cli-install: cli
 # Remove build artifacts and the generated Xcode project
 clean:
     rm -rf .build DerivedData Dottie.xcodeproj
+
+# Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or `app`, as a GitHub release
+release app="":
+    scripts/release.sh "{{app}}"

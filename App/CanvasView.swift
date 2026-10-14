@@ -1582,12 +1582,17 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         let base = editBase
         editBase = nil
-        let finish = { [onPreview, onCommit] in
-            if let base { onPreview?(base) }
-            onCommit?(next, "Edit Text")
+        if deferCommit {
+            DispatchQueue.main.async { [weak self] in self?.commitEdit(next, base: base) }
+        } else {
+            commitEdit(next, base: base)
         }
-        if deferCommit { DispatchQueue.main.async(execute: finish) } else { finish() }
         window?.makeFirstResponder(self)
+    }
+
+    private func commitEdit(_ next: DottieDocument, base: DottieDocument?) {
+        if let base { onPreview?(base) }
+        onCommit?(next, "Edit Text")
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endEditing() }

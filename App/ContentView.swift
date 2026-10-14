@@ -338,7 +338,7 @@ struct GuidesEditor: View {
             }), format: .number.precision(.fractionLength(0...2)))
             .textFieldStyle(.roundedBorder)
             .disabled(document.model.guidesLocked == true)
-            Button { edit("Remove Guide") { vertical ? ($0.guidesX?.remove(at: index)) : ($0.guidesY?.remove(at: index)) } } label: {
+            Button { edit("Remove Guide") { if vertical { _ = $0.guidesX?.remove(at: index) } else { _ = $0.guidesY?.remove(at: index) } } } label: {
                 Image(systemName: "xmark.circle")
             }
             .buttonStyle(.borderless)
