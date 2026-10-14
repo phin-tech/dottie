@@ -21,9 +21,10 @@ final class DottieKitTests: XCTestCase {
         var red = Style(); red.stroke = RGBA(r: 1, g: 0, b: 0)
         doc.elements[1].style = red
         let dark = doc.resolvingInk(to: .inkOnDark)
-        XCTAssertEqual(dark.elements[0].style.stroke, .inkOnDark)
+        XCTAssertEqual(dark.elements[2].style.stroke, .inkOnDark)       // unfilled: light ink
+        XCTAssertEqual(dark.elements[0].style.stroke, .black)           // light yellow fill keeps dark ink
         XCTAssertEqual(dark.elements[1].style.stroke, RGBA(r: 1, g: 0, b: 0))
-        XCTAssertEqual(dark.resolvingInk(to: .black).elements[0].style.stroke, .black)
+        XCTAssertEqual(dark.resolvingInk(to: .black).elements[2].style.stroke, .black)
         XCTAssertEqual(doc.elements[0].style.stroke, .black) // original untouched
     }
 
@@ -149,6 +150,31 @@ final class DottieKitTests: XCTestCase {
         XCTAssertNotNil(Exporter.png(doc))
         let round = try? DottieDocument.decode(doc.encoded())
         XCTAssertEqual(round?.elements[0].points, pts)
+    }
+
+    func testLightInkKeepsDarkInkOnLightFills() {
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        var pastel = Style(); pastel.fill = RGBA(r: 1, g: 0.84, b: 0.65)
+        var darkFill = Style(); darkFill.fill = RGBA(r: 0.1, g: 0.1, b: 0.3)
+        var faint = Style(); faint.fill = RGBA(r: 1, g: 1, b: 1, a: 0.2)
+        doc.elements = [
+            Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), style: pastel, layerID: l),
+            Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), style: darkFill, layerID: l),
+            Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), style: faint, layerID: l),
+            Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), layerID: l),
+        ]
+        let shown = doc.resolvingInk(to: .inkOnDark).elements.map(\.style.stroke)
+        XCTAssertEqual(shown, [.black, .inkOnDark, .inkOnDark, .inkOnDark])
+        // Exporting always resolves to black, whatever the fill.
+        XCTAssertTrue(doc.resolvingInk(to: .black).elements.allSatisfy { $0.style.stroke == .black })
+    }
+
+    func testLiveKeyAddressesCurrentWindowAndNormalizesPaths() {
+        XCTAssertEqual(LiveSocket.key(forPath: "current"), "@current")
+        XCTAssertEqual(LiveSocket.key(forPath: "@current"), "@current")
+        XCTAssertEqual(LiveSocket.key(forPath: "/tmp/a/../b.dottie"), "/private/tmp/b.dottie")
+        XCTAssertEqual(LiveSocket.key(forPath: "/private/tmp/b.dottie"), "/private/tmp/b.dottie")
     }
 
     func testJSONRoundTrip() throws {

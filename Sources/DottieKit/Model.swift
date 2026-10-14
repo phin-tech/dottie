@@ -11,6 +11,8 @@ public struct RGBA: Codable, Equatable, Sendable {
     /// `black` is the automatic ink: shown as `inkOnDark` on a dark canvas, and always exported as black.
     public static let inkOnDark = RGBA(r: 0.93, g: 0.93, b: 0.94)
     public var isAutomaticInk: Bool { self == .black || self == .inkOnDark }
+    /// Rec. 709 relative luminance of the sRGB components, 0...1.
+    public var luminance: Double { 0.2126 * r + 0.7152 * g + 0.0722 * b }
     public var cgColor: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: a) }
 }
 
@@ -112,10 +114,15 @@ public struct DottieDocument: Codable, Equatable, Sendable {
 
     /// Copy with every automatic-ink stroke replaced by `ink`, for display on a dark canvas or export.
     /// Explicitly chosen colors are untouched.
+    ///
+    /// A light ink is not used on a light, mostly opaque fill (a pastel box on a dark canvas): that
+    /// shape's outline and label stay dark so they remain readable.
     public func resolvingInk(to ink: RGBA) -> DottieDocument {
         var copy = self
         for i in copy.elements.indices where copy.elements[i].style.stroke.isAutomaticInk {
-            copy.elements[i].style.stroke = ink
+            let fill = copy.elements[i].style.fill
+            let onLightFill = fill.a >= 0.5 && fill.luminance > 0.5
+            copy.elements[i].style.stroke = (ink.luminance > 0.5 && onLightFill) ? .black : ink
         }
         return copy
     }

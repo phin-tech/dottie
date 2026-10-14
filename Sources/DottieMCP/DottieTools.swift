@@ -15,7 +15,7 @@ private func schema(_ props: [String: Value], required: [String] = []) -> Value 
     .object(["type": "object", "properties": .object(props), "required": .array(required.map { .string($0) })])
 }
 
-private let pathProp = prop("string", "Absolute path to a .dottie file")
+private let pathProp = prop("string", "Absolute path to a .dottie file, or \"current\" for the frontmost open Dottie window (needs the app running)")
 private let kindValues = ["rectangle", "ellipse", "diamond", "text"]
 private let routingValues = ["straight", "curved", "elbow"]
 
@@ -173,8 +173,12 @@ actor DottieTools {
 
     // MARK: Files
 
+    /// Sentinel for "the frontmost window in the app": live only, never a file.
+    private static let currentURL = URL(string: "dottie-live:current")!
+
     private func fileURL(_ args: Args, key: String = "path", ext: String = "dottie") throws -> URL {
         let raw = try args.require(key)
+        if key == "path", raw == "current" { return Self.currentURL }
         let expanded = (raw as NSString).expandingTildeInPath
         guard expanded.hasPrefix("/") else { throw ToolFailure(message: "'\(key)' must be an absolute path") }
         guard expanded.lowercased().hasSuffix("." + ext) else { throw ToolFailure(message: "'\(key)' must end in .\(ext)") }
@@ -183,6 +187,12 @@ actor DottieTools {
 
     private func load(_ url: URL, createIfMissing: Bool = false) throws -> DottieDocument {
         // Live mode: if the Dottie app has this file open, edit that copy instead of the file on disk.
+        if url == Self.currentURL {
+            guard let live = LiveClient.get(path: "current") else {
+                throw ToolFailure(message: "No Dottie window to draw in. Open or create a document in the Dottie app (it must be running), or pass an absolute .dottie path.")
+            }
+            return live
+        }
         if let live = LiveClient.get(path: url.path) { return live }
         guard FileManager.default.fileExists(atPath: url.path) else {
             if createIfMissing { return DottieDocument() }
@@ -193,6 +203,12 @@ actor DottieTools {
     }
 
     private func save(_ doc: DottieDocument, to url: URL) throws {
+        if url == Self.currentURL {
+            guard LiveClient.put(doc, path: "current", actionName: "Agent: \(currentTool)") else {
+                throw ToolFailure(message: "The Dottie window is no longer available.")
+            }
+            return
+        }
         if LiveClient.put(doc, path: url.path, actionName: "Agent: \(currentTool)") { return }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try doc.encoded().write(to: url, options: .atomic)
@@ -213,6 +229,7 @@ actor DottieTools {
         switch name {
         case "create_diagram":
             let url = try fileURL(a)
+            if url == Self.currentURL { throw ToolFailure(message: "create_diagram needs a file path; \"current\" already refers to an open window.") }
             if FileManager.default.fileExists(atPath: url.path), a.bool("overwrite") != true {
                 throw ToolFailure(message: "\(url.path) already exists. Pass overwrite=true to replace it, or edit it directly.")
             }

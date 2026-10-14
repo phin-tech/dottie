@@ -5,6 +5,7 @@ struct ContentView: View {
     @ObservedObject var document: DrawingDocument
     var fileURL: URL?
     @Environment(\.undoManager) var undoManager
+    @Environment(\.controlActiveState) private var activeState
     @State private var tool: Tool = .select
     @State var selection: Set<UUID> = []
     @State private var newStyle = Style()
@@ -41,6 +42,11 @@ struct ContentView: View {
         }
         .onChange(of: fileURL, initial: true) { _, url in
             LiveRegistry.shared.register(document, fileURL: url, undoManager: undoManager)
+        }
+        // A new window counts as current until another becomes key, so "current" works before first focus.
+        .onAppear { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
+        .onChange(of: activeState) { _, state in
+            if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
         }
         .focusedSceneValue(\.tool, $tool)
         .focusedSceneValue(\.editor, editorActions)

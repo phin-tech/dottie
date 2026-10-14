@@ -34,9 +34,25 @@ public enum LiveSocket {
         return (dir as NSString).appendingPathComponent("live.sock")
     }
 
+    /// Addresses the app's frontmost document, saved or not.
+    public static let currentKey = "@current"
+
     /// One spelling per file, so the app's registry and the MCP server agree on keys.
     public static func key(forPath path: String) -> String {
-        URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL.resolvingSymlinksInPath().path
+        if path == "current" || path == currentKey { return currentKey }
+        var url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath).standardizedFileURL
+        // Resolve symlinks (/tmp -> /private/tmp) on the part that exists; keep the rest as written.
+        var tail: [String] = []
+        func real(_ p: String) -> String? {
+            guard let r = realpath(p, nil) else { return nil }
+            defer { free(r) }
+            return String(cString: r)
+        }
+        while url.path != "/", real(url.path) == nil {
+            tail.insert(url.lastPathComponent, at: 0)
+            url.deleteLastPathComponent()
+        }
+        return tail.reduce(real(url.path) ?? url.path) { ($0 as NSString).appendingPathComponent($1) }
     }
 
     public static func address(_ path: String) -> sockaddr_un? {

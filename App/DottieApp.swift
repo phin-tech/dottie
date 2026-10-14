@@ -2,7 +2,10 @@ import SwiftUI
 
 @main
 struct DottieApp: App {
-    init() { LiveServer.shared.start() }
+    init() {
+        LiveServer.shared.start()
+        AppearanceMode.stored.apply()
+    }
 
     var body: some Scene {
         DocumentGroup(newDocument: { DrawingDocument() }) { file in

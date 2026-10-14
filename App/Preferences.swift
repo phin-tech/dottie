@@ -10,6 +10,9 @@ enum Pref {
     static let snapToGrid = "snapToGrid"
     static let gridSize = "gridSize"
     static let singleKeyShortcuts = "singleKeyToolShortcuts"
+    static let mcpBinaryPath = "mcpBinaryPath"
+    static let settingsTab = "settingsTab"
+    static let appearance = "appearance"
 
     static let routingDefault = Routing.straight.rawValue
     static let gridSizeDefault = 20.0
@@ -27,9 +30,47 @@ enum Pref {
     }
 }
 
+/// App-wide light/dark override. `system` follows macOS.
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system, light, dark
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+
+    static var stored: AppearanceMode {
+        AppearanceMode(rawValue: UserDefaults.standard.string(forKey: Pref.appearance) ?? "") ?? .system
+    }
+
+    /// Uses `NSApplication.shared`, not `NSApp`: this runs from `App.init()`, before `NSApp` is set.
+    @MainActor func apply() {
+        let app = NSApplication.shared
+        switch self {
+        case .system: app.appearance = nil
+        case .light: app.appearance = NSAppearance(named: .aqua)
+        case .dark: app.appearance = NSAppearance(named: .darkAqua)
+        }
+    }
+}
+
 /// ⌘, window. Holds general, infrequently changed options; the style for new shapes lives in the
 /// inspector, next to the shapes it affects, and is remembered between launches.
 struct SettingsView: View {
+    @AppStorage(Pref.settingsTab) private var tab = "general" // restore the last viewed pane
+
+    var body: some View {
+        TabView(selection: $tab) {
+            GeneralSettings()
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag("general")
+            MCPSettings()
+                .tabItem { Label("MCP", systemImage: "point.3.connected.trianglepath.dotted") }
+                .tag("mcp")
+        }
+        .frame(width: 480)
+    }
+}
+
+private struct GeneralSettings: View {
+    @AppStorage(Pref.appearance) private var appearance = AppearanceMode.system.rawValue
     @AppStorage(Pref.snapToObjects) private var snapToObjects = true
     @AppStorage(Pref.snapToGrid) private var snapToGrid = false
     @AppStorage(Pref.gridSize) private var gridSize = Pref.gridSizeDefault
@@ -39,6 +80,13 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            Section("Appearance") {
+                Picker("Canvas and windows", selection: $appearance) {
+                    ForEach(AppearanceMode.allCases) { Text($0.label).tag($0.rawValue) }
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: appearance) { _, v in (AppearanceMode(rawValue: v) ?? .system).apply() }
+            }
             Section {
                 Toggle("Snap to other shapes", isOn: $snapToObjects)
                 Toggle("Snap to grid", isOn: $snapToGrid)
@@ -62,8 +110,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 440)
         .fixedSize(horizontal: false, vertical: true)
-        .navigationTitle("Dottie Settings")
     }
 }

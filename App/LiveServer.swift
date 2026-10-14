@@ -12,6 +12,21 @@ final class LiveRegistry {
         weak var undoManager: UndoManager?
     }
     private var entries: [String: Entry] = [:]
+    /// The document whose window was most recently key; reachable as path "current", even unsaved.
+    private var frontmost: Entry?
+
+    func markFront(_ document: DrawingDocument, undoManager: UndoManager?) {
+        frontmost = Entry(document: document, undoManager: undoManager)
+    }
+
+    private func entry(forPath path: String) -> Entry? {
+        let key = LiveSocket.key(forPath: path)
+        if key == LiveSocket.currentKey { return frontmost?.document == nil ? nil : frontmost }
+        return entries[key]
+    }
+
+    /// Paths of documents currently reachable by agents.
+    var openPaths: [String] { entries.filter { $0.value.document != nil }.keys.sorted() }
 
     /// Call whenever a window's file URL (or undo manager) may have changed.
     func register(_ document: DrawingDocument, fileURL: URL?, undoManager: UndoManager?) {
@@ -25,12 +40,12 @@ final class LiveRegistry {
         case .ping:
             return LiveResponse(open: true)
         case .get:
-            guard let path = request.path, let doc = entries[LiveSocket.key(forPath: path)]?.document else {
+            guard let path = request.path, let doc = entry(forPath: path)?.document else {
                 return LiveResponse(open: false)
             }
             return LiveResponse(open: true, document: doc.model)
         case .put:
-            guard let path = request.path, let entry = entries[LiveSocket.key(forPath: path)], let doc = entry.document,
+            guard let path = request.path, let entry = entry(forPath: path), let doc = entry.document,
                   let new = request.document else { return LiveResponse(open: false) }
             doc.commit(new, actionName: request.actionName ?? "Agent Edit", undoManager: entry.undoManager)
             return LiveResponse(open: true)
@@ -43,6 +58,8 @@ final class LiveRegistry {
 final class LiveServer: @unchecked Sendable {
     static let shared = LiveServer()
     private var started = false
+    /// True once the socket is bound and listening.
+    private(set) var isListening = false
 
     func start() {
         guard !started else { return }
@@ -59,6 +76,7 @@ final class LiveServer: @unchecked Sendable {
         }
         guard bound == 0, listen(fd, 8) == 0 else { close(fd); return }
         chmod(path, 0o600)
+        isListening = true
         Thread.detachNewThread { [self] in acceptLoop(fd) }
     }
 
