@@ -13,13 +13,14 @@ struct ContentView: View {
     @AppStorage(Pref.newStyle) private var storedStyle = ""
     @AppStorage(Pref.routing) private var prefRouting = Pref.routingDefault
     @State private var showInspector = true
+    @AppStorage(Pref.showRulers) private var showRulers = false
     @State private var activeLayer: UUID?
     @State private var placeRequest: PlaceRequest?
     @State private var sidebarTab: SidebarTab = .inspector
 
     var body: some View {
         CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
-                   activeLayerID: activeLayer, placeRequest: $placeRequest)
+                   activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers)
             .frame(minWidth: 400)
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
@@ -95,6 +96,16 @@ struct Inspector: View {
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(Pref.showRulers) private var showRulers = false
+
+    private var themeBinding: Binding<String> {
+        Binding(get: { document.model.theme ?? "" },
+                set: { id in
+                    var next = document.model
+                    next.theme = id.isEmpty ? nil : id
+                    document.commit(next, actionName: "Change Theme", undoManager: undoManager)
+                })
+    }
 
     private var selected: [Element] { document.model.elements.filter { selection.contains($0.id) } }
 
@@ -116,6 +127,20 @@ struct Inspector: View {
     var body: some View {
         Form {
             LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager)
+            Section("Canvas") {
+                Picker("Theme", selection: themeBinding) {
+                    Text("Automatic").tag("")
+                    ForEach(Theme.all) { t in Text(t.name).tag(t.id) }
+                }
+                Toggle("Rulers and guides", isOn: $showRulers)
+                if document.model.guidesX != nil || document.model.guidesY != nil {
+                    Button("Clear Guides") {
+                        var next = document.model
+                        next.guidesX = nil; next.guidesY = nil
+                        document.commit(next, actionName: "Clear Guides", undoManager: undoManager)
+                    }
+                }
+            }
             Section("Style") {
                 Picker("Look", selection: lookBinding) {
                     Text("Sketchy").tag(true)

@@ -102,6 +102,8 @@ private enum Gesture {
     case editingPoint(id: UUID, index: Int)
     case rotating(id: UUID)
     case rotatingGroup(center: CGPoint, start: Double)
+    /// Dragging a ruler guide; `vertical` guides live in `guidesX`.
+    case guide(vertical: Bool, index: Int)
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
@@ -124,6 +126,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         spatialStale = false
         return s
     }
+    var showRulers = false { didSet { needsDisplay = true } }
+    private let rulerSize: CGFloat = 20
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
@@ -169,15 +173,28 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        NSColor.textBackgroundColor.setFill(); dirtyRect.fill()
+        canvasBackground.setFill(); dirtyRect.fill()
         ctx.saveGState()
         ctx.translateBy(x: pan.x, y: pan.y)
         ctx.scaleBy(x: zoom, y: zoom)
         // Only what the dirty rectangle shows, in model units, found through the spatial index.
         let visible = CGRect(x: (dirtyRect.minX - pan.x) / zoom, y: (dirtyRect.minY - pan.y) / zoom,
                              width: dirtyRect.width / zoom, height: dirtyRect.height / zoom)
-        Renderer.draw(model, in: ctx, background: NSColor.textBackgroundColor.cgColor, clip: visible,
-                      zoom: Double(zoom), ink: isDark ? .inkOnDark : .black, spatial: spatial)
+        Renderer.draw(model, in: ctx, background: canvasBackground.cgColor, clip: visible,
+                      zoom: Double(zoom), ink: canvasInk, spatial: spatial)
+
+        // Ruler guides sit over the drawing and under the selection.
+        if showRulers {
+            ctx.setStrokeColor(NSColor.systemTeal.withAlphaComponent(0.85).cgColor)
+            ctx.setLineWidth(1 / zoom)
+            for x in model.guidesX ?? [] {
+                ctx.move(to: CGPoint(x: x, y: visible.minY)); ctx.addLine(to: CGPoint(x: x, y: visible.maxY))
+            }
+            for y in model.guidesY ?? [] {
+                ctx.move(to: CGPoint(x: visible.minX, y: y)); ctx.addLine(to: CGPoint(x: visible.maxX, y: y))
+            }
+            ctx.strokePath()
+        }
 
         let accent = NSColor.controlAccentColor
         ctx.setStrokeColor(accent.cgColor)
@@ -296,6 +313,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         ctx.restoreGState()
 
+        if showRulers { drawRulers(ctx) }
+
         if zoom != 1 {
             let label = "\(Int((zoom * 100).rounded()))%" as NSString
             let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium),
@@ -306,6 +325,87 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     private var isDark: Bool { effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
+
+    // MARK: Theme
+
+    private func nsColor(_ c: RGBA) -> NSColor { NSColor(srgbRed: c.r, green: c.g, blue: c.b, alpha: c.a) }
+    /// The page color: the drawing's theme, or the system's text background.
+    private var canvasBackground: NSColor { model.resolvedTheme.map { nsColor($0.background) } ?? .textBackgroundColor }
+    /// What automatic ink is shown as on this page.
+    private var canvasInk: RGBA { model.resolvedTheme?.ink ?? (isDark ? .inkOnDark : .black) }
+
+    // MARK: Rulers
+
+    private func rulerStep() -> Double {
+        let steps: [Double] = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10_000, 20_000, 50_000, 100_000]
+        return steps.first { $0 * Double(zoom) >= 60 } ?? 100_000
+    }
+
+    private func drawRulers(_ ctx: CGContext) {
+        let t = rulerSize
+        let ink = nsColor(canvasInk)
+        let bg = canvasBackground.blended(withFraction: 0.08, of: ink) ?? canvasBackground
+        ctx.saveGState()
+        ctx.setFillColor(bg.cgColor)
+        ctx.fill(CGRect(x: 0, y: 0, width: bounds.width, height: t))
+        ctx.fill(CGRect(x: 0, y: 0, width: t, height: bounds.height))
+        ctx.setStrokeColor(ink.withAlphaComponent(0.25).cgColor)
+        ctx.setLineWidth(1)
+        ctx.move(to: CGPoint(x: 0, y: t - 0.5)); ctx.addLine(to: CGPoint(x: bounds.width, y: t - 0.5))
+        ctx.move(to: CGPoint(x: t - 0.5, y: 0)); ctx.addLine(to: CGPoint(x: t - 0.5, y: bounds.height))
+        ctx.strokePath()
+
+        let step = rulerStep()
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.monospacedDigitSystemFont(ofSize: 9, weight: .regular),
+                                                    .foregroundColor: ink.withAlphaComponent(0.7)]
+        ctx.setStrokeColor(ink.withAlphaComponent(0.5).cgColor)
+        func ticks(origin: CGFloat, length: CGFloat, horizontal: Bool) {
+            var v = floor(-origin / zoom / step) * step
+            let end = (length - origin) / zoom
+            while v <= end {
+                let at = CGFloat(v) * zoom + origin
+                if at >= t {
+                    if horizontal { ctx.move(to: CGPoint(x: at, y: t - 9)); ctx.addLine(to: CGPoint(x: at, y: t)) }
+                    else { ctx.move(to: CGPoint(x: t - 9, y: at)); ctx.addLine(to: CGPoint(x: t, y: at)) }
+                    ctx.strokePath()
+                    let label = "\(Int(v.rounded()))" as NSString
+                    if horizontal {
+                        label.draw(at: CGPoint(x: at + 2, y: 2), withAttributes: attrs)
+                    } else {
+                        ctx.saveGState()
+                        ctx.translateBy(x: 2, y: at - 2)
+                        ctx.rotate(by: -.pi / 2)
+                        label.draw(at: .zero, withAttributes: attrs)
+                        ctx.restoreGState()
+                    }
+                }
+                for k in 1..<5 {
+                    let m = CGFloat(v + step * Double(k) / 5) * zoom + origin
+                    guard m >= t else { continue }
+                    if horizontal { ctx.move(to: CGPoint(x: m, y: t - 4)); ctx.addLine(to: CGPoint(x: m, y: t)) }
+                    else { ctx.move(to: CGPoint(x: t - 4, y: m)); ctx.addLine(to: CGPoint(x: t, y: m)) }
+                }
+                ctx.strokePath()
+                v += step
+            }
+        }
+        ticks(origin: pan.x, length: bounds.width, horizontal: true)
+        ticks(origin: pan.y, length: bounds.height, horizontal: false)
+        ctx.restoreGState()
+    }
+
+    /// The guide under a model-space point (within a few screen pixels), if any.
+    private func guideHit(_ p: CGPoint) -> (vertical: Bool, index: Int)? {
+        let tol = 4 / zoom
+        if let i = (model.guidesX ?? []).firstIndex(where: { abs($0 - p.x) <= tol }) { return (true, i) }
+        if let i = (model.guidesY ?? []).firstIndex(where: { abs($0 - p.y) <= tol }) { return (false, i) }
+        return nil
+    }
+
+    private func setGuide(_ doc: inout DottieDocument, vertical: Bool, index: Int, to value: Double) {
+        if vertical, doc.guidesX?.indices.contains(index) == true { doc.guidesX?[index] = value }
+        if !vertical, doc.guidesY?.indices.contains(index) == true { doc.guidesY?[index] = value }
+    }
 
     override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
 
@@ -708,10 +808,27 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             window?.invalidateCursorRects(for: self)
             return
         }
+        if showRulers {
+            let raw = convert(event.locationInWindow, from: nil)
+            let inTop = raw.y < rulerSize, inLeft = raw.x < rulerSize
+            if inTop != inLeft { // a drag from a ruler pulls out a guide (the corner does nothing)
+                baseline = model
+                var next = model
+                let q = point(event)
+                if inLeft { next.guidesX = (next.guidesX ?? []) + [q.x] } else { next.guidesY = (next.guidesY ?? []) + [q.y] }
+                gesture = .guide(vertical: inLeft, index: (inLeft ? next.guidesX : next.guidesY)!.count - 1)
+                model = next
+                return
+            }
+        }
         var p = point(event)
         if tool.kind != nil, tool != .text, tool != .pencil { p = snapped(p, event) }
         dragStart = p
         baseline = model
+        if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model) == nil {
+            gesture = .guide(vertical: hit.vertical, index: hit.index)
+            return
+        }
         let usable = model.layers.filter { !$0.locked && $0.visible }
         guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return }
 
@@ -800,6 +917,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         if case .erasing? = gesture { eraseStep(at: point(event)); return }
+        if case .guide(let vertical, let index)? = gesture {
+            let q = point(event)
+            var pos = vertical ? q.x : q.y
+            if let g = gridSize, !event.modifierFlags.contains(.command) { pos = Snap.grid(pos, size: g) }
+            var next = model
+            setGuide(&next, vertical: vertical, index: index, to: pos)
+            model = next
+            return
+        }
         guard let g = gesture, var next = baseline else { return }
         let p = snapped(point(event), event)
         var d = CGPoint(x: p.x - dragStart.x, y: p.y - dragStart.y)
@@ -813,7 +939,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if !moving.isNull, !event.modifierFlags.contains(.command) {
                 let others = next.elements.filter { !selection.contains($0.id) && $0.kind != .connector && layersOK.contains($0.layerID) }.map(\.rotatedBounds)
                 let r = Snap.move(moving.offsetBy(dx: d.x, dy: d.y), others: snapToObjects ? others : [],
-                                  threshold: 6 / zoom, gridSize: gridSize)
+                                  threshold: 6 / zoom, gridSize: gridSize,
+                                  guidesX: showRulers ? model.guidesX ?? [] : [], guidesY: showRulers ? model.guidesY ?? [] : [])
                 d.x += r.dx; d.y += r.dy
                 guides = r.guides
                 spacingGuides = r.spacing
@@ -865,7 +992,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 if angle == 0, snapToObjects, !event.modifierFlags.contains(.command) {
                     let ok = Set(next.layers.filter { $0.visible && !$0.locked }.map(\.id))
                     let others = next.elements.filter { $0.id != id && $0.kind != .connector && ok.contains($0.layerID) }.map(\.rotatedBounds)
-                    let r = Snap.resize(f, hx: h.hx, hy: h.hy, others: others, threshold: 6 / zoom)
+                    let r = Snap.resize(f, hx: h.hx, hy: h.hy, others: others, threshold: 6 / zoom,
+                                        guidesX: showRulers ? model.guidesX ?? [] : [], guidesY: showRulers ? model.guidesY ?? [] : [])
                     if h.hx < 0 { f.origin.x += r.dx; f.size.width -= r.dx }
                     if h.hx > 0 { f.size.width += r.dx }
                     if h.hy < 0 { f.origin.y += r.dy; f.size.height -= r.dy }
@@ -880,7 +1008,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 }
                 next.elements[i].frame = f
             }
-        case .panning, .erasing:
+        case .panning, .erasing, .guide:
             return
         case .rotating(let id):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
@@ -951,6 +1079,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if strokePoints.count < 2 { model = base; selection = []; onPreview?(base); return }
             if let i = model.elements.firstIndex(where: { $0.id == id }) { model.elements[i].fitStroke() }
             commit(base, "Draw")
+        case .guide(let vertical, let index):
+            // Dropping a guide back on its ruler removes it.
+            let raw = convert(event.locationInWindow, from: nil)
+            if vertical ? raw.x < rulerSize : raw.y < rulerSize {
+                var next = model
+                if vertical { if next.guidesX?.indices.contains(index) == true { next.guidesX?.remove(at: index) } }
+                else if next.guidesY?.indices.contains(index) == true { next.guidesY?.remove(at: index) }
+                if next.guidesX?.isEmpty == true { next.guidesX = nil }
+                if next.guidesY?.isEmpty == true { next.guidesY = nil }
+                model = next
+            }
+            if model != base {
+                let before = (base.guidesX?.count ?? 0) + (base.guidesY?.count ?? 0)
+                let after = (model.guidesX?.count ?? 0) + (model.guidesY?.count ?? 0)
+                commit(base, after > before ? "Add Guide" : after < before ? "Remove Guide" : "Move Guide")
+            }
         case .erasing where model != base: commit(base, "Erase")
         case .editingPoint where model != base: commit(base, "Edit Stroke")
         case .rotating where model != base: commit(base, "Rotate")
@@ -1020,7 +1164,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         field.isBordered = false
         field.focusRingType = .none
         field.alignment = e.kind == .text ? .left : .center
-        field.backgroundColor = .textBackgroundColor
+        field.backgroundColor = canvasBackground
+        field.textColor = nsColor(canvasInk)
         field.drawsBackground = e.kind == .connector
         field.delegate = self
         addSubview(field)
@@ -1072,6 +1217,7 @@ struct CanvasView: NSViewRepresentable {
     var routing: Routing
     var activeLayerID: UUID?
     @Binding var placeRequest: PlaceRequest?
+    var showRulers = false
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
@@ -1089,6 +1235,7 @@ struct CanvasView: NSViewRepresentable {
         v.style = style
         v.routing = routing
         v.activeLayerID = activeLayerID
+        v.showRulers = showRulers
         if v.selection != selection { v.selection = selection }
         if let req = placeRequest {
             // Applying it changes the model and bindings, so do it after this update pass.

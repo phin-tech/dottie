@@ -281,4 +281,56 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertFalse(view.importDrawio(Data("<nope/>".utf8), at: .zero, keepOriginalColors: false))
         XCTAssertEqual(commits.count, 2)
     }
+
+    // MARK: Rulers and guides
+
+    func testDraggingFromTheRulersPullsOutGuidesAndDroppingBackRemovesThem() {
+        view.showRulers = true
+        // Left ruler (x < 20) pulls a vertical guide; the model point is the drop point at zoom 1, pan 0.
+        drag(CGPoint(x: 10, y: 300), CGPoint(x: 250, y: 300))
+        XCTAssertEqual(view.model.guidesX, [250])
+        XCTAssertEqual(commits.count, 1)
+        // Top ruler (y < 20) pulls a horizontal one.
+        drag(CGPoint(x: 400, y: 10), CGPoint(x: 400, y: 180))
+        XCTAssertEqual(view.model.guidesY, [180])
+        XCTAssertEqual(commits.count, 2)
+        XCTAssertEqual(commits.map(\.name), ["Add Guide", "Add Guide"])
+        // Grab the existing vertical guide in empty space and move it.
+        drag(CGPoint(x: 250, y: 500), CGPoint(x: 320, y: 500))
+        XCTAssertEqual(view.model.guidesX, [320])
+        XCTAssertEqual(commits.last?.name, "Move Guide")
+        // Drop it back on the left ruler: gone.
+        drag(CGPoint(x: 320, y: 500), CGPoint(x: 5, y: 500))
+        XCTAssertNil(view.model.guidesX)
+        XCTAssertEqual(commits.last?.name, "Remove Guide")
+        XCTAssertEqual(view.model.guidesY, [180])
+    }
+
+    func testShapesSnapToGuidesWhileMoving() {
+        view.showRulers = true
+        var doc = view.model
+        doc.guidesX = [500]
+        view.model = doc
+        let e = add(.rectangle, CGRect(x: 300, y: 300, width: 100, height: 60))
+        // Drag so the right edge lands 3 points shy of the guide at x=500.
+        drag(CGPoint(x: 350, y: 330), CGPoint(x: 350 + 97, y: 330))
+        XCTAssertEqual(element(e.id).frame.maxX, 500, accuracy: 0.001)
+    }
+
+    func testRulersAndThemeRenderWithoutDisturbingContent() throws {
+        view.showRulers = true
+        var doc = view.model
+        doc.theme = "blueprint"; doc.guidesX = [200]
+        view.model = doc
+        _ = add(.rectangle, CGRect(x: 100, y: 100, width: 200, height: 100), text: "hello")
+        let rep = try XCTUnwrap(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+        view.cacheDisplay(in: view.bounds, to: rep)
+        if let out = ProcessInfo.processInfo.environment["DOTTIE_SNAPSHOT"], let png = rep.representation(using: .png, properties: [:]) {
+            try png.write(to: URL(fileURLWithPath: out))
+        }
+        // The page color is the theme's, not the system's, in the middle of the canvas.
+        let c = try XCTUnwrap(rep.colorAt(x: 700, y: 600)?.usingColorSpace(.sRGB))
+        XCTAssertLessThan(c.redComponent, 0.3)            // dark blue, not the system's white or black
+        XCTAssertGreaterThan(c.blueComponent, c.redComponent + 0.15)
+    }
 }

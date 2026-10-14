@@ -13,6 +13,7 @@ enum Pref {
     static let mcpBinaryPath = "mcpBinaryPath"
     static let settingsTab = "settingsTab"
     static let appearance = "appearance"
+    static let showRulers = "showRulers"
 
     static let routingDefault = Routing.straight.rawValue
     static let gridSizeDefault = 20.0
