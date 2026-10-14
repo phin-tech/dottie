@@ -448,6 +448,49 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertLessThan(ink.brightnessComponent, 0.3, "dark text on a light fill, not the white canvas ink")
     }
 
+    func testClickingWithTheNoteToolPlacesANoteAndReturnStartsANewLine() throws {
+        view.tool = .note
+        click(CGPoint(x: 120, y: 100))
+        let note = try XCTUnwrap(view.model.elements.first)
+        XCTAssertEqual(note.kind, .note)
+        XCTAssertEqual(note.frame, CGRect(origin: CGPoint(x: 120, y: 100), size: DiagramOps.defaultSize(for: .note, text: "")))
+        XCTAssertEqual(note.style.fill, Note.defaultFill)
+        XCTAssertTrue(commits.isEmpty, "nothing commits until the typing is done")
+
+        let field = try XCTUnwrap(view.textEditor)
+        XCTAssertEqual(field.frame.minY, Note.textRect(note.frame).minY, accuracy: 1, "a note is edited from the top, not centered")
+        let editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
+        editor.insertText("# Hi", replacementRange: editor.selectedRange())
+        XCTAssertTrue(view.control(field, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))))
+        editor.insertText("- one", replacementRange: editor.selectedRange())
+        XCTAssertNotNil(view.textEditor, "Return did not end editing")
+
+        window.makeFirstResponder(view)
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(commits.last?.name, "Add Note")
+        XCTAssertEqual(commits.last?.doc.elements.first?.text, "# Hi\n- one")
+    }
+
+    func testANewNoteLeftEmptyDisappearsButOneEmptiedLaterStays() throws {
+        view.tool = .note
+        click(CGPoint(x: 120, y: 100))
+        var field = try XCTUnwrap(view.textEditor)
+        var editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
+        XCTAssertTrue(view.control(field, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))))
+        XCTAssertTrue(view.model.elements.isEmpty, "an untouched new note is not left behind")
+        XCTAssertTrue(commits.isEmpty)
+
+        let note = add(.note, CGRect(x: 100, y: 100, width: 200, height: 160), text: "keep")
+        view.tool = .select
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 180, y: 160), clicks: 2))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 180, y: 160), clicks: 2))
+        field = try XCTUnwrap(view.textEditor)
+        editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
+        editor.selectAll(nil); editor.delete(nil)
+        window.makeFirstResponder(view)
+        XCTAssertEqual(element(note.id).text, "", "a note emptied on purpose stays")
+    }
+
     // MARK: Context menu
 
     func testRightClickSelectsTheShapeAndOffersLinkItems() throws {

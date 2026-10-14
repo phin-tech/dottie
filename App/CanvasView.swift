@@ -18,7 +18,7 @@ struct PlaceRequest: Equatable {
 }
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text, connector, pencil, eraser
+    case select, rectangle, ellipse, diamond, text, note, connector, pencil, eraser
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -27,6 +27,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "circle"
         case .diamond: "diamond"
         case .text: "textformat"
+        case .note: "note.text"
         case .connector: "arrow.up.right"
         case .pencil: "pencil.tip"
         case .eraser: "eraser"
@@ -39,6 +40,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "Ellipse"
         case .diamond: "Diamond"
         case .text: "Text"
+        case .note: "Note"
         case .connector: "Connector"
         case .pencil: "Pencil"
         case .eraser: "Eraser"
@@ -52,6 +54,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "o"
         case .diamond: "d"
         case .text: "t"
+        case .note: "n"
         case .connector: "c"
         case .pencil: "p"
         case .eraser: "e"
@@ -64,6 +67,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: .ellipse
         case .diamond: .diamond
         case .text: .text
+        case .note: .note
         case .connector: nil
         case .pencil: .freehand
         case .eraser: nil
@@ -691,7 +695,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// For a multi-selection: its bounds (padded) and the rotation knob above them.
     private func groupRotationKnob() -> (CGRect, CGPoint)? {
-        guard tool == .select || tool == .rectangle || tool == .ellipse || tool == .diamond || tool == .text,
+        guard tool == .select || tool == .rectangle || tool == .ellipse || tool == .diamond || tool == .text || tool == .note,
               selection.count >= 2 else { return nil }
         let b = model.selectionBounds(selection)
         guard !b.isNull else { return nil }
@@ -731,22 +735,24 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// Where an element's text is edited, matching where the renderer draws it: a connector's label at the
-    /// middle of its route, a shape's label inside a 6pt inset, a text box's text across its frame.
+    /// middle of its route, a shape's label inside a 6pt inset, a text box's text across its frame, a note's
+    /// Markdown source inside its padding.
     private func editFrame(for e: Element) -> CGRect {
         switch e.kind {
         case .connector: Renderer.labelRect(for: e, in: model)
         case .text: e.frame
+        case .note: Note.textRect(e.frame)
         default: e.frame.insetBy(dx: 6, dy: 6)
         }
     }
 
-    /// Sizes the text editor to its text and, except in a text box, centers it vertically in the edit
+    /// Sizes the text editor to its text and, except in a text box or note, centers it vertically in the edit
     /// frame, so typing happens where the label will be drawn.
     private func layoutEditor() {
         guard let field = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
         field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
         let box = viewFrame(editFrame(for: e))
-        guard e.kind != .text, let cell = field.cell else { field.frame = box; return }
+        guard e.kind != .text, e.kind != .note, let cell = field.cell else { field.frame = box; return }
         let height = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: box.width, height: .greatestFiniteMagnitude)).height
         field.frame = NSRect(x: box.minX, y: box.midY - height / 2, width: box.width, height: height)
     }
@@ -1257,7 +1263,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             gesture = .drawing(id: e.id)
             onPreview?(model)
         } else if let kind = tool.kind {
-            let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: style, layerID: layer.id)
+            let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: kind == .note ? Note.style(from: style) : style,
+                            layerID: layer.id)
             gesture = .creating(e)
             model.elements.append(e)
             selection = [e.id]
@@ -1438,6 +1445,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard let base = baseline, let g = gesture else { return }
         switch g {
         case .creating(let e):
+            if e.kind == .note { // a click places a default-size note; either way, start typing in it
+                if let i = model.elements.firstIndex(where: { $0.id == e.id }),
+                   model.elements[i].width < 3 && model.elements[i].height < 3 {
+                    model.elements[i].frame.size = DiagramOps.defaultSize(for: .note, text: "")
+                }
+                onPreview?(model)
+                beginEditing(e.id, isNew: true)
+                return
+            }
             if e.width < 3 && e.height < 3 { // accidental click
                 model = base; selection = []; onPreview?(base); return
             }
@@ -1539,7 +1555,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         field.stringValue = e.text ?? ""
         field.isBordered = false
         field.focusRingType = .none
-        field.alignment = e.kind == .text ? .left : .center
+        field.alignment = e.kind == .text || e.kind == .note ? .left : .center
         field.usesSingleLineMode = false
         field.cell?.wraps = true
         field.cell?.isScrollable = false
@@ -1569,8 +1585,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         needsDisplay = true
         guard let i = model.elements.firstIndex(where: { $0.id == id }) else { return }
         var next = model
-        if next.elements[i].kind == .text && text.isEmpty {
-            next.elements.remove(at: i) // empty text boxes disappear
+        let kind = next.elements[i].kind
+        // Empty text boxes disappear, and so does a note left empty as it was placed (one emptied later stays).
+        if text.isEmpty && (kind == .text || (kind == .note && editBase != nil)) {
+            next.elements.remove(at: i)
             selection = []
         } else {
             next.elements[i].text = text
@@ -1582,23 +1600,31 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         let base = editBase
         editBase = nil
+        let name = base != nil && kind == .note ? "Add Note" : "Edit Text"
         if deferCommit {
-            DispatchQueue.main.async { [weak self] in self?.commitEdit(next, base: base) }
+            DispatchQueue.main.async { [weak self] in self?.commitEdit(next, base: base, name: name) }
         } else {
-            commitEdit(next, base: base)
+            commitEdit(next, base: base, name: name)
         }
         window?.makeFirstResponder(self)
     }
 
-    private func commitEdit(_ next: DottieDocument, base: DottieDocument?) {
+    private func commitEdit(_ next: DottieDocument, base: DottieDocument?, name: String) {
         if let base { onPreview?(base) }
-        onCommit?(next, "Edit Text")
+        if next == base { return } // a new box or note left empty: nothing to undo
+        onCommit?(next, name)
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endEditing() }
 
-    /// Escape inside the text editor finishes editing and returns to the arrow.
+    /// Escape inside the text editor finishes editing and returns to the arrow. In a note, Return starts a
+    /// new line, since Markdown needs them; Escape or clicking away finishes.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
+        if selector == #selector(NSResponder.insertNewline(_:)), let id = editingID,
+           model.elements.first(where: { $0.id == id })?.kind == .note {
+            textView.insertNewlineIgnoringFieldEditor(nil)
+            return true
+        }
         guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
         endEditing()
         switchTool(.select)

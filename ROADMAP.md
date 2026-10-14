@@ -35,6 +35,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Element links: pick a target in the inspector, follow by badge or ⌘-click, Back/Forward (⌘[ ⌘]); `link` over MCP and scripts
 - [x] Canvas context menu (edit, link, arrange); hidden element anchors (`anchor`)
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
+- [x] Sticky notes (`note` kind, N): Markdown laid out with CoreText, identical in PNG, PDF and SVG; `note` over MCP and scripts
 
 ## Next
 - Custom themes and a color palette per theme

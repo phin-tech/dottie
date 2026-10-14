@@ -505,6 +505,7 @@ private struct ElementRow: View {
         case .ellipse: "circle"
         case .diamond: "diamond"
         case .text: "textformat"
+        case .note: "note.text"
         case .connector: "arrow.right"
         case .freehand: "scribble"
         case .path: "scribble.variable"

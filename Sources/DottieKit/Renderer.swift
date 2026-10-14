@@ -86,7 +86,7 @@ public enum Renderer {
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
         switch e.kind {
-        case .rectangle:
+        case .rectangle, .note:
             if rough <= 0 { return CGPath(rect: r, transform: nil) }
             return Rough.polygon([CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY),
                                   CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)],
@@ -447,6 +447,11 @@ public enum Renderer {
             }
             return
         }
+        if e.kind == .note, e.style.fill.a > 0 { // a soft drop shadow lifts the note off the page
+            ctx.addPath(fillPath(for: e).copy(using: [CGAffineTransform(translationX: Note.shadowOffset.width, y: Note.shadowOffset.height)])!)
+            ctx.setFillColor(CGColor(gray: 0, alpha: 0.14 * e.style.fill.a))
+            ctx.fillPath()
+        }
         if e.style.fill.a > 0, e.kind != .freehand {
             if e.style.fillStyle == .solid || !(lod?.hatch ?? true) {
                 ctx.addPath(fillPath(for: e))
@@ -467,6 +472,12 @@ public enum Renderer {
         ctx.addPath(outline(for: e))
         applyStroke()
         ctx.strokePath()
+        if e.kind == .note {
+            if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
+                Note.draw(t, in: Note.textRect(e.frame), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
+            }
+            return
+        }
         if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
             drawText(t, in: e.frame.insetBy(dx: 6, dy: 6), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
         }

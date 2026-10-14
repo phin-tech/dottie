@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import CoreText
 
 extension Exporter {
     /// SVG built from the same paths the renderer draws, so the sketchy look is identical.
@@ -55,8 +56,12 @@ extension Exporter {
             return textElement(e.text ?? "", frame: e.frame, e: e, centered: false)
         case .freehand:
             return "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
-        case .rectangle, .ellipse, .diamond, .path:
+        case .rectangle, .ellipse, .diamond, .path, .note:
             var s = ""
+            if e.kind == .note, e.style.fill.a > 0 {
+                let shadow = Renderer.fillPath(for: e).copy(using: [CGAffineTransform(translationX: Note.shadowOffset.width, y: Note.shadowOffset.height)])!
+                s += "<path d=\"\(pathData(shadow))\" fill=\"#000000\" fill-opacity=\"\(num(0.14 * e.style.fill.a))\" stroke=\"none\"/>\n"
+            }
             if e.style.fill.a > 0 {
                 if e.style.fillStyle == .solid {
                     s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity"))\(e.evenOdd == true ? " fill-rule=\"evenodd\"" : "") stroke=\"none\"/>\n"
@@ -65,7 +70,9 @@ extension Exporter {
                 }
             }
             s += "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
-            if let t = e.text, !t.isEmpty { s += textElement(t, frame: e.frame, e: e, centered: true) }
+            if let t = e.text, !t.isEmpty {
+                s += e.kind == .note ? noteText(t, e: e) : textElement(t, frame: e.frame, e: e, centered: true)
+            }
             return s
         }
     }
@@ -82,6 +89,47 @@ extension Exporter {
             s += "<tspan x=\"\(num(x))\" y=\"\(num(top + lineHeight * (Double(i) + 0.8)))\">\(escape(line))</tspan>"
         }
         return s + "</text>\n"
+    }
+
+    /// A note's Markdown as positioned runs: the same CoreText layout the renderer draws, one `<text>` per
+    /// line and a `<tspan>` per style run, so the SVG wraps exactly where the PNG does.
+    private static func noteText(_ source: String, e: Element) -> String {
+        let rect = Note.textRect(e.frame)
+        let (text, frame) = Note.layout(source, in: rect, fontSize: e.style.fontSize, color: e.style.stroke.cgColor)
+        let lines = Note.lines(of: frame, in: rect)
+        let string = text.string as NSString
+        var s = ""
+        for l in lines {
+            var spans = ""
+            for run in CTLineGetGlyphRuns(l.line) as! [CTRun] {
+                let range = CTRunGetStringRange(run)
+                let piece = string.substring(with: NSRange(location: range.location, length: range.length))
+                    .replacingOccurrences(of: "\t", with: "").replacingOccurrences(of: "\n", with: "")
+                guard !piece.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
+                var first = CGPoint.zero
+                CTRunGetPositions(run, CFRange(location: 0, length: 1), &first)
+                // A marker run like "•\t" starts at the marker, so the tab dropped above moves nothing.
+                let attrs = CTRunGetAttributes(run) as NSDictionary
+                let font = attrs[kCTFontAttributeName as String] as! CTFont
+                let traits = CTFontGetSymbolicTraits(font)
+                var a = "x=\"\(num(l.origin.x + first.x))\" font-size=\"\(num(Double(CTFontGetSize(font))))\""
+                if traits.contains(.traitMonoSpace) { a += " font-family=\"Menlo, Consolas, monospace\"" }
+                if traits.contains(.traitBold) { a += " font-weight=\"bold\"" }
+                if traits.contains(.traitItalic) { a += " font-style=\"italic\"" }
+                if attrs[kCTUnderlineStyleAttributeName as String] != nil { a += " text-decoration=\"underline\"" }
+                if let c = attrs[kCTForegroundColorAttributeName as String], CFGetTypeID(c as CFTypeRef) == CGColor.typeID,
+                   (c as! CGColor).alpha < 1 {
+                    a += " fill-opacity=\"\(num(Double((c as! CGColor).alpha)))\""
+                }
+                spans += "<tspan \(a)>\(escape(piece))</tspan>"
+            }
+            guard !spans.isEmpty else { continue }
+            s += "<text y=\"\(num(l.origin.y))\" font-family=\"Helvetica Neue, Helvetica, Arial, sans-serif\" fill=\"\(color(e.style.stroke))\" xml:space=\"preserve\">\(spans)</text>\n"
+        }
+        for (a, b) in Note.decorations(lines, in: rect) {
+            s += "<line x1=\"\(num(a.x))\" y1=\"\(num(a.y))\" x2=\"\(num(b.x))\" y2=\"\(num(b.y))\" stroke=\"\(color(e.style.stroke))\" stroke-width=\"\(num(max(1, e.style.fontSize / 14)))\"/>\n"
+        }
+        return s
     }
 
     static func pathData(_ path: CGPath) -> String {

@@ -324,7 +324,7 @@ public enum DottieScript {
             case "shape":
                 let kindName = a.string("kind") ?? "rectangle"
                 guard let kind = ElementKind(rawValue: kindName), kind != .connector, kind != .path, kind != .freehand else {
-                    throw OpsError.invalid("'kind' must be one of rectangle, ellipse, diamond, text, got '\(kindName)'")
+                    throw OpsError.invalid("'kind' must be one of rectangle, ellipse, diamond, text, note, got '\(kindName)'")
                 }
                 let x = a.double("x") ?? 0, y = a.double("y") ?? 0
                 var frame: CGRect?
@@ -385,8 +385,8 @@ public enum DottieScript {
                 guard let nodeArgs = a.list("nodes"), !nodeArgs.isEmpty else { throw OpsError.invalid("'nodes' must be a non-empty array") }
                 let nodes = try nodeArgs.map { n -> DiagramOps.NodeSpec in
                     let kindName = n.string("kind") ?? "rectangle"
-                    guard let kind = ElementKind(rawValue: kindName), [.rectangle, .ellipse, .diamond, .text].contains(kind) else {
-                        throw OpsError.invalid("node 'kind' must be one of rectangle, ellipse, diamond, text, got '\(kindName)'")
+                    guard let kind = ElementKind(rawValue: kindName), [.rectangle, .ellipse, .diamond, .text, .note].contains(kind) else {
+                        throw OpsError.invalid("node 'kind' must be one of rectangle, ellipse, diamond, text, note, got '\(kindName)'")
                     }
                     return DiagramOps.NodeSpec(key: try n.require("key"), text: n.string("text") ?? "", kind: kind,
                                                fill: try n.color("fill"), width: n.double("width"), height: n.double("height"))
@@ -463,7 +463,7 @@ public enum DottieScript {
         elements: function (filter) { return call("elements", filter); },
         get: function (id) { return call("get", { id: idOf(id) }); },
         shape: function (o) { return call("shape", o); },
-        rect: kind("rectangle"), ellipse: kind("ellipse"), diamond: kind("diamond"), text: kind("text"),
+        rect: kind("rectangle"), ellipse: kind("ellipse"), diamond: kind("diamond"), text: kind("text"), note: kind("note"),
         connect: function (from, to, o) { return call("connector", merge(o, { from: idOf(from), to: idOf(to) })); },
         update: function (id, changes) {
           var o = merge(changes, { id: idOf(id) });
@@ -545,7 +545,8 @@ public enum DottieScript {
       dottie.stencils({query?, library?})  stencil items: {library, name, tags, width, height}
 
     Drawing (each returns the new element)
-      dottie.rect/ellipse/diamond/text({x, y, width?, height?, text?, fill?, stroke?, sketchy?, ...look})
+      dottie.rect/ellipse/diamond/text/note({x, y, width?, height?, text?, fill?, stroke?, sketchy?, ...look})
+        (a note is a sticky note: its text is Markdown, drawn from the top left; the fill defaults to yellow)
       dottie.shape({kind, ...})        same, with kind as a field
       dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, ...look})   routing: straight | curved | elbow
       dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}

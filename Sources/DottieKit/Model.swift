@@ -50,6 +50,8 @@ public enum ElementKind: String, Codable, Sendable {
     case rectangle, ellipse, diamond, text, connector, freehand
     /// A closed or open compound Bézier shape (`subpaths`), as imported from SVG or a stencil.
     case path
+    /// A sticky note: a filled card whose `text` is Markdown, laid out from the top left (see `Note`).
+    case note
 }
 
 /// One contour of a `.path` element: cubic Béziers as flat `x, y` pairs normalized to the element's
