@@ -295,7 +295,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     @objc func duplicate(_ sender: Any?) {
-        guard !selection.isEmpty else { return }
+        guard editor == nil, !selection.isEmpty else { return } // ⌘D while typing a label must not clone the shape
         var next = model
         let added = next.duplicate(selection)
         selection = added
