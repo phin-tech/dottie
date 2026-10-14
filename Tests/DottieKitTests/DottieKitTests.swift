@@ -536,3 +536,53 @@ final class LayerTests: XCTestCase {
         XCTAssertEqual(doc.elements.first { $0.id == a.id }?.layerID, other)
     }
 }
+
+final class StrokeEditTests: XCTestCase {
+    private func line(in doc: inout DottieDocument) -> Element {
+        let raw = (0...100).map { StrokePoint(x: Double($0) / 100, y: 0.5) }
+        var e = Element(kind: .freehand, frame: CGRect(x: 0, y: 0, width: 200, height: 20), layerID: doc.layers[0].id, points: raw)
+        e.style.roughness = 0
+        e.fitStroke()
+        doc.elements = [e]
+        return e
+    }
+
+    func testErasingTheMiddleSplitsAStrokeInTwo() throws {
+        var doc = DottieDocument()
+        let e = line(in: &doc)
+        XCTAssertNotNil(e.strokeControlPoints)
+        XCTAssertTrue(doc.erase(at: CGPoint(x: 100, y: 10), radius: 10))
+        XCTAssertEqual(doc.elements.count, 2)
+        let xs = doc.elements.map { $0.frame }
+        XCTAssertLessThan(xs[0].maxX, 100)
+        XCTAssertGreaterThan(xs[1].minX, 100)
+        XCTAssertEqual(Set(doc.elements.map(\.id)).count, 2)
+        XCTAssertFalse(doc.erase(at: CGPoint(x: 100, y: 10), radius: 10)) // nothing left under the cursor
+    }
+
+    func testErasingWholeStrokeAndShapes() {
+        var doc = DottieDocument()
+        _ = line(in: &doc)
+        let l = doc.layers[0].id
+        doc.elements.append(Element(kind: .rectangle, frame: CGRect(x: 300, y: 0, width: 40, height: 40), layerID: l))
+        XCTAssertTrue(doc.erase(at: CGPoint(x: 320, y: 20), radius: 6))
+        XCTAssertEqual(doc.elements.count, 1)
+        // A tiny stroke inside the radius disappears entirely.
+        XCTAssertTrue(doc.erase(at: CGPoint(x: 100, y: 10), radius: 150))
+        XCTAssertTrue(doc.elements.isEmpty)
+    }
+
+    func testMovingAnAnchorCarriesItsHandlesAndRefitsTheFrame() throws {
+        var doc = DottieDocument()
+        var e = line(in: &doc)
+        let before = try XCTUnwrap(e.strokeControlPoints)
+        e.moveStrokeControlPoint(0, to: CGPoint(x: before[0].x, y: before[0].y - 50))
+        let after = try XCTUnwrap(e.strokeControlPoints)
+        XCTAssertEqual(after.count, before.count)
+        XCTAssertEqual(after[0].y, before[0].y - 50, accuracy: 0.01)
+        XCTAssertEqual(after[1].y, before[1].y - 50, accuracy: 0.01) // the handle came along
+        XCTAssertEqual(after[2], before[2])
+        XCTAssertLessThanOrEqual(e.frame.minY, before[0].y - 50 + 0.5)
+        XCTAssertNil(e.points)
+    }
+}

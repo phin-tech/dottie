@@ -3,7 +3,7 @@ import SwiftUI
 import DottieKit
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text, connector, pencil
+    case select, rectangle, ellipse, diamond, text, connector, pencil, eraser
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -14,6 +14,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .text: "textformat"
         case .connector: "arrow.up.right"
         case .pencil: "pencil.tip"
+        case .eraser: "eraser"
         }
     }
     var label: String {
@@ -25,6 +26,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .text: "Text"
         case .connector: "Connector"
         case .pencil: "Pencil"
+        case .eraser: "Eraser"
         }
     }
     /// Single-key tool switch, Photoshop-style.
@@ -37,6 +39,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .text: "t"
         case .connector: "c"
         case .pencil: "p"
+        case .eraser: "e"
         }
     }
     var kind: ElementKind? {
@@ -48,6 +51,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .text: .text
         case .connector: nil
         case .pencil: .freehand
+        case .eraser: nil
         }
     }
 }
@@ -79,6 +83,8 @@ private enum Gesture {
     case endpoint(id: UUID, isStart: Bool)
     case panning
     case drawing(id: UUID)
+    case erasing
+    case editingPoint(id: UUID, index: Int)
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
@@ -173,6 +179,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 ctx.fill(r); ctx.stroke(r)
             }
         }
+        if tool == .select, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
+           let cp = e.strokeControlPoints {
+            ctx.setLineWidth(1 / zoom)
+            ctx.setStrokeColor(accent.withAlphaComponent(0.6).cgColor)
+            for s in 0..<((cp.count - 1) / 3) {
+                ctx.move(to: cp[3 * s]); ctx.addLine(to: cp[3 * s + 1])
+                ctx.move(to: cp[3 * s + 3]); ctx.addLine(to: cp[3 * s + 2])
+            }
+            ctx.strokePath()
+            ctx.setStrokeColor(accent.cgColor)
+            for (i, p) in cp.enumerated() {
+                let r = CGRect(x: p.x - 4 / zoom, y: p.y - 4 / zoom, width: 8 / zoom, height: 8 / zoom)
+                if i % 3 == 0 { ctx.setFillColor(NSColor.white.cgColor); ctx.fill(r); ctx.stroke(r) }
+                else { ctx.setFillColor(accent.cgColor); ctx.fillEllipse(in: r.insetBy(dx: 1 / zoom, dy: 1 / zoom)) }
+            }
+        }
         if !guides.isEmpty {
             ctx.setStrokeColor(NSColor.systemPink.cgColor)
             ctx.setLineWidth(1 / zoom)
@@ -214,6 +236,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let c = h.point(in: box)
             if abs(p.x - c.x) <= hs, abs(p.y - c.y) <= hs { return (id, h, e.frame) }
         }
+        return nil
+    }
+
+    /// Eraser reach in model units; constant on screen at any zoom.
+    private var eraserRadius: CGFloat { 9 / zoom }
+
+    /// Control point of the single selected pen stroke under `p`.
+    private func strokePointHit(_ p: CGPoint) -> (UUID, Int)? {
+        guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
+              let cp = e.strokeControlPoints else { return nil }
+        // Anchors win over handles when they overlap.
+        let order = cp.indices.sorted { ($0 % 3 == 0 ? 0 : 1) < ($1 % 3 == 0 ? 0 : 1) }
+        for i in order where hypot(p.x - cp[i].x, p.y - cp[i].y) <= 7 / zoom { return (id, i) }
         return nil
     }
 
@@ -419,6 +454,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
 
+        if tool == .eraser {
+            gesture = .erasing
+            eraseStep(at: p)
+            return
+        }
+        if tool == .select, let (id, index) = strokePointHit(p) {
+            gesture = .editingPoint(id: id, index: index)
+            return
+        }
+
         if tool == .connector {
             var st = style
             st.fill = .clear
@@ -470,6 +515,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             pan = CGPoint(x: panAnchor.pan.x + raw.x - panAnchor.raw.x, y: panAnchor.pan.y + raw.y - panAnchor.raw.y)
             return
         }
+        if case .erasing? = gesture { eraseStep(at: point(event)); return }
         guard let g = gesture, var next = baseline else { return }
         let p = snapped(point(event), event)
         var d = CGPoint(x: p.x - dragStart.x, y: p.y - dragStart.y)
@@ -530,8 +576,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 f.size.width = max(f.width, 4); f.size.height = max(f.height, 4)
                 next.elements[i].frame = f
             }
-        case .panning:
+        case .panning, .erasing:
             return
+        case .editingPoint(let id, let index):
+            if let i = next.elements.firstIndex(where: { $0.id == id }) {
+                next.elements[i].moveStrokeControlPoint(index, to: point(event))
+            }
         case .drawing(let id):
             let p = point(event) // freehand never grid-snaps
             if let last = strokePoints.last, hypot(p.x - last.x, p.y - last.y) < 1 / zoom { return }
@@ -578,11 +628,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if strokePoints.count < 2 { model = base; selection = []; onPreview?(base); return }
             if let i = model.elements.firstIndex(where: { $0.id == id }) { model.elements[i].fitStroke() }
             commit(base, "Draw")
+        case .erasing where model != base: commit(base, "Erase")
+        case .editingPoint where model != base: commit(base, "Edit Stroke")
         case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")
         case .resizing where model != base: commit(base, "Resize")
         default: break
         }
+    }
+
+    /// One eraser dab. Applied to the live model so a sweep accumulates; undo sees the whole sweep as one step.
+    private func eraseStep(at p: CGPoint) {
+        var next = model
+        guard next.erase(at: p, radius: eraserRadius) else { return }
+        selection = selection.filter { id in next.elements.contains { $0.id == id } }
+        model = next
+        onPreview?(next)
     }
 
     private func switchTool(_ t: Tool) {
