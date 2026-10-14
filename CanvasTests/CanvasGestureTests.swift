@@ -448,6 +448,39 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertLessThan(ink.brightnessComponent, 0.3, "dark text on a light fill, not the white canvas ink")
     }
 
+    // MARK: Pictures
+
+    func pngData(width: Int, height: Int) -> Data {
+        let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height, bitsPerSample: 8,
+                                   samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                   bytesPerRow: 0, bitsPerPixel: 0)!
+        return rep.representation(using: .png, properties: [:])!
+    }
+
+    func testPastingPictureDataPlacesAnImageInOneStep() throws {
+        let pb = NSPasteboard(name: NSPasteboard.Name("tech.phin.dottie.tests.\(UUID().uuidString)"))
+        defer { pb.releaseGlobally() }
+        pb.clearContents()
+        pb.setData(pngData(width: 120, height: 80), forType: .png)
+        XCTAssertTrue(CanvasNSView.hasImages(pb))
+        view.pasteImages(from: pb)
+        XCTAssertEqual(commits.map(\.name), ["Paste"])
+        let e = try XCTUnwrap(view.model.elements.first)
+        XCTAssertEqual(e.kind, .image)
+        XCTAssertEqual(e.frame.size, CGSize(width: 120, height: 80))
+        XCTAssertEqual(view.selection, [e.id])
+    }
+
+    func testDoubleClickingAPictureDoesNotEditALabel() throws {
+        var doc = view.model
+        let e = try DiagramOps.addImage(&doc, data: pngData(width: 100, height: 100), at: CGPoint(x: 100, y: 100))
+        view.model = doc
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 150, y: 150), clicks: 2))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 150, y: 150), clicks: 2))
+        XCTAssertNil(view.textEditor)
+        XCTAssertEqual(view.selection, [e.id])
+    }
+
     func testClickingWithTheNoteToolPlacesANoteAndReturnStartsANewLine() throws {
         view.tool = .note
         click(CGPoint(x: 120, y: 100))

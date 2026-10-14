@@ -323,7 +323,7 @@ public enum DottieScript {
 
             case "shape":
                 let kindName = a.string("kind") ?? "rectangle"
-                guard let kind = ElementKind(rawValue: kindName), kind != .connector, kind != .path, kind != .freehand else {
+                guard let kind = ElementKind(rawValue: kindName), kind != .connector, kind != .path, kind != .freehand, kind != .image else {
                     throw OpsError.invalid("'kind' must be one of rectangle, ellipse, diamond, text, note, got '\(kindName)'")
                 }
                 let x = a.double("x") ?? 0, y = a.double("y") ?? 0

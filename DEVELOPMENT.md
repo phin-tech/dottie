@@ -50,6 +50,11 @@ A `note` element is a sticky note whose `text` is GitHub Flavored Markdown; `Not
 [swift-markdown](https://github.com/swiftlang/swift-markdown) (cmark-gfm), DottieKit's only dependency, and lays
 it out with CoreText, and the renderer and SVG export share that layout. A single newline is a line break, as in
 GitHub comments, and bare URLs are underlined by `Note` itself (swift-markdown leaves cmark's autolink extension off). Dottie 0.1.1 and earlier cannot open a file containing a note.
+An `image` element carries its picture in `image` (`data`, base64, and `format`, `png` or `jpeg`). Every picture
+is normalized on the way in by `ImageImport` (EXIF rotation applied, longest side capped at 2048 px, re-encoded
+as PNG, or JPEG for large opaque photos) so SVG and HTML exports can embed the bytes as a `data:` URI. Decoded
+images are cached by a SHA-256 of the bytes that is computed on load and never saved. Each element stores its own
+copy, so duplicating a picture duplicates its bytes. Versions before pictures cannot open a file containing one.
 
 ## MCP server
 
@@ -57,7 +62,7 @@ A stdio MCP server; every tool takes an absolute `path` to a `.dottie` file, or 
 front in the app.
 
 Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
-`delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
+`delete_element`, `add_image`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
 work, plus each element's id and pixel box), `export_svg`, `create_diagram`, `open_document`, `list_stencils`,
 `add_stencil`, `list_pages`, `add_page`, `rename_page`, `run_script` and `script_api`. Tools that draw, list or
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element

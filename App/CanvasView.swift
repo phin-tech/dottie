@@ -826,7 +826,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     @objc func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
-        guard let data = pb.data(forType: Self.pasteboardType) else { return }
+        guard let data = pb.data(forType: Self.pasteboardType) else { pasteImages(from: pb); return }
         // Repeated pastes of the same clipboard step diagonally instead of stacking.
         pasteStep = pb.changeCount == lastPasteChangeCount ? pasteStep + 1 : 1
         lastPasteChangeCount = pb.changeCount
@@ -836,6 +836,80 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard !added.isEmpty else { return }
         selection = added
         onCommit?(next, "Paste")
+    }
+
+    // MARK: Pictures
+
+    /// Picture files Dottie embeds: bitmaps only, since SVGs are imported as editable shapes.
+    private static func isImageFile(_ url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension) else { return false }
+        return type.conforms(to: .image) && !type.conforms(to: .svg)
+    }
+
+    private func droppedImages(_ info: NSDraggingInfo) -> [URL] {
+        let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                       options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return urls.filter(Self.isImageFile)
+    }
+
+    /// Image files copied in Finder, or picture data copied from another app (a screenshot, a browser image).
+    private static func pastedImages(_ pb: NSPasteboard) -> [Data] {
+        let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        let files = urls.filter(isImageFile).compactMap { try? Data(contentsOf: $0) }
+        if !files.isEmpty || !urls.isEmpty { return files }
+        for type in [NSPasteboard.PasteboardType.png, .tiff, NSPasteboard.PasteboardType("public.jpeg"),
+                     NSPasteboard.PasteboardType("public.heic")] {
+            if let data = pb.data(forType: type) { return [data] }
+        }
+        return []
+    }
+
+    static func hasImages(_ pb: NSPasteboard) -> Bool {
+        if pb.availableType(from: [.png, .tiff, NSPasteboard.PasteboardType("public.jpeg"), NSPasteboard.PasteboardType("public.heic")]) != nil {
+            return true
+        }
+        let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        return urls.contains(where: isImageFile)
+    }
+
+    func pasteImages(from pb: NSPasteboard) {
+        let images = Self.pastedImages(pb)
+        guard !images.isEmpty else { return }
+        insertImages(images, at: viewportCenter, actionName: "Paste")
+    }
+
+    /// Embeds pictures in a row centered on `center`, as one undo step. Returns false if none could be read.
+    @discardableResult
+    func insertImages(_ files: [Data], at center: CGPoint, actionName: String = "Insert Image") -> Bool {
+        let usable = model.layers.filter { !$0.locked && $0.visible }
+        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
+        let pictures = files.compactMap { try? ImageImport.normalize($0) }
+        guard !pictures.isEmpty else { NSSound.beep(); return false }
+        var next = model
+        var added = Set<UUID>()
+        let gap = 24.0
+        var x = center.x - (pictures.map { Double($0.size.width) }.reduce(0, +) + gap * Double(pictures.count - 1)) / 2
+        for (image, size) in pictures {
+            let e = Element.image(image, frame: CGRect(x: x, y: center.y - size.height / 2, width: size.width, height: size.height),
+                                  layerID: layer.id)
+            next.elements.append(e)
+            added.insert(e.id)
+            x += size.width + gap
+        }
+        selection = added
+        tool = .select
+        onToolChange?(.select)
+        onCommit?(next, actionName)
+        return true
+    }
+
+    @objc func insertImage(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff, .gif, .bmp, .webP]
+        panel.allowsMultipleSelection = true
+        panel.message = "Choose pictures to place on the canvas"
+        guard panel.runModal() == .OK else { return }
+        insertImages(panel.urls.compactMap { try? Data(contentsOf: $0) }, at: viewportCenter)
     }
 
     // MARK: Importing SVG
@@ -987,7 +1061,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private func droppedSVGs(_ info: NSDraggingInfo) -> [URL] { droppedFiles(info, ext: "svg") }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        draggedStencil(sender) != nil || !droppedSVGs(sender).isEmpty || !droppedFiles(sender, ext: "excalidraw").isEmpty
+        draggedStencil(sender) != nil || !droppedImages(sender).isEmpty || !droppedSVGs(sender).isEmpty || !droppedFiles(sender, ext: "excalidraw").isEmpty
             || !droppedFiles(sender, ext: "drawio").isEmpty ? .copy : []
     }
 
@@ -1005,6 +1079,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let raw = convert(sender.draggingLocation, from: nil)
             return importDrawio(data, at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom),
                                 keepOriginalColors: NSEvent.modifierFlags.contains(.option))
+        }
+        if !droppedImages(sender).isEmpty {
+            let raw = convert(sender.draggingLocation, from: nil)
+            return insertImages(droppedImages(sender).compactMap { try? Data(contentsOf: $0) },
+                                at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom))
         }
         let files = droppedSVGs(sender).compactMap { try? Data(contentsOf: $0) }
         guard !files.isEmpty else { return false }
@@ -1111,7 +1190,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicate(_:)):
             return !selection.isEmpty
         case #selector(paste(_:)):
-            return NSPasteboard.general.data(forType: Self.pasteboardType) != nil
+            return NSPasteboard.general.data(forType: Self.pasteboardType) != nil || Self.hasImages(NSPasteboard.general)
         default: return true
         }
     }
@@ -1563,7 +1642,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     // MARK: In-place text editing
 
     private func beginEditing(_ id: UUID, isNew: Bool = false) {
-        guard let e = model.elements.first(where: { $0.id == id }) else { return }
+        guard let e = model.elements.first(where: { $0.id == id }), e.kind != .image else { return } // pictures have no label
         endEditing()
         let field = NSTextField(frame: viewFrame(editFrame(for: e)))
         field.stringValue = e.text ?? ""

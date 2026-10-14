@@ -86,7 +86,7 @@ public enum Renderer {
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
         switch e.kind {
-        case .rectangle, .note:
+        case .rectangle, .note, .image:
             if rough <= 0 { return CGPath(rect: r, transform: nil) }
             return Rough.polygon([CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY),
                                   CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)],
@@ -312,7 +312,7 @@ public enum Renderer {
 
     /// Pen-shaded fill for `fillStyle` hachure / crossHatch; empty for solid fills.
     public static func hachurePath(for e: Element) -> CGPath {
-        guard e.style.fillStyle != .solid, e.kind != .freehand, e.kind != .connector, e.kind != .text else {
+        guard e.style.fillStyle != .solid, e.kind != .freehand, e.kind != .connector, e.kind != .text, e.kind != .image else {
             return CGMutablePath()
         }
         return cache.shape(shapeKey(e, tag: 1)) { computeHachure(for: e) }
@@ -447,6 +447,10 @@ public enum Renderer {
             }
             return
         }
+        if e.kind == .image {
+            drawImage(e, in: ctx)
+            return
+        }
         if e.kind == .note, e.style.fill.a > 0 { // a soft drop shadow lifts the note off the page
             ctx.addPath(fillPath(for: e).copy(using: [CGAffineTransform(translationX: Note.shadowOffset.width, y: Note.shadowOffset.height)])!)
             ctx.setFillColor(CGColor(gray: 0, alpha: 0.14 * e.style.fill.a))
@@ -481,6 +485,36 @@ public enum Renderer {
         if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
             drawText(t, in: e.frame.insetBy(dx: 6, dy: 6), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
         }
+    }
+
+    /// A picture fills its frame (stretched if the frame was resized out of proportion); a visible stroke
+    /// draws a border over it, sketchy like any other outline. A picture that cannot be decoded shows as a
+    /// crossed-out box so it is not silently invisible.
+    private static func drawImage(_ e: Element, in ctx: CGContext) {
+        let r = e.frame
+        if let img = e.image?.cgImage {
+            // CGContext draws images y-up; flip locally within the top-left-origin context.
+            ctx.saveGState()
+            ctx.translateBy(x: 0, y: r.minY + r.maxY)
+            ctx.scaleBy(x: 1, y: -1)
+            ctx.interpolationQuality = .high
+            ctx.draw(img, in: r)
+            ctx.restoreGState()
+        } else {
+            ctx.setStrokeColor(CGColor(gray: 0.5, alpha: 1))
+            ctx.setLineWidth(1)
+            ctx.stroke(r)
+            ctx.move(to: CGPoint(x: r.minX, y: r.minY)); ctx.addLine(to: CGPoint(x: r.maxX, y: r.maxY))
+            ctx.move(to: CGPoint(x: r.maxX, y: r.minY)); ctx.addLine(to: CGPoint(x: r.minX, y: r.maxY))
+            ctx.strokePath()
+        }
+        guard e.style.stroke.a > 0, e.style.strokeWidth > 0 else { return }
+        ctx.addPath(outline(for: e))
+        ctx.setStrokeColor(e.style.stroke.cgColor)
+        ctx.setLineWidth(e.style.strokeWidth)
+        ctx.setLineCap(.round); ctx.setLineJoin(.round)
+        if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) { ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) }) }
+        ctx.strokePath()
     }
 
     static func drawText(_ s: String, in rect: CGRect, fontSize: Double, color: CGColor, ctx: CGContext, centered: Bool = false) {

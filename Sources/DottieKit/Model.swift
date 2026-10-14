@@ -52,6 +52,8 @@ public enum ElementKind: String, Codable, Sendable {
     case path
     /// A sticky note: a filled card whose `text` is Markdown, laid out from the top left (see `Note`).
     case note
+    /// A picture (`image`), drawn in its frame; outlined only when it has a visible stroke.
+    case image
 }
 
 /// One contour of a `.path` element: cubic Béziers as flat `x, y` pairs normalized to the element's
@@ -110,6 +112,8 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var link: UUID?
     /// A hidden label for finding and linking to the element. Never drawn or exported.
     public var anchor: String?
+    /// Only set for `.image`: the picture's bytes.
+    public var image: EmbeddedImage?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,

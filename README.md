@@ -82,6 +82,9 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 - **Links.** Make a shape jump to another one, even on another page: select it and choose a target under
   **Jumps to**. Click the little arrow badge to go there, and ⌘[ to come back. Great for a summary page that
   links to the details.
+- **Pictures.** Paste a screenshot or a copied image (⌘V), drop image files on the canvas, or use
+  File ▸ Insert Image… (⌥⌘I). Pictures are saved inside the drawing; give one a stroke color in the inspector
+  for a sketchy border.
 - **Shape library.** The Library tab has flowchart symbols and common shapes ready to drag in. Add your own
   from SVG files or from shapes you've drawn.
 - **Layers, rulers and guides** for when things need to line up exactly (⇧⌘R shows the rulers).

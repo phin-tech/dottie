@@ -116,6 +116,7 @@ public enum DiagramOps {
                                 text: String?, fill: RGBA?, stroke: RGBA?, roughness: Double?,
                                 look: Look = Look()) throws -> Element {
         guard kind != .connector else { throw OpsError.invalid("Use add_connector for connectors") }
+        guard kind != .image else { throw OpsError.invalid("Use add_image for pictures") }
         var style = Style()
         if let fill { style.fill = fill }
         if let stroke { style.stroke = stroke }
@@ -197,6 +198,7 @@ public enum DiagramOps {
                              defaultRouting: Routing = .elbow) throws -> [String: UUID] {
         var seen = Set<String>()
         for n in nodes {
+            guard n.kind != .image, n.kind != .connector else { throw OpsError.invalid("Node '\(n.key)' cannot be a \(n.kind.rawValue)") }
             guard !n.key.isEmpty else { throw OpsError.invalid("Node key must not be empty") }
             guard seen.insert(n.key).inserted else { throw OpsError.invalid("Duplicate node key '\(n.key)'") }
         }
