@@ -48,6 +48,17 @@ public struct Style: Codable, Equatable, Sendable {
 
 public enum ElementKind: String, Codable, Sendable {
     case rectangle, ellipse, diamond, text, connector, freehand
+    /// A closed or open compound Bézier shape (`subpaths`), as imported from SVG or a stencil.
+    case path
+}
+
+/// One contour of a `.path` element: cubic Béziers as flat `x, y` pairs normalized to the element's
+/// frame (the start point, then `c1, c2, end` per segment: `2 + 6n` numbers). A straight line is a
+/// segment whose control points sit on its end points.
+public struct PathSubpath: Codable, Hashable, Sendable {
+    public var closed: Bool
+    public var coords: [Double]
+    public init(closed: Bool, coords: [Double]) { self.closed = closed; self.coords = coords }
 }
 
 /// A point inside a freehand stroke, normalized to the element's frame (0...1 on each axis),
@@ -86,6 +97,8 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Only set for `.freehand`. Fitted cubic Béziers as flat normalized `x, y` pairs:
     /// the start point, then `c1, c2, end` per segment (`2 + 6n` numbers).
     public var path: [Double]?
+    /// Only set for `.path`. The shape's contours, filled together and stroked as one.
+    public var subpaths: [PathSubpath]?
     /// Clockwise rotation in radians about the frame's center. nil is unrotated; connectors ignore it.
     public var rotation: Double?
 

@@ -71,7 +71,7 @@ public enum Renderer {
     private static func shapeKey(_ e: Element, tag: UInt8) -> ShapeKey {
         ShapeKey(tag: tag, kind: e.kind, x: e.x, y: e.y, w: e.width, h: e.height, seed: e.seed,
                  roughness: e.style.roughness, bowing: e.style.bowing, strokeWidth: e.style.strokeWidth,
-                 fillStyle: e.style.fillStyle, pathHash: e.path?.hashValue ?? 0)
+                 fillStyle: e.style.fillStyle, pathHash: e.path?.hashValue ?? e.subpaths?.hashValue ?? 0)
     }
 
     /// Outline path for an element. roughness == 0 gives exact geometry.
@@ -105,7 +105,36 @@ public enum Renderer {
             return CGPath(rect: r, transform: nil)
         case .freehand:
             return freehandPath(for: e)
+        case .path:
+            return rough <= 0 ? e.shapePath : sketchyShape(e, rng: &rng)
         }
+    }
+
+    /// A `.path` drawn by hand: straight segments get the doubled rough.js line, curves are retraced
+    /// twice with their control points nudged. End points stay put so contours remain joined.
+    private static func sketchyShape(_ e: Element, rng: inout SeededRNG) -> CGPath {
+        let rough = e.style.roughness
+        let out = CGMutablePath()
+        for sub in e.shapeContours {
+            let p = sub.points
+            for k in 0..<((p.count - 1) / 3) {
+                let a = p[3 * k], c1 = p[3 * k + 1], c2 = p[3 * k + 2], b = p[3 * k + 3]
+                if c1 == a && c2 == b {
+                    Rough.line(a, b, rng: &rng, roughness: rough, bowing: e.style.bowing, preserveEnds: true, into: out)
+                    continue
+                }
+                let hull = hypot(c1.x - a.x, c1.y - a.y) + hypot(c2.x - c1.x, c2.y - c1.y) + hypot(b.x - c2.x, b.y - c2.y)
+                let wobble = min(2.5, hull / 30) * rough
+                for pass in 0..<2 {
+                    let spread = pass == 0 ? 1.0 : 0.5
+                    func j() -> CGFloat { CGFloat(rng.signed() * wobble * spread) }
+                    out.move(to: a)
+                    out.addCurve(to: b, control1: CGPoint(x: c1.x + j(), y: c1.y + j()),
+                                 control2: CGPoint(x: c2.x + j(), y: c2.y + j()))
+                }
+            }
+        }
+        return out
     }
 
     /// A committed stroke is its fitted Bézier chain; one still being drawn (or from an older file)
@@ -258,6 +287,12 @@ public enum Renderer {
     // MARK: Fills
 
     /// Straight-edged outline of a filled shape; an ellipse is approximated closely enough to hatch.
+    /// Every contour of the filled shape as a polygon; only a `.path` has more than one.
+    static func fillPolygons(for e: Element) -> [[CGPoint]] {
+        guard e.kind == .path else { return [fillPolygon(for: e)] }
+        return e.shapeContours.map { Element.flatten($0.points, maxStep: 3) }
+    }
+
     static func fillPolygon(for e: Element) -> [CGPoint] {
         let r = e.frame
         switch e.kind {
@@ -285,13 +320,13 @@ public enum Renderer {
 
     private static func computeHachure(for e: Element) -> CGPath {
         let path = CGMutablePath()
-        let poly = fillPolygon(for: e)
+        let polys = fillPolygons(for: e)
         let gap = max(4, e.style.strokeWidth * 4)
         var angles = [Hachure.angle]
         if e.style.fillStyle == .crossHatch { angles.append(Hachure.angle + .pi / 2) }
         var rng = SeededRNG(seed: e.seed ^ 0x5bd1e995)
         for angle in angles {
-            for (a, b) in Hachure.lines(in: poly, angle: angle, gap: gap) {
+            for (a, b) in Hachure.lines(in: polys, angle: angle, gap: gap) {
                 if e.style.roughness <= 0 { path.move(to: a); path.addLine(to: b) }
                 else { Rough.line(a, b, rng: &rng, roughness: e.style.roughness * 0.6, bowing: 0.5, into: path) }
             }
@@ -313,6 +348,7 @@ public enum Renderer {
         let r = e.frame
         switch e.kind {
         case .ellipse: return CGPath(ellipseIn: r, transform: nil)
+        case .path: return e.shapePath
         case .diamond:
             let p = CGMutablePath()
             p.addLines(between: [CGPoint(x: r.midX, y: r.minY), CGPoint(x: r.maxX, y: r.midY),

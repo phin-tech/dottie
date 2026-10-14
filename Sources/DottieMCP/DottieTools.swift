@@ -54,7 +54,7 @@ private struct Args {
     }
     func kind(_ k: String, default d: ElementKind = .rectangle) throws -> ElementKind {
         guard let s = string(k) else { return d }
-        guard let kind = ElementKind(rawValue: s), kind != .connector else {
+        guard let kind = ElementKind(rawValue: s), kind != .connector, kind != .path else {
             throw ToolFailure(message: "'\(k)' must be one of \(kindValues.joined(separator: ", ")), got '\(s)'")
         }
         return kind

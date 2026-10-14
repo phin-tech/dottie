@@ -53,7 +53,7 @@ extension Exporter {
             return textElement(e.text ?? "", frame: e.frame, e: e, centered: false)
         case .freehand:
             return "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
-        case .rectangle, .ellipse, .diamond:
+        case .rectangle, .ellipse, .diamond, .path:
             var s = ""
             if e.style.fill.a > 0 {
                 if e.style.fillStyle == .solid {

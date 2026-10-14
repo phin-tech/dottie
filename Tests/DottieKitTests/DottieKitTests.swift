@@ -902,3 +902,78 @@ final class IncrementalIndexTests: XCTestCase {
         XCTAssertTrue(index.update(to: doc))
     }
 }
+
+final class PathShapeTests: XCTestCase {
+    /// An outer square with an inner square hole, plus a curved blob.
+    func sample() -> CGPath {
+        let p = CGMutablePath()
+        p.addRect(CGRect(x: 100, y: 50, width: 80, height: 80))
+        p.addRect(CGRect(x: 120, y: 70, width: 40, height: 40))
+        p.move(to: CGPoint(x: 200, y: 50))
+        p.addQuadCurve(to: CGPoint(x: 260, y: 130), control: CGPoint(x: 280, y: 40))
+        p.addCurve(to: CGPoint(x: 200, y: 50), control1: CGPoint(x: 240, y: 160), control2: CGPoint(x: 190, y: 120))
+        p.closeSubpath()
+        return p
+    }
+
+    func element(roughness: Double = 0) -> Element {
+        var st = Style(); st.roughness = roughness; st.fill = RGBA(r: 0.8, g: 0.9, b: 1)
+        return Element.shape(sample(), style: st, seed: 7, layerID: UUID())!
+    }
+
+    func testRoundTripsGeometry() {
+        let e = element()
+        XCTAssertEqual(e.kind, .path)
+        XCTAssertEqual(e.subpaths?.count, 3)
+        XCTAssertEqual(e.subpaths?.allSatisfy(\.closed), true)
+        XCTAssertEqual(e.frame.minX, 100, accuracy: 0.5)
+        XCTAssertEqual(e.frame.minY, 50, accuracy: 1.5) // the quad bulges just above the rects
+        XCTAssertGreaterThan(e.frame.maxX, 240)
+        XCTAssertTrue(e.shapePath.contains(CGPoint(x: 110, y: 60), using: .evenOdd))
+        XCTAssertFalse(e.shapePath.contains(CGPoint(x: 140, y: 90), using: .evenOdd)) // the hole
+    }
+
+    func testResizeFollowsTheFrame() {
+        var e = element()
+        let w = e.frame.width
+        e.frame = CGRect(x: 0, y: 0, width: w * 2, height: e.frame.height)
+        let xs = e.shapeContours.flatMap { Element.flatten($0.points, maxStep: 2) }.map(\.x)
+        XCTAssertEqual(xs.max()! - xs.min()!, w * 2, accuracy: 1)
+    }
+
+    func testCodableRoundTripKeepsPath() throws {
+        var doc = DottieDocument()
+        var e = element(); e.layerID = doc.layers[0].id
+        doc.elements = [e]
+        let back = try DottieDocument.decode(doc.encoded())
+        XCTAssertEqual(back.elements[0].subpaths, doc.elements[0].subpaths)
+    }
+
+    func testSketchyIsDeterministic() {
+        let e = element(roughness: 1)
+        XCTAssertEqual(Renderer.outline(for: e), Renderer.outline(for: e))
+        XCTAssertFalse(Renderer.outline(for: e).isEmpty)
+        XCTAssertNotEqual(Renderer.outline(for: e), element(roughness: 0).shapePath)
+    }
+
+    func testHachureSkipsTheHoleAndSvgExports() {
+        var e = element()
+        e.style.fillStyle = .hachure
+        let hatch = Renderer.hachurePath(for: e)
+        XCTAssertFalse(hatch.isEmpty)
+        var inside = 0
+        hatch.applyWithBlock { el in
+            if el.pointee.type == .moveToPoint,
+               CGRect(x: 124, y: 74, width: 32, height: 32).contains(el.pointee.points[0]) { inside += 1 }
+        }
+        XCTAssertEqual(inside, 0)
+        var doc = DottieDocument(); e.layerID = doc.layers[0].id; doc.elements = [e]
+        XCTAssertTrue(Exporter.svg(doc).contains("<path"))
+    }
+
+    func testRendersToPNG() {
+        var doc = DottieDocument(); var e = element(roughness: 1); e.layerID = doc.layers[0].id
+        doc.elements = [e]
+        XCTAssertNotNil(Exporter.png(doc, scale: 1))
+    }
+}

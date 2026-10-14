@@ -104,20 +104,29 @@ public enum Hachure {
     /// Segments of parallel lines `gap` apart at `angle` (radians) that lie inside `polygon`.
     /// Deterministic, and aligned to the polygon so the pattern doesn't swim when it is resized.
     public static func lines(in polygon: [CGPoint], angle: Double = angle, gap: Double) -> [(CGPoint, CGPoint)] {
-        guard polygon.count >= 3, gap > 0 else { return [] }
+        lines(in: [polygon], angle: angle, gap: gap)
+    }
+
+    /// Several contours at once, filled even-odd, so a contour inside another is a hole.
+    public static func lines(in polygons: [[CGPoint]], angle: Double = angle, gap: Double) -> [(CGPoint, CGPoint)] {
+        guard gap > 0 else { return [] }
         let c = cos(angle), s = sin(angle)
         // Rotate so the hatch direction is horizontal.
-        let rot = polygon.map { CGPoint(x: $0.x * c + $0.y * s, y: -$0.x * s + $0.y * c) }
-        guard let minY = rot.map(\.y).min(), let maxY = rot.map(\.y).max() else { return [] }
+        let rots = polygons.filter { $0.count >= 3 }.map { poly in
+            poly.map { CGPoint(x: $0.x * c + $0.y * s, y: -$0.x * s + $0.y * c) }
+        }
+        guard let minY = rots.joined().map(\.y).min(), let maxY = rots.joined().map(\.y).max() else { return [] }
         func back(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * c - y * s, y: x * s + y * c) }
         var out: [(CGPoint, CGPoint)] = []
         var y = minY + gap / 2
         while y < maxY {
             var xs: [Double] = []
-            for i in rot.indices {
-                let a = rot[i], b = rot[(i + 1) % rot.count]
-                if (a.y <= y && y < b.y) || (b.y <= y && y < a.y) {
-                    xs.append(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x))
+            for rot in rots {
+                for i in rot.indices {
+                    let a = rot[i], b = rot[(i + 1) % rot.count]
+                    if (a.y <= y && y < b.y) || (b.y <= y && y < a.y) {
+                        xs.append(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x))
+                    }
                 }
             }
             xs.sort()
