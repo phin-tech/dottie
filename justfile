@@ -44,6 +44,10 @@ cli-install: cli
 clean:
     rm -rf .build DerivedData Dottie.xcodeproj
 
+# Bump the version (major, minor or patch) in project.yml and the tools, and the build number
+bump part:
+    scripts/bump.sh "{{part}}"
+
 # Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or `app`, as a GitHub release
 release app="":
     scripts/release.sh "{{app}}"

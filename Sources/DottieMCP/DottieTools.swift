@@ -37,6 +37,11 @@ private let lookProps: [String: Value] = [
 
 private struct ToolFailure: Error { var message: String }
 
+extension Tool.Content {
+    static func plain(_ s: String) -> Self { .text(text: s, annotations: nil, _meta: nil) }
+    static func png(_ data: Data) -> Self { .image(data: data.base64EncodedString(), mimeType: "image/png", annotations: nil, _meta: nil) }
+}
+
 private struct Args {
     var raw: [String: Value]
 
@@ -258,9 +263,9 @@ actor DottieTools {
         do {
             return try run(name, Args(raw: arguments))
         } catch let e as ToolFailure {
-            return .init(content: [.text(e.message)], isError: true)
+            return .init(content: [.plain(e.message)], isError: true)
         } catch {
-            return .init(content: [.text("\(error)")], isError: true)
+            return .init(content: [.plain("\(error)")], isError: true)
         }
     }
 
@@ -340,7 +345,7 @@ actor DottieTools {
         return String(decoding: try enc.encode(value), as: UTF8.self)
     }
 
-    private func text(_ s: String) -> CallTool.Result { .init(content: [.text(s)]) }
+    private func text(_ s: String) -> CallTool.Result { .init(content: [.plain(s)]) }
 
     // MARK: Dispatch
 
@@ -446,7 +451,7 @@ actor DottieTools {
             if let error = result.error {
                 append("Script error: \(error)")
                 append("Nothing was changed.")
-                return .init(content: [.text(report)], isError: true)
+                return .init(content: [.plain(report)], isError: true)
             }
             if doc != before {
                 file.pages[p] = doc
@@ -455,11 +460,11 @@ actor DottieTools {
             }
             else { append("No changes.") }
             if let value = result.value { append("Result: \(value)") }
-            var content: [Tool.Content] = [.text(report)]
+            var content: [Tool.Content] = [.plain(report)]
             if a.bool("render") == true, !doc.elements.isEmpty {
                 let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
                 if let png = Exporter.png(doc, scale: scale) {
-                    content.insert(.image(data: png.base64EncodedString(), mimeType: "image/png", metadata: nil), at: 0)
+                    content.insert(.png(png), at: 0)
                 }
             }
             return .init(content: content)
@@ -592,8 +597,8 @@ actor DottieTools {
                 note += ", saved to \(out.path)"
             }
             let map = DiagramOps.annotations(doc, scale: scale)
-            return .init(content: [.image(data: png.base64EncodedString(), mimeType: "image/png", metadata: nil),
-                                   .text(note + "\nElements in the image (pixels from its top-left):\n" + (try json(map)))])
+            return .init(content: [.png(png),
+                                   .plain(note + "\nElements in the image (pixels from its top-left):\n" + (try json(map)))])
 
         case "export_svg":
             let file = try load(try fileURL(a))

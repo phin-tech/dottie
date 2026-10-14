@@ -2,7 +2,7 @@ import Foundation
 import CoreGraphics
 import DottieKit
 
-let version = "0.1.0"
+let version = DottieVersion.current
 
 let usage = """
 dottie \(version): render and manage Dottie drawings from the command line.

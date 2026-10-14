@@ -2,146 +2,87 @@
 
 <img src="Design/icon-1024.png" width="128" alt="Dottie">
 
-A native macOS diagramming app: Excalidraw's sketchy speed with OmniGraffle-style precision.
-See `ROADMAP.md` for status.
+**Diagrams that look hand-drawn, on your Mac, and your AI assistant can draw them for you.**
 
-## Build
+Sketch a flowchart, a system diagram or a whiteboard idea in seconds. Switch to a clean, precise look when it
+needs to go in a document. Or just ask Claude to draw it, and watch the shapes appear.
 
-```sh
-swift test                         # DottieKit + MCP logic, headless
-xcodegen generate                  # regenerates Dottie.xcodeproj from project.yml
-xcodebuild -project Dottie.xcodeproj -scheme Dottie build
-```
+![A signup flowchart drawn in Dottie's sketchy style](Design/example.png)
 
-Builds are signed to run locally unless a gitignored `Signing.local.xcconfig` sets `DEVELOPMENT_TEAM` and
-`CODE_SIGN_IDENTITY = Apple Development` (see `Signing.xcconfig`). Set the team there rather than in Xcode's
-Signing & Capabilities pane, which is lost when the project is regenerated.
+## Get Dottie
 
-## Command line: `dottie`
+1. Download the latest `Dottie-x.y.z.zip` from [Releases](https://github.com/phin-tech/dottie/releases).
+2. Unzip it and drag **Dottie** into your Applications folder.
+3. Open it. You need macOS 14 Sonoma or later.
 
-Render drawings and manage libraries without opening the app.
+## Ask your AI assistant to draw
 
-```sh
-dottie render diagram.dottie                      # diagram.png next to it
-dottie render diagram.dottie -o diagram.svg       # png, svg, pdf or html, from the extension
-dottie render a.dottie b.dottie -f html -d out/   # several files into a directory
-dottie render diagram.dottie --clean --scale 3 -o - > clean.png
-dottie render diagram.dottie --page Details       # a page other than the first, by name or number
-dottie library list
-dottie library install shapes.dottielib
-```
+Dottie works with Claude and other assistants that support MCP (a standard way for assistants to use apps).
+Once connected, you can say things like:
 
-`--clean` / `--sketchy` override the look, `--transparent` drops the page background, and the HTML output is a
-single self-contained page. It reads the file on disk, not unsaved edits in the app. To install it, open
-Settings ▸ Command Line and link it into `/usr/local/bin` or `~/.local/bin` (the app carries the tool in
-`Contents/Helpers`), or from a checkout run `just cli-install`.
+- *"Draw our deployment pipeline as a left-to-right diagram."*
+- *"Add a staging step between build and deploy."*
+- *"Make a second page with the database tables, and link the Database box to it."*
+- *"Make it clean instead of sketchy and save it as an SVG."*
 
-## Let agents draw: `dottie-mcp`
+The assistant lays the diagram out, looks at the result, and tidies anything that reads badly.
 
-A stdio MCP server that creates and edits `.dottie` files. Every tool takes an absolute `path`.
+### Connect it once
 
-```sh
-swift build -c release --product dottie-mcp
-claude mcp add dottie -- "$(swift build -c release --product dottie-mcp --show-bin-path)/dottie-mcp"
-```
+Open Dottie, then **Dottie ▸ Settings… ▸ MCP**. Under *Add to an MCP client*:
 
-Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
-`delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its work),
-`export_svg`, `create_diagram`, `open_document`, `list_stencils` and `add_stencil` (place shapes from the
-built-in and user stencil libraries), `list_pages` / `add_page` / `rename_page`, and `run_script` /
-`script_api` (see below). Tools that draw, list or export take an optional `page` (name or 1-based number) and
-default to the first page; tools given an element id find its page themselves.
+- **Claude Desktop** (and most other apps): click **Copy** next to the JSON snippet, paste it into the
+  app's MCP settings file, and restart the app. In Claude Desktop that file is under
+  Settings ▸ Developer ▸ Edit Config.
+- **Claude Code:** click **Copy** next to the command, and run it once in Terminal.
 
-### Scripting
+If you move Dottie to a different folder later, copy the snippet again.
 
-Drawings can be scripted in JavaScript (JavaScriptCore, no dependencies). A script sees one global, `dottie`,
-with calls to read, draw and change elements; it has no file or network access, runs against a copy, and is
-applied as a single undo step only if it finishes without throwing. Runaway scripts are stopped after 10 s.
+### Watch it draw
 
-```js
-const a = dottie.rect({ x: 0, y: 0, text: "Start", fill: "#d6f5d6" });
-const b = dottie.diamond({ x: 0, y: 140, text: "OK?" });
-dottie.connect(a, b, { routing: "elbow" });
-return dottie.elements().length;
-```
+Keep the drawing open in Dottie while you chat, and every change appears in the window as the assistant makes
+it. Each change can be undone with ⌘Z, like your own. Save when you like the result. You can tell the assistant
+to work on "the drawing I have open", or give it a file path. If Dottie isn't running, the assistant edits the
+file directly and you see the result next time you open it.
 
-- **In the app:** Script ▸ Script Console… (⌥⌘J) opens an editor with Run (⌘↩), Open/Save and an API
-  reference; `dottie.selection` is the selected elements. `.js` files in
-  `~/Library/Application Support/Dottie/Scripts` appear in the Script menu and run on the front drawing.
-- **From an agent (code mode):** the MCP tool `run_script` takes a `path` and `code`, so a loop or a computed
-  edit is one call instead of dozens, and returns `console.log` output, the script's value, and optionally a
-  PNG (`render`). The API is documented in the tool's description, the `script_api` tool, and the
-  `dottie://script-api` resource.
+## Draw it yourself
 
-Scripts can `require()` libraries. Bundled: `lodash`, `d3-array`, `d3-color`, `d3-hierarchy`, `dagre` (graph layout), `dayjs` (regenerate or bump
-with `scripts/update-script-modules.py`). The Settings ▸ Scripting tab has a checklist of optional libraries (`d3-scale`, `d3-shape`, `d3-force`, `chroma-js`,
-`seedrandom`, `simple-statistics`): checking one downloads its pinned, checksum-verified version into the modules
-folder, unchecking removes it. Timers never fire in scripts, so step `d3-force` by hand with `simulation.stop().tick(n)`.
-The same tab has an **Add a library** field: paste an npm name (`marked`, `lodash@4`) or an `https://` link to a
-`.js` file. Dottie resolves and pins the version via jsDelivr, loads the file in the script engine before keeping it
-(ES-module-only or Node-only packages are refused with the reason), fetches missing package dependencies the same
-way, and lists what you added so it can be removed. This is app-only; agents cannot install libraries.
-You can also drop any other single-file CommonJS/UMD bundle into
-`~/Library/Application Support/Dottie/Scripts/modules/` (Script ▸ Show Scripts Folder) and `require("name")` loads
-it; a file there overrides a bundled one. `./` and `../` work between your modules, and nothing outside that folder
-is reachable. Agents can also pass `modules: {name: source}` to `run_script`, and `script_api` lists what is
-installed. There is no npm, `import` syntax, or Node built-ins.
+Pick a tool from the toolbar or press its letter:
 
-```js
-const _ = require("lodash"), { hierarchy, tree } = require("d3-hierarchy");
-const root = tree().nodeSize([180, 120])(hierarchy({ name: "App", children: [{ name: "UI" }, { name: "API" }] }));
-const ids = {};
-root.each(n => { ids[n.data.name] = dottie.rect({ x: n.x + 300, y: n.y, text: n.data.name }); });
-root.links().forEach(l => dottie.connect(ids[l.source.data.name], ids[l.target.data.name]));
-```
+| Key | Tool | | Key | Tool |
+|---|---|---|---|---|
+| V | Select | | T | Text |
+| R | Rectangle | | C | Connector |
+| O | Ellipse | | P | Pencil |
+| D | Diamond | | E | Eraser |
 
-### Pages
+Double-click a shape to give it a label. Connectors stay attached when you move shapes around.
 
-A drawing has one or more pages, shown as tabs under the canvas. Click a tab to show it, double-click to rename,
-drag to reorder, and right-click to duplicate or delete; **+** or Page ▸ New Page (⌥⌘N) adds one, and ⇧⌘[ / ⇧⌘]
-step through them. Each page has its own layers, guides and theme, and keeps its own scroll and zoom. Undo
-switches back to the page it changes. Element ids are unique across the file, so links work between pages
-(see below); connectors join shapes on one page.
+- **Sketchy or clean.** The inspector on the right switches the look, and sets colors, fill patterns,
+  dashed lines and arrowheads. Themes like Blueprint and Chalkboard change the whole page.
+- **Pages.** Big diagram? Split it into pages, shown as tabs along the bottom. Click **+** to add one,
+  double-click a tab to rename it, drag tabs to reorder them.
+- **Links.** Make a shape jump to another one, even on another page: select it and choose a target under
+  **Jumps to**. Click the little arrow badge to go there, and ⌘[ to come back. Great for a summary page that
+  links to the details.
+- **Shape library.** The Library tab has flowchart symbols and common shapes ready to drag in. Add your own
+  from SVG files or from shapes you've drawn.
+- **Layers, rulers and guides** for when things need to line up exactly (⇧⌘R shows the rulers).
+- **Bring diagrams in** from Excalidraw, draw.io or SVG files (File menu, or drop them on the canvas).
+- **Send diagrams out** as PNG, SVG or PDF with File ▸ Export As.
 
-### Themes, rulers, layers
+## Extras for power users
 
-The Canvas section of the inspector sets a per-page theme (page color and ink; exports match) and shows
-rulers (⇧⌘R). Drag out of a ruler to pull a guide: moves and resizes snap to it, and dropping it back on the
-ruler removes it. The Layers section unfolds each layer to its elements; drag one onto another to restack,
-or onto a layer to move it there. Guides can be typed in exactly, added at a position, and locked.
+- **Scripting.** Script ▸ Script Console… (⌥⌘J) runs JavaScript to draw or change many things at once, such as
+  a grid of boxes or restyling everything labelled "TODO". The console includes a full reference.
+- **Command line.** Settings ▸ Command Line installs a `dottie` command, so you can turn drawings into images
+  from Terminal: `dottie render diagram.dottie -o diagram.png`. Run `dottie --help` for more.
 
-### Links
+## Help and feedback
 
-Any element can link to a labelled shape elsewhere in the drawing, on its own page or another: select it and
-choose a target under **Jumps to** in the inspector's Link section (other pages' shapes are listed as
-"Page › Shape"). A small arrow badge appears beside the linked element (grey with a cross when the target is
-deleted or on a hidden layer). Right-click ▸ Link to Element… and then a click on any shape does the same,
-including shapes with no text; switch tabs first to pick a shape on another page, and the view comes back. The inspector's **Anchor** field gives an element a hidden label, never drawn or
-exported, that the Layers panel and the Link list show. Click the badge, ⌘-click the element, or use View ▸ Follow Link to go
-there: the view glides to the target, and to its whole group if it has one. It zooms out if the target does not
-fit, and zooms in to at most 100%. A target on another page switches to that tab first. View ▸ Back (⌘[) and
-Forward (⌘]) retrace your jumps, across pages too. A copied link follows its target if the target was copied too,
-and otherwise survives as long as the target is still in the file. Agents and scripts set `link` on
-`update_element` / `dottie.update` (scripts find shapes on other pages with `dottie.pages()`).
+Found a bug or have an idea? [Open an issue](https://github.com/phin-tech/dottie/issues). Want to build Dottie
+yourself or contribute? See [DEVELOPMENT.md](DEVELOPMENT.md).
 
-### Stencils
+## License
 
-The Library tab in the sidebar holds stencil libraries: the built-in Basics set (flowchart symbols and common
-shapes) plus any `.dottielib` in `~/Library/Application Support/Dottie/Libraries`. Click or drag an item to place
-it. **+ ▸ New Library from SVGs…** turns SVG files or folders into a library; **Add Selection to Library…** saves
-what you have selected. Items are stored at original fidelity and restyled to the drawing's look when placed
-(**Keep original colors** places them as drawn). Drop `.svg` files straight onto the canvas, or use
-File ▸ Import SVG…. Right-click an item in one of your libraries to rename, tag, duplicate or reorder it.
-Double-click a `.dottielib` in Finder to browse it in the library viewer, copy or export items, or install it.
-
-`export_png` also returns each element's id, kind, text and pixel box in the image. Connectors take a `label`;
-shapes and connectors take `fill_style` (solid, hachure, crossHatch), `dash`, `stroke_width`, `bowing`,
-`rotation` (degrees) and `start_head` / `end_head` (none, arrow, triangle, dot, bar).
-
-**Live mode.** If the Dottie app has the file open, tool calls edit that open document (one undo step each,
-shown as "Agent: <tool>" in Edit ▸ Undo) instead of the file on disk, and `export_png` renders the open document (its first page, unless `page` says otherwise).
-The app listens on `~/Library/Application Support/Dottie/live.sock`; when it isn't running or the file isn't
-open, tools fall back to reading and writing the file. Save in the app to persist agent edits.
-
-Uses the official [MCP Swift SDK](https://github.com/modelcontextprotocol/swift-sdk), pinned to a `main`
-revision because 0.11.0 fails to compile under Swift 6.4. Move back to a release tag once one builds.
+Dottie is free and open source under the [Apache License 2.0](LICENSE).

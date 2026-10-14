@@ -155,3 +155,13 @@ final class PagesTests: XCTestCase {
         XCTAssertEqual(doc.elements.first?.link, b.id)
     }
 }
+
+final class VersionTests: XCTestCase {
+    /// The app's version (project.yml) and the tools' (DottieVersion) are bumped together by `just bump`.
+    func testToolVersionMatchesTheApp() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let yml = try String(contentsOf: root.appendingPathComponent("project.yml"), encoding: .utf8)
+        let line = try XCTUnwrap(yml.split(separator: "\n").first { $0.contains("MARKETING_VERSION:") })
+        XCTAssertEqual(line.split(separator: "\"").dropFirst().first.map(String.init), DottieVersion.current)
+    }
+}

@@ -14,7 +14,7 @@ dottie://script-api) documents the `dottie` object it uses.
 
 let server = Server(
     name: "dottie",
-    version: "0.1.0",
+    version: DottieVersion.current,
     instructions: instructions,
     capabilities: .init(resources: .init(subscribe: false, listChanged: false), tools: .init(listChanged: false))
 )

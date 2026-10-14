@@ -8,6 +8,10 @@ options:
 packages:
   Dottie:
     path: .
+  # Same pin as Package.swift, for the bundled dottie-mcp target.
+  MCP:
+    url: https://github.com/modelcontextprotocol/swift-sdk.git
+    revision: a0ae212ebf6eab5f754c3129608bc5557637e605
 targets:
   Dottie:
     type: application
@@ -20,6 +24,12 @@ targets:
       - package: Dottie
         product: DottieKit
       - target: DottieCLI
+        embed: true
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      - target: DottieMCP
         embed: true
         codeSign: true
         copy:
@@ -88,6 +98,26 @@ targets:
         DEAD_CODE_STRIPPING: YES
         # Ships inside the app only; installing it on its own makes an archive a generic one Xcode cannot
         # distribute as an app.
+        SKIP_INSTALL: YES
+  # The MCP server, embedded in the app at Contents/Helpers; Settings ▸ MCP shows how to connect a client to it.
+  DottieMCP:
+    type: tool
+    platform: macOS
+    sources: [Sources/DottieMCP]
+    configFiles:
+      Debug: Signing.xcconfig
+      Release: Signing.xcconfig
+    dependencies:
+      - package: Dottie
+        product: DottieKit
+      - package: MCP
+        product: MCP
+    settings:
+      base:
+        PRODUCT_NAME: dottie-mcp
+        SWIFT_VERSION: "6.0"
+        ENABLE_HARDENED_RUNTIME: YES
+        DEAD_CODE_STRIPPING: YES
         SKIP_INSTALL: YES
   # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
   # as a test host would take over the live socket of a running Dottie.
