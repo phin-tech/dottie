@@ -117,6 +117,23 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
     public static func item(from doc: DottieDocument, ids: Set<UUID>, name: String, tags: [String] = []) -> StencilItem? {
         guard let data = doc.clipboardData(for: ids),
               var items = try? JSONDecoder().decode([Element].self, from: data), !items.isEmpty else { return nil }
+        let box = normalizeToOrigin(&items)
+        return StencilItem(name: name, tags: tags, width: box.width, height: box.height, elements: items, imported: false)
+    }
+
+    /// A library from an Excalidraw library (or scene, as one item). Items keep their authored look.
+    public static func fromExcalidraw(name: String, data: Data) throws -> StencilLibrary {
+        let items = try ExcalidrawImporter.importItems(from: data, layerID: UUID())
+        return StencilLibrary(name: name, items: items.enumerated().map { i, it in
+            StencilItem(name: it.name ?? "Item \(i + 1)", width: it.size.width, height: it.size.height,
+                        elements: it.elements, imported: false)
+        })
+    }
+
+    /// Moves `items` so their joint bounds start at the origin (free connector ends move with them).
+    /// Returns the bounds the items had.
+    @discardableResult
+    static func normalizeToOrigin(_ items: inout [Element]) -> CGRect {
         var holder = DottieDocument()
         holder.elements = items
         let box = Exporter.bounds(of: holder, padding: 0)
@@ -132,7 +149,7 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
                 items[i].x -= box.minX; items[i].y -= box.minY
             }
         }
-        return StencilItem(name: name, tags: tags, width: box.width, height: box.height, elements: items, imported: false)
+        return CGRect(origin: .zero, size: box.size)
     }
 
     /// One item per readable SVG, named for its file. `failed` lists the names that had nothing to draw.

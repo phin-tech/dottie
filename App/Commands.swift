@@ -37,6 +37,7 @@ struct DottieCommands: Commands {
         CommandGroup(replacing: .importExport) {
             Button("Import SVG…") { send(#selector(CanvasNSView.importSVG(_:))) }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
+            Button("Import Excalidraw…") { send(#selector(CanvasNSView.importExcalidrawScene(_:))) }
             Menu("Export As") {
                 ForEach(ExportFormat.allCases, id: \.self) { f in
                     Button("\(f.rawValue)…") { editor?.export(f) }

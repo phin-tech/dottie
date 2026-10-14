@@ -39,6 +39,7 @@ struct LibraryPanel: View {
                         .disabled(selection.isEmpty || entry?.isBuiltIn != false)
                     Divider()
                     Button("New Library from SVGs…", action: importSVGs)
+                    Button("New Library from Excalidraw Library…", action: importExcalidrawLibrary)
                     Button("Open Library File…", action: openLibraryFile)
                     Divider()
                     Button("Show Libraries in Finder") {
@@ -125,6 +126,20 @@ struct LibraryPanel: View {
             message = failed > 0 ? "Imported with \(failed) unreadable file\(failed == 1 ? "" : "s")." : nil
         } catch {
             message = "No drawable SVGs found."
+        }
+    }
+
+    private func importExcalidrawLibrary() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "excalidrawlib") ?? .json, .json]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose an Excalidraw library (.excalidrawlib)"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            selectedID = try store.importExcalidrawLibrary(file: url)
+            message = nil
+        } catch {
+            message = "That file is not an Excalidraw library, or it is empty."
         }
     }
 

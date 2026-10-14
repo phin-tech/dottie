@@ -116,6 +116,13 @@ final class LibraryStore: ObservableObject {
         return (id, failed.count + (files.count - named.count))
     }
 
+    /// Imports an `.excalidrawlib` as a new library named for the file.
+    func importExcalidrawLibrary(file: URL) throws -> String {
+        let lib = try StencilLibrary.fromExcalidraw(name: file.deletingPathExtension().lastPathComponent,
+                                                    data: Data(contentsOf: file))
+        return try create(lib)
+    }
+
     func importLibrary(file: URL) throws -> String {
         let lib = try StencilLibrary.decode(Data(contentsOf: file))
         return try create(lib)

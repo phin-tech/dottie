@@ -205,3 +205,77 @@ final class StencilFilesTests: XCTestCase {
         XCTAssertTrue(StencilLibrary.load(directory: dir.appendingPathComponent("missing")).isEmpty)
     }
 }
+
+final class ExcalidrawImportTests: XCTestCase {
+    let scene = """
+    {"type":"excalidraw","version":2,"elements":[
+      {"id":"a","type":"rectangle","x":100,"y":200,"width":160,"height":80,"angle":0,"strokeColor":"#1e1e1e",
+       "backgroundColor":"#ffec99","fillStyle":"hachure","strokeWidth":2,"strokeStyle":"dashed","roughness":2,"opacity":100,
+       "seed":1234,"groupIds":["g1"],"isDeleted":false},
+      {"id":"t","type":"text","x":120,"y":220,"width":100,"height":25,"text":"Hello","fontSize":20,"containerId":"a",
+       "strokeColor":"#1e1e1e","backgroundColor":"transparent","isDeleted":false},
+      {"id":"b","type":"ellipse","x":400,"y":200,"width":80,"height":80,"angle":0.5,"strokeColor":"#e03131",
+       "backgroundColor":"transparent","isDeleted":false},
+      {"id":"ar","type":"arrow","x":260,"y":240,"width":140,"height":0,"points":[[0,0],[140,0]],
+       "startBinding":{"elementId":"a","focus":0,"gap":4},"endBinding":{"elementId":"b","focus":0,"gap":4},
+       "startArrowhead":null,"endArrowhead":"triangle","strokeColor":"#1e1e1e","backgroundColor":"transparent","isDeleted":false},
+      {"id":"gone","type":"rectangle","x":0,"y":0,"width":10,"height":10,"isDeleted":true},
+      {"id":"img","type":"image","x":0,"y":0,"width":10,"height":10,"isDeleted":false},
+      {"id":"fd","type":"freedraw","x":10,"y":10,"width":30,"height":20,"points":[[0,0],[10,8],[30,20]],
+       "strokeColor":"#2f9e44","backgroundColor":"transparent","isDeleted":false}
+    ]}
+    """
+
+    func testSceneMapsShapesLabelsBindingsAndLook() throws {
+        let items = try ExcalidrawImporter.importItems(from: Data(scene.utf8), layerID: UUID())
+        XCTAssertEqual(items.count, 1)
+        let els = items[0].elements
+        XCTAssertEqual(els.map(\.kind), [.rectangle, .ellipse, .connector, .path]) // label folded, deleted/image dropped
+        let rect = els[0], ell = els[1], arrow = els[2]
+        XCTAssertEqual(rect.text, "Hello")
+        XCTAssertTrue(rect.style.stroke.isAutomaticInk)
+        XCTAssertEqual(rect.style.fillStyle, .hachure)
+        XCTAssertEqual(rect.style.dash, .dashed)
+        XCTAssertEqual(rect.style.roughness, 2)
+        XCTAssertNotNil(rect.groupID)
+        XCTAssertEqual(ell.rotation, 0.5)
+        XCTAssertEqual(ell.style.stroke, RGBA(r: 224.0 / 255, g: 49.0 / 255, b: 49.0 / 255))
+        XCTAssertEqual(arrow.connector?.start.elementID, rect.id)
+        XCTAssertEqual(arrow.connector?.end.elementID, ell.id)
+        XCTAssertEqual(arrow.connector?.endHead, .triangle)
+        XCTAssertEqual(arrow.connector?.startHead, Arrowhead.none)
+        XCTAssertEqual(rect.x, 90, accuracy: 0.01) // normalized: freedraw's x=10 is the left edge
+        XCTAssertEqual(items[0].size.width, 470, accuracy: 20) // the rotated ellipse sticks out a little
+    }
+
+    func testLibraryYieldsOneItemPerEntryAndV1Works() throws {
+        let v2 = """
+        {"type":"excalidrawlib","version":2,"libraryItems":[
+          {"id":"1","name":"Box","elements":[{"id":"r","type":"rectangle","x":50,"y":50,"width":40,"height":20}]},
+          {"id":"2","elements":[{"id":"e","type":"ellipse","x":5,"y":5,"width":10,"height":10}]}]}
+        """
+        let a = try ExcalidrawImporter.importItems(from: Data(v2.utf8), layerID: UUID())
+        XCTAssertEqual(a.map(\.name), ["Box", "Item 2"])
+        XCTAssertEqual(a[0].elements[0].x, 0)
+        let v1 = #"{"type":"excalidrawlib","version":1,"library":[[{"id":"r","type":"diamond","x":9,"y":9,"width":10,"height":10}]]}"#
+        XCTAssertEqual(try ExcalidrawImporter.importItems(from: Data(v1.utf8), layerID: UUID()).count, 1)
+    }
+
+    func testRejectsOtherJSON() {
+        XCTAssertThrowsError(try ExcalidrawImporter.importItems(from: Data(#"{"type":"nope"}"#.utf8), layerID: UUID()))
+        XCTAssertThrowsError(try ExcalidrawImporter.importItems(from: Data("[]".utf8), layerID: UUID()))
+        XCTAssertThrowsError(try ExcalidrawImporter.importItems(from: Data(#"{"type":"excalidraw","elements":[]}"#.utf8), layerID: UUID()))
+    }
+}
+
+final class ExcalidrawLibraryTests: XCTestCase {
+    func testLibraryKeepsAuthoredLookAndPlaces() throws {
+        let json = ##"{"type":"excalidrawlib","version":2,"libraryItems":[{"id":"1","name":"Box","elements":[{"id":"r","type":"rectangle","x":50,"y":50,"width":40,"height":20,"strokeColor":"#e03131","roughness":0}]}]}"##
+        let lib = try StencilLibrary.fromExcalidraw(name: "X", data: Data(json.utf8))
+        XCTAssertEqual(lib.items.count, 1)
+        XCTAssertFalse(lib.items[0].imported)
+        var doc = DottieDocument()
+        let ids = doc.place(lib.items[0], center: .zero, layerID: doc.layers[0].id, keepOriginalColors: false)
+        XCTAssertEqual(doc.elements.first { ids.contains($0.id) }?.style.roughness, 0)  // not restyled
+    }
+}

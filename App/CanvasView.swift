@@ -1,4 +1,5 @@
 import AppKit
+import UniformTypeIdentifiers
 import SwiftUI
 import DottieKit
 
@@ -496,6 +497,36 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         importSVGs(files, at: CGPoint(x: viewportCenter.x - half, y: viewportCenter.y), keepOriginalColors: keep.state == .on)
     }
 
+    /// Places an Excalidraw scene (or the first item of a library) as authored, in one undo step.
+    @discardableResult
+    func importExcalidraw(_ data: Data, at center: CGPoint) -> Bool {
+        guard let items = try? ExcalidrawImporter.importItems(from: data, layerID: UUID()), let first = items.first else {
+            NSSound.beep(); return false
+        }
+        let item = StencilItem(name: "Excalidraw", width: first.size.width, height: first.size.height,
+                               elements: first.elements, imported: false)
+        // Authored scenes keep their own size; only the readable-icon scaling is skipped.
+        let usable = model.layers.filter { !$0.locked && $0.visible }
+        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
+        var next = model
+        let added = next.insert(item.elements, size: item.size, center: center, layerID: layer.id)
+        guard !added.isEmpty else { return false }
+        selection = added
+        tool = .select
+        onToolChange?(.select)
+        onCommit?(next, "Import Excalidraw")
+        return true
+    }
+
+    @objc func importExcalidrawScene(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "excalidraw") ?? .json, .json]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose an Excalidraw scene (.excalidraw)"
+        guard panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) else { return }
+        importExcalidraw(data, at: viewportCenter)
+    }
+
     // Dropping .svg files from Finder places them under the cursor; hold ⌥ to keep original colors.
 
     override func viewDidMoveToWindow() {
@@ -524,14 +555,17 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return true
     }
 
-    private func droppedSVGs(_ info: NSDraggingInfo) -> [URL] {
+    private func droppedFiles(_ info: NSDraggingInfo, ext: String) -> [URL] {
         let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self],
                                                        options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
-        return urls.filter { $0.pathExtension.lowercased() == "svg" }
+        return urls.filter { $0.pathExtension.lowercased() == ext }
     }
 
+    private func droppedSVGs(_ info: NSDraggingInfo) -> [URL] { droppedFiles(info, ext: "svg") }
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        draggedStencil(sender) != nil || !droppedSVGs(sender).isEmpty ? .copy : []
+        draggedStencil(sender) != nil || !droppedSVGs(sender).isEmpty || !droppedFiles(sender, ext: "excalidraw").isEmpty
+            ? .copy : []
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
@@ -539,6 +573,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let raw = convert(sender.draggingLocation, from: nil)
             let at = CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom)
             return placeStencil(dragged.item, keepOriginalColors: dragged.keepOriginalColors, at: at)
+        }
+        if let scene = droppedFiles(sender, ext: "excalidraw").first, let data = try? Data(contentsOf: scene) {
+            let raw = convert(sender.draggingLocation, from: nil)
+            return importExcalidraw(data, at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom))
         }
         let files = droppedSVGs(sender).compactMap { try? Data(contentsOf: $0) }
         guard !files.isEmpty else { return false }
