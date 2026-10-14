@@ -12,6 +12,10 @@ struct DottieApp: App {
             ContentView(document: file.document, fileURL: file.fileURL)
         }
         .commands { DottieCommands() }
+        DocumentGroup(viewing: LibraryFileDocument.self) { file in
+            LibraryViewer(library: file.document.library)
+                .navigationTitle(file.document.library.name)
+        }
         Settings {
             SettingsView()
         }

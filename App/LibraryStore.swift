@@ -16,7 +16,7 @@ final class LibraryStore: ObservableObject {
     }
 
     @Published private(set) var entries: [Entry] = []
-    private struct Thumb: Hashable { var id: UUID; var original: Bool }
+    private struct Thumb: Hashable { var id: UUID; var original: Bool; var roughness: Double }
     private var thumbnails: [Thumb: NSImage] = [:]
 
     static var directory: URL {
@@ -41,10 +41,10 @@ final class LibraryStore: ObservableObject {
     func entry(_ id: String?) -> Entry? { entries.first { $0.id == id } ?? entries.first }
 
     /// The item drawn the way it will be placed (the caller sets it on a white tile).
-    func thumbnail(for item: StencilItem, keepOriginalColors: Bool) -> NSImage? {
-        let key = Thumb(id: item.id, original: keepOriginalColors)
+    func thumbnail(for item: StencilItem, keepOriginalColors: Bool, roughness: Double = Style().roughness) -> NSImage? {
+        let key = Thumb(id: item.id, original: keepOriginalColors, roughness: roughness)
         if let hit = thumbnails[key] { return hit }
-        guard let data = Exporter.png(item.document(keepOriginalColors: keepOriginalColors), scale: 2),
+        guard let data = Exporter.png(item.document(keepOriginalColors: keepOriginalColors, roughness: roughness), scale: 2),
               let image = NSImage(data: data) else { return nil }
         thumbnails[key] = image
         return image

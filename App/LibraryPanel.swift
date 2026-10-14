@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import DottieKit
 
 extension UTType {
-    static let dottieLibrary = UTType(filenameExtension: "dottielib", conformingTo: .json) ?? .json
+    static let dottieLibrary = UTType(exportedAs: "tech.phin.dottielib", conformingTo: .json)
 }
 
 /// Browse stencil libraries and put their items on the canvas (click, or drag).
@@ -43,6 +43,10 @@ struct LibraryPanel: View {
                     Button("New Library from draw.io File…", action: importDrawio)
                     Button("Open Library File…", action: openLibraryFile)
                     Divider()
+                    Button("Open Library in Viewer") {
+                        if let url = entry?.url { NSWorkspace.shared.open(url) }
+                    }
+                    .disabled(entry?.url == nil)
                     Button("Show Libraries in Finder") {
                         try? FileManager.default.createDirectory(at: LibraryStore.directory, withIntermediateDirectories: true)
                         NSWorkspace.shared.open(LibraryStore.directory)

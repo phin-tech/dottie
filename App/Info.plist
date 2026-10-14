@@ -18,6 +18,18 @@
 				<string>tech.phin.dottie</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Dottie Stencil Library</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>tech.phin.dottielib</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
@@ -50,6 +62,24 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>dottie</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.json</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>Dottie Stencil Library</string>
+			<key>UTTypeIdentifier</key>
+			<string>tech.phin.dottielib</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>dottielib</string>
 				</array>
 			</dict>
 		</dict>

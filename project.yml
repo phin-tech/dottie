@@ -30,12 +30,21 @@ targets:
             CFBundleTypeRole: Editor
             LSHandlerRank: Owner
             LSItemContentTypes: [tech.phin.dottie]
+          - CFBundleTypeName: Dottie Stencil Library
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes: [tech.phin.dottielib]
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: tech.phin.dottie
             UTTypeDescription: Dottie Drawing
             UTTypeConformsTo: [public.json, public.data]
             UTTypeTagSpecification:
               public.filename-extension: [dottie]
+          - UTTypeIdentifier: tech.phin.dottielib
+            UTTypeDescription: Dottie Stencil Library
+            UTTypeConformsTo: [public.json, public.data]
+            UTTypeTagSpecification:
+              public.filename-extension: [dottielib]
   # Drives the real CanvasNSView with synthesized mouse events. Unhosted on purpose: launching the app
   # as a test host would take over the live socket of a running Dottie.
   CanvasTests:
