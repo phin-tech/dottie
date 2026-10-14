@@ -4,8 +4,84 @@ import CoreText
 
 /// Single drawing path shared by the canvas, PNG and PDF export.
 public enum Renderer {
+    // MARK: Path cache
+
+    /// What an element's outline or hatch depends on. Everything in the key is a plain value, so a
+    /// cached path can never go stale: change the geometry or look and the key changes with it.
+    struct ShapeKey: Hashable {
+        var tag: UInt8            // 0 outline, 1 hachure
+        var kind: ElementKind
+        var x, y, w, h: Double
+        var seed: UInt32
+        var roughness, bowing, strokeWidth: Double
+        var fillStyle: FillStyle
+        var pathHash: Int
+    }
+
+    struct ConnectorKey: Hashable {
+        var seed: UInt32
+        var roughness, bowing, strokeWidth: Double
+        var routing: Routing
+        var startHead, endHead: Arrowhead
+        var startPort, endPort: Port?
+        var ax, ay, bx, by: Double
+    }
+
+    final class PathCache: @unchecked Sendable {
+        private let lock = NSLock()
+        private var shapes: [ShapeKey: CGPath] = [:]
+        private var connectors: [ConnectorKey: (CGPath, CGPath)] = [:]
+        private let limit = 6000
+        private(set) var hits = 0
+        private(set) var misses = 0
+
+        func shape(_ k: ShapeKey, _ make: () -> CGPath) -> CGPath {
+            lock.lock()
+            if let p = shapes[k] { hits += 1; lock.unlock(); return p }
+            lock.unlock()
+            let p = make()
+            lock.lock(); defer { lock.unlock() }
+            misses += 1
+            if shapes.count >= limit { shapes.removeAll(keepingCapacity: true) }
+            shapes[k] = p
+            return p
+        }
+
+        func connector(_ k: ConnectorKey, _ make: () -> (CGPath, CGPath)) -> (CGPath, CGPath) {
+            lock.lock()
+            if let p = connectors[k] { hits += 1; lock.unlock(); return p }
+            lock.unlock()
+            let p = make()
+            lock.lock(); defer { lock.unlock() }
+            misses += 1
+            if connectors.count >= limit { connectors.removeAll(keepingCapacity: true) }
+            connectors[k] = p
+            return p
+        }
+
+        func reset() { lock.lock(); shapes = [:]; connectors = [:]; hits = 0; misses = 0; lock.unlock() }
+        var stats: (hits: Int, misses: Int) { lock.lock(); defer { lock.unlock() }; return (hits, misses) }
+    }
+
+    nonisolated(unsafe) static let cache = PathCache()
+    /// Cache hit and miss counts since the last `resetPathCache()`; for tests and tuning.
+    public static var pathCacheStats: (hits: Int, misses: Int) { cache.stats }
+    public static func resetPathCache() { cache.reset() }
+
+    private static func shapeKey(_ e: Element, tag: UInt8) -> ShapeKey {
+        ShapeKey(tag: tag, kind: e.kind, x: e.x, y: e.y, w: e.width, h: e.height, seed: e.seed,
+                 roughness: e.style.roughness, bowing: e.style.bowing, strokeWidth: e.style.strokeWidth,
+                 fillStyle: e.style.fillStyle, pathHash: e.path?.hashValue ?? 0)
+    }
+
     /// Outline path for an element. roughness == 0 gives exact geometry.
     public static func outline(for e: Element) -> CGPath {
+        // A stroke still being drawn changes every event; caching it would only churn the cache.
+        if e.kind == .freehand, e.path == nil { return computeOutline(for: e) }
+        return cache.shape(shapeKey(e, tag: 0)) { computeOutline(for: e) }
+    }
+
+    private static func computeOutline(for e: Element) -> CGPath {
         let r = e.frame
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
@@ -64,6 +140,18 @@ public enum Renderer {
     /// Connector geometry split into the stroked line (with open arrowheads) and the closed shapes
     /// (triangle and dot heads) that are also filled with the stroke color. Sketchy when roughness > 0.
     public static func connectorParts(for e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> (line: CGPath, filled: CGPath) {
+        guard let c = e.connector else { return (CGMutablePath(), CGMutablePath()) }
+        // The route depends on the document only through the two resolved endpoints.
+        let (a, b) = Connector.endpoints(of: e, in: doc, index: index)
+        let key = ConnectorKey(seed: e.seed, roughness: e.style.roughness, bowing: e.style.bowing,
+                               strokeWidth: e.style.strokeWidth, routing: c.routing, startHead: c.startHead,
+                               endHead: c.endHead, startPort: c.start.port, endPort: c.end.port,
+                               ax: a.x, ay: a.y, bx: b.x, by: b.y)
+        let parts = cache.connector(key) { computeConnector(for: e, in: doc, index: index) }
+        return (parts.0, parts.1)
+    }
+
+    private static func computeConnector(for e: Element, in doc: DottieDocument, index: [UUID: Element]?) -> (CGPath, CGPath) {
         guard let c = e.connector else { return (CGMutablePath(), CGMutablePath()) }
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
@@ -189,8 +277,14 @@ public enum Renderer {
 
     /// Pen-shaded fill for `fillStyle` hachure / crossHatch; empty for solid fills.
     public static func hachurePath(for e: Element) -> CGPath {
+        guard e.style.fillStyle != .solid, e.kind != .freehand, e.kind != .connector, e.kind != .text else {
+            return CGMutablePath()
+        }
+        return cache.shape(shapeKey(e, tag: 1)) { computeHachure(for: e) }
+    }
+
+    private static func computeHachure(for e: Element) -> CGPath {
         let path = CGMutablePath()
-        guard e.style.fillStyle != .solid, e.kind != .freehand, e.kind != .connector, e.kind != .text else { return path }
         let poly = fillPolygon(for: e)
         let gap = max(4, e.style.strokeWidth * 4)
         var angles = [Hachure.angle]
@@ -232,29 +326,60 @@ public enum Renderer {
 
     /// Draws with a top-left origin (y down). Callers must flip the context if needed.
     /// `background` is painted behind connector labels so the line doesn't strike through the text.
+    /// How much detail is worth drawing at a view zoom (screen points per model unit). Far out,
+    /// thousands of hairline hatches are noise: they fall back to a flat tint, and unreadable labels go.
+    public struct DetailLevel: Sendable {
+        public var zoom: Double
+        public init(zoom: Double) { self.zoom = zoom }
+        var hatch: Bool { zoom >= 0.25 }
+        var dashes: Bool { zoom >= 0.2 }
+        var sketchy: Bool { zoom >= 0.12 }
+        func showsText(fontSize: Double) -> Bool { fontSize * zoom >= 4 }
+        func isVisible(_ box: CGRect) -> Bool { max(box.width, box.height) * zoom >= 0.75 }
+    }
+
     /// `clip` (model units) skips elements entirely outside it, so a zoomed-in view of a big drawing
-    /// only pays for what is on screen.
-    public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil, clip: CGRect? = nil) {
+    /// only pays for what is on screen. Pass a `spatial` index built from `doc` to find those elements
+    /// without visiting the rest. `zoom` enables level of detail; `ink` resolves automatic ink per drawn
+    /// element instead of copying the whole document.
+    public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil, clip: CGRect? = nil,
+                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
-        let index = doc.elementIndex
-        for e in doc.orderedElements where visible.contains(e.layerID) {
+        let lod = zoom.map(DetailLevel.init)
+        let index = spatial?.byID ?? doc.elementIndex
+
+        func paint(_ e: Element) {
+            guard visible.contains(e.layerID) else { return }
+            if let lod, e.kind != .connector, !lod.isVisible(e.rotatedBounds) { return }
+            draw(ink.map { e.resolvingInk(to: $0) } ?? e, in: ctx, document: doc, background: background, index: index, lod: lod)
+        }
+
+        if let spatial, let clip {
+            for pos in spatial.candidates(in: clip) { paint(spatial.ordered[pos]) }
+            return
+        }
+        for e in doc.orderedElements {
             if let clip {
                 let box = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.rotatedBounds
                 // Pad for stroke width, arrowheads and connector labels.
                 if !box.insetBy(dx: -(e.style.strokeWidth + 60), dy: -(e.style.strokeWidth + 60)).intersects(clip) { continue }
             }
-            draw(e, in: ctx, document: doc, background: background, index: index)
+            paint(e)
         }
     }
 
     public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil, background: CGColor? = nil,
-                            index: [UUID: Element]? = nil) {
+                            index: [UUID: Element]? = nil, lod: DetailLevel? = nil) {
+        var e = e
+        if let lod, !lod.sketchy, e.style.roughness > 0 { e.style.roughness = 0 } // clean geometry is cheaper and unseen far out
         ctx.saveGState(); defer { ctx.restoreGState() }
         func applyStroke() {
             ctx.setStrokeColor(e.style.stroke.cgColor)
             ctx.setLineWidth(e.style.strokeWidth)
             ctx.setLineCap(.round); ctx.setLineJoin(.round)
-            if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) { ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) }) }
+            if lod?.dashes ?? true, let d = dashPattern(e.style.dash, width: e.style.strokeWidth) {
+                ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) })
+            }
         }
         if e.kind == .connector {
             guard let document else { return }
@@ -268,7 +393,7 @@ public enum Renderer {
                 ctx.setFillColor(e.style.stroke.cgColor)
                 ctx.fillPath()
             }
-            if let t = e.text, !t.isEmpty {
+            if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
                 let r = labelRect(for: e, in: document, index: index)
                 if let background { ctx.setFillColor(background); ctx.fill(r) }
                 drawText(t, in: r, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
@@ -281,13 +406,17 @@ public enum Renderer {
             ctx.translateBy(x: -e.frame.midX, y: -e.frame.midY)
         }
         if e.kind == .text {
-            drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
+            if lod?.showsText(fontSize: e.style.fontSize) ?? true {
+                drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
+            }
             return
         }
         if e.style.fill.a > 0, e.kind != .freehand {
-            if e.style.fillStyle == .solid {
+            if e.style.fillStyle == .solid || !(lod?.hatch ?? true) {
                 ctx.addPath(fillPath(for: e))
-                ctx.setFillColor(e.style.fill.cgColor)
+                var tint = e.style.fill
+                if e.style.fillStyle != .solid { tint.a *= 0.55 } // hatching read from afar is a lighter wash
+                ctx.setFillColor(tint.cgColor)
                 ctx.fillPath()
             } else {
                 ctx.saveGState()
@@ -302,7 +431,7 @@ public enum Renderer {
         ctx.addPath(outline(for: e))
         applyStroke()
         ctx.strokePath()
-        if let t = e.text, !t.isEmpty {
+        if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
             drawText(t, in: e.frame.insetBy(dx: 6, dy: 6), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
         }
     }

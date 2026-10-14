@@ -83,6 +83,30 @@ final class PerformanceTests: XCTestCase {
 
         let (_, svgMs) = time("svg export") { _ = Exporter.svg(doc) }
 
+        // The canvas path: spatial index once, then frames. First frame fills the path cache.
+        let (spatial, idxMs) = time("build spatial index") { SpatialIndex(doc) }
+        let view = CGRect(x: 0, y: 0, width: 1600, height: 1000)
+        Renderer.resetPathCache()
+        let (_, cold) = time("frame, cold cache, 1600x1000 view") { Renderer.draw(doc, in: ctx, clip: view, zoom: 1, ink: .black, spatial: spatial) }
+        let (_, warm) = time("frame, warm cache") { Renderer.draw(doc, in: ctx, clip: view, zoom: 1, ink: .black, spatial: spatial) }
+        let (_, panned) = time("frame, panned 400pt") {
+            Renderer.draw(doc, in: ctx, clip: view.offsetBy(dx: 400, dy: 300), zoom: 1, ink: .black, spatial: spatial)
+        }
+        let bounds = Exporter.bounds(of: doc)
+        let (_, farOut) = time("frame, whole doc at 5% zoom") {
+            let c2 = CGContext(data: nil, width: 1600, height: 1000, bitsPerComponent: 8, bytesPerRow: 0,
+                               space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            c2.scaleBy(x: 0.05, y: 0.05)
+            Renderer.draw(doc, in: c2, clip: bounds, zoom: 0.05, ink: .black, spatial: spatial)
+        }
+        let (_, hit) = time("indexed click x100") {
+            for i in 0..<100 { _ = spatial.element(at: CGPoint(x: Double(i) * 37, y: Double(i) * 23), in: doc) }
+        }
+        print("PERF cache: \(Renderer.pathCacheStats)")
+        XCTAssertLessThan(warm, cold)
+        XCTAssertLessThan(hit / 100, 20)
+        XCTAssertLessThan(idxMs, 5_000); XCTAssertLessThan(panned, 10_000); XCTAssertLessThan(farOut, 10_000)
+
         XCTAssertLessThan(encMs, 5_000); XCTAssertLessThan(decMs, 5_000)
         XCTAssertLessThan(orderMs, 1_000); XCTAssertLessThan(hitMs / 100, 150) // per click, debug build
         XCTAssertLessThan(eqMs, 2_000); XCTAssertLessThan(inkMs, 2_000)

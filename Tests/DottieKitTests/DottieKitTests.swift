@@ -722,3 +722,110 @@ final class GroupRotationTests: XCTestCase {
         XCTAssertEqual(doc.elements[1].frame.midX, 90, accuracy: 1e-6)
     }
 }
+
+final class CullingTests: XCTestCase {
+    private func grid(_ n: Int) -> DottieDocument {
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        let top = doc.addLayer(name: "Top")
+        var ids: [UUID] = []
+        for i in 0..<n {
+            var e = Element(kind: [.rectangle, .ellipse, .diamond][i % 3],
+                            frame: CGRect(x: Double(i % 20) * 90, y: Double(i / 20) * 70, width: 60, height: 40),
+                            seed: UInt32(i + 1), layerID: i % 4 == 0 ? top : l, text: "n\(i)")
+            if i % 5 == 0 { e.rotation = 0.4 }
+            doc.elements.append(e); ids.append(e.id)
+        }
+        for i in stride(from: 0, to: n - 1, by: 3) {
+            doc.elements.append(Element(kind: .connector, frame: .zero, layerID: l,
+                                        connector: ConnectorData(start: .bound(ids[i]), end: .bound(ids[i + 1]),
+                                                                 routing: Routing.allCases[i % 3])))
+        }
+        return doc
+    }
+
+    func testSpatialIndexAgreesWithBruteForce() {
+        let doc = grid(400)
+        let spatial = SpatialIndex(doc)
+        XCTAssertEqual(spatial.ordered.map(\.id), doc.orderedElements.map(\.id))
+        for (x, y) in [(5.0, 5.0), (95.0, 75.0), (300.0, 200.0), (1000.0, 1000.0), (-50.0, -50.0), (450.0, 130.0)] {
+            let p = CGPoint(x: x, y: y)
+            XCTAssertEqual(spatial.element(at: p, in: doc)?.id, doc.element(at: p)?.id, "at \(p)")
+        }
+        // Marquee: same set as testing every element's bounds.
+        let rect = CGRect(x: 100, y: 60, width: 300, height: 200)
+        let index = doc.elementIndex
+        let brute = Set(doc.elements.filter {
+            ($0.kind == .connector ? Connector.bounds(of: $0, in: doc, index: index) : $0.rotatedBounds).intersects(rect)
+        }.map(\.id))
+        XCTAssertEqual(Set(spatial.elements(intersecting: rect, in: doc)), brute)
+        // A small window finds a small candidate set.
+        XCTAssertLessThan(spatial.candidates(in: CGRect(x: 0, y: 0, width: 100, height: 100)).count, doc.elements.count / 4)
+    }
+
+    func testCullingChangesNothingYouCanSee() throws {
+        let doc = grid(300)
+        func render(clip: CGRect?, spatial: SpatialIndex?) -> Data {
+            let ctx = CGContext(data: nil, width: 400, height: 300, bitsPerComponent: 8, bytesPerRow: 0,
+                                space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+            ctx.setFillColor(CGColor(gray: 1, alpha: 1)); ctx.fill(CGRect(x: 0, y: 0, width: 400, height: 300))
+            Renderer.draw(doc, in: ctx, clip: clip, spatial: spatial)
+            return Data(bytes: ctx.data!, count: ctx.bytesPerRow * ctx.height)
+        }
+        let view = CGRect(x: 0, y: 0, width: 400, height: 300)
+        let all = render(clip: nil, spatial: nil)
+        XCTAssertEqual(render(clip: view, spatial: nil), all)
+        XCTAssertEqual(render(clip: view, spatial: SpatialIndex(doc)), all)
+        XCTAssertTrue(all.contains { $0 != 255 }) // something was actually drawn
+    }
+
+    func testPathCacheHitsAndKeysFollowGeometryAndLook() {
+        Renderer.resetPathCache()
+        var st = Style(); st.fill = RGBA(r: 1, g: 0.5, b: 0); st.fillStyle = .hachure
+        var e = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 100, height: 60), style: st, seed: 9, layerID: UUID())
+        let first = Renderer.outline(for: e), hatch = Renderer.hachurePath(for: e)
+        XCTAssertEqual(Renderer.pathCacheStats.misses, 2)
+        XCTAssertEqual(Renderer.outline(for: e), first)
+        XCTAssertEqual(Renderer.hachurePath(for: e), hatch)
+        XCTAssertEqual(Renderer.pathCacheStats.hits, 2)
+        // Stroke color and position-independent edits don't matter; geometry and sketchiness do.
+        e.style.stroke = RGBA(r: 0, g: 0, b: 1)
+        _ = Renderer.outline(for: e)
+        XCTAssertEqual(Renderer.pathCacheStats.misses, 2)
+        e.width = 140
+        XCTAssertNotEqual(Renderer.outline(for: e).boundingBoxOfPath, first.boundingBoxOfPath)
+        e.style.roughness = 0
+        XCTAssertEqual(Renderer.outline(for: e).boundingBoxOfPath.width, 140, accuracy: 0.001)
+        // A connector re-renders when its end moves, and not when only its colour changes.
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        let a = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 50, height: 50), layerID: l)
+        var b = Element(kind: .rectangle, frame: CGRect(x: 200, y: 0, width: 50, height: 50), layerID: l)
+        let c = Element(kind: .connector, frame: .zero, layerID: l, connector: ConnectorData(start: .bound(a.id), end: .bound(b.id)))
+        doc.elements = [a, b, c]
+        let p1 = Renderer.connectorParts(for: c, in: doc).line.boundingBoxOfPath
+        b.x = 400; doc.elements[1] = b
+        let p2 = Renderer.connectorParts(for: c, in: doc).line.boundingBoxOfPath
+        XCTAssertGreaterThan(p2.maxX, p1.maxX + 100)
+    }
+
+    func testDetailLevelDropsHatchTextAndTinyThings() {
+        let far = Renderer.DetailLevel(zoom: 0.1), near = Renderer.DetailLevel(zoom: 1)
+        XCTAssertFalse(far.hatch); XCTAssertTrue(near.hatch)
+        XCTAssertFalse(far.showsText(fontSize: 18)); XCTAssertTrue(near.showsText(fontSize: 18))
+        XCTAssertFalse(far.isVisible(CGRect(x: 0, y: 0, width: 5, height: 5)))
+        XCTAssertTrue(far.isVisible(CGRect(x: 0, y: 0, width: 50, height: 5)))
+        // Drawn far out, a hatched shape still shows up (as a tint) and doesn't touch the hatch cache.
+        Renderer.resetPathCache()
+        var st = Style(); st.fill = RGBA(r: 1, g: 0, b: 0); st.fillStyle = .crossHatch
+        var doc = DottieDocument()
+        doc.elements = [Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 400, height: 300), style: st, layerID: doc.layers[0].id)]
+        let ctx = CGContext(data: nil, width: 100, height: 100, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        ctx.scaleBy(x: 0.1, y: 0.1)
+        Renderer.draw(doc, in: ctx, zoom: 0.1)
+        XCTAssertEqual(Renderer.pathCacheStats.misses, 1) // the outline only; hatch was skipped
+        XCTAssertTrue(Data(bytes: ctx.data!, count: ctx.bytesPerRow * ctx.height).contains { $0 != 0 })
+    }
+}

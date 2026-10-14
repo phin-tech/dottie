@@ -127,6 +127,15 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
         return CGPoint(x: c.x + dx * cos(a) - dy * sin(a), y: c.y + dx * sin(a) + dy * cos(a))
     }
 
+    /// Copy with automatic ink replaced by `ink`; a light ink is not used on a light, mostly opaque fill.
+    public func resolvingInk(to ink: RGBA) -> Element {
+        guard style.stroke.isAutomaticInk else { return self }
+        var copy = self
+        let onLightFill = style.fill.a >= 0.5 && style.fill.luminance > 0.5
+        copy.style.stroke = (ink.luminance > 0.5 && onLightFill) ? .black : ink
+        return copy
+    }
+
     /// Bounding box of the frame after rotation.
     public var rotatedBounds: CGRect {
         let r = frame
@@ -189,11 +198,7 @@ public struct DottieDocument: Codable, Equatable, Sendable {
     /// shape's outline and label stay dark so they remain readable.
     public func resolvingInk(to ink: RGBA) -> DottieDocument {
         var copy = self
-        for i in copy.elements.indices where copy.elements[i].style.stroke.isAutomaticInk {
-            let fill = copy.elements[i].style.fill
-            let onLightFill = fill.a >= 0.5 && fill.luminance > 0.5
-            copy.elements[i].style.stroke = (ink.luminance > 0.5 && onLightFill) ? .black : ink
-        }
+        for i in copy.elements.indices { copy.elements[i] = copy.elements[i].resolvingInk(to: ink) }
         return copy
     }
 

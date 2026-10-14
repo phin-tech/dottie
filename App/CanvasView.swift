@@ -91,7 +91,17 @@ private enum Gesture {
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
 final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
-    var model = DottieDocument() { didSet { needsDisplay = true } }
+    var model = DottieDocument() {
+        didSet { needsDisplay = true; spatialCache = nil }
+    }
+    /// Built lazily for the current `model`; panning and zooming reuse it, any edit drops it.
+    private var spatialCache: SpatialIndex?
+    private var spatial: SpatialIndex {
+        if let s = spatialCache { return s }
+        let s = SpatialIndex(model)
+        spatialCache = s
+        return s
+    }
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
@@ -141,10 +151,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.saveGState()
         ctx.translateBy(x: pan.x, y: pan.y)
         ctx.scaleBy(x: zoom, y: zoom)
-        // Only what is on screen: the visible rectangle in model units.
-        let visible = CGRect(x: -pan.x / zoom, y: -pan.y / zoom, width: bounds.width / zoom, height: bounds.height / zoom)
-        Renderer.draw(model.resolvingInk(to: isDark ? .inkOnDark : .black), in: ctx,
-                      background: NSColor.textBackgroundColor.cgColor, clip: visible)
+        // Only what the dirty rectangle shows, in model units, found through the spatial index.
+        let visible = CGRect(x: (dirtyRect.minX - pan.x) / zoom, y: (dirtyRect.minY - pan.y) / zoom,
+                             width: dirtyRect.width / zoom, height: dirtyRect.height / zoom)
+        Renderer.draw(model, in: ctx, background: NSColor.textBackgroundColor.cgColor, clip: visible,
+                      zoom: Double(zoom), ink: isDark ? .inkOnDark : .black, spatial: spatial)
 
         let accent = NSColor.controlAccentColor
         ctx.setStrokeColor(accent.cgColor)
@@ -507,7 +518,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         let usable = model.layers.filter { !$0.locked && $0.visible }
         guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return }
 
-        if event.clickCount == 2, tool == .select, let hit = model.element(at: p) {
+        if event.clickCount == 2, tool == .select, let hit = spatial.element(at: p, in: model) {
             selection = [hit.id]
             beginEditing(hit.id)
             gesture = nil
@@ -571,7 +582,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             gesture = .rotating(id: id)
         } else if let (id, h, frame) = handle(at: p) {
             gesture = .resizing(id: id, handle: h, original: frame)
-        } else if let hit = model.element(at: p) {
+        } else if let hit = spatial.element(at: p, in: model) {
             let hitSet = model.expandingGroups([hit.id])
             if event.modifierFlags.contains(.shift) {
                 selection = selection.isSuperset(of: hitSet) ? selection.subtracting(hitSet) : selection.union(hitSet)
@@ -712,7 +723,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .marquee:
             let r = CGRect(x: min(dragStart.x, p.x), y: min(dragStart.y, p.y), width: abs(d.x), height: abs(d.y))
             marqueeRect = r
-            selection = next.expandingGroups(Set(next.elements.filter { r.intersects($0.rotatedBounds) }.map(\.id)))
+            selection = next.expandingGroups(Set(spatial.elements(intersecting: r, in: model)))
             needsDisplay = true
             return
         }
