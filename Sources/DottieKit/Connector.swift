@@ -81,25 +81,32 @@ public enum Connector {
             .min { $0.1 < $1.1 }?.0
     }
 
-    private static func reference(_ ep: Endpoint, in doc: DottieDocument) -> CGPoint {
-        if let id = ep.elementID, let s = doc.elements.first(where: { $0.id == id }) {
+    /// `index` is `doc.elementIndex`. Callers that resolve many connectors in one pass build it once;
+    /// without it each lookup scans the element array, which is quadratic on large documents.
+    private static func shape(_ id: UUID, in doc: DottieDocument, _ index: [UUID: Element]?) -> Element? {
+        if let index { return index[id] }
+        return doc.elements.first { $0.id == id }
+    }
+
+    private static func reference(_ ep: Endpoint, in doc: DottieDocument, _ index: [UUID: Element]?) -> CGPoint {
+        if let id = ep.elementID, let s = shape(id, in: doc, index) {
             return CGPoint(x: s.frame.midX, y: s.frame.midY)
         }
         return CGPoint(x: ep.x, y: ep.y)
     }
 
-    private static func resolve(_ ep: Endpoint, other: CGPoint, in doc: DottieDocument) -> CGPoint {
-        guard let id = ep.elementID, let s = doc.elements.first(where: { $0.id == id }) else {
+    private static func resolve(_ ep: Endpoint, other: CGPoint, in doc: DottieDocument, _ index: [UUID: Element]?) -> CGPoint {
+        guard let id = ep.elementID, let s = shape(id, in: doc, index) else {
             return CGPoint(x: ep.x, y: ep.y)
         }
         if let port = ep.port { return portPoint(s, port) }
         return edgePoint(s, toward: other)
     }
 
-    public static func endpoints(of e: Element, in doc: DottieDocument) -> (CGPoint, CGPoint) {
+    public static func endpoints(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> (CGPoint, CGPoint) {
         guard let c = e.connector else { return (.zero, .zero) }
-        let s = resolve(c.start, other: reference(c.end, in: doc), in: doc)
-        let t = resolve(c.end, other: reference(c.start, in: doc), in: doc)
+        let s = resolve(c.start, other: reference(c.end, in: doc, index), in: doc, index)
+        let t = resolve(c.end, other: reference(c.start, in: doc, index), in: doc, index)
         return (s, t)
     }
 
@@ -121,9 +128,9 @@ public enum Connector {
         }
     }
 
-    public static func route(of e: Element, in doc: DottieDocument) -> Route {
+    public static func route(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> Route {
         guard let c = e.connector else { return .polyline([]) }
-        let (a, b) = endpoints(of: e, in: doc)
+        let (a, b) = endpoints(of: e, in: doc, index: index)
         let dx = b.x - a.x, dy = b.y - a.y
         let horizontal = abs(dx) >= abs(dy)
         switch c.routing {
@@ -164,8 +171,8 @@ public enum Connector {
         return (wing(spread), wing(-spread))
     }
 
-    public static func distance(from p: CGPoint, to e: Element, in doc: DottieDocument) -> CGFloat {
-        let pts = route(of: e, in: doc).points
+    public static func distance(from p: CGPoint, to e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> CGFloat {
+        let pts = route(of: e, in: doc, index: index).points
         guard pts.count > 1 else { return .infinity }
         var best = CGFloat.infinity
         for i in 0..<(pts.count - 1) {
@@ -177,8 +184,8 @@ public enum Connector {
         return best
     }
 
-    public static func bounds(of e: Element, in doc: DottieDocument) -> CGRect {
-        let pts = route(of: e, in: doc).points
+    public static func bounds(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> CGRect {
+        let pts = route(of: e, in: doc, index: index).points
         guard let f = pts.first else { return .zero }
         return pts.reduce(CGRect(origin: f, size: .zero)) { $0.union(CGRect(origin: $1, size: .zero)) }
     }

@@ -148,15 +148,52 @@ extension DottieDocument {
         }
     }
 
+    // MARK: Rotation
+
+    /// Union of the selected shapes' rotated bounds; connectors don't contribute.
+    public func selectionBounds(_ ids: Set<UUID>) -> CGRect {
+        elements.filter { ids.contains($0.id) && $0.kind != .connector }.map(\.rotatedBounds)
+            .reduce(CGRect.null) { $0.union($1) }
+    }
+
+    /// Turns shapes about a shared `center` by `delta` radians (clockwise): each shape's own angle
+    /// grows by `delta` and its position orbits the center. Free connector ends orbit too; bound ends
+    /// follow their shapes.
+    public mutating func rotate(_ ids: Set<UUID>, by delta: Double, about center: CGPoint) {
+        for i in elements.indices where ids.contains(elements[i].id) {
+            if var c = elements[i].connector {
+                for isStart in [true, false] {
+                    var ep = isStart ? c.start : c.end
+                    if ep.elementID == nil {
+                        let p = Element.rotate(CGPoint(x: ep.x, y: ep.y), about: center, by: delta)
+                        ep.x = p.x; ep.y = p.y
+                    }
+                    if isStart { c.start = ep } else { c.end = ep }
+                }
+                elements[i].connector = c
+            } else {
+                let f = elements[i].frame
+                let m = Element.rotate(CGPoint(x: f.midX, y: f.midY), about: center, by: delta)
+                elements[i].x = m.x - f.width / 2
+                elements[i].y = m.y - f.height / 2
+                var a = (elements[i].angle + delta).truncatingRemainder(dividingBy: 2 * .pi)
+                if a > .pi { a -= 2 * .pi } else if a <= -.pi { a += 2 * .pi }
+                elements[i].rotation = abs(a) < 1e-9 ? nil : a
+            }
+        }
+    }
+
     // MARK: Layers
 
     /// Elements back to front: lower layers first, array order within a layer. This is what is drawn
     /// and what a click hits, so reordering layers reorders the picture.
     public var orderedElements: [Element] {
+        guard layers.count > 1 else { return elements }
+        // Bucket by layer rank: stable, and linear instead of a sort on every draw and click.
         let rank = Dictionary(uniqueKeysWithValues: layers.enumerated().map { ($1.id, $0) })
-        return elements.enumerated()
-            .sorted { (rank[$0.element.layerID] ?? 0, $0.offset) < (rank[$1.element.layerID] ?? 0, $1.offset) }
-            .map(\.element)
+        var buckets = [[Element]](repeating: [], count: layers.count)
+        for e in elements { buckets[rank[e.layerID] ?? 0].append(e) }
+        return buckets.flatMap { $0 }
     }
 
     /// Adds a layer above `above` (or on top). Returns its id.

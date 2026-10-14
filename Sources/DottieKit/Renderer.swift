@@ -63,14 +63,14 @@ public enum Renderer {
 
     /// Connector geometry split into the stroked line (with open arrowheads) and the closed shapes
     /// (triangle and dot heads) that are also filled with the stroke color. Sketchy when roughness > 0.
-    public static func connectorParts(for e: Element, in doc: DottieDocument) -> (line: CGPath, filled: CGPath) {
+    public static func connectorParts(for e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> (line: CGPath, filled: CGPath) {
         guard let c = e.connector else { return (CGMutablePath(), CGMutablePath()) }
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
         let bow = e.style.bowing
         let path = CGMutablePath()
         let solid = CGMutablePath()
-        let route = Connector.route(of: e, in: doc)
+        let route = Connector.route(of: e, in: doc, index: index)
 
         switch route {
         case .polyline(let pts):
@@ -130,8 +130,8 @@ public enum Renderer {
     // MARK: Connector labels
 
     /// Point halfway along the connector's route.
-    public static func midpoint(of e: Element, in doc: DottieDocument) -> CGPoint {
-        let pts = Connector.route(of: e, in: doc).points
+    public static func midpoint(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> CGPoint {
+        let pts = Connector.route(of: e, in: doc, index: index).points
         guard pts.count > 1 else { return pts.first ?? .zero }
         var lengths: [CGFloat] = []
         var total: CGFloat = 0
@@ -151,8 +151,8 @@ public enum Renderer {
     }
 
     /// Where a connector's label sits (and where its in-place editor goes).
-    public static func labelRect(for e: Element, in doc: DottieDocument) -> CGRect {
-        let m = midpoint(of: e, in: doc)
+    public static func labelRect(for e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> CGRect {
+        let m = midpoint(of: e, in: doc, index: index)
         let text = e.text ?? ""
         let size = textSize(text.isEmpty ? "Label" : text, fontSize: e.style.fontSize, maxWidth: 200)
         let w = max(size.width + 12, 44), h = size.height + 6
@@ -232,14 +232,23 @@ public enum Renderer {
 
     /// Draws with a top-left origin (y down). Callers must flip the context if needed.
     /// `background` is painted behind connector labels so the line doesn't strike through the text.
-    public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil) {
+    /// `clip` (model units) skips elements entirely outside it, so a zoomed-in view of a big drawing
+    /// only pays for what is on screen.
+    public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil, clip: CGRect? = nil) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
+        let index = doc.elementIndex
         for e in doc.orderedElements where visible.contains(e.layerID) {
-            draw(e, in: ctx, document: doc, background: background)
+            if let clip {
+                let box = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.rotatedBounds
+                // Pad for stroke width, arrowheads and connector labels.
+                if !box.insetBy(dx: -(e.style.strokeWidth + 60), dy: -(e.style.strokeWidth + 60)).intersects(clip) { continue }
+            }
+            draw(e, in: ctx, document: doc, background: background, index: index)
         }
     }
 
-    public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil, background: CGColor? = nil) {
+    public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil, background: CGColor? = nil,
+                            index: [UUID: Element]? = nil) {
         ctx.saveGState(); defer { ctx.restoreGState() }
         func applyStroke() {
             ctx.setStrokeColor(e.style.stroke.cgColor)
@@ -249,7 +258,7 @@ public enum Renderer {
         }
         if e.kind == .connector {
             guard let document else { return }
-            let (line, filled) = connectorParts(for: e, in: document)
+            let (line, filled) = connectorParts(for: e, in: document, index: index)
             ctx.addPath(line); ctx.addPath(filled)
             applyStroke()
             ctx.strokePath()
@@ -260,7 +269,7 @@ public enum Renderer {
                 ctx.fillPath()
             }
             if let t = e.text, !t.isEmpty {
-                let r = labelRect(for: e, in: document)
+                let r = labelRect(for: e, in: document, index: index)
                 if let background { ctx.setFillColor(background); ctx.fill(r) }
                 drawText(t, in: r, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
             }

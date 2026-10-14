@@ -5,7 +5,8 @@ import UniformTypeIdentifiers
 
 public enum Exporter {
     public static func bounds(of doc: DottieDocument, padding: Double = 24) -> CGRect {
-        func frame(_ e: Element) -> CGRect { e.kind == .connector ? Connector.bounds(of: e, in: doc) : e.rotatedBounds }
+        let index = doc.elementIndex
+        func frame(_ e: Element) -> CGRect { e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.rotatedBounds }
         guard var r = doc.elements.first.map(frame) else { return CGRect(x: 0, y: 0, width: 200, height: 200) }
         for e in doc.elements { r = r.union(frame(e)) }
         return r.insetBy(dx: -padding, dy: -padding)

@@ -240,10 +240,11 @@ public enum DiagramOps {
 
     public static func annotations(_ doc: DottieDocument, scale: Double) -> [Annotation] {
         let origin = Exporter.bounds(of: doc).origin
+        let index = doc.elementIndex
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         func px(_ v: Double) -> Double { (v * scale * 10).rounded() / 10 }
         return doc.orderedElements.filter { visible.contains($0.layerID) }.map { e in
-            let b = e.kind == .connector ? Connector.bounds(of: e, in: doc) : e.rotatedBounds
+            let b = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.rotatedBounds
             return Annotation(id: e.id.uuidString, kind: e.kind.rawValue, text: e.text,
                               x: px(b.minX - origin.x), y: px(b.minY - origin.y), width: px(b.width), height: px(b.height))
         }
@@ -264,8 +265,9 @@ public enum DiagramOps {
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
-        doc.elements.map { e in
-            let b = e.kind == .connector ? Connector.bounds(of: e, in: doc) : e.frame
+        let index = doc.elementIndex
+        return doc.elements.map { e in
+            let b = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.frame
             return ElementSummary(id: e.id.uuidString, kind: e.kind.rawValue,
                                   x: (b.minX * 10).rounded() / 10, y: (b.minY * 10).rounded() / 10,
                                   width: (b.width * 10).rounded() / 10, height: (b.height * 10).rounded() / 10,

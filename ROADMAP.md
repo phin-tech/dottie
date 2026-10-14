@@ -18,12 +18,12 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Pen strokes stored as fitted Béziers (flat, deterministic); point editing and an eraser that cuts strokes
 - [x] Hachure / cross-hatch fills, dashed and dotted lines, arrowhead choices, bowing, connector labels
 - [x] Layers panel (add, hide, lock, rename, reorder; layer order is z-order)
-- [x] Rotation, resize with smart guides, equal-spacing guides while moving
+- [x] Rotation (single and multi-selection), resize with smart guides, equal-spacing guides while moving
+- [x] Large-document performance: id-indexed connector passes, viewport culling, linear layer ordering (see PerformanceTests)
 
 ## Next
 1. Stencil/shape libraries, rulers, themes
-2. Rotate multiple elements together; rotate pen strokes' control handles with the stroke
-3. Per-element layer drag-and-drop in the layers panel
+2. Per-element layer drag-and-drop in the layers panel
 
 ## Agents (MCP)
 - [x] Live mode (see README); `export_svg`

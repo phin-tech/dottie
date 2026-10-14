@@ -154,10 +154,17 @@ public struct DottieDocument: Codable, Equatable, Sendable {
         self.elements = elements
     }
 
+    /// Elements by id, for passes that resolve many connectors at once.
+    public var elementIndex: [UUID: Element] {
+        Dictionary(elements.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    }
+
     public func element(at point: CGPoint) -> Element? {
-        orderedElements.last { e in
-            guard let layer = layers.first(where: { $0.id == e.layerID }), layer.visible, !layer.locked else { return false }
-            if e.kind == .connector { return Connector.distance(from: point, to: e, in: self) <= 6 }
+        let index = elements.contains { $0.kind == .connector } ? elementIndex : nil
+        let open = Set(layers.filter { $0.visible && !$0.locked }.map(\.id))
+        return orderedElements.last { e in
+            guard open.contains(e.layerID) else { return false }
+            if e.kind == .connector { return Connector.distance(from: point, to: e, in: self, index: index) <= 6 }
             return e.frame.insetBy(dx: -4, dy: -4).contains(e.unrotated(point))
         }
     }

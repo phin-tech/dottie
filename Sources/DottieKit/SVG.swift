@@ -16,8 +16,9 @@ extension Exporter {
         if let background {
             out += "<rect x=\"\(num(b.minX))\" y=\"\(num(b.minY))\" width=\"\(num(b.width))\" height=\"\(num(b.height))\" fill=\"\(color(background))\"/>\n"
         }
+        let index = d.elementIndex
         for e in d.orderedElements where visible.contains(e.layerID) {
-            let body = svgElement(e, in: d, labelBackground: background)
+            let body = svgElement(e, in: d, index: index, labelBackground: background)
             if e.angle != 0, e.kind != .connector {
                 out += "<g transform=\"rotate(\(num(e.angle * 180 / .pi)) \(num(e.frame.midX)) \(num(e.frame.midY)))\">\n\(body)</g>\n"
             } else {
@@ -27,7 +28,7 @@ extension Exporter {
         return out + "</svg>\n"
     }
 
-    private static func svgElement(_ e: Element, in doc: DottieDocument, labelBackground: RGBA?) -> String {
+    private static func svgElement(_ e: Element, in doc: DottieDocument, index: [UUID: Element], labelBackground: RGBA?) -> String {
         let stroke = color(e.style.stroke)
         var strokeAttrs = "stroke=\"\(stroke)\" stroke-width=\"\(num(e.style.strokeWidth))\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
         if let d = Renderer.dashPattern(e.style.dash, width: e.style.strokeWidth) {
@@ -35,13 +36,13 @@ extension Exporter {
         }
         switch e.kind {
         case .connector:
-            let (line, filled) = Renderer.connectorParts(for: e, in: doc)
+            let (line, filled) = Renderer.connectorParts(for: e, in: doc, index: index)
             var s = "<path d=\"\(pathData(line))\" fill=\"none\" \(strokeAttrs)/>\n"
             if !filled.isEmpty {
                 s += "<path d=\"\(pathData(filled))\" fill=\"\(stroke)\" stroke=\"none\"/>\n"
             }
             if let t = e.text, !t.isEmpty {
-                let r = Renderer.labelRect(for: e, in: doc)
+                let r = Renderer.labelRect(for: e, in: doc, index: index)
                 if let bg = labelBackground {
                     s += "<rect x=\"\(num(r.minX))\" y=\"\(num(r.minY))\" width=\"\(num(r.width))\" height=\"\(num(r.height))\" fill=\"\(color(bg))\"/>\n"
                 }

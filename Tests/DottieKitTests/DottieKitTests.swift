@@ -687,3 +687,38 @@ final class AgentOpsTests: XCTestCase {
         XCTAssertEqual(end.width, 200, accuracy: 0.1)
     }
 }
+
+final class GroupRotationTests: XCTestCase {
+    func testRotatingTwoShapesQuarterTurnOrbitsTheSharedCenter() throws {
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        let a = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 20, height: 20), layerID: l)
+        let b = Element(kind: .rectangle, frame: CGRect(x: 80, y: 0, width: 20, height: 20), layerID: l)
+        var free = Element(kind: .connector, frame: .zero, layerID: l,
+                           connector: ConnectorData(start: .free(CGPoint(x: 0, y: 0)), end: .bound(a.id)))
+        free.seed = 3
+        doc.elements = [a, b, free]
+        let ids = Set(doc.elements.map(\.id))
+        let box = doc.selectionBounds(ids)
+        XCTAssertEqual(box, CGRect(x: 0, y: 0, width: 100, height: 20))
+        let center = CGPoint(x: box.midX, y: box.midY) // (50, 10)
+
+        doc.rotate(ids, by: .pi / 2, about: center)
+        let ra = doc.elements[0], rb = doc.elements[1]
+        XCTAssertEqual(ra.angle, .pi / 2, accuracy: 1e-9)
+        XCTAssertEqual(rb.angle, .pi / 2, accuracy: 1e-9)
+        // a's center (10,10) swings to (50, -30); b's (90,10) to (50, 50): the pair is now vertical.
+        XCTAssertEqual(ra.frame.midX, 50, accuracy: 1e-6); XCTAssertEqual(ra.frame.midY, -30, accuracy: 1e-6)
+        XCTAssertEqual(rb.frame.midX, 50, accuracy: 1e-6); XCTAssertEqual(rb.frame.midY, 50, accuracy: 1e-6)
+        // The free connector end orbits with them; the bound end still follows shape a.
+        let c = try XCTUnwrap(doc.elements[2].connector)
+        XCTAssertEqual(c.start.x, 60, accuracy: 1e-6); XCTAssertEqual(c.start.y, -40, accuracy: 1e-6)
+        XCTAssertEqual(c.end.elementID, a.id)
+
+        // Four more quarter turns return everything to the start, and the angle normalises away.
+        for _ in 0..<3 { doc.rotate(ids, by: .pi / 2, about: center) }
+        XCTAssertNil(doc.elements[0].rotation)
+        XCTAssertEqual(doc.elements[0].frame.midX, 10, accuracy: 1e-6)
+        XCTAssertEqual(doc.elements[1].frame.midX, 90, accuracy: 1e-6)
+    }
+}

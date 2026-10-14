@@ -86,6 +86,7 @@ private enum Gesture {
     case erasing
     case editingPoint(id: UUID, index: Int)
     case rotating(id: UUID)
+    case rotatingGroup(center: CGPoint, start: Double)
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
@@ -140,7 +141,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.saveGState()
         ctx.translateBy(x: pan.x, y: pan.y)
         ctx.scaleBy(x: zoom, y: zoom)
-        Renderer.draw(model.resolvingInk(to: isDark ? .inkOnDark : .black), in: ctx, background: NSColor.textBackgroundColor.cgColor)
+        // Only what is on screen: the visible rectangle in model units.
+        let visible = CGRect(x: -pan.x / zoom, y: -pan.y / zoom, width: bounds.width / zoom, height: bounds.height / zoom)
+        Renderer.draw(model.resolvingInk(to: isDark ? .inkOnDark : .black), in: ctx,
+                      background: NSColor.textBackgroundColor.cgColor, clip: visible)
 
         let accent = NSColor.controlAccentColor
         ctx.setStrokeColor(accent.cgColor)
@@ -189,6 +193,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let knob = rotationKnob(for: e)
             ctx.move(to: stemTop); ctx.addLine(to: knob); ctx.strokePath()
             let kr = CGRect(x: knob.x - hs / 2, y: knob.y - hs / 2, width: hs, height: hs)
+            ctx.fillEllipse(in: kr); ctx.strokeEllipse(in: kr)
+        }
+        if let (box, knob) = groupRotationKnob() {
+            ctx.setLineWidth(1 / zoom)
+            ctx.setLineDash(phase: 0, lengths: [4 / zoom, 3 / zoom])
+            ctx.stroke(box)
+            ctx.setLineDash(phase: 0, lengths: [])
+            ctx.move(to: CGPoint(x: box.midX, y: box.minY)); ctx.addLine(to: knob); ctx.strokePath()
+            let kr = CGRect(x: knob.x - hs / 2, y: knob.y - hs / 2, width: hs, height: hs)
+            ctx.setFillColor(NSColor.white.cgColor)
             ctx.fillEllipse(in: kr); ctx.strokeEllipse(in: kr)
         }
         if tool == .select, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
@@ -278,6 +292,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// Canvas position of the rotation knob: above the top edge, in the element's rotated frame.
     private func rotationKnob(for e: Element) -> CGPoint {
         e.rotated(CGPoint(x: e.frame.midX, y: e.frame.minY - 4 - 24 / zoom))
+    }
+
+    /// For a multi-selection: its bounds (padded) and the rotation knob above them.
+    private func groupRotationKnob() -> (CGRect, CGPoint)? {
+        guard tool == .select || tool == .rectangle || tool == .ellipse || tool == .diamond || tool == .text,
+              selection.count >= 2 else { return nil }
+        let b = model.selectionBounds(selection)
+        guard !b.isNull else { return nil }
+        let box = b.insetBy(dx: -6, dy: -6)
+        return (box, CGPoint(x: box.midX, y: box.minY - 24 / zoom))
     }
 
     private func rotationHit(_ p: CGPoint) -> UUID? {
@@ -540,6 +564,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             model.elements.append(e)
             selection = [e.id]
             onPreview?(model)
+        } else if tool == .select, let (box, knob) = groupRotationKnob(), hypot(p.x - knob.x, p.y - knob.y) <= hs {
+            let c = CGPoint(x: box.midX, y: box.midY)
+            gesture = .rotatingGroup(center: c, start: atan2(p.y - c.y, p.x - c.x))
         } else if tool == .select, let id = rotationHit(p) {
             gesture = .rotating(id: id)
         } else if let (id, h, frame) = handle(at: p) {
@@ -659,6 +686,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 a = a.truncatingRemainder(dividingBy: 2 * .pi)
                 next.elements[i].rotation = abs(a) < 1e-9 ? nil : a
             }
+        case .rotatingGroup(let center, let start):
+            let q = point(event)
+            var delta = atan2(q.y - center.y, q.x - center.x) - start
+            let step = Double.pi / 12
+            let near = (delta / step).rounded() * step
+            if event.modifierFlags.contains(.shift) || abs(delta - near) < .pi / 60 { delta = near }
+            next.rotate(selection, by: delta, about: center)
         case .editingPoint(let id, let index):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
                 next.elements[i].moveStrokeControlPoint(index, to: point(event))
@@ -712,6 +746,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .erasing where model != base: commit(base, "Erase")
         case .editingPoint where model != base: commit(base, "Edit Stroke")
         case .rotating where model != base: commit(base, "Rotate")
+        case .rotatingGroup where model != base: commit(base, "Rotate")
         case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")
         case .resizing where model != base: commit(base, "Resize")
