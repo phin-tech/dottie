@@ -18,7 +18,7 @@ struct PlaceRequest: Equatable {
 }
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text, connector, pencil, eraser
+    case select, rectangle, ellipse, diamond, text, note, connector, pencil, eraser
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -27,6 +27,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "circle"
         case .diamond: "diamond"
         case .text: "textformat"
+        case .note: "note.text"
         case .connector: "arrow.up.right"
         case .pencil: "pencil.tip"
         case .eraser: "eraser"
@@ -39,6 +40,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "Ellipse"
         case .diamond: "Diamond"
         case .text: "Text"
+        case .note: "Note"
         case .connector: "Connector"
         case .pencil: "Pencil"
         case .eraser: "Eraser"
@@ -52,6 +54,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: "o"
         case .diamond: "d"
         case .text: "t"
+        case .note: "n"
         case .connector: "c"
         case .pencil: "p"
         case .eraser: "e"
@@ -64,6 +67,7 @@ enum Tool: String, CaseIterable, Identifiable {
         case .ellipse: .ellipse
         case .diamond: .diamond
         case .text: .text
+        case .note: .note
         case .connector: nil
         case .pencil: .freehand
         case .eraser: nil
@@ -545,6 +549,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// The target of the link badge under `p`, front-most first.
+    /// Ticks or unticks the task checkbox in a note under `p`, as one undo step. False if there is none.
+    private func toggleCheckbox(at p: CGPoint) -> Bool {
+        guard let hit = spatial.element(at: p, in: model), hit.kind == .note,
+              let line = Note.checkboxLine(at: hit.unrotated(p), in: hit),
+              let i = model.elements.firstIndex(where: { $0.id == hit.id }) else { return false }
+        var next = model
+        next.elements[i].text = Note.togglingCheckbox(line: line, in: hit.text ?? "")
+        guard next != model else { return false }
+        selection = [hit.id]
+        onCommit?(next, "Check Item")
+        return true
+    }
+
     private func badgeHit(_ p: CGPoint) -> UUID? {
         linkBadges.last { b in
             let c = badgeCenter(b)
@@ -691,7 +708,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// For a multi-selection: its bounds (padded) and the rotation knob above them.
     private func groupRotationKnob() -> (CGRect, CGPoint)? {
-        guard tool == .select || tool == .rectangle || tool == .ellipse || tool == .diamond || tool == .text,
+        guard tool == .select || tool == .rectangle || tool == .ellipse || tool == .diamond || tool == .text || tool == .note,
               selection.count >= 2 else { return nil }
         let b = model.selectionBounds(selection)
         guard !b.isNull else { return nil }
@@ -731,22 +748,24 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// Where an element's text is edited, matching where the renderer draws it: a connector's label at the
-    /// middle of its route, a shape's label inside a 6pt inset, a text box's text across its frame.
+    /// middle of its route, a shape's label inside a 6pt inset, a text box's text across its frame, a note's
+    /// Markdown source inside its padding.
     private func editFrame(for e: Element) -> CGRect {
         switch e.kind {
         case .connector: Renderer.labelRect(for: e, in: model)
         case .text: e.frame
+        case .note: Note.textRect(e.frame)
         default: e.frame.insetBy(dx: 6, dy: 6)
         }
     }
 
-    /// Sizes the text editor to its text and, except in a text box, centers it vertically in the edit
+    /// Sizes the text editor to its text and, except in a text box or note, centers it vertically in the edit
     /// frame, so typing happens where the label will be drawn.
     private func layoutEditor() {
         guard let field = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
         field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
         let box = viewFrame(editFrame(for: e))
-        guard e.kind != .text, let cell = field.cell else { field.frame = box; return }
+        guard e.kind != .text, e.kind != .note, let cell = field.cell else { field.frame = box; return }
         let height = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: box.width, height: .greatestFiniteMagnitude)).height
         field.frame = NSRect(x: box.minX, y: box.midY - height / 2, width: box.width, height: height)
     }
@@ -1197,6 +1216,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             jump(to: target)
             return
         }
+        if tool == .select, event.clickCount == 1, toggleCheckbox(at: p) { return }
         baseline = model
         if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model) == nil {
             gesture = .guide(vertical: hit.vertical, index: hit.index)
@@ -1257,7 +1277,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             gesture = .drawing(id: e.id)
             onPreview?(model)
         } else if let kind = tool.kind {
-            let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: style, layerID: layer.id)
+            let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: kind == .note ? Note.style(from: style) : style,
+                            layerID: layer.id)
             gesture = .creating(e)
             model.elements.append(e)
             selection = [e.id]
@@ -1438,6 +1459,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard let base = baseline, let g = gesture else { return }
         switch g {
         case .creating(let e):
+            if e.kind == .note { // a click places a default-size note; either way, start typing in it
+                if let i = model.elements.firstIndex(where: { $0.id == e.id }),
+                   model.elements[i].width < 3 && model.elements[i].height < 3 {
+                    model.elements[i].frame.size = DiagramOps.defaultSize(for: .note, text: "")
+                }
+                onPreview?(model)
+                beginEditing(e.id, isNew: true)
+                return
+            }
             if e.width < 3 && e.height < 3 { // accidental click
                 model = base; selection = []; onPreview?(base); return
             }
@@ -1539,7 +1569,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         field.stringValue = e.text ?? ""
         field.isBordered = false
         field.focusRingType = .none
-        field.alignment = e.kind == .text ? .left : .center
+        field.alignment = e.kind == .text || e.kind == .note ? .left : .center
         field.usesSingleLineMode = false
         field.cell?.wraps = true
         field.cell?.isScrollable = false
@@ -1569,8 +1599,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         needsDisplay = true
         guard let i = model.elements.firstIndex(where: { $0.id == id }) else { return }
         var next = model
-        if next.elements[i].kind == .text && text.isEmpty {
-            next.elements.remove(at: i) // empty text boxes disappear
+        let kind = next.elements[i].kind
+        // Empty text boxes disappear, and so does a note left empty as it was placed (one emptied later stays).
+        if text.isEmpty && (kind == .text || (kind == .note && editBase != nil)) {
+            next.elements.remove(at: i)
             selection = []
         } else {
             next.elements[i].text = text
@@ -1582,24 +1614,64 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         let base = editBase
         editBase = nil
+        let name = base != nil && kind == .note ? "Add Note" : "Edit Text"
         if deferCommit {
-            DispatchQueue.main.async { [weak self] in self?.commitEdit(next, base: base) }
+            DispatchQueue.main.async { [weak self] in self?.commitEdit(next, base: base, name: name) }
         } else {
-            commitEdit(next, base: base)
+            commitEdit(next, base: base, name: name)
         }
         window?.makeFirstResponder(self)
     }
 
-    private func commitEdit(_ next: DottieDocument, base: DottieDocument?) {
+    private func commitEdit(_ next: DottieDocument, base: DottieDocument?, name: String) {
         if let base { onPreview?(base) }
-        onCommit?(next, "Edit Text")
+        if next == base { return } // a new box or note left empty: nothing to undo
+        onCommit?(next, name)
     }
 
     func controlTextDidEndEditing(_ obj: Notification) { endEditing() }
 
-    /// Escape inside the text editor finishes editing and returns to the arrow.
+    /// Tab and Shift-Tab in a note: indent or outdent the caret's line by two spaces, which nests a list item.
+    private func indentLine(in textView: NSTextView, out: Bool) {
+        let text = textView.string as NSString
+        let sel = textView.selectedRange()
+        let start = text.lineRange(for: NSRange(location: sel.location, length: 0)).location
+        let change: NSRange, replacement: String
+        if out {
+            var n = 0
+            while n < 2, start + n < text.length, text.character(at: start + n) == 32 { n += 1 }
+            guard n > 0 else { return }
+            change = NSRange(location: start, length: n); replacement = ""
+        } else {
+            change = NSRange(location: start, length: 0); replacement = "  "
+        }
+        guard textView.shouldChangeText(in: change, replacementString: replacement) else { return }
+        textView.replaceCharacters(in: change, with: replacement)
+        textView.didChangeText()
+        let delta = replacement.count - change.length
+        textView.setSelectedRange(NSRange(location: max(start, sel.location + delta), length: sel.length))
+    }
+
+    /// Escape inside the text editor finishes editing and returns to the arrow. In a note, Return starts a
+    /// new line, since Markdown needs them, and Shift- or Command-Return finishes like Escape.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        if let id = editingID, model.elements.first(where: { $0.id == id })?.kind == .note {
+            // Shift-Return arrives as insertNewline and Command-Return as noop, so ask the key event.
+            let finishing = NSApp.currentEvent.map {
+                $0.type == .keyDown && [36, 76].contains($0.keyCode) && !$0.modifierFlags.isDisjoint(with: [.shift, .command])
+            } ?? false
+            if !finishing, selector == #selector(NSResponder.insertNewline(_:)) {
+                textView.insertNewlineIgnoringFieldEditor(nil)
+                return true
+            }
+            if selector == #selector(NSResponder.insertTab(_:)) || selector == #selector(NSResponder.insertBacktab(_:)) {
+                indentLine(in: textView, out: selector == #selector(NSResponder.insertBacktab(_:)))
+                return true
+            }
+            guard finishing || selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        } else if selector != #selector(NSResponder.cancelOperation(_:)) {
+            return false
+        }
         endEditing()
         switchTool(.select)
         return true

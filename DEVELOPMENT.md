@@ -46,6 +46,10 @@ only tells people: Homebrew installs get the `brew upgrade` command, others the 
 A `.dottie` file is JSON (sorted keys, pretty-printed, rounded frames, so it diffs well in git): a `DottieFile`
 with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme.
 Element ids are unique across the file, which is what lets a link point at a shape on another page.
+A `note` element is a sticky note whose `text` is GitHub Flavored Markdown; `Note` parses it with
+[swift-markdown](https://github.com/swiftlang/swift-markdown) (cmark-gfm), DottieKit's only dependency, and lays
+it out with CoreText, and the renderer and SVG export share that layout. A single newline is a line break, as in
+GitHub comments, and bare URLs are underlined by `Note` itself (swift-markdown leaves cmark's autolink extension off). Dottie 0.1.1 and earlier cannot open a file containing a note.
 
 ## MCP server
 
@@ -57,7 +61,8 @@ Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connect
 work, plus each element's id and pixel box), `export_svg`, `create_diagram`, `open_document`, `list_stencils`,
 `add_stencil`, `list_pages`, `add_page`, `rename_page`, `run_script` and `script_api`. Tools that draw, list or
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element
-id find its page themselves. Connectors take a `label`; shapes and connectors take `fill_style`, `dash`,
+id find its page themselves. `add_shape` and `build_diagram` take kind `note` for a sticky note
+whose text is Markdown. Connectors take a `label`; shapes and connectors take `fill_style`, `dash`,
 `stroke_width`, `bowing`, `rotation` and `start_head` / `end_head`.
 
 **Live mode.** The app listens on `~/Library/Application Support/Dottie/live.sock`. When it has the file open,

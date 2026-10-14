@@ -18,7 +18,7 @@ private func schema(_ props: [String: Value], required: [String] = []) -> Value 
 private let pathProp = prop("string", "Absolute path to a .dottie file, or \"current\" for the frontmost open Dottie window (needs the app running)")
 private let pageProp = prop("string", "Page (tab) to work on, by name or 1-based number; default the first page. "
     + "Tools given an element id find its page themselves.")
-private let kindValues = ["rectangle", "ellipse", "diamond", "text"]
+private let kindValues = ["rectangle", "ellipse", "diamond", "text", "note"]
 private let routingValues = ["straight", "curved", "elbow"]
 private let fillStyleValues = ["solid", "hachure", "crossHatch"]
 private let dashValues = ["solid", "dashed", "dotted"]
@@ -113,7 +113,7 @@ actor DottieTools {
                     "properties": .object([
                         "key": prop("string", "Unique local key used by edges"),
                         "text": prop("string", "Label shown inside the shape"),
-                        "kind": prop("string", "Shape type, default rectangle", enum: kindValues),
+                        "kind": prop("string", "Shape type, default rectangle. A note is a sticky note whose text is Markdown", enum: kindValues),
                         "fill": prop("string", "Hex fill color, e.g. #ffeeaa"),
                         "width": prop("number", "Optional width; auto-sized from text otherwise"),
                         "height": prop("number", "Optional height"),
@@ -138,11 +138,11 @@ actor DottieTools {
              description: "Add one shape at an exact position. Returns its element id.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
-                "kind": prop("string", "Shape type", enum: kindValues),
+                "kind": prop("string", "Shape type. A note is a sticky note whose text is GitHub Flavored Markdown (headings, lists, - [ ] tasks, tables, **bold**, `code`; a single newline is a line break), yellow unless fill is set", enum: kindValues),
                 "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
                 "width": prop("number", "Width; auto-sized from text if omitted"),
                 "height": prop("number", "Height"),
-                "text": prop("string", "Label"),
+                "text": prop("string", "Label (Markdown for a note)"),
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "kind", "x", "y"])),
@@ -160,7 +160,7 @@ actor DottieTools {
              description: "Change text (a connector's text is its label), position, size, colors, look or routing of an element. Only provided fields change.",
              inputSchema: schema([
                 "path": pathProp, "id": prop("string", "Element id (its page is found from it)"),
-                "text": prop("string", "New label"),
+                "text": prop("string", "New label (Markdown for a note)"),
                 "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
                 "width": prop("number", "Width"), "height": prop("number", "Height"),
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),

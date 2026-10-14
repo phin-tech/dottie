@@ -11,9 +11,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", revision: "a0ae212ebf6eab5f754c3129608bc5557637e605"),
+        // GitHub Flavored Markdown (cmark-gfm) for sticky notes.
+        .package(url: "https://github.com/swiftlang/swift-markdown.git", exact: "0.9.0"),
     ],
     targets: [
-        .target(name: "DottieKit"),
+        .target(name: "DottieKit", dependencies: [.product(name: "Markdown", package: "swift-markdown")]),
         .executableTarget(name: "DottieMCP", dependencies: [
             "DottieKit",
             .product(name: "MCP", package: "swift-sdk"),

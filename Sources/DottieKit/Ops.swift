@@ -65,6 +65,8 @@ public enum DiagramOps {
         case .diamond: return CGSize(width: max(140, w * 1.7 + 40), height: max(90, Double(lines) * fontSize * 2.6))
         case .ellipse: return CGSize(width: max(120, w * 1.35 + 40), height: max(70, Double(lines) * fontSize * 1.8 + 30))
         case .text: return CGSize(width: max(40, w + 12), height: Double(lines) * fontSize * 1.4 + 6)
+        case .note: return CGSize(width: min(max(200, w * 0.9 + 2 * Note.padding), 360),
+                                  height: max(160, Double(lines) * fontSize * 1.5 + 2 * Note.padding))
         default: return CGSize(width: max(120, w + 40), height: max(60, Double(lines) * fontSize * 1.4 + 30))
         }
     }
@@ -119,6 +121,7 @@ public enum DiagramOps {
         if let stroke { style.stroke = stroke }
         if let roughness { style.roughness = roughness }
         if kind == .text { style.roughness = 0 }
+        if kind == .note { style = Note.style(from: style) }
         let size = frame?.size ?? defaultSize(for: kind, text: text ?? "", fontSize: style.fontSize)
         let f = CGRect(origin: frame?.origin ?? origin, size: size)
         var e = Element(kind: kind, frame: f, style: style, layerID: activeLayerID(&doc), text: text)
@@ -209,6 +212,7 @@ public enum DiagramOps {
             var style = Style()
             style.roughness = roughness
             if let f = n.fill { style.fill = f }
+            if n.kind == .note { style = Note.style(from: style) }
             let auto = defaultSize(for: n.kind, text: n.text, fontSize: style.fontSize)
             let size = CGSize(width: n.width ?? auto.width, height: n.height ?? auto.height)
             let e = Element(kind: n.kind, frame: CGRect(origin: .zero, size: size), style: style, layerID: layerID,

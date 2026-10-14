@@ -64,8 +64,16 @@ Pick a tool from the toolbar or press its letter:
 | R | Rectangle | | C | Connector |
 | O | Ellipse | | P | Pencil |
 | D | Diamond | | E | Eraser |
+| N | Note | | | |
 
 Double-click a shape to give it a label. Connectors stay attached when you move shapes around.
+
+- **Sticky notes.** Click with the Note tool (or drag out a size) and type GitHub Flavored Markdown:
+  headings, bullet, numbered and `- [ ]` task lists, tables, quotes, code, links, and **bold**, *italic*,
+  `code` and ~~struck~~ text. A new line in the text is a new line in the note, as in GitHub comments. Return
+  starts a new line and Tab / ⇧Tab indent or outdent it; ⇧Return, ⌘Return, Escape or clicking away finishes,
+  and the note shows the rendered text. Click a ☐ to tick it off, and pick a note color from the swatches in the
+  inspector.
 
 - **Sketchy or clean.** The inspector on the right switches the look, and sets colors, fill patterns,
   dashed lines and arrowheads. Themes like Blueprint and Chalkboard change the whole page.
