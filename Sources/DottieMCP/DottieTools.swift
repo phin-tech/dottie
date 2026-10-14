@@ -61,7 +61,7 @@ private struct Args {
     }
     func kind(_ k: String, default d: ElementKind = .rectangle) throws -> ElementKind {
         guard let s = string(k) else { return d }
-        guard let kind = ElementKind(rawValue: s), kind != .connector, kind != .path else {
+        guard let kind = ElementKind(rawValue: s), kind != .connector, kind != .path, kind != .image else {
             throw ToolFailure(message: "'\(k)' must be one of \(kindValues.joined(separator: ", ")), got '\(s)'")
         }
         return kind
@@ -146,6 +146,16 @@ actor DottieTools {
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "kind", "x", "y"])),
+        Tool(name: "add_image",
+             description: "Place a picture (PNG, JPEG, HEIC, GIF, TIFF, …) from a file with its top-left corner at x, y. "
+                + "It is embedded in the drawing. Give width or height to scale it (the other follows the aspect ratio), or "
+                + "neither for its own size, capped at 640 points. Returns its element id.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "image_path": prop("string", "Absolute path of the image file"),
+                "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
+                "width": prop("number", "Width"), "height": prop("number", "Height"),
+             ], required: ["path", "image_path", "x", "y"])),
         Tool(name: "add_connector",
              description: "Connect two shapes. The connector stays attached when shapes move.",
              inputSchema: schema([
@@ -393,6 +403,21 @@ actor DottieTools {
             let e = try DiagramOps.addShape(&file.pages[p], kind: try a.kind("kind"), frame: frame, at: CGPoint(x: x, y: y),
                                             text: a.string("text"), fill: try a.color("fill"), stroke: try a.color("stroke"),
                                             roughness: a.roughness, look: try a.look())
+            try save(file, to: url)
+            return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
+
+        case "add_image":
+            let url = try fileURL(a)
+            let source = URL(fileURLWithPath: (try a.require("image_path") as NSString).expandingTildeInPath)
+            guard let x = a.double("x"), let y = a.double("y") else { throw ToolFailure(message: "'x' and 'y' are required") }
+            let bytes: Data
+            do { bytes = try Data(contentsOf: source) } catch { throw ToolFailure(message: "Cannot read \(source.path): \(error.localizedDescription)") }
+            var file = try load(url, createIfMissing: true)
+            let p = try pageIndex(file, a)
+            let e: Element
+            do {
+                e = try DiagramOps.addImage(&file.pages[p], data: bytes, at: CGPoint(x: x, y: y), width: a.double("width"), height: a.double("height"))
+            } catch { throw ToolFailure(message: "\(source.lastPathComponent): \(error)") }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
 

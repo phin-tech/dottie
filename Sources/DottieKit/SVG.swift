@@ -54,6 +54,16 @@ extension Exporter {
             return s
         case .text:
             return textElement(e.text ?? "", frame: e.frame, e: e, centered: false)
+        case .image:
+            let r = e.frame
+            var s = ""
+            if let img = e.image {
+                s += "<image x=\"\(num(r.minX))\" y=\"\(num(r.minY))\" width=\"\(num(r.width))\" height=\"\(num(r.height))\" preserveAspectRatio=\"none\" href=\"data:\(img.mimeType);base64,\(img.data.base64EncodedString())\"/>\n"
+            }
+            if e.style.stroke.a > 0, e.style.strokeWidth > 0 {
+                s += "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
+            }
+            return s
         case .freehand:
             return "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
         case .rectangle, .ellipse, .diamond, .path, .note:

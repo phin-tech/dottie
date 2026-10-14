@@ -47,6 +47,9 @@ struct DottieCommands: Commands {
                 .keyboardShortcut("d")
         }
         CommandGroup(replacing: .importExport) {
+            Button("Insert Image…") { send(#selector(CanvasNSView.insertImage(_:))) }
+                .keyboardShortcut("i", modifiers: [.command, .option])
+            Divider()
             Button("Import SVG…") { send(#selector(CanvasNSView.importSVG(_:))) }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
             Button("Import Excalidraw…") { send(#selector(CanvasNSView.importExcalidrawScene(_:))) }

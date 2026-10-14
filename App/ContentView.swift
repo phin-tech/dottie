@@ -170,13 +170,15 @@ struct Inspector: View {
                     .disabled(binding(\.roughness, "").wrappedValue == 0)
                 Slider(value: binding(\.strokeWidth, "Change Stroke Width"), in: 1...12) { Text("Width") }
                 ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
-                ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
-                Picker("Fill pattern", selection: binding(\.fillStyle, "Change Fill Pattern")) {
-                    Text("Solid").tag(FillStyle.solid)
-                    Text("Hachure").tag(FillStyle.hachure)
-                    Text("Cross").tag(FillStyle.crossHatch)
+                if selected.isEmpty || !selected.allSatisfy({ $0.kind == .image }) { // a picture has no fill
+                    ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
+                    Picker("Fill pattern", selection: binding(\.fillStyle, "Change Fill Pattern")) {
+                        Text("Solid").tag(FillStyle.solid)
+                        Text("Hachure").tag(FillStyle.hachure)
+                        Text("Cross").tag(FillStyle.crossHatch)
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
                 Picker("Line", selection: binding(\.dash, "Change Line Style")) {
                     Text("Solid").tag(DashStyle.solid)
                     Text("Dashed").tag(DashStyle.dashed)
@@ -515,6 +517,7 @@ private struct ElementRow: View {
         case .connector: "arrow.right"
         case .freehand: "scribble"
         case .path: "scribble.variable"
+        case .image: "photo"
         }
     }
 
