@@ -49,8 +49,10 @@ public enum DiagramOps {
         public var routing: Routing?
         public var arrow: Bool
         public var label: String?
-        public init(from: String, to: String, routing: Routing? = nil, arrow: Bool = true, label: String? = nil) {
-            self.from = from; self.to = to; self.routing = routing; self.arrow = arrow; self.label = label
+        /// Dash, width and arrowheads beyond `arrow` (e.g. both ends for a two-way link).
+        public var look: Look
+        public init(from: String, to: String, routing: Routing? = nil, arrow: Bool = true, label: String? = nil, look: Look = Look()) {
+            self.from = from; self.to = to; self.routing = routing; self.arrow = arrow; self.label = label; self.look = look
         }
     }
 
@@ -229,11 +231,17 @@ public enum DiagramOps {
             e.x += 40 - origin.x; e.y += top - origin.y
             doc.elements.append(e)
         }
+        let placed = doc.elementIndex
         for edge in edges {
-            // Ports follow the flow direction so laid-out diagrams read as clean flowcharts.
-            let ports: (Port?, Port?) = direction == .topToBottom ? (.bottom, .top) : (.right, .left)
+            // Ports follow the flow direction so laid-out diagrams read as clean flowcharts. An edge that goes
+            // back up the flow (a loop) leaves and enters from the side instead of cutting through the shapes between.
+            var ports: (Port?, Port?) = direction == .topToBottom ? (.bottom, .top) : (.right, .left)
+            if let a = placed[ids[edge.from]!]?.frame, let b = placed[ids[edge.to]!]?.frame,
+               direction == .topToBottom ? b.minY < a.maxY : b.minX < a.maxX {
+                ports = direction == .topToBottom ? (.right, .right) : (.bottom, .bottom)
+            }
             try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: edge.routing ?? defaultRouting,
-                             arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label)
+                             arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label, look: edge.look)
         }
         return ids
     }

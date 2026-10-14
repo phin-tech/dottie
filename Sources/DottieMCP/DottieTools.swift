@@ -134,6 +134,15 @@ actor DottieTools {
                 "direction": prop("string", "TB = top to bottom (default), LR = left to right", enum: ["TB", "LR"]),
                 "sketchy": prop("boolean", "Hand-drawn look (default true); false for precise geometry"),
              ], required: ["path", "nodes"])),
+        Tool(name: "import_mermaid",
+             description: "Draw a Mermaid flowchart (text starting with `flowchart` or `graph`): nodes, shapes, labelled, dashed, "
+                + "thick and two-way links, laid out like build_diagram and appended below existing content. Subgraphs are "
+                + "flattened and styling other than fill colors is ignored. Returns a map of Mermaid node id to element id.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "mermaid": prop("string", "Mermaid flowchart source, e.g. \"flowchart LR\\n  A[Start] --> B{OK?}\""),
+                "sketchy": prop("boolean", "Hand-drawn look (default true); false for precise geometry"),
+             ], required: ["path", "mermaid"])),
         Tool(name: "add_shape",
              description: "Add one shape at an exact position. Returns its element id.",
              inputSchema: schema([
@@ -382,6 +391,21 @@ actor DottieTools {
             try save(file, to: url)
             let map = ids.mapValues(\.uuidString)
             return text("Added \(nodes.count) nodes and \(edges.count) edges to \(url.path)\(on(file, p)).\n" + (try json(map)))
+
+        case "import_mermaid":
+            let url = try fileURL(a)
+            let source = try a.require("mermaid")
+            var file = try load(url, createIfMissing: true)
+            let p = try pageIndex(file, a)
+            let result: (ids: [String: UUID], notes: [String])
+            do {
+                result = try MermaidImporter.build(&file.pages[p], mermaid: source, roughness: a.roughness ?? 1)
+            } catch let e as MermaidError { throw ToolFailure(message: e.description) }
+            catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let notes = result.notes.isEmpty ? "" : result.notes.joined(separator: "\n") + "\n"
+            return text("Added \(result.ids.count) nodes from Mermaid to \(url.path)\(on(file, p)).\n" + notes
+                        + (try json(result.ids.mapValues(\.uuidString))))
 
         case "add_shape":
             let url = try fileURL(a)

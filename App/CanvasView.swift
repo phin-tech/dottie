@@ -826,7 +826,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     @objc func paste(_ sender: Any?) {
         let pb = NSPasteboard.general
-        guard let data = pb.data(forType: Self.pasteboardType) else { return }
+        guard let data = pb.data(forType: Self.pasteboardType) else {
+            // Plain text that is a Mermaid flowchart pastes as a laid-out diagram.
+            if editor == nil, let text = pastedMermaid { importMermaid(text, at: viewportCenter) }
+            return
+        }
         // Repeated pastes of the same clipboard step diagonally instead of stacking.
         pasteStep = pb.changeCount == lastPasteChangeCount ? pasteStep + 1 : 1
         lastPasteChangeCount = pb.changeCount
@@ -950,6 +954,46 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         importExcalidraw(data, at: viewportCenter)
     }
 
+    // MARK: Importing Mermaid
+
+    /// The pasteboard's plain text, when it is a Mermaid flowchart.
+    private var pastedMermaid: String? {
+        guard let text = NSPasteboard.general.string(forType: .string), MermaidImporter.isFlowchart(text) else { return nil }
+        return text
+    }
+
+    /// Lays out a Mermaid flowchart centered at `center`, as one undo step. Shows why if it cannot be read.
+    @discardableResult
+    func importMermaid(_ text: String, at center: CGPoint) -> Bool {
+        let usable = model.layers.filter { !$0.locked && $0.visible }
+        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
+        let art: (elements: [Element], size: CGSize, notes: [String])
+        do { art = try MermaidImporter.elements(from: text) } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn't import the Mermaid diagram"
+            alert.informativeText = error.localizedDescription
+            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+            return false
+        }
+        var next = model
+        let added = next.insert(art.elements, size: art.size, center: center, layerID: layer.id)
+        guard !added.isEmpty else { NSSound.beep(); return false }
+        selection = added
+        tool = .select
+        onToolChange?(.select)
+        onCommit?(next, "Import Mermaid")
+        return true
+    }
+
+    @objc func importMermaidFile(_ sender: Any?) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = MermaidImporter.fileExtensions.compactMap { UTType(filenameExtension: $0) } + [.plainText]
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a Mermaid flowchart (.mmd)"
+        guard panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) else { return }
+        importMermaid(String(decoding: data, as: UTF8.self), at: viewportCenter)
+    }
+
     // Dropping .svg files from Finder places them under the cursor; hold ⌥ to keep original colors.
 
     override func viewDidMoveToWindow() {
@@ -986,9 +1030,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     private func droppedSVGs(_ info: NSDraggingInfo) -> [URL] { droppedFiles(info, ext: "svg") }
 
+    private func droppedMermaid(_ info: NSDraggingInfo) -> URL? {
+        MermaidImporter.fileExtensions.lazy.compactMap { self.droppedFiles(info, ext: $0).first }.first
+    }
+
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         draggedStencil(sender) != nil || !droppedSVGs(sender).isEmpty || !droppedFiles(sender, ext: "excalidraw").isEmpty
-            || !droppedFiles(sender, ext: "drawio").isEmpty ? .copy : []
+            || !droppedFiles(sender, ext: "drawio").isEmpty || droppedMermaid(sender) != nil ? .copy : []
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
@@ -1000,6 +1048,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if let scene = droppedFiles(sender, ext: "excalidraw").first, let data = try? Data(contentsOf: scene) {
             let raw = convert(sender.draggingLocation, from: nil)
             return importExcalidraw(data, at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom))
+        }
+        if let file = droppedMermaid(sender), let data = try? Data(contentsOf: file) {
+            let raw = convert(sender.draggingLocation, from: nil)
+            return importMermaid(String(decoding: data, as: UTF8.self), at: CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom))
         }
         if let scene = droppedFiles(sender, ext: "drawio").first, let data = try? Data(contentsOf: scene) {
             let raw = convert(sender.draggingLocation, from: nil)
@@ -1111,7 +1163,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicate(_:)):
             return !selection.isEmpty
         case #selector(paste(_:)):
-            return NSPasteboard.general.data(forType: Self.pasteboardType) != nil
+            return NSPasteboard.general.data(forType: Self.pasteboardType) != nil || pastedMermaid != nil
         default: return true
         }
     }

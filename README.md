@@ -86,6 +86,8 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
   from SVG files or from shapes you've drawn.
 - **Layers, rulers and guides** for when things need to line up exactly (⇧⌘R shows the rulers).
 - **Bring diagrams in** from Excalidraw, draw.io or SVG files (File menu, or drop them on the canvas).
+  Mermaid flowcharts come in laid out: File ▸ Import Mermaid…, drop a `.mmd` file, or copy the text
+  (starting with `flowchart` or `graph`) and paste it with ⌘V. Subgraphs come in without their frames.
 - **Send diagrams out** as PNG, SVG or PDF with File ▸ Export As.
 
 ## Extras for power users

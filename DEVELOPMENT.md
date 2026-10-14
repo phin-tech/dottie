@@ -51,12 +51,20 @@ A `note` element is a sticky note whose `text` is GitHub Flavored Markdown; `Not
 it out with CoreText, and the renderer and SVG export share that layout. A single newline is a line break, as in
 GitHub comments, and bare URLs are underlined by `Note` itself (swift-markdown leaves cmark's autolink extension off). Dottie 0.1.1 and earlier cannot open a file containing a note.
 
+## Mermaid
+
+`MermaidImporter` parses `flowchart` / `graph` text with a hand-written scanner into `DiagramOps.build` nodes
+and edges, so an import lays out exactly like `build_diagram`. Shapes map to the nearest kind (circles and
+stadiums to ellipses, `{}` to a diamond, the rest to rectangles). BT and RL draw as TB and LR, subgraphs are
+flattened, and only `fill` survives from `style` / `classDef`. Other diagram types are refused with a clear error.
+
 ## MCP server
 
 A stdio MCP server; every tool takes an absolute `path` to a `.dottie` file, or `"current"` for the drawing in
 front in the app.
 
-Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
+Tools: `build_diagram` (nodes + edges, auto-laid-out), `import_mermaid` (a Mermaid flowchart, laid out the same
+way), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
 work, plus each element's id and pixel box), `export_svg`, `create_diagram`, `open_document`, `list_stencils`,
 `add_stencil`, `list_pages`, `add_page`, `rename_page`, `run_script` and `script_api`. Tools that draw, list or
@@ -91,6 +99,7 @@ checksum-verified, or any npm name or `.js` URL resolved through jsDelivr), and 
 dottie render a.dottie b.dottie -f html -d out/   # several files into a directory
 dottie render diagram.dottie --clean --scale 3 -o - > clean.png
 dottie render diagram.dottie --page Details
+dottie render flow.mmd -o flow.svg                # a Mermaid flowchart, laid out like import_mermaid
 dottie library list
 dottie library install shapes.dottielib
 ```

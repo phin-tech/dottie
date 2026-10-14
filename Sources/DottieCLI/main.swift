@@ -8,7 +8,7 @@ let usage = """
 dottie \(version): render and manage Dottie drawings from the command line.
 
 USAGE
-  dottie render <file.dottie>... [-o <out>] [options]
+  dottie render <file.dottie | file.mmd>... [-o <out>] [options]
   dottie library list
   dottie library install <file.dottielib>...
   dottie --help | --version
@@ -16,6 +16,7 @@ USAGE
 RENDER
   Writes png, svg, pdf or html. The format comes from the extension of -o, or --format.
   With no -o the result is written next to the input (drawing.dottie -> drawing.png).
+  A Mermaid flowchart (.mmd, .mermaid, or flowchart text on stdin) is laid out and rendered too.
 
   -o, --output <path>   Output file, or "-" for stdout. Needs a single input.
   -d, --out-dir <dir>   Directory for the results of one or more inputs.
@@ -102,7 +103,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         }
         i += 1
     }
-    guard !o.inputs.isEmpty else { throw CLIError(message: "render needs at least one .dottie file", code: 2) }
+    guard !o.inputs.isEmpty else { throw CLIError(message: "render needs at least one .dottie or .mmd file", code: 2) }
     if o.output != nil, o.outDir != nil { throw CLIError(message: "use -o or --out-dir, not both", code: 2) }
     if o.output != nil, o.inputs.count > 1 { throw CLIError(message: "-o takes a single input; use --out-dir for several", code: 2) }
     if o.inputs.contains("-"), o.output == nil, o.outDir == nil {
@@ -166,8 +167,16 @@ func runRender(_ args: [String]) -> Int32 {
                 directory = url.deletingLastPathComponent()
             }
             let file: DottieFile
-            do { file = try DottieFile.decode(data) }
-            catch { throw CLIError(message: "\(input): not a Dottie drawing (\(error.localizedDescription))") }
+            let text = String(decoding: data, as: UTF8.self)
+            let isMermaid = input == "-" ? MermaidImporter.isFlowchart(text)
+                : MermaidImporter.fileExtensions.contains(absolute(input).pathExtension.lowercased())
+            if isMermaid {
+                do { file = try MermaidImporter.file(from: text, roughness: o.roughness ?? 1) }
+                catch { throw CLIError(message: "\(input): \(error.localizedDescription)") }
+            } else {
+                do { file = try DottieFile.decode(data) }
+                catch { throw CLIError(message: "\(input): not a Dottie drawing (\(error.localizedDescription))") }
+            }
             var doc = file.pages[0]
             if let spec = o.page {
                 guard let i = file.pageIndex(matching: spec) else {
