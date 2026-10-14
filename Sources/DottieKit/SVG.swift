@@ -5,7 +5,9 @@ extension Exporter {
     /// SVG built from the same paths the renderer draws, so the sketchy look is identical.
     /// Automatic ink is exported as black. Pass `background: nil` for a transparent page.
     public static func svg(_ doc: DottieDocument, background: RGBA? = RGBA(r: 1, g: 1, b: 1)) -> String {
-        let d = doc.resolvingInk(to: .black)
+        let theme = doc.resolvedTheme
+        let background = background.map { plain in theme?.background ?? plain }
+        let d = doc.resolvingInk(to: theme?.ink ?? .black)
         let b = bounds(of: d)
         let visible = Set(d.layers.filter(\.visible).map(\.id))
         var out = """

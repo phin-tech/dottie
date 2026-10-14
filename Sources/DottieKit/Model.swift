@@ -172,6 +172,11 @@ public struct DottieDocument: Codable, Equatable, Sendable {
     public var version: Int = 1
     public var layers: [Layer]
     public var elements: [Element]
+    /// A `Theme` id (page color and ink); nil follows the system appearance and exports on white.
+    public var theme: String?
+    /// Ruler guides: x positions of vertical guides and y positions of horizontal ones.
+    public var guidesX: [Double]?
+    public var guidesY: [Double]?
 
     public init(layers: [Layer]? = nil, elements: [Element] = []) {
         self.layers = layers ?? [Layer(name: "Layer 1")]

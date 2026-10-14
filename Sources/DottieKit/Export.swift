@@ -14,6 +14,9 @@ public enum Exporter {
 
     public static func png(_ doc: DottieDocument, scale: Double = 2, background: CGColor? = CGColor(gray: 1, alpha: 1)) -> Data? {
         let b = bounds(of: doc)
+        // A themed drawing exports on its own page color, unless the caller asked for transparency.
+        let background = background.map { plain in doc.resolvedTheme?.background.cgColor ?? plain }
+        let ink = doc.resolvedTheme?.ink ?? .black
         let w = Int(b.width * scale), h = Int(b.height * scale)
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
@@ -22,7 +25,7 @@ public enum Exporter {
         // Flip to top-left origin, then map document bounds to the bitmap.
         ctx.translateBy(x: 0, y: CGFloat(h)); ctx.scaleBy(x: scale, y: -scale)
         ctx.translateBy(x: -b.minX, y: -b.minY)
-        Renderer.draw(doc.resolvingInk(to: .black), in: ctx, background: background)
+        Renderer.draw(doc.resolvingInk(to: ink), in: ctx, background: background)
         guard let img = ctx.makeImage() else { return nil }
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
@@ -32,6 +35,8 @@ public enum Exporter {
 
     public static func pdf(_ doc: DottieDocument) -> Data? {
         let b = bounds(of: doc)
+        let background = doc.resolvedTheme?.background.cgColor ?? CGColor(gray: 1, alpha: 1)
+        let ink = doc.resolvedTheme?.ink ?? .black
         let data = NSMutableData()
         guard let consumer = CGDataConsumer(data: data) else { return nil }
         var box = CGRect(origin: .zero, size: b.size)
@@ -39,7 +44,8 @@ public enum Exporter {
         ctx.beginPDFPage(nil)
         ctx.translateBy(x: 0, y: b.height); ctx.scaleBy(x: 1, y: -1)
         ctx.translateBy(x: -b.minX, y: -b.minY)
-        Renderer.draw(doc.resolvingInk(to: .black), in: ctx, background: CGColor(gray: 1, alpha: 1))
+        ctx.setFillColor(background); ctx.fill(b)
+        Renderer.draw(doc.resolvingInk(to: ink), in: ctx, background: background)
         ctx.endPDFPage(); ctx.closePDF()
         return data as Data
     }

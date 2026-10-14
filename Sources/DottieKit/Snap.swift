@@ -31,7 +31,8 @@ public enum Snap {
 
     /// Offset that aligns `moving`'s edges or center with `others`' edges or centers within
     /// `threshold`; falls back to the grid on an axis with no object match.
-    public static func move(_ moving: CGRect, others: [CGRect], threshold: Double, gridSize: Double? = nil) -> Result {
+    public static func move(_ moving: CGRect, others: [CGRect], threshold: Double, gridSize: Double? = nil,
+                            guidesX: [Double] = [], guidesY: [Double] = []) -> Result {
         var result = Result()
         func xs(_ r: CGRect) -> [Double] { [r.minX, r.midX, r.maxX] }
         func ys(_ r: CGRect) -> [Double] { [r.minY, r.midY, r.maxY] }
@@ -49,13 +50,25 @@ public enum Snap {
             return found.map { (delta: $0.0, target: $0.1, other: $0.2) }
         }
 
+        /// Offset that puts one of `mine` on a ruler guide, if any is within the threshold.
+        func onGuide(_ mine: [Double], _ guides: [Double]) -> Double? {
+            guides.flatMap { g in mine.map { g - $0 } }.filter { abs($0) <= threshold }.min { abs($0) < abs($1) }
+        }
+        let gx = onGuide(xs(moving), guidesX), gy = onGuide(ys(moving), guidesY)
+
         if let hit = best(xs(moving), xs) {
             result.dx = hit.delta
+            if let g = gx, abs(g) < abs(hit.delta) { result.dx = g }
+        } else if let g = gx {
+            result.dx = g
         } else if let g = gridSize, g > 0 {
             result.dx = grid(moving.minX, size: g) - moving.minX
         }
         if let hit = best(ys(moving), ys) {
             result.dy = hit.delta
+            if let g = gy, abs(g) < abs(hit.delta) { result.dy = g }
+        } else if let g = gy {
+            result.dy = g
         } else if let g = gridSize, g > 0 {
             result.dy = grid(moving.minY, size: g) - moving.minY
         }
@@ -63,11 +76,11 @@ public enum Snap {
         // Equal spacing: where an axis found no edge match, a position that makes two gaps equal
         // (between two neighbours, or repeating the gap of an existing pair) wins over the raw grid.
         if !others.isEmpty {
-            if !hasEdgeMatch(xs(moving), xs, others, threshold),
+            if gx == nil, !hasEdgeMatch(xs(moving), xs, others, threshold),
                let m = spacingMatch(moving, others, horizontal: true, threshold: threshold) {
                 result.dx = m.delta; result.spacing.append(contentsOf: m.guides)
             }
-            if !hasEdgeMatch(ys(moving), ys, others, threshold),
+            if gy == nil, !hasEdgeMatch(ys(moving), ys, others, threshold),
                let m = spacingMatch(moving, others, horizontal: false, threshold: threshold) {
                 result.dy = m.delta; result.spacing.append(contentsOf: m.guides)
             }
@@ -141,13 +154,14 @@ public enum Snap {
 
     /// Snaps the edges a resize handle is moving to other shapes' edges and centers.
     /// `hx`/`hy` follow the handle convention: -1 moves the min side, 1 the max side, 0 neither.
-    public static func resize(_ rect: CGRect, hx: Int, hy: Int, others: [CGRect], threshold: Double) -> Result {
+    public static func resize(_ rect: CGRect, hx: Int, hy: Int, others: [CGRect], threshold: Double,
+                              guidesX: [Double] = [], guidesY: [Double] = []) -> Result {
         var result = Result()
         func nearest(_ v: Double, _ candidates: [Double]) -> Double? {
             candidates.map { $0 - v }.filter { abs($0) <= threshold }.min { abs($0) < abs($1) }
         }
-        let xs: [Double] = others.flatMap { [Double($0.minX), Double($0.midX), Double($0.maxX)] }
-        let ys: [Double] = others.flatMap { [Double($0.minY), Double($0.midY), Double($0.maxY)] }
+        let xs: [Double] = others.flatMap { [Double($0.minX), Double($0.midX), Double($0.maxX)] } + guidesX
+        let ys: [Double] = others.flatMap { [Double($0.minY), Double($0.midY), Double($0.maxY)] } + guidesY
         if hx != 0, let d = nearest(hx < 0 ? rect.minX : rect.maxX, xs) { result.dx = d }
         if hy != 0, let d = nearest(hy < 0 ? rect.minY : rect.maxY, ys) { result.dy = d }
         var snapped = rect

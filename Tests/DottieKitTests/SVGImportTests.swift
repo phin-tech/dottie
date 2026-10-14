@@ -346,3 +346,35 @@ final class DrawioImportTests: XCTestCase {
         XCTAssertTrue(doc.elements.filter { ids.contains($0.id) && $0.kind != .text }.allSatisfy { $0.style.roughness > 0 })
     }
 }
+
+final class ThemeAndGuideTests: XCTestCase {
+    func testThemeRoundTripsAndDrivesExportInk() throws {
+        var doc = DottieDocument()
+        doc.elements = [Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 50, height: 30), layerID: doc.layers[0].id)]
+        XCTAssertNil(doc.resolvedTheme)
+        XCTAssertFalse(try String(decoding: doc.encoded(), as: UTF8.self).contains("theme"))
+        doc.theme = "blueprint"
+        doc.guidesX = [100]; doc.guidesY = [20, 40]
+        let back = try DottieDocument.decode(doc.encoded())
+        XCTAssertEqual(back.resolvedTheme, .blueprint)
+        XCTAssertEqual(back.guidesY, [20, 40])
+        let svg = Exporter.svg(back)
+        XCTAssertTrue(svg.contains("#1b3a5c"), "page uses the theme background")
+        XCTAssertTrue(svg.contains("#e8f1fb"), "automatic ink takes the theme ink")
+        XCTAssertNil(Theme.named("nope"))
+        XCTAssertTrue(Theme.midnight.isDark); XCTAssertFalse(Theme.paper.isDark)
+        // Transparent SVG stays transparent under a theme.
+        XCTAssertFalse(Exporter.svg(back, background: nil).contains("<rect x=\"-"))
+    }
+
+    func testMovingSnapsToRulerGuides() {
+        let moving = CGRect(x: 97, y: 10, width: 40, height: 20)
+        let r = Snap.move(moving, others: [], threshold: 6, guidesX: [100], guidesY: [58])
+        XCTAssertEqual(r.dx, 3, accuracy: 0.001)          // left edge to x=100
+        XCTAssertEqual(r.dy, 0, accuracy: 0.001)          // nothing within 6 of y=58 (edges 10, 20, 30)
+        let center = Snap.move(CGRect(x: 0, y: 0, width: 40, height: 20), others: [], threshold: 6, guidesX: [22])
+        XCTAssertEqual(center.dx, 2, accuracy: 0.001)     // centre (20) to x=22
+        let rs = Snap.resize(CGRect(x: 0, y: 0, width: 98, height: 50), hx: 1, hy: 0, others: [], threshold: 6, guidesX: [100])
+        XCTAssertEqual(rs.dx, 2, accuracy: 0.001)
+    }
+}
