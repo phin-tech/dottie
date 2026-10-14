@@ -1,5 +1,7 @@
 # Dottie
 
+<img src="Design/icon-1024.png" width="128" alt="Dottie">
+
 A native macOS diagramming app: Excalidraw's sketchy speed with OmniGraffle-style precision.
 See `ROADMAP.md` for status.
 
