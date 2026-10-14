@@ -348,4 +348,140 @@ final class CanvasGestureTests: XCTestCase {
         drag(CGPoint(x: 350, y: 130), CGPoint(x: 447, y: 130))          // still snaps: right edge to 500
         XCTAssertEqual(element(e.id).frame.maxX, 500, accuracy: 0.001)
     }
+
+    // MARK: Links
+
+    /// Where the link badge of an unrotated, ungrouped element is drawn at zoom 1, in view points.
+    func badge(of e: Element) -> CGPoint {
+        let (pan, zoom) = view.viewport
+        let m = CGPoint(x: e.frame.maxX + 4 + 18 / zoom, y: e.frame.minY + 6 / zoom)
+        return CGPoint(x: m.x * zoom + pan.x, y: m.y * zoom + pan.y)
+    }
+
+    func click(_ p: CGPoint, mods: NSEvent.ModifierFlags = []) {
+        view.mouseDown(with: event(.leftMouseDown, p, mods: mods))
+        view.mouseUp(with: event(.leftMouseUp, p, mods: mods))
+    }
+
+    /// The model point at the middle of the view.
+    var viewCenter: CGPoint {
+        let (pan, zoom) = view.viewport
+        return CGPoint(x: (view.bounds.midX - pan.x) / zoom, y: (view.bounds.midY - pan.y) / zoom)
+    }
+
+    func testClickingABadgeJumpsToTheTargetAndBackReturns() {
+        let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
+        let far = add(.rectangle, CGRect(x: 3000, y: 2000, width: 200, height: 100), text: "Billing")
+        view.model.elements[0].link = far.id
+        click(badge(of: toc))
+        XCTAssertEqual(viewCenter.x, far.frame.midX, accuracy: 0.5)
+        XCTAssertEqual(viewCenter.y, far.frame.midY, accuracy: 0.5)
+        XCTAssertEqual(view.viewport.zoom, 1, accuracy: 1e-9) // it fits at 100%, so no zoom change
+        XCTAssertTrue(commits.isEmpty)                        // following a link is not an edit
+        XCTAssertTrue(view.selection.isEmpty)
+        XCTAssertTrue(view.jumpBack(animated: false))
+        XCTAssertEqual(view.viewport.pan, .zero)
+        XCTAssertTrue(view.jumpForward(animated: false))
+        XCTAssertEqual(viewCenter.x, far.frame.midX, accuracy: 0.5)
+        XCTAssertFalse(view.jumpForward(animated: false))
+    }
+
+    func testJumpZoomsOutToFitALargeTarget() {
+        let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
+        let section = add(.rectangle, CGRect(x: 2000, y: 0, width: 2000, height: 1000), text: "Section")
+        view.model.elements[0].link = section.id
+        click(badge(of: toc))
+        let zoom = view.viewport.zoom
+        XCTAssertLessThan(zoom, 1)
+        XCTAssertLessThanOrEqual(section.frame.width * zoom, view.bounds.width - 120 + 0.001)
+        XCTAssertEqual(viewCenter.x, section.frame.midX, accuracy: 0.5)
+    }
+
+    func testBrokenLinkStaysPut() {
+        let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
+        view.model.elements[0].link = UUID()
+        click(badge(of: toc))
+        XCTAssertEqual(view.viewport.pan, .zero)
+        XCTAssertFalse(view.jumpBack(animated: false))
+    }
+
+    func testCommandClickFollowsButCommandDragStillMoves() {
+        let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
+        let far = add(.rectangle, CGRect(x: 3000, y: 2000, width: 200, height: 100), text: "Billing")
+        view.model.elements[0].link = far.id
+        drag(CGPoint(x: 160, y: 130), CGPoint(x: 260, y: 130), mods: .command)
+        XCTAssertEqual(commits.last?.name, "Move")
+        XCTAssertEqual(view.viewport.pan, .zero)
+        click(CGPoint(x: 260, y: 130), mods: .command)
+        XCTAssertEqual(viewCenter.x, far.frame.midX, accuracy: 0.5)
+        XCTAssertEqual(element(toc.id).frame.minX, 200, accuracy: 0.001)
+    }
+
+    func testResizeHandleNextToTheBadgeStillResizes() {
+        let toc = add(.rectangle, CGRect(x: 300, y: 300, width: 120, height: 40), text: "Contents")
+        let far = add(.rectangle, CGRect(x: 3000, y: 2000, width: 200, height: 100), text: "Billing")
+        view.model.elements[0].link = far.id
+        view.selection = [toc.id]
+        for top in [true, false] { // the top-right handle, then the right-middle one
+            let f = element(toc.id).frame, before = f.maxX
+            let handle = CGPoint(x: f.maxX + 4, y: top ? f.minY - 4 : f.midY)
+            drag(handle, CGPoint(x: handle.x + 30, y: handle.y))
+            XCTAssertEqual(commits.last?.name, "Resize")
+            XCTAssertEqual(element(toc.id).frame.maxX, before + 30, accuracy: 0.001)
+        }
+        XCTAssertEqual(view.viewport.pan, .zero)
+    }
+
+    // MARK: Context menu
+
+    func testRightClickSelectsTheShapeAndOffersLinkItems() throws {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let menu = try XCTUnwrap(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 130))))
+        XCTAssertEqual(view.selection, [a.id])
+        let titles = menu.items.map(\.title)
+        XCTAssertTrue(titles.contains("Link to Element…"))
+        XCTAssertTrue(titles.contains("Copy"))
+        let follow = try XCTUnwrap(menu.items.first { $0.title == "Follow Link" })
+        XCTAssertFalse(view.validateMenuItem(follow)) // nothing to follow yet
+        _ = view.menu(for: event(.rightMouseDown, CGPoint(x: 600, y: 500)))
+        XCTAssertTrue(view.selection.isEmpty)
+    }
+
+    func testLinkToElementWaitsForAClickOnTheTarget() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let b = add(.ellipse, CGRect(x: 500, y: 400, width: 120, height: 80)) // unlabelled: the inspector list can't offer it
+        view.selection = [a.id]
+        view.linkToElement(nil)
+        click(CGPoint(x: 150, y: 130))           // the source itself: still waiting
+        XCTAssertTrue(commits.isEmpty)
+        click(CGPoint(x: 560, y: 440))
+        XCTAssertEqual(commits.map(\.name), ["Link"])
+        XCTAssertEqual(element(a.id).link, b.id)
+        click(CGPoint(x: 560, y: 440))           // back to normal clicking: selects b, no new link
+        XCTAssertEqual(view.selection, [b.id])
+        view.selection = [a.id]
+        view.removeLink(nil)
+        XCTAssertNil(element(a.id).link)
+        XCTAssertEqual(commits.last?.name, "Remove Link")
+    }
+
+    func testEscapeOrAnEmptyClickCancelsLinkToElement() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let b = add(.rectangle, CGRect(x: 500, y: 400, width: 120, height: 60))
+        view.selection = [a.id]
+        view.linkToElement(nil)
+        view.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                            windowNumber: window.windowNumber, context: nil, characters: "\u{1b}",
+                                            charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)!)
+        XCTAssertEqual(view.selection, [a.id])    // Esc only cancelled the pick
+        click(CGPoint(x: 560, y: 430))
+        XCTAssertNil(element(a.id).link)
+        view.selection = [a.id]
+        view.linkToElement(nil)
+        click(CGPoint(x: 800, y: 100))            // empty canvas
+        click(CGPoint(x: 560, y: 430))
+        XCTAssertNil(element(a.id).link)
+        XCTAssertNil(element(b.id).link)
+        XCTAssertTrue(commits.isEmpty)
+    }
 }

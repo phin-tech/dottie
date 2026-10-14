@@ -31,12 +31,15 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 
 - [x] Library viewer: `.dottielib` opens in its own window (Finder double-click or Library ▸ Open in Viewer); copy, export PNG/SVG, install
 - [x] Guides by number (type, add, remove) and lock; stencil items rename, tag, duplicate, reorder; library rename
+- [x] Element links: pick a target in the inspector, follow by badge or ⌘-click, Back/Forward (⌘[ ⌘]); `link` over MCP and scripts
+- [x] Canvas context menu (edit, link, arrange); hidden element names (`name`)
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 
 ## Next
 - Custom themes and a color palette per theme
 - Cursor-position marker on the rulers
 - Visio (`.vsdx`) import
+- Links: a Sections list in the sidebar, URL links, clickable links in PDF and SVG export, links to other drawings
 
 ## Agents (MCP)
 - [x] Live mode (see README); `export_svg`
@@ -44,6 +47,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Connector labels (`label` on edges and `add_connector`; `text` on `update_element`)
 - [x] `export_png` returns an element-id -> kind, text and pixel box map
 - [x] Look options on shapes and connectors: `fill_style`, `dash`, `stroke_width`, `bowing`, `rotation`, `start_head`, `end_head`
+- [x] `link` on `update_element` (and in `list_elements`)
 
 ## Open questions
 - Hand-drawn font: Excalidraw's Virgil/Excalifont have their own license; using system font until decided.

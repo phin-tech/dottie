@@ -71,6 +71,12 @@ enum Tool: String, CaseIterable, Identifiable {
     }
 }
 
+/// Asks the canvas to follow a link to `target`, as clicking its badge would.
+struct JumpRequest: Equatable {
+    var id = UUID()
+    var target: UUID
+}
+
 /// Which edge(s) a resize handle moves: -1 = min side, 1 = max side, 0 = unchanged.
 private struct Handle: Equatable {
     var hx: Int, hy: Int
@@ -109,7 +115,7 @@ private enum Gesture {
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
 final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var model = DottieDocument() {
-        didSet { needsDisplay = true; spatialStale = true }
+        didSet { needsDisplay = true; spatialStale = true; badgeCache = nil }
     }
     /// Built lazily for the current `model`. Panning and zooming reuse it; an edit marks it stale and
     /// the next use folds the changed elements in (or rebuilds when the structure changed).
@@ -161,6 +167,23 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var editor: NSTextField?
     private var editingID: UUID?
     private var editBase: DottieDocument? // set for new text so undo removes the box entirely
+
+    /// Where the view was before each jump, for Back and Forward.
+    private var backStack: [Viewport] = []
+    private var forwardStack: [Viewport] = []
+    private var jumpTimer: Timer?
+    /// The elements a jump just landed on, outlined briefly so the eye finds them.
+    private var flashIDs: Set<UUID> = [] { didSet { needsDisplay = true } }
+    private var flashToken = 0
+    private var badgeCache: [LinkBadge]?
+    /// The link of the shape under a ⌘-press, followed on release if the press did not turn into a drag.
+    private var pressedLink: UUID?
+    /// While set, the next click on a shape links these elements to it (Link to Element… in the context menu).
+    private var linkSources: Set<UUID>? {
+        didSet { needsDisplay = true; window?.invalidateCursorRects(for: self) }
+    }
+    /// The last `JumpRequest` acted on, so a repeated SwiftUI update does not jump twice.
+    var handledJump: UUID?
 
     private let handleSize: CGFloat = 8
     /// Handle size in model units so handles stay the same size on screen at any zoom.
@@ -306,6 +329,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             ctx.strokePath()
             ctx.setStrokeColor(accent.cgColor)
         }
+        if !flashIDs.isEmpty {
+            ctx.setFillColor(accent.withAlphaComponent(0.12).cgColor)
+            ctx.setLineWidth(3 / zoom)
+            for e in model.elements where flashIDs.contains(e.id) && e.kind != .connector {
+                ctx.saveGState()
+                ctx.translateBy(x: e.frame.midX, y: e.frame.midY); ctx.rotate(by: e.angle)
+                ctx.translateBy(x: -e.frame.midX, y: -e.frame.midY)
+                let r = e.frame.insetBy(dx: -6, dy: -6)
+                ctx.fill(r); ctx.stroke(r)
+                ctx.restoreGState()
+            }
+        }
+        drawLinkBadges(ctx, accent: accent)
         if let m = marqueeRect {
             ctx.setFillColor(accent.withAlphaComponent(0.08).cgColor)
             ctx.fill(m)
@@ -314,6 +350,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.restoreGState()
 
         if showRulers { drawRulers(ctx) }
+        if linkSources != nil { drawHint("Click the shape to link to   ·   Esc to cancel") }
 
         if zoom != 1 {
             let label = "\(Int((zoom * 100).rounded()))%" as NSString
@@ -322,6 +359,17 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let size = label.size(withAttributes: attrs)
             label.draw(at: CGPoint(x: bounds.maxX - size.width - 12, y: bounds.maxY - size.height - 8), withAttributes: attrs)
         }
+    }
+
+    /// A pill of text at the top middle of the view.
+    private func drawHint(_ text: String) {
+        let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .medium), .foregroundColor: NSColor.white]
+        let label = text as NSString
+        let size = label.size(withAttributes: attrs)
+        let pill = CGRect(x: canvasArea.midX - size.width / 2 - 12, y: canvasArea.minY + 12, width: size.width + 24, height: size.height + 10)
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(roundedRect: pill, xRadius: pill.height / 2, yRadius: pill.height / 2).fill()
+        label.draw(at: CGPoint(x: pill.minX + 12, y: pill.minY + 5), withAttributes: attrs)
     }
 
     private var isDark: Bool { effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua }
@@ -410,6 +458,160 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
 
+    // MARK: Links
+
+    private struct Viewport { var pan: CGPoint; var zoom: CGFloat }
+
+    /// A link badge: `corner` is the top-right of the linked element (or of its group, which shares one badge).
+    private struct LinkBadge { var corner: CGPoint; var target: UUID; var broken: Bool }
+
+    private var linkBadges: [LinkBadge] {
+        if let cached = badgeCache { return cached }
+        var out: [LinkBadge] = []
+        if model.elements.contains(where: { $0.link != nil }) {
+            let visible = Set(model.layers.filter(\.visible).map(\.id))
+            var groupBounds: [UUID: CGRect] = [:]
+            for e in model.elements where e.kind != .connector {
+                if let g = e.groupID { groupBounds[g] = (groupBounds[g] ?? .null).union(e.rotatedBounds) }
+            }
+            // A target is reachable when it exists on a visible layer (what `linkBounds(to:)` checks), found in one pass.
+            let reachable = Set(model.elements.filter { visible.contains($0.layerID) && $0.kind != .connector }.map(\.id))
+            var seen = Set<[UUID]>()
+            for e in model.orderedElements {
+                guard let target = e.link, visible.contains(e.layerID) else { continue }
+                let b: CGRect
+                if let g = e.groupID, let box = groupBounds[g] {
+                    guard seen.insert([g, target]).inserted else { continue }
+                    b = box
+                } else {
+                    b = e.kind == .connector ? Connector.bounds(of: e, in: model) : e.rotatedBounds
+                }
+                out.append(LinkBadge(corner: CGPoint(x: b.maxX, y: b.minY), target: target,
+                                     broken: !reachable.contains(target)))
+            }
+        }
+        badgeCache = out
+        return out
+    }
+
+    /// Beside the top-right corner, clear of the resize handles; the same size on screen at any zoom.
+    private func badgeCenter(_ badge: LinkBadge) -> CGPoint {
+        CGPoint(x: badge.corner.x + 4 + 18 / zoom, y: badge.corner.y + 6 / zoom)
+    }
+
+    /// The target of the link badge under `p`, front-most first.
+    private func badgeHit(_ p: CGPoint) -> UUID? {
+        linkBadges.last { b in
+            let c = badgeCenter(b)
+            return hypot(p.x - c.x, p.y - c.y) <= 10 / zoom
+        }?.target
+    }
+
+    private func drawLinkBadges(_ ctx: CGContext, accent: NSColor) {
+        let badges = linkBadges
+        guard !badges.isEmpty else { return }
+        let r = 8 / zoom, a = 3 / zoom
+        ctx.setLineWidth(1.5 / zoom)
+        ctx.setStrokeColor(NSColor.white.cgColor)
+        for badge in badges {
+            let c = badgeCenter(badge)
+            ctx.setFillColor((badge.broken ? NSColor.systemGray : accent).cgColor)
+            ctx.fillEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
+            if badge.broken { // a cross: the target is gone or hidden
+                ctx.move(to: CGPoint(x: c.x - a, y: c.y - a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y + a))
+                ctx.move(to: CGPoint(x: c.x - a, y: c.y + a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y - a))
+            } else { // an arrow pointing up and right
+                ctx.move(to: CGPoint(x: c.x - a, y: c.y + a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y - a))
+                ctx.move(to: CGPoint(x: c.x - a / 3, y: c.y - a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y - a))
+                ctx.addLine(to: CGPoint(x: c.x + a, y: c.y + a / 3))
+            }
+            ctx.strokePath()
+        }
+        ctx.setStrokeColor(accent.cgColor)
+    }
+
+    /// Pan and zoom, readable by tests.
+    var viewport: (pan: CGPoint, zoom: CGFloat) { (pan, zoom) }
+
+    /// The part of the view the drawing shows through (the rulers cover the top and left edges).
+    private var canvasArea: CGRect {
+        let inset = showRulers ? rulerSize : 0
+        return CGRect(x: inset, y: inset, width: bounds.width - inset, height: bounds.height - inset)
+    }
+
+    /// Follows a link: brings `target` (with its group) to the middle of the view, zooming out if it does not
+    /// fit and in to at most 100% when the view was further out. Beeps and stays put on a broken link.
+    @discardableResult
+    func jump(to target: UUID, animated: Bool = true) -> Bool {
+        guard let b = model.linkBounds(to: target) else { NSSound.beep(); return false }
+        stopJumpAnimation()
+        backStack.append(Viewport(pan: pan, zoom: zoom))
+        if backStack.count > 50 { backStack.removeFirst() }
+        forwardStack = []
+        let area = canvasArea, margin: CGFloat = 60
+        let fit = min((area.width - 2 * margin) / max(b.width, 1), (area.height - 2 * margin) / max(b.height, 1))
+        let z = min(max(min(fit, max(zoom, 1)), zoomRange.lowerBound), zoomRange.upperBound)
+        show(Viewport(pan: CGPoint(x: area.midX - b.midX * z, y: area.midY - b.midY * z), zoom: z), animated: animated)
+        flashIDs = model.expandingGroups([target])
+        flashToken += 1
+        let token = flashToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { [weak self] in
+            if self?.flashToken == token { self?.flashIDs = [] }
+        }
+        return true
+    }
+
+    private func stopJumpAnimation() { jumpTimer?.invalidate(); jumpTimer = nil }
+
+    private func show(_ dest: Viewport, animated: Bool) {
+        stopJumpAnimation()
+        guard animated, window?.isVisible == true, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            zoom = dest.zoom; pan = dest.pan
+            return
+        }
+        // Glide the model point at the middle of the view, and the zoom by a constant ratio per step.
+        let mid = CGPoint(x: canvasArea.midX, y: canvasArea.midY)
+        let from = Viewport(pan: pan, zoom: zoom)
+        func center(_ v: Viewport) -> CGPoint { CGPoint(x: (mid.x - v.pan.x) / v.zoom, y: (mid.y - v.pan.y) / v.zoom) }
+        let c0 = center(from), c1 = center(dest)
+        let began = Date()
+        jumpTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60, repeats: true) { [weak self] timer in
+            guard let self else { timer.invalidate(); return } // the canvas went away mid-glide
+            MainActor.assumeIsolated {
+                let t = min(Date().timeIntervalSince(began) / 0.3, 1)
+                let k = t * t * (3 - 2 * t)
+                let z = from.zoom * pow(dest.zoom / from.zoom, k)
+                self.zoom = z
+                self.pan = CGPoint(x: mid.x - (c0.x + (c1.x - c0.x) * k) * z, y: mid.y - (c0.y + (c1.y - c0.y) * k) * z)
+                if t >= 1 { self.zoom = dest.zoom; self.pan = dest.pan; self.stopJumpAnimation() }
+            }
+        }
+    }
+
+    // Menu commands (View ▸ Follow Link, Back, Forward) arrive through the responder chain.
+
+    @objc func followLink(_ sender: Any?) {
+        guard let target = model.elements.first(where: { selection.contains($0.id) && $0.link != nil })?.link else { NSSound.beep(); return }
+        jump(to: target)
+    }
+
+    @objc func jumpBack(_ sender: Any?) { step(from: &backStack, to: &forwardStack, animated: true) }
+    @objc func jumpForward(_ sender: Any?) { step(from: &forwardStack, to: &backStack, animated: true) }
+
+    @discardableResult
+    func jumpBack(animated: Bool) -> Bool { step(from: &backStack, to: &forwardStack, animated: animated) }
+    @discardableResult
+    func jumpForward(animated: Bool) -> Bool { step(from: &forwardStack, to: &backStack, animated: animated) }
+
+    @discardableResult
+    private func step(from: inout [Viewport], to: inout [Viewport], animated: Bool) -> Bool {
+        guard let dest = from.popLast() else { NSSound.beep(); return false }
+        to.append(Viewport(pan: pan, zoom: zoom))
+        flashIDs = []
+        show(dest, animated: animated)
+        return true
+    }
+
     private var singleSelectionID: UUID? { selection.count == 1 ? selection.first : nil }
 
     private func handle(at p: CGPoint) -> (UUID, Handle, CGRect)? {
@@ -482,6 +684,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// Zooms keeping the model point under `anchor` (view coords) fixed.
     private func zoom(by factor: CGFloat, at anchor: CGPoint) {
+        stopJumpAnimation()
         let new = min(max(zoom * factor, zoomRange.lowerBound), zoomRange.upperBound)
         let m = CGPoint(x: (anchor.x - pan.x) / zoom, y: (anchor.y - pan.y) / zoom)
         zoom = new
@@ -512,7 +715,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     @objc func zoomIn(_ sender: Any?) { zoom(by: 1.25, at: CGPoint(x: bounds.midX, y: bounds.midY)) }
     @objc func zoomOut(_ sender: Any?) { zoom(by: 0.8, at: CGPoint(x: bounds.midX, y: bounds.midY)) }
-    @objc func zoomActualSize(_ sender: Any?) { zoom = 1; pan = .zero }
+    @objc func zoomActualSize(_ sender: Any?) { stopJumpAnimation(); zoom = 1; pan = .zero }
 
     @objc func delete(_ sender: Any?) { deleteSelection() }
 
@@ -724,8 +927,84 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         onCommit?(next, "Duplicate")
     }
 
+    // MARK: Context menu
+
+    /// Right-clicking a shape selects it (with its group) unless it is already selected; empty canvas clears the selection.
+    override func menu(for event: NSEvent) -> NSMenu? {
+        endEditing()
+        linkSources = nil
+        if let hit = spatial.element(at: point(event), in: model) {
+            if !selection.contains(hit.id) { selection = model.expandingGroups([hit.id]) }
+        } else {
+            selection = []
+        }
+        let menu = NSMenu()
+        func add(_ title: String, _ action: Selector) { menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self }
+        add("Cut", #selector(cut(_:)))
+        add("Copy", #selector(copy(_:)))
+        add("Paste", #selector(paste(_:)))
+        add("Duplicate", #selector(duplicate(_:)))
+        add("Delete", #selector(delete(_:)))
+        menu.addItem(.separator())
+        add("Link to Element…", #selector(linkToElement(_:)))
+        add("Follow Link", #selector(followLink(_:)))
+        add("Remove Link", #selector(removeLink(_:)))
+        menu.addItem(.separator())
+        add("Bring to Front", #selector(bringToFront(_:)))
+        add("Send to Back", #selector(sendToBack(_:)))
+        add("Group", #selector(groupSelection(_:)))
+        add("Ungroup", #selector(ungroupSelection(_:)))
+        return menu
+    }
+
+    private var selectionHasLink: Bool { model.elements.contains { selection.contains($0.id) && $0.link != nil } }
+
+    /// Waits for a click on the shape the selection should link to.
+    @objc func linkToElement(_ sender: Any?) {
+        guard !selection.isEmpty else { return }
+        if tool != .select { switchTool(.select) }
+        linkSources = selection
+    }
+
+    @objc func removeLink(_ sender: Any?) {
+        var next = model
+        guard (try? next.setLink(selection, to: nil)) != nil, next != model else { return }
+        onCommit?(next, "Remove Link")
+    }
+
+    private func edit(_ name: String, _ change: (inout DottieDocument) -> Void) {
+        var next = model
+        change(&next)
+        if next != model { onCommit?(next, name) }
+    }
+
+    @objc func bringToFront(_ sender: Any?) { let ids = selection; edit("Arrange") { $0.reorder(ids, .toFront) } }
+    @objc func sendToBack(_ sender: Any?) { let ids = selection; edit("Arrange") { $0.reorder(ids, .toBack) } }
+    @objc func groupSelection(_ sender: Any?) { let ids = selection; edit("Group") { $0.group(ids) } }
+    @objc func ungroupSelection(_ sender: Any?) { let ids = selection; edit("Ungroup") { $0.ungroup(ids) } }
+
+    /// Ends Link to Element… with a click at `p`: a shape outside the sources gets the link; empty canvas cancels;
+    /// a connector or one of the sources beeps and keeps waiting.
+    private func finishLink(at p: CGPoint) {
+        guard let sources = linkSources else { return }
+        guard let hit = spatial.element(at: p, in: model) else { linkSources = nil; return }
+        guard hit.kind != .connector, !sources.contains(hit.id) else { NSSound.beep(); return }
+        linkSources = nil
+        var next = model
+        guard (try? next.setLink(sources, to: hit.id)) != nil else { NSSound.beep(); return }
+        onCommit?(next, "Link")
+    }
+
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
+        case #selector(linkToElement(_:)), #selector(bringToFront(_:)), #selector(sendToBack(_:)):
+            return !selection.isEmpty
+        case #selector(followLink(_:)), #selector(removeLink(_:)):
+            return selectionHasLink
+        case #selector(groupSelection(_:)):
+            return model.expandingGroups(selection).count >= 2
+        case #selector(ungroupSelection(_:)):
+            return model.elements.contains { selection.contains($0.id) && $0.groupID != nil }
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicate(_:)):
             return !selection.isEmpty
         case #selector(paste(_:)):
@@ -743,7 +1022,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func resetCursorRects() {
-        if spaceDown {
+        if linkSources != nil, !spaceDown {
+            addCursorRect(bounds, cursor: .crosshair)
+        } else if spaceDown {
             addCursorRect(bounds, cursor: gesture.map { if case .panning = $0 { return true } else { return false } } == true ? .closedHand : .openHand)
         }
     }
@@ -754,6 +1035,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             zoom(by: exp(dy * 0.01), at: convert(event.locationInWindow, from: nil))
             return
         }
+        stopJumpAnimation()
         pan = CGPoint(x: pan.x + event.scrollingDeltaX, y: pan.y + event.scrollingDeltaY)
     }
 
@@ -802,6 +1084,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func mouseDown(with event: NSEvent) {
         endEditing()
+        stopJumpAnimation()
         window?.makeFirstResponder(self)
         if spaceDown {
             gesture = .panning
@@ -809,6 +1092,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             window?.invalidateCursorRects(for: self)
             return
         }
+        if linkSources != nil { finishLink(at: point(event)); return }
         if showRulers {
             let raw = convert(event.locationInWindow, from: nil)
             let inTop = raw.y < rulerSize, inLeft = raw.x < rulerSize
@@ -825,6 +1109,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         var p = point(event)
         if tool.kind != nil, tool != .text, tool != .pencil { p = snapped(p, event) }
         dragStart = p
+        if tool == .select, event.clickCount == 1, let target = badgeHit(p) { // a link badge: go there
+            jump(to: target)
+            return
+        }
         baseline = model
         if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model) == nil {
             gesture = .guide(vertical: hit.vertical, index: hit.index)
@@ -904,6 +1192,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             } else if !selection.contains(hit.id) {
                 selection = hitSet
             }
+            pressedLink = tool == .select && event.modifierFlags.contains(.command) ? hit.link : nil
             gesture = .moving
         } else {
             if !event.modifierFlags.contains(.shift) { selection = [] }
@@ -1059,7 +1348,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func mouseUp(with event: NSEvent) {
         defer {
-            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; guides = []; spacingGuides = []; strokePoints = []; needsDisplay = true
+            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; pressedLink = nil; guides = []; spacingGuides = []; strokePoints = []; needsDisplay = true
             if spaceDown { window?.invalidateCursorRects(for: self) }
         }
         guard let base = baseline, let g = gesture else { return }
@@ -1102,6 +1391,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .rotatingGroup where model != base: commit(base, "Rotate")
         case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")
+        case .moving: if let target = pressedLink { jump(to: target) } // ⌘-click on a linked shape
         case .resizing where model != base: commit(base, "Resize")
         default: break
         }
@@ -1117,6 +1407,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     private func switchTool(_ t: Tool) {
+        if t != .select { linkSources = nil }
         tool = t
         onToolChange?(t)
         if t != .select, t != .connector { hoverShapeID = nil }
@@ -1128,6 +1419,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if !event.isARepeat { spaceDown = true }
             return
         }
+        if event.keyCode == 53, linkSources != nil { linkSources = nil; return } // escape cancels Link to Element…
         if event.keyCode == 53 { // escape: back to the arrow; a second press clears the selection
             if tool != .select { switchTool(.select) } else { selection = [] }
             return
@@ -1219,6 +1511,7 @@ struct CanvasView: NSViewRepresentable {
     var activeLayerID: UUID?
     @Binding var placeRequest: PlaceRequest?
     var showRulers = false
+    @Binding var jumpRequest: JumpRequest?
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
@@ -1243,6 +1536,13 @@ struct CanvasView: NSViewRepresentable {
             DispatchQueue.main.async {
                 v.placeStencil(req.item, keepOriginalColors: req.keepOriginalColors)
                 if placeRequest == req { placeRequest = nil }
+            }
+        }
+        if let req = jumpRequest, v.handledJump != req.id {
+            v.handledJump = req.id
+            DispatchQueue.main.async {
+                v.jump(to: req.target)
+                if jumpRequest == req { jumpRequest = nil }
             }
         }
     }

@@ -95,6 +95,17 @@ rulers (⇧⌘R). Drag out of a ruler to pull a guide: moves and resizes snap to
 ruler removes it. The Layers section unfolds each layer to its elements; drag one onto another to restack,
 or onto a layer to move it there. Guides can be typed in exactly, added at a position, and locked.
 
+### Links
+
+Any element can link to a labelled shape elsewhere in the drawing: select it and choose a target under **Jumps to**
+in the inspector's Link section. A small arrow badge appears beside the linked element (grey with a cross when the
+target is deleted or on a hidden layer). Right-click ▸ Link to Element… and then a click on any shape does the same,
+including shapes with no text. The inspector's **Name** field gives an element a hidden name, never drawn or
+exported, that the Layers panel and the Link list show. Click the badge, ⌘-click the element, or use View ▸ Follow Link to go
+there: the view glides to the target, and to its whole group if it has one. It zooms out if the target does not
+fit, and zooms in to at most 100%. View ▸ Back (⌘[) and Forward (⌘]) retrace your jumps. A copied link follows its
+target if the target was copied too. Agents and scripts set `link` on `update_element` / `dottie.update`.
+
 ### Stencils
 
 The Library tab in the sidebar holds stencil libraries: the built-in Basics set (flowchart symbols and common

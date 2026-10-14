@@ -222,4 +222,32 @@ final class ScriptTests: XCTestCase {
         if case .failed = DottieScript.check(module: "throws", in: dir) {} else { XCTFail("a throwing module should fail") }
         XCTAssertEqual(DottieScript.check(module: "lodash", in: dir), .ok) // bundled
     }
+
+    func testLinksSetByIdOrElementAndClearedWithNull() {
+        var doc = DottieDocument()
+        let r = run("""
+            const a = dottie.rect({x: 0, y: 0, text: "Contents"}), b = dottie.rect({x: 0, y: 400, text: "Billing"});
+            const linked = dottie.update(a, {link: b});
+            dottie.update(b, {link: a.id});
+            const cleared = dottie.update(b, {link: null});
+            return [linked.link === b.id, dottie.get(b).link === undefined, cleared.link === undefined];
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(r.value, "[true,true,true]")
+        XCTAssertEqual(doc.elements[0].link, doc.elements[1].id)
+        XCTAssertNil(doc.elements[1].link)
+        XCTAssertNotNil(run("dottie.update(dottie.elements()[0], {link: 'nope'})", &doc).error)
+    }
+
+    func testNamesFilterAndClear() {
+        var doc = DottieDocument()
+        let r = run("""
+            const a = dottie.rect({x: 0, y: 0, name: "Intro"}); dottie.rect({x: 0, y: 200});
+            const found = dottie.elements({name: "intro"}).map(e => e.id);
+            dottie.update(a, {name: ""});
+            return [found.length === 1 && found[0] === a.id, a.name, dottie.get(a).name === undefined];
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(r.value, "[true,\"Intro\",true]")
+    }
 }

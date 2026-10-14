@@ -32,9 +32,12 @@ extension DottieDocument {
         var groupMap: [UUID: UUID] = [:]
         for e in items { idMap[e.id] = UUID() }
         let fallback = layers.first { $0.visible && !$0.locked }?.id ?? layers[0].id
+        let existing = items.contains { $0.link != nil } ? Set(elements.map(\.id)) : []
         var added: [Element] = []
         for var e in items {
             e.id = idMap[e.id]!
+            // A link follows its target into the copy; otherwise it survives only if the target is in this drawing.
+            if let t = e.link { e.link = idMap[t] ?? (existing.contains(t) ? t : nil) }
             e.seed = .random(in: 1...UInt32.max)
             if !layers.contains(where: { $0.id == e.layerID && !$0.locked }) { e.layerID = fallback }
             if let g = e.groupID { e.groupID = groupMap[g, default: UUID()]; groupMap[g] = e.groupID }
@@ -94,6 +97,27 @@ extension DottieDocument {
     public mutating func ungroup(_ ids: Set<UUID>) {
         let ids = expandingGroups(ids)
         for i in elements.indices where ids.contains(elements[i].id) { elements[i].groupID = nil }
+    }
+
+    // MARK: Links
+
+    /// Points every element in `ids` at `target`, or clears their links when it is nil.
+    public mutating func setLink(_ ids: Set<UUID>, to target: UUID?) throws {
+        if let target {
+            guard let t = elements.first(where: { $0.id == target }) else { throw OpsError.notFound("No element \(target.uuidString)") }
+            guard t.kind != .connector else { throw OpsError.invalid("A link must point at a shape, not a connector") }
+            guard !ids.contains(target) else { throw OpsError.invalid("An element cannot link to itself") }
+        }
+        for i in elements.indices where ids.contains(elements[i].id) { elements[i].link = target }
+    }
+
+    /// Where following a link to `id` should look: the element, or its whole group so a grouped "section"
+    /// is shown complete. nil when the link is broken (the element is gone or its layer is hidden).
+    public func linkBounds(to id: UUID) -> CGRect? {
+        guard let t = elements.first(where: { $0.id == id }),
+              layers.first(where: { $0.id == t.layerID })?.visible == true else { return nil }
+        let b = selectionBounds(expandingGroups([id]))
+        return b.isNull ? nil : b
     }
 
     // MARK: Arrangement

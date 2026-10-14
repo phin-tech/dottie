@@ -1000,3 +1000,80 @@ final class PathShapeTests: XCTestCase {
         XCTAssertNotNil(Exporter.png(doc, scale: 1))
     }
 }
+
+/// Links between elements.
+extension DottieKitTests {
+
+    func testLinksAreOptionalInTheFileAndRoundTrip() throws {
+        var doc = sampleDoc()
+        XCTAssertFalse(String(decoding: try doc.encoded(), as: UTF8.self).contains("\"link\""))
+        try doc.setLink([doc.elements[0].id], to: doc.elements[2].id)
+        let back = try DottieDocument.decode(try doc.encoded())
+        XCTAssertEqual(back.elements[0].link, doc.elements[2].id)
+    }
+
+    func testSetLinkRejectsMissingSelfAndConnectorTargets() throws {
+        var (doc, a, b, c) = twoBoxesAndArrow()
+        XCTAssertThrowsError(try doc.setLink([a], to: UUID()))
+        XCTAssertThrowsError(try doc.setLink([a], to: a))
+        XCTAssertThrowsError(try doc.setLink([a], to: c))
+        try doc.setLink([a, c], to: b)
+        XCTAssertEqual(doc.elements.filter { $0.link == b }.count, 2)
+        try doc.setLink([a], to: nil)
+        XCTAssertNil(doc.elements.first { $0.id == a }!.link)
+    }
+
+    func testPasteRemapsCopiedTargetsKeepsLocalOnesAndDropsForeignOnes() throws {
+        var (doc, a, b, _) = twoBoxesAndArrow()
+        try doc.setLink([a], to: b)
+        // Both copied: the copy of a points at the copy of b.
+        let both = doc.duplicate([a, b])
+        let copyA = doc.elements.first { both.contains($0.id) && $0.link != nil }!
+        XCTAssertTrue(both.contains(copyA.link!))
+        // Only a copied: the copy still points at the original b.
+        let one = doc.duplicate([a])
+        XCTAssertEqual(doc.elements.first { one.contains($0.id) }!.link, b)
+        // Pasted into another drawing, where b does not exist: the link is dropped.
+        var other = DottieDocument()
+        let pasted = other.paste(try XCTUnwrap(doc.clipboardData(for: [a])))
+        XCTAssertNil(other.elements.first { pasted.contains($0.id) }!.link)
+    }
+
+    func testDeletingATargetLeavesABrokenLinkAndHiddenLayersBreakIt() throws {
+        var (doc, a, b, _) = twoBoxesAndArrow()
+        try doc.setLink([a], to: b)
+        XCTAssertEqual(doc.linkBounds(to: b), CGRect(x: 200, y: 100, width: 80, height: 40))
+        var hidden = doc
+        hidden.layers[0].visible = false
+        XCTAssertNil(hidden.linkBounds(to: b))
+        doc.remove([b])
+        XCTAssertEqual(doc.elements.first { $0.id == a }!.link, b)
+        XCTAssertNil(doc.linkBounds(to: b))
+    }
+
+    func testLinkBoundsCoverTheTargetsGroup() throws {
+        var (doc, a, b, _) = twoBoxesAndArrow()
+        doc.group([a, b])
+        XCTAssertEqual(doc.linkBounds(to: b), CGRect(x: 0, y: 0, width: 280, height: 140))
+    }
+
+    func testUpdateSetsAndClearsLinksAndSummaryReportsThem() throws {
+        var (doc, a, b, _) = twoBoxesAndArrow()
+        try DiagramOps.update(&doc, id: a, link: .some(b))
+        XCTAssertEqual(DiagramOps.summarize(doc).first { $0.id == a.uuidString }?.link, b.uuidString)
+        try DiagramOps.update(&doc, id: a, text: "unchanged link")
+        XCTAssertEqual(doc.elements.first { $0.id == a }!.link, b)
+        try DiagramOps.update(&doc, id: a, link: .some(nil))
+        XCTAssertNil(doc.elements.first { $0.id == a }!.link)
+        XCTAssertThrowsError(try DiagramOps.update(&doc, id: a, link: .some(a)))
+    }
+
+    func testNamesAreHiddenAndSetThroughUpdate() throws {
+        var (doc, a, _, _) = twoBoxesAndArrow()
+        try DiagramOps.update(&doc, id: a, name: .some("Billing section"))
+        XCTAssertEqual(DiagramOps.summarize(doc).first { $0.id == a.uuidString }?.name, "Billing section")
+        XCTAssertFalse(Exporter.svg(doc).contains("Billing section"))
+        try DiagramOps.update(&doc, id: a, name: .some(""))
+        XCTAssertNil(doc.elements.first { $0.id == a }!.name)
+    }
+}

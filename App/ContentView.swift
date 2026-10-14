@@ -16,6 +16,7 @@ struct ContentView: View {
     @AppStorage(Pref.showRulers) private var showRulers = false
     @State private var activeLayer: UUID?
     @State private var placeRequest: PlaceRequest?
+    @State private var jumpRequest: JumpRequest?
     @State private var sidebarTab: SidebarTab = .inspector
     @State var showScriptConsole = false
     @State var scriptOutput = ""
@@ -24,7 +25,7 @@ struct ContentView: View {
 
     var body: some View {
         CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
-                   activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers)
+                   activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest)
             .frame(minWidth: 400)
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
@@ -37,7 +38,7 @@ struct ContentView: View {
                     switch sidebarTab {
                     case .inspector:
                         Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager,
-                                  onSelect: { selection = $0 })
+                                  onSelect: { selection = $0 }, onJump: { jumpRequest = JumpRequest(target: $0) })
                     case .library:
                         LibraryPanel(document: document, selection: selection) { item, keep in
                             placeRequest = PlaceRequest(item: item, keepOriginalColors: keep)
@@ -105,6 +106,7 @@ struct Inspector: View {
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
     var onSelect: (Set<UUID>) -> Void = { _ in }
+    var onJump: (UUID) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(Pref.showRulers) private var showRulers = false
 
@@ -172,6 +174,31 @@ struct Inspector: View {
                 Slider(value: binding(\.bowing, "Change Bowing"), in: 0...3) { Text("Bowing") }
                     .disabled(binding(\.roughness, "").wrappedValue == 0)
             }
+            if selected.count == 1, let e = selected.first {
+                Section("Element") {
+                    NameField(element: e) { name in
+                        var next = document.model
+                        guard let i = next.elements.firstIndex(where: { $0.id == e.id }) else { return }
+                        next.elements[i].name = name.isEmpty ? nil : name
+                        document.commit(next, actionName: "Rename", undoManager: undoManager)
+                    }
+                }
+            }
+            if !selected.isEmpty {
+                Section("Link") {
+                    Picker("Jumps to", selection: linkBinding) {
+                        Text("None").tag(UUID?.none)
+                        if let id = selectedLink, !linkTargets.contains(where: { $0.id == id }) {
+                            Text(document.model.elements.first { $0.id == id }?.displayTitle ?? "Missing element").tag(UUID?.some(id))
+                        }
+                        ForEach(linkTargets) { e in Text(e.displayTitle).tag(UUID?.some(e.id)) }
+                    }
+                    .help("Click the badge beside the shape, or ⌘-click the shape, to go there")
+                    if let id = selectedLink {
+                        Button("Go") { onJump(id) }
+                    }
+                }
+            }
             if tool == .connector || !selectedConnectors.isEmpty {
                 Section("Connector") {
                     Picker("Routing", selection: routingBinding) {
@@ -189,6 +216,31 @@ struct Inspector: View {
     }
 
     private var selectedConnectors: [Element] { selected.filter { $0.kind == .connector } }
+
+    private static let linkTargetLimit = 200
+
+    /// The link the selection shares, if every selected element has the same one.
+    private var selectedLink: UUID? {
+        guard let first = selected.first?.link, selected.allSatisfy({ $0.link == first }) else { return nil }
+        return first
+    }
+
+    /// Named or labelled shapes outside the selection, by name: what a link can point at.
+    private var linkTargets: [Element] {
+        Array(document.model.elements
+            .filter { $0.kind != .connector && !selection.contains($0.id) && !(($0.name ?? $0.text) ?? "").isEmpty }
+            .sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
+            .prefix(Self.linkTargetLimit))
+    }
+
+    private var linkBinding: Binding<UUID?> {
+        Binding(get: { selectedLink },
+                set: { target in
+                    var next = document.model
+                    guard (try? next.setLink(selection, to: target)) != nil else { return }
+                    document.commit(next, actionName: target == nil ? "Remove Link" : "Link", undoManager: undoManager)
+                })
+    }
 
     private func editConnectors(_ name: String, _ change: (inout ConnectorData) -> Void) {
         var next = document.model
@@ -378,6 +430,43 @@ struct LayersSection: View {
     }
 }
 
+/// The selected element's hidden name. Committed on Return or when the field loses focus, so typing is one undo step.
+private struct NameField: View {
+    var element: Element
+    var commit: (String) -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("Name", text: $text, prompt: Text("Not shown on the canvas"))
+            .focused($focused)
+            .onSubmit(save)
+            .onChange(of: focused) { _, now in if !now { save() } }
+            .onAppear { text = element.name ?? "" }
+            .onChange(of: element.id) { _, _ in text = element.name ?? "" }
+            .onChange(of: element.name) { _, n in if !focused { text = n ?? "" } }
+            .help("A name for finding this element in the Layers panel and the Link list")
+    }
+
+    private func save() {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed != (element.name ?? "") { commit(trimmed) }
+    }
+}
+
+extension Element {
+    /// How an element is named in lists: its hidden name, the first line of its text, or its kind.
+    var displayTitle: String {
+        if let n = name, !n.isEmpty { return String(n.prefix(28)) }
+        if let t = text?.split(separator: "\n").first, !t.isEmpty { return String(t.prefix(28)) }
+        switch kind {
+        case .path: return "Shape"
+        case .freehand: return "Stroke"
+        default: return kind.rawValue.capitalized
+        }
+    }
+}
+
 private struct ElementRow: View {
     var element: Element
     var isSelected: Bool
@@ -394,19 +483,10 @@ private struct ElementRow: View {
         }
     }
 
-    private var title: String {
-        if let t = element.text?.split(separator: "\n").first, !t.isEmpty { return String(t.prefix(28)) }
-        switch element.kind {
-        case .path: return "Shape"
-        case .freehand: return "Stroke"
-        default: return element.kind.rawValue.capitalized
-        }
-    }
-
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: symbol).frame(width: 16).foregroundStyle(.secondary)
-            Text(title).lineLimit(1).font(.callout)
+            Text(element.displayTitle).lineLimit(1).font(.callout)
             Spacer(minLength: 0)
         }
         .padding(.vertical, 1)

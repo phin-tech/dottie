@@ -31,6 +31,12 @@ struct DottieCommands: Commands {
             Toggle("Show Rulers", isOn: $showRulers)
                 .keyboardShortcut("r", modifiers: [.command, .shift])
             Divider()
+            Button("Follow Link") { send(#selector(CanvasNSView.followLink(_:))) }
+            Button("Back") { send(#selector(CanvasNSView.jumpBack(_:))) }
+                .keyboardShortcut("[")
+            Button("Forward") { send(#selector(CanvasNSView.jumpForward(_:))) }
+                .keyboardShortcut("]")
+            Divider()
         }
         InspectorCommands()
         CommandGroup(after: .pasteboard) {

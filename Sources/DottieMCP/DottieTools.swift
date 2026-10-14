@@ -159,6 +159,8 @@ actor DottieTools {
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look"),
                 "routing": prop("string", "Connector routing", enum: routingValues),
+                "name": prop("string", "Hidden name for finding and linking to the element; never drawn. Empty string removes it"),
+                "link": prop("string", "Id of a shape this element jumps to when its link badge is clicked in the app; an empty string removes the link"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
         Tool(name: "run_script",
              description: "Code mode: run a JavaScript program that edits the diagram through a `dottie` object, in one call "
@@ -365,11 +367,14 @@ actor DottieTools {
         case "update_element":
             let url = try fileURL(a)
             var doc = try load(url)
+            var link: UUID?? = nil
+            if let s = a.string("link") { link = .some(s.isEmpty ? nil : try a.uuid("link")) }
             do {
                 try DiagramOps.update(&doc, id: try a.uuid("id"), text: a.string("text").map { Optional($0) },
                                       x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
-                                      routing: try a.routing("routing"), look: try a.look())
+                                      routing: try a.routing("routing"), look: try a.look(), link: link,
+                                      name: a.string("name").map { Optional($0) })
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(doc, to: url)
             return text("Updated")
