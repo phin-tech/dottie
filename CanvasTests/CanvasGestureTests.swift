@@ -471,6 +471,37 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(commits.last?.doc.elements.first?.text, "# Hi\n- one")
     }
 
+    /// Return through the app's event queue, as typed, so the editor sees it as the current event.
+    func pressReturn(_ mods: NSEvent.ModifierFlags = []) {
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            NSApp.postEvent(NSEvent.keyEvent(with: type, location: .zero, modifierFlags: mods, timestamp: 0,
+                                             windowNumber: window.windowNumber, context: nil, characters: "\r",
+                                             charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!, atStart: false)
+            // Dequeuing is what makes it NSApp.currentEvent, as the run loop would.
+            guard let e = NSApp.nextEvent(matching: [.keyDown, .keyUp], until: .distantFuture, inMode: .default, dequeue: true) else { return }
+            NSApp.sendEvent(e)
+        }
+    }
+
+    func testReturnInANoteIsANewLineAndShiftOrCommandReturnFinishes() throws {
+        window.makeKeyAndOrderFront(nil)
+        for mods: NSEvent.ModifierFlags in [.shift, .command] {
+            commits = []
+            view.model.elements = []
+            view.tool = .note
+            click(CGPoint(x: 120, y: 100))
+            let editor = try XCTUnwrap(view.textEditor?.currentEditor() as? NSTextView)
+            editor.insertText("a", replacementRange: editor.selectedRange())
+            pressReturn()
+            editor.insertText("b", replacementRange: editor.selectedRange())
+            XCTAssertNotNil(view.textEditor, "plain Return keeps editing")
+            pressReturn(mods)
+            XCTAssertNil(view.textEditor, "\(mods) Return finishes")
+            XCTAssertEqual(view.tool, .select)
+            XCTAssertEqual(commits.last?.doc.elements.first?.text, "a\nb")
+        }
+    }
+
     func testANewNoteLeftEmptyDisappearsButOneEmptiedLaterStays() throws {
         view.tool = .note
         click(CGPoint(x: 120, y: 100))

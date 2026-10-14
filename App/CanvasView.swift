@@ -1618,14 +1618,21 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     func controlTextDidEndEditing(_ obj: Notification) { endEditing() }
 
     /// Escape inside the text editor finishes editing and returns to the arrow. In a note, Return starts a
-    /// new line, since Markdown needs them; Escape or clicking away finishes.
+    /// new line, since Markdown needs them, and Shift- or Command-Return finishes like Escape.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
-        if selector == #selector(NSResponder.insertNewline(_:)), let id = editingID,
-           model.elements.first(where: { $0.id == id })?.kind == .note {
-            textView.insertNewlineIgnoringFieldEditor(nil)
-            return true
+        if let id = editingID, model.elements.first(where: { $0.id == id })?.kind == .note {
+            // Shift-Return arrives as insertNewline and Command-Return as noop, so ask the key event.
+            let finishing = NSApp.currentEvent.map {
+                $0.type == .keyDown && [36, 76].contains($0.keyCode) && !$0.modifierFlags.isDisjoint(with: [.shift, .command])
+            } ?? false
+            if !finishing, selector == #selector(NSResponder.insertNewline(_:)) {
+                textView.insertNewlineIgnoringFieldEditor(nil)
+                return true
+            }
+            guard finishing || selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
+        } else if selector != #selector(NSResponder.cancelOperation(_:)) {
+            return false
         }
-        guard selector == #selector(NSResponder.cancelOperation(_:)) else { return false }
         endEditing()
         switchTool(.select)
         return true
