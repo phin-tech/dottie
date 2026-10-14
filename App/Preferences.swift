@@ -16,6 +16,11 @@ enum Pref {
     static let showRulers = "showRulers"
     /// The script console's text, kept across launches.
     static let scriptSource = "scriptSource"
+    static let checkForUpdates = "checkForUpdates"
+    /// Seconds since 1970 of the last successful update check.
+    static let lastUpdateCheck = "lastUpdateCheck"
+    /// A version the automatic check should not offer again.
+    static let skippedUpdate = "skippedUpdateVersion"
 
     static let routingDefault = Routing.straight.rawValue
     static let gridSizeDefault = 20.0
@@ -86,6 +91,7 @@ private struct GeneralSettings: View {
     @AppStorage(Pref.singleKeyShortcuts) private var singleKeyShortcuts = true
     @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
+    @AppStorage(Pref.checkForUpdates) private var checkForUpdates = true
 
     var body: some View {
         Form {
@@ -110,6 +116,15 @@ private struct GeneralSettings: View {
             }
             Section("Keyboard") {
                 Toggle("Single-key tool shortcuts (V, R, O, D, T, C, P)", isOn: $singleKeyShortcuts)
+            }
+            Section {
+                Toggle("Check for updates automatically", isOn: $checkForUpdates)
+                Button("Check Now") { Task { await UpdateChecker.shared.check(userInitiated: true) } }
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text("Once a day, Dottie asks GitHub for the latest release. It never downloads or installs anything by itself.")
+                    .foregroundStyle(.secondary)
             }
             Section {
                 Button("Reset Style for New Shapes") {

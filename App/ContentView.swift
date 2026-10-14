@@ -79,7 +79,10 @@ struct ContentView: View {
             LiveRegistry.shared.register(document, fileURL: url, undoManager: undoManager)
         }
         // A new window counts as current until another becomes key, so "current" works before first focus.
-        .onAppear { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
+        .onAppear {
+            LiveRegistry.shared.markFront(document, undoManager: undoManager)
+            UpdateChecker.shared.checkIfDue()
+        }
         .onChange(of: activeState) { _, state in
             if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
         }

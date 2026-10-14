@@ -21,6 +21,9 @@ struct DottieCommands: Commands {
     private func send(_ action: Selector) { NSApp.sendAction(action, to: nil, from: nil) }
 
     var body: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { Task { await UpdateChecker.shared.check(userInitiated: true) } }
+        }
         CommandGroup(after: .toolbar) {
             Button("Zoom In") { send(#selector(CanvasNSView.zoomIn(_:))) }
                 .keyboardShortcut("=")

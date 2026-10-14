@@ -134,6 +134,7 @@ targets:
       - App/OptionalLibraries.swift
       - App/LiveServer.swift
       - App/DrawingDocument.swift
+      - App/UpdateChecker.swift
     dependencies:
       - package: Dottie
         product: DottieKit

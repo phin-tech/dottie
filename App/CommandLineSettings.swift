@@ -32,10 +32,32 @@ struct CommandLineSettings: View {
             .first { (try? FileManager.default.destinationOfSymbolicLink(atPath: $0.path)) != nil }
     }
 
+    /// The cask links `dottie` itself and removes it on uninstall, so Settings leaves that link alone.
+    private static var homebrewLink: URL? {
+        guard ["/opt/homebrew/Caskroom/dottie", "/usr/local/Caskroom/dottie"].contains(where: { FileManager.default.fileExists(atPath: $0) })
+        else { return nil }
+        return ["/opt/homebrew/bin/dottie", "/usr/local/bin/dottie"].map { URL(fileURLWithPath: $0) }
+            .first { (try? FileManager.default.destinationOfSymbolicLink(atPath: $0.path)) != nil }
+    }
+
     var body: some View {
         let _ = refresh
         let binary = Self.binaryURL
         let link = Self.installedLink
+        if let brew = Self.homebrewLink {
+            Form {
+                Section {
+                    LabeledContent("Installed") { Text(brew.path).font(.caption.monospaced()).textSelection(.enabled) }
+                } header: {
+                    Text("dottie command")
+                } footer: {
+                    Text("Homebrew installed the dottie command with the app, and updates and removes it with the app.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .formStyle(.grouped)
+            .fixedSize(horizontal: false, vertical: true)
+        } else {
         Form {
             Section {
                 LabeledContent("Tool") {
@@ -74,6 +96,7 @@ struct CommandLineSettings: View {
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func install(_ binary: URL?, into dir: URL, admin: Bool) {

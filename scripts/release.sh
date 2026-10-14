@@ -54,3 +54,6 @@ sum=$(shasum -a 256 "$zip" | cut -d' ' -f1)
 gh release create "$tag" "$zip" --target "$(git rev-parse HEAD)" --title "Dottie $version" --generate-notes >/dev/null
 echo "Released $tag (build $build): Dottie-$version.zip, sha256 $sum"
 gh release view "$tag" --json url -q .url
+
+# The Homebrew cask; if this fails, `just tap` retries it.
+scripts/update-tap.sh "$version"

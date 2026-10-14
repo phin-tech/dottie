@@ -33,8 +33,13 @@ rather than in Xcode's Signing & Capabilities pane, which is lost when the proje
 3. In Xcode: Product ▸ Archive, then Distribute App ▸ Direct Distribution, and wait for "Ready to distribute".
    This needs a Developer ID Application certificate.
 4. `just release`: finds the newest notarized `Dottie.app` Xcode kept in the archive's `Submissions` folder,
-   checks it is a stapled, notarized Developer ID build and that `main` is clean and pushed, then publishes
-   `Dottie-<version>.zip` as a GitHub release tagged `v<version>` with generated notes.
+   checks it is a stapled, notarized Developer ID build of the version in `project.yml` and that `main` is clean
+   and pushed, then publishes `Dottie-<version>.zip` as a GitHub release tagged `v<version>` with generated
+   notes. Last, it points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at
+   the new zip; `just tap` does that step alone if it failed.
+
+The app's update check (`UpdateChecker`) reads GitHub's latest release, which skips drafts and pre-releases. It
+only tells people: Homebrew installs get the `brew upgrade` command, others the release page.
 
 ## File format
 

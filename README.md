@@ -11,9 +11,18 @@ needs to go in a document. Or just ask Claude to draw it, and watch the shapes a
 
 ## Get Dottie
 
-1. Download the latest `Dottie-x.y.z.zip` from [Releases](https://github.com/phin-tech/dottie/releases).
-2. Unzip it and drag **Dottie** into your Applications folder.
-3. Open it. You need macOS 14 Sonoma or later.
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask phin-tech/tap/dottie
+```
+
+Or download the latest `Dottie-x.y.z.zip` from [Releases](https://github.com/phin-tech/dottie/releases), unzip
+it, and drag **Dottie** into your Applications folder. You need macOS 14 Sonoma or later.
+
+Dottie checks GitHub once a day and tells you when a new version is out (turn that off in Settings ▸ General,
+or use Dottie ▸ Check for Updates… any time). It never updates itself: with Homebrew, run
+`brew upgrade --cask dottie`; otherwise download the new version.
 
 ## Ask your AI assistant to draw
 
@@ -75,7 +84,7 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 
 - **Scripting.** Script ▸ Script Console… (⌥⌘J) runs JavaScript to draw or change many things at once, such as
   a grid of boxes or restyling everything labelled "TODO". The console includes a full reference.
-- **Command line.** Settings ▸ Command Line installs a `dottie` command, so you can turn drawings into images
+- **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
   from Terminal: `dottie render diagram.dottie -o diagram.png`. Run `dottie --help` for more.
 
 ## Help and feedback

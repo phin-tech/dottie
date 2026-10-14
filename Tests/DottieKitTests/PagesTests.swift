@@ -165,3 +165,31 @@ final class VersionTests: XCTestCase {
         XCTAssertEqual(line.split(separator: "\"").dropFirst().first.map(String.init), DottieVersion.current)
     }
 }
+
+final class UpdateTests: XCTestCase {
+    func testVersionsCompareNumberByNumber() throws {
+        func v(_ s: String) throws -> ReleaseVersion { try XCTUnwrap(ReleaseVersion(s)) }
+        XCTAssertLessThan(try v("0.1.9"), try v("0.1.10"))
+        XCTAssertLessThan(try v("v0.1.1"), try v("0.2"))
+        XCTAssertEqual(try v("1.0"), try v("1.0.0"))
+        XCTAssertEqual(try v("v2.0.0-beta.1").description, "2.0.0")
+        XCTAssertNil(ReleaseVersion("latest"))
+        XCTAssertNil(ReleaseVersion("1..2"))
+    }
+
+    /// Trimmed from a real `releases/latest` response.
+    private let response = #"""
+    {"url":"https://api.github.com/repos/phin-tech/dottie/releases/1","html_url":"https://github.com/phin-tech/dottie/releases/tag/v0.1.1",
+     "tag_name":"v0.1.1","name":"Dottie 0.1.1","draft":false,"prerelease":false,
+     "assets":[{"name":"Dottie-0.1.1.zip","browser_download_url":"https://github.com/phin-tech/dottie/releases/download/v0.1.1/Dottie-0.1.1.zip"}]}
+    """#
+
+    func testReadsTheLatestReleaseAndComparesWithTheRunningVersion() throws {
+        let release = try JSONDecoder().decode(LatestRelease.self, from: Data(response.utf8))
+        XCTAssertEqual(release.pageURL.absoluteString, "https://github.com/phin-tech/dottie/releases/tag/v0.1.1")
+        XCTAssertEqual(release.newer(than: "0.1.0")?.description, "0.1.1")
+        XCTAssertNil(release.newer(than: "0.1.1"))
+        XCTAssertNil(release.newer(than: "0.2.0"), "a build newer than the latest release is not offered a downgrade")
+        XCTAssertNil(release.newer(than: "not a version"))
+    }
+}

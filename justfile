@@ -48,6 +48,10 @@ clean:
 bump part:
     scripts/bump.sh "{{part}}"
 
+# Point the Homebrew cask in phin-tech/homebrew-tap at a published release (default: the current version)
+tap version="":
+    scripts/update-tap.sh {{version}}
+
 # Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or `app`, as a GitHub release
 release app="":
     scripts/release.sh "{{app}}"
