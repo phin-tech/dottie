@@ -648,3 +648,42 @@ final class RotatedResizeTests: XCTestCase {
         XCTAssertEqual(moved.frame.width, 110, accuracy: 0.001)
     }
 }
+
+final class AgentOpsTests: XCTestCase {
+    func testBuildCarriesEdgeLabelsAndLooksApply() throws {
+        var doc = DottieDocument()
+        let ids = try DiagramOps.build(&doc, nodes: [.init(key: "a", text: "A"), .init(key: "b", text: "B")],
+                                       edges: [.init(from: "a", to: "b", label: "yes")], roughness: 0)
+        let conn = try XCTUnwrap(doc.elements.first { $0.kind == .connector })
+        XCTAssertEqual(conn.text, "yes")
+        XCTAssertEqual(DiagramOps.summarize(doc).first { $0.kind == "connector" }?.text, "yes")
+
+        try DiagramOps.update(&doc, id: ids["a"]!, look: .init(fillStyle: .hachure, dash: .dashed, strokeWidth: 4, rotation: 90))
+        let a = try XCTUnwrap(doc.elements.first { $0.id == ids["a"] })
+        XCTAssertEqual(a.style.fillStyle, .hachure)
+        XCTAssertEqual(a.style.dash, .dashed)
+        XCTAssertEqual(a.angle, .pi / 2, accuracy: 1e-9)
+        try DiagramOps.update(&doc, id: conn.id, look: .init(startHead: .dot, endHead: .bar, rotation: 45))
+        let c2 = try XCTUnwrap(doc.elements.first { $0.id == conn.id })
+        XCTAssertEqual(c2.connector?.startHead, .dot)
+        XCTAssertEqual(c2.connector?.endHead, .bar)
+        XCTAssertNil(c2.rotation) // connectors ignore rotation
+        XCTAssertEqual(DiagramOps.summarize(doc).first { $0.id == ids["a"]!.uuidString }?.rotation, 90)
+    }
+
+    func testAnnotationsMapIdsToPixelBoxesInThePNG() throws {
+        var doc = DottieDocument()
+        _ = try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 100, height: 50), at: .zero,
+                                    text: "Start", fill: nil, stroke: nil, roughness: 0)
+        let b = try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 200, y: 100, width: 100, height: 50), at: .zero,
+                                        text: "End", fill: nil, stroke: nil, roughness: 0)
+        let notes = DiagramOps.annotations(doc, scale: 2)
+        XCTAssertEqual(notes.count, 2)
+        let end = try XCTUnwrap(notes.first { $0.id == b.id.uuidString })
+        XCTAssertEqual(end.text, "End")
+        // Export pads by 24 around the content, so the first shape starts at 24 * scale.
+        XCTAssertEqual(try XCTUnwrap(notes.first { $0.text == "Start" }).x, 48, accuracy: 0.1)
+        XCTAssertEqual(end.x, (200 + 24) * 2, accuracy: 0.1)
+        XCTAssertEqual(end.width, 200, accuracy: 0.1)
+    }
+}

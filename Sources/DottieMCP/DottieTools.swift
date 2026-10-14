@@ -18,6 +18,20 @@ private func schema(_ props: [String: Value], required: [String] = []) -> Value 
 private let pathProp = prop("string", "Absolute path to a .dottie file, or \"current\" for the frontmost open Dottie window (needs the app running)")
 private let kindValues = ["rectangle", "ellipse", "diamond", "text"]
 private let routingValues = ["straight", "curved", "elbow"]
+private let fillStyleValues = ["solid", "hachure", "crossHatch"]
+private let dashValues = ["solid", "dashed", "dotted"]
+private let headValues = ["none", "arrow", "triangle", "dot", "bar"]
+
+/// Look options shared by add_shape, add_connector and update_element.
+private let lookProps: [String: Value] = [
+    "fill_style": prop("string", "How the fill is painted: solid, or pen-shaded hachure / crossHatch", enum: fillStyleValues),
+    "dash": prop("string", "Line style", enum: dashValues),
+    "stroke_width": prop("number", "Line width, 0.5 to 24 (default 2)"),
+    "bowing": prop("number", "How much sketchy lines bow sideways, 0 to 3 (default 1)"),
+    "rotation": prop("number", "Degrees clockwise about the shape's center (shapes only)"),
+    "start_head": prop("string", "Connector start arrowhead", enum: headValues),
+    "end_head": prop("string", "Connector end arrowhead", enum: headValues),
+]
 
 private struct ToolFailure: Error { var message: String }
 
@@ -56,6 +70,19 @@ private struct Args {
         return u
     }
     var roughness: Double? { bool("sketchy").map { $0 ? 1 : 0 } }
+
+    private func enumValue<T: RawRepresentable>(_ k: String, _ values: [String]) throws -> T? where T.RawValue == String {
+        guard let s = string(k) else { return nil }
+        guard let v = T(rawValue: s) else { throw ToolFailure(message: "'\(k)' must be one of \(values.joined(separator: ", ")), got '\(s)'") }
+        return v
+    }
+
+    func look() throws -> DiagramOps.Look {
+        DiagramOps.Look(fillStyle: try enumValue("fill_style", fillStyleValues), dash: try enumValue("dash", dashValues),
+                        strokeWidth: double("stroke_width"), bowing: double("bowing"),
+                        startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
+                        rotation: double("rotation"))
+    }
 }
 
 // MARK: Tools
@@ -93,6 +120,7 @@ actor DottieTools {
                         "to": prop("string", "Target node key"),
                         "routing": prop("string", "Default elbow", enum: routingValues),
                         "arrow": prop("boolean", "Arrowhead at the target, default true"),
+                        "label": prop("string", "Text shown on the connector, e.g. \"yes\""),
                     ]),
                     "required": ["from", "to"],
                 ])]),
@@ -110,7 +138,7 @@ actor DottieTools {
                 "text": prop("string", "Label"),
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
-             ], required: ["path", "kind", "x", "y"])),
+             ].merging(lookProps) { a, _ in a }, required: ["path", "kind", "x", "y"])),
         Tool(name: "add_connector",
              description: "Connect two shapes. The connector stays attached when shapes move.",
              inputSchema: schema([
@@ -118,10 +146,11 @@ actor DottieTools {
                 "from_id": prop("string", "Source element id"), "to_id": prop("string", "Target element id"),
                 "routing": prop("string", "Default straight", enum: routingValues),
                 "arrow": prop("boolean", "Arrowhead at the target, default true"),
+                "label": prop("string", "Text shown on the connector"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
-             ], required: ["path", "from_id", "to_id"])),
+             ].merging(lookProps) { a, _ in a }, required: ["path", "from_id", "to_id"])),
         Tool(name: "update_element",
-             description: "Change text, position, size, colors, look or routing of an element. Only provided fields change.",
+             description: "Change text (a connector's text is its label), position, size, colors, look or routing of an element. Only provided fields change.",
              inputSchema: schema([
                 "path": pathProp, "id": prop("string", "Element id"),
                 "text": prop("string", "New label"),
@@ -130,7 +159,14 @@ actor DottieTools {
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look"),
                 "routing": prop("string", "Connector routing", enum: routingValues),
-             ], required: ["path", "id"])),
+             ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "open_document",
+             description: "Open a .dottie file in the Dottie app (launching it if needed) so edits show live and are undoable. "
+                + "Set create=true to make the file first if it does not exist. Reports whether live editing is available.",
+             inputSchema: schema([
+                "path": .object(["type": "string", "description": "Absolute path to a .dottie file"]),
+                "create": prop("boolean", "Create an empty diagram if the file does not exist"),
+             ], required: ["path"])),
         Tool(name: "delete_element",
              description: "Delete an element. Connectors attached to a deleted shape stay in place as free arrows.",
              inputSchema: schema(["path": pathProp, "id": prop("string", "Element id")], required: ["path", "id"])),
@@ -143,7 +179,8 @@ actor DottieTools {
                                   "direction": prop("string", "TB (default) or LR", enum: ["TB", "LR"])], required: ["path"])),
         Tool(name: "export_png",
              description: "Render the diagram to a PNG and return it as an image so you can check the result. "
-                + "Optionally also save it to out_path. Set sketchy=false to render the same drawing clean.",
+                + "Optionally also save it to out_path. Set sketchy=false to render the same drawing clean. "
+                + "Also returns a JSON map of element id to kind, text and pixel box in the image, so you can refer to what you see.",
              inputSchema: schema([
                 "path": pathProp,
                 "scale": prop("number", "Pixel scale, default 2"),
@@ -246,7 +283,7 @@ actor DottieTools {
             }
             let edges = try (a.array("edges") ?? []).map { e in
                 DiagramOps.EdgeSpec(from: try e.require("from"), to: try e.require("to"),
-                                    routing: try e.routing("routing"), arrow: e.bool("arrow") ?? true)
+                                    routing: try e.routing("routing"), arrow: e.bool("arrow") ?? true, label: e.string("label"))
             }
             let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
             let ids: [String: UUID]
@@ -265,7 +302,7 @@ actor DottieTools {
             if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: x, y: y, width: w, height: h) }
             let e = try DiagramOps.addShape(&doc, kind: try a.kind("kind"), frame: frame, at: CGPoint(x: x, y: y),
                                             text: a.string("text"), fill: try a.color("fill"), stroke: try a.color("stroke"),
-                                            roughness: a.roughness)
+                                            roughness: a.roughness, look: try a.look())
             try save(doc, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)")
 
@@ -276,7 +313,7 @@ actor DottieTools {
             do {
                 c = try DiagramOps.addConnector(&doc, from: try a.uuid("from_id"), to: try a.uuid("to_id"),
                                                 routing: try a.routing("routing") ?? .straight, arrow: a.bool("arrow") ?? true,
-                                                roughness: a.roughness)
+                                                roughness: a.roughness, label: a.string("label"), look: try a.look())
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(doc, to: url)
             return text("id: \(c.id.uuidString)")
@@ -288,10 +325,44 @@ actor DottieTools {
                 try DiagramOps.update(&doc, id: try a.uuid("id"), text: a.string("text").map { Optional($0) },
                                       x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
-                                      routing: try a.routing("routing"))
+                                      routing: try a.routing("routing"), look: try a.look())
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(doc, to: url)
             return text("Updated")
+
+        case "open_document":
+            let url = try fileURL(a)
+            if url == Self.currentURL { throw ToolFailure(message: "\"current\" is already open; pass the file's absolute path.") }
+            if !FileManager.default.fileExists(atPath: url.path) {
+                guard a.bool("create") == true else {
+                    throw ToolFailure(message: "No such file: \(url.path). Pass create=true to make it, or call create_diagram.")
+                }
+                try save(DottieDocument(), to: url)
+            }
+            if LiveClient.get(path: url.path) != nil { return text("\(url.path) is already open in Dottie; edits are live.") }
+            let open = Process()
+            open.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            open.arguments = ["-a", "Dottie", url.path]
+            open.standardError = FileHandle.nullDevice
+            try? open.run()
+            open.waitUntilExit()
+            if open.terminationStatus != 0 {
+                // No app named Dottie registered: let Launch Services pick the handler for .dottie.
+                let fallback = Process()
+                fallback.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+                fallback.arguments = [url.path]
+                try? fallback.run()
+                fallback.waitUntilExit()
+                guard fallback.terminationStatus == 0 else {
+                    throw ToolFailure(message: "Could not open \(url.path) in Dottie. Is the app installed?")
+                }
+            }
+            // The window registers with the live server shortly after it appears.
+            for _ in 0..<40 {
+                if LiveClient.get(path: url.path) != nil { return text("Opened \(url.path) in Dottie; edits are live.") }
+                Thread.sleep(forTimeInterval: 0.125)
+            }
+            return text("Asked Dottie to open \(url.path), but it has not reported in yet. Edits will go to the file until it does.")
 
         case "delete_element":
             let url = try fileURL(a)
@@ -324,7 +395,9 @@ actor DottieTools {
                 try png.write(to: out, options: .atomic)
                 note += ", saved to \(out.path)"
             }
-            return .init(content: [.image(data: png.base64EncodedString(), mimeType: "image/png", metadata: nil), .text(note)])
+            let map = DiagramOps.annotations(doc, scale: scale)
+            return .init(content: [.image(data: png.base64EncodedString(), mimeType: "image/png", metadata: nil),
+                                   .text(note + "\nElements in the image (pixels from its top-left):\n" + (try json(map)))])
 
         case "export_svg":
             var doc = try load(try fileURL(a))

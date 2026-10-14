@@ -15,18 +15,22 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Copy/paste/duplicate, groups, align/distribute, z-order, smart guides + grid snap, pencil, SVG export
 - [x] Live mode: the MCP server edits documents open in the app over a Unix socket (undoable)
 
+- [x] Pen strokes stored as fitted Béziers (flat, deterministic); point editing and an eraser that cuts strokes
+- [x] Hachure / cross-hatch fills, dashed and dotted lines, arrowhead choices, bowing, connector labels
+- [x] Layers panel (add, hide, lock, rename, reorder; layer order is z-order)
+- [x] Rotation, resize with smart guides, equal-spacing guides while moving
+
 ## Next
-1. Layers panel (add/hide/lock/reorder)
-2. Hachure fills, stroke-width/dash styles, arrowhead choices
-3. Resize-with-smart-guides, distribute spacing guides, rotate
-4. Stencil/shape libraries, rulers, themes
-5. Edit pencil strokes (point editing), eraser
+1. Stencil/shape libraries, rulers, themes
+2. Rotate multiple elements together; rotate pen strokes' control handles with the stroke
+3. Per-element layer drag-and-drop in the layers panel
 
 ## Agents (MCP)
 - [x] Live mode (see README); `export_svg`
-- [ ] Open a file in the app from the MCP server (`open_document`)
-- [ ] Connector labels
-- [ ] Return an element-id -> text map from `export_png` so agents can annotate
+- [x] `open_document`: open a file in the app from the MCP server
+- [x] Connector labels (`label` on edges and `add_connector`; `text` on `update_element`)
+- [x] `export_png` returns an element-id -> kind, text and pixel box map
+- [x] Look options on shapes and connectors: `fill_style`, `dash`, `stroke_width`, `bowing`, `rotation`, `start_head`, `end_head`
 
 ## Open questions
 - Hand-drawn font: Excalidraw's Virgil/Excalifont have their own license; using system font until decided.

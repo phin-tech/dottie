@@ -48,8 +48,9 @@ public enum DiagramOps {
         public var from: String, to: String
         public var routing: Routing?
         public var arrow: Bool
-        public init(from: String, to: String, routing: Routing? = nil, arrow: Bool = true) {
-            self.from = from; self.to = to; self.routing = routing; self.arrow = arrow
+        public var label: String?
+        public init(from: String, to: String, routing: Routing? = nil, arrow: Bool = true, label: String? = nil) {
+            self.from = from; self.to = to; self.routing = routing; self.arrow = arrow; self.label = label
         }
     }
 
@@ -75,11 +76,43 @@ public enum DiagramOps {
         return l.id
     }
 
+    /// Look options an agent can set on any element. Everything is optional; nil leaves the field alone.
+    public struct Look: Sendable {
+        public var fillStyle: FillStyle?
+        public var dash: DashStyle?
+        public var strokeWidth: Double?
+        public var bowing: Double?
+        public var startHead: Arrowhead?
+        public var endHead: Arrowhead?
+        /// Degrees, clockwise.
+        public var rotation: Double?
+        public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
+                    startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil) {
+            self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
+            self.startHead = startHead; self.endHead = endHead; self.rotation = rotation
+        }
+
+        func apply(to e: inout Element) {
+            if let fillStyle { e.style.fillStyle = fillStyle }
+            if let dash { e.style.dash = dash }
+            if let strokeWidth { e.style.strokeWidth = min(max(strokeWidth, 0.5), 24) }
+            if let bowing { e.style.bowing = max(0, bowing) }
+            if e.kind == .connector {
+                if let startHead { e.connector?.startHead = startHead }
+                if let endHead { e.connector?.endHead = endHead }
+            } else if let rotation {
+                let a = (rotation * .pi / 180).truncatingRemainder(dividingBy: 2 * .pi)
+                e.rotation = abs(a) < 1e-9 ? nil : a
+            }
+        }
+    }
+
     // MARK: Primitive edits
 
     @discardableResult
     public static func addShape(_ doc: inout DottieDocument, kind: ElementKind, frame: CGRect?, at origin: CGPoint,
-                                text: String?, fill: RGBA?, stroke: RGBA?, roughness: Double?) throws -> Element {
+                                text: String?, fill: RGBA?, stroke: RGBA?, roughness: Double?,
+                                look: Look = Look()) throws -> Element {
         guard kind != .connector else { throw OpsError.invalid("Use add_connector for connectors") }
         var style = Style()
         if let fill { style.fill = fill }
@@ -88,14 +121,16 @@ public enum DiagramOps {
         if kind == .text { style.roughness = 0 }
         let size = frame?.size ?? defaultSize(for: kind, text: text ?? "", fontSize: style.fontSize)
         let f = CGRect(origin: frame?.origin ?? origin, size: size)
-        let e = Element(kind: kind, frame: f, style: style, layerID: activeLayerID(&doc), text: text)
+        var e = Element(kind: kind, frame: f, style: style, layerID: activeLayerID(&doc), text: text)
+        look.apply(to: &e)
         doc.elements.append(e)
         return e
     }
 
     @discardableResult
     public static func addConnector(_ doc: inout DottieDocument, from: UUID, to: UUID, routing: Routing = .straight,
-                                    arrow: Bool = true, port: (Port?, Port?) = (nil, nil), roughness: Double? = nil) throws -> Element {
+                                    arrow: Bool = true, port: (Port?, Port?) = (nil, nil), roughness: Double? = nil,
+                                    label: String? = nil, look: Look = Look()) throws -> Element {
         func shape(_ id: UUID) throws -> Element {
             guard let e = doc.elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
             guard e.kind != .connector else { throw OpsError.invalid("Connectors can only attach to shapes") }
@@ -105,14 +140,15 @@ public enum DiagramOps {
         var style = Style()
         if let roughness { style.roughness = roughness }
         let data = ConnectorData(start: .bound(from, port: port.0), end: .bound(to, port: port.1), routing: routing, endArrow: arrow)
-        let e = Element(kind: .connector, frame: .zero, style: style, layerID: activeLayerID(&doc), connector: data)
+        var e = Element(kind: .connector, frame: .zero, style: style, layerID: activeLayerID(&doc), text: label, connector: data)
+        look.apply(to: &e)
         doc.elements.append(e)
         return e
     }
 
     public static func update(_ doc: inout DottieDocument, id: UUID, text: String?? = nil, x: Double? = nil, y: Double? = nil,
                               width: Double? = nil, height: Double? = nil, fill: RGBA? = nil, stroke: RGBA? = nil,
-                              roughness: Double? = nil, routing: Routing? = nil) throws {
+                              roughness: Double? = nil, routing: Routing? = nil, look: Look = Look()) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
         if let text { doc.elements[i].text = text }
         if doc.elements[i].kind != .connector {
@@ -125,6 +161,7 @@ public enum DiagramOps {
         if let stroke { doc.elements[i].style.stroke = stroke }
         if let roughness { doc.elements[i].style.roughness = roughness }
         if let routing { doc.elements[i].connector?.routing = routing }
+        look.apply(to: &doc.elements[i])
     }
 
     public static func delete(_ doc: inout DottieDocument, id: UUID) throws {
@@ -176,7 +213,7 @@ public enum DiagramOps {
             // Ports follow the flow direction so laid-out diagrams read as clean flowcharts.
             let ports: (Port?, Port?) = direction == .topToBottom ? (.bottom, .top) : (.right, .left)
             try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: edge.routing ?? defaultRouting,
-                             arrow: edge.arrow, port: ports, roughness: roughness)
+                             arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label)
         }
         return ids
     }
@@ -192,6 +229,26 @@ public enum DiagramOps {
 
     // MARK: Inspection
 
+    /// Where each element landed in an exported PNG, so an agent can point at things it sees in the image.
+    public struct Annotation: Codable, Equatable, Sendable {
+        public var id: String
+        public var kind: String
+        public var text: String?
+        /// Pixels from the image's top-left corner.
+        public var x, y, width, height: Double
+    }
+
+    public static func annotations(_ doc: DottieDocument, scale: Double) -> [Annotation] {
+        let origin = Exporter.bounds(of: doc).origin
+        let visible = Set(doc.layers.filter(\.visible).map(\.id))
+        func px(_ v: Double) -> Double { (v * scale * 10).rounded() / 10 }
+        return doc.orderedElements.filter { visible.contains($0.layerID) }.map { e in
+            let b = e.kind == .connector ? Connector.bounds(of: e, in: doc) : e.rotatedBounds
+            return Annotation(id: e.id.uuidString, kind: e.kind.rawValue, text: e.text,
+                              x: px(b.minX - origin.x), y: px(b.minY - origin.y), width: px(b.width), height: px(b.height))
+        }
+    }
+
     public struct ElementSummary: Codable, Equatable, Sendable {
         public var id: String
         public var kind: String
@@ -201,6 +258,9 @@ public enum DiagramOps {
         public var to: String?
         public var routing: String?
         public var sketchy: Bool
+        public var rotation: Double?
+        public var fillStyle: String?
+        public var dash: String?
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
@@ -211,7 +271,10 @@ public enum DiagramOps {
                                   width: (b.width * 10).rounded() / 10, height: (b.height * 10).rounded() / 10,
                                   text: e.text, from: e.connector?.start.elementID?.uuidString,
                                   to: e.connector?.end.elementID?.uuidString,
-                                  routing: e.connector?.routing.rawValue, sketchy: e.style.roughness > 0)
+                                  routing: e.connector?.routing.rawValue, sketchy: e.style.roughness > 0,
+                                  rotation: e.rotation.map { ($0 * 180 / .pi * 10).rounded() / 10 },
+                                  fillStyle: e.style.fillStyle == .solid ? nil : e.style.fillStyle.rawValue,
+                                  dash: e.style.dash == .solid ? nil : e.style.dash.rawValue)
         }
     }
 }

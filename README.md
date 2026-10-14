@@ -22,7 +22,11 @@ claude mcp add dottie -- "$(swift build -c release --product dottie-mcp --show-b
 
 Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its work),
-`export_svg`, `create_diagram`.
+`export_svg`, `create_diagram`, `open_document`.
+
+`export_png` also returns each element's id, kind, text and pixel box in the image. Connectors take a `label`;
+shapes and connectors take `fill_style` (solid, hachure, crossHatch), `dash`, `stroke_width`, `bowing`,
+`rotation` (degrees) and `start_head` / `end_head` (none, arrow, triangle, dot, bar).
 
 **Live mode.** If the Dottie app has the file open, tool calls edit that open document (one undo step each,
 shown as "Agent: <tool>" in Edit ▸ Undo) instead of the file on disk, and `export_png` renders what is on screen.
