@@ -451,3 +451,57 @@ final class OpsTests: XCTestCase {
         XCTAssertEqual(pts[pts.count - 2].x, pts.last!.x, accuracy: 0.001) // arrives straight down
     }
 }
+
+final class PhaseOneTests: XCTestCase {
+    func testHachureLinesStayInsideThePolygon() {
+        let poly = [CGPoint(x: 0, y: 0), CGPoint(x: 100, y: 0), CGPoint(x: 100, y: 60), CGPoint(x: 0, y: 60)]
+        let lines = Hachure.lines(in: poly, gap: 8)
+        XCTAssertGreaterThan(lines.count, 8)
+        for (a, b) in lines {
+            for p in [a, b] {
+                XCTAssertGreaterThanOrEqual(p.x, -0.01); XCTAssertLessThanOrEqual(p.x, 100.01)
+                XCTAssertGreaterThanOrEqual(p.y, -0.01); XCTAssertLessThanOrEqual(p.y, 60.01)
+            }
+        }
+        // Concave shapes get one segment per crossing pair, not one chord across the notch.
+        let u = [CGPoint(x: 0, y: 0), CGPoint(x: 90, y: 0), CGPoint(x: 90, y: 90), CGPoint(x: 60, y: 90),
+                 CGPoint(x: 60, y: 30), CGPoint(x: 30, y: 30), CGPoint(x: 30, y: 90), CGPoint(x: 0, y: 90)]
+        XCTAssertGreaterThan(Hachure.lines(in: u, angle: 0, gap: 10).count, Hachure.lines(in: poly, angle: 0, gap: 10).count / 2)
+    }
+
+    func testFillStylesAndDashesRenderAndExport() throws {
+        var doc = DottieDocument()
+        var st = Style(); st.fill = RGBA(r: 0.9, g: 0.5, b: 0.2); st.fillStyle = .crossHatch; st.dash = .dashed
+        let a = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 120, height: 80), style: st, layerID: doc.layers[0].id)
+        doc.elements = [a]
+        XCTAssertFalse(Renderer.hachurePath(for: a).isEmpty)
+        XCTAssertTrue(Exporter.svg(doc).contains("stroke-dasharray"))
+        XCTAssertNotNil(Exporter.png(doc))
+        // Same seed, same hatch.
+        XCTAssertEqual(Renderer.hachurePath(for: a), Renderer.hachurePath(for: a))
+        XCTAssertTrue(Renderer.hachurePath(for: { var s = a; s.style.fillStyle = .solid; return s }()).isEmpty)
+    }
+
+    func testArrowheadsAndConnectorLabels() throws {
+        var doc = DottieDocument()
+        let a = try DiagramOps.addShape(&doc, kind: .rectangle, frame: nil, at: .zero, text: "A", fill: nil, stroke: nil, roughness: 0)
+        let b = try DiagramOps.addShape(&doc, kind: .rectangle, frame: nil, at: CGPoint(x: 300, y: 0), text: "B", fill: nil, stroke: nil, roughness: 0)
+        var c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id, roughness: 0)
+        let i = doc.elements.firstIndex { $0.id == c.id }!
+        doc.elements[i].connector?.endHead = .triangle
+        doc.elements[i].connector?.startHead = .dot
+        doc.elements[i].text = "yes"
+        c = doc.elements[i]
+        let parts = Renderer.connectorParts(for: c, in: doc)
+        XCTAssertFalse(parts.filled.isEmpty)
+        let mid = Renderer.midpoint(of: c, in: doc)
+        let ends = Connector.endpoints(of: c, in: doc)
+        XCTAssertEqual(mid.x, (ends.0.x + ends.1.x) / 2, accuracy: 0.5)
+        XCTAssertTrue(Renderer.labelRect(for: c, in: doc).contains(mid))
+        XCTAssertTrue(Exporter.svg(doc).contains(">yes</tspan>"))
+        // Round trip keeps the heads.
+        let round = try DottieDocument.decode(doc.encoded())
+        XCTAssertEqual(round.elements[i].connector?.endHead, .triangle)
+        XCTAssertEqual(round.elements[i].connector?.startHead, .dot)
+    }
+}

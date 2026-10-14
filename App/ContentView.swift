@@ -101,6 +101,20 @@ struct Inspector: View {
                 Slider(value: binding(\.strokeWidth, "Change Stroke Width"), in: 1...12) { Text("Width") }
                 ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
                 ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
+                Picker("Fill pattern", selection: binding(\.fillStyle, "Change Fill Pattern")) {
+                    Text("Solid").tag(FillStyle.solid)
+                    Text("Hachure").tag(FillStyle.hachure)
+                    Text("Cross").tag(FillStyle.crossHatch)
+                }
+                .pickerStyle(.segmented)
+                Picker("Line", selection: binding(\.dash, "Change Line Style")) {
+                    Text("Solid").tag(DashStyle.solid)
+                    Text("Dashed").tag(DashStyle.dashed)
+                    Text("Dotted").tag(DashStyle.dotted)
+                }
+                .pickerStyle(.segmented)
+                Slider(value: binding(\.bowing, "Change Bowing"), in: 0...3) { Text("Bowing") }
+                    .disabled(binding(\.roughness, "").wrappedValue == 0)
             }
             if tool == .connector || !selectedConnectors.isEmpty {
                 Section("Connector") {
@@ -110,7 +124,8 @@ struct Inspector: View {
                         Text("Elbow").tag(Routing.elbow)
                     }
                     .pickerStyle(.segmented)
-                    Toggle("Arrowhead", isOn: arrowBinding)
+                    Picker("Start", selection: headBinding(\.startHead, "Change Start Arrowhead")) { headItems }
+                    Picker("End", selection: headBinding(\.endHead, "Change End Arrowhead")) { headItems }
                 }
             }
         }
@@ -132,9 +147,18 @@ struct Inspector: View {
                 set: { r in newRouting = r; if !selectedConnectors.isEmpty { editConnectors("Change Routing") { $0.routing = r } } })
     }
 
-    private var arrowBinding: Binding<Bool> {
-        Binding(get: { selectedConnectors.first?.connector?.endArrow ?? true },
-                set: { v in editConnectors("Toggle Arrowhead") { $0.endArrow = v } })
+    @ViewBuilder private var headItems: some View {
+        Text("None").tag(Arrowhead.none)
+        Text("Arrow").tag(Arrowhead.arrow)
+        Text("Triangle").tag(Arrowhead.triangle)
+        Text("Dot").tag(Arrowhead.dot)
+        Text("Bar").tag(Arrowhead.bar)
+    }
+
+    private func headBinding(_ kp: WritableKeyPath<ConnectorData, Arrowhead>, _ name: String) -> Binding<Arrowhead> {
+        let fallback: Arrowhead = kp == \ConnectorData.endHead ? .arrow : .none
+        return Binding(get: { selectedConnectors.first?.connector?[keyPath: kp] ?? fallback },
+                       set: { v in editConnectors(name) { $0[keyPath: kp] = v } })
     }
 
     /// Sketchy (roughness 1) vs clean (0); the slider fine-tunes sketchy.

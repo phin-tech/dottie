@@ -15,14 +15,26 @@ public struct Endpoint: Codable, Equatable, Sendable {
     public static func bound(_ id: UUID, port: Port? = nil) -> Endpoint { Endpoint(elementID: id, port: port) }
 }
 
+public enum Arrowhead: String, Codable, Sendable, CaseIterable { case none, arrow, triangle, dot, bar }
+
 public struct ConnectorData: Codable, Equatable, Sendable {
     public var start: Endpoint
     public var end: Endpoint
     public var routing: Routing = .straight
-    public var startArrow = false
-    public var endArrow = true
+    public var startHead: Arrowhead = .none
+    public var endHead: Arrowhead = .arrow
     public init(start: Endpoint, end: Endpoint, routing: Routing = .straight, endArrow: Bool = true) {
-        self.start = start; self.end = end; self.routing = routing; self.endArrow = endArrow
+        self.start = start; self.end = end; self.routing = routing
+        self.endHead = endArrow ? .arrow : .none
+    }
+    /// Convenience over `endHead`/`startHead` for callers that only care whether there is a head.
+    public var endArrow: Bool {
+        get { endHead != .none }
+        set { endHead = newValue ? (endHead == .none ? .arrow : endHead) : .none }
+    }
+    public var startArrow: Bool {
+        get { startHead != .none }
+        set { startHead = newValue ? (startHead == .none ? .arrow : startHead) : .none }
     }
 }
 

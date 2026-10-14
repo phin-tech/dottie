@@ -130,7 +130,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.saveGState()
         ctx.translateBy(x: pan.x, y: pan.y)
         ctx.scaleBy(x: zoom, y: zoom)
-        Renderer.draw(model.resolvingInk(to: isDark ? .inkOnDark : .black), in: ctx)
+        Renderer.draw(model.resolvingInk(to: isDark ? .inkOnDark : .black), in: ctx, background: NSColor.textBackgroundColor.cgColor)
 
         let accent = NSColor.controlAccentColor
         ctx.setStrokeColor(accent.cgColor)
@@ -225,8 +225,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private func viewportChanged() {
         needsDisplay = true
         guard let f = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
-        f.frame = viewFrame(e.frame)
+        f.frame = viewFrame(editFrame(for: e))
         f.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
+    }
+
+    /// Where an element's text is edited: a connector's label sits at the middle of its route.
+    private func editFrame(for e: Element) -> CGRect {
+        e.kind == .connector ? Renderer.labelRect(for: e, in: model) : e.frame
     }
 
     private func viewFrame(_ r: CGRect) -> CGRect {
@@ -620,13 +625,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private func beginEditing(_ id: UUID, isNew: Bool = false) {
         guard let e = model.elements.first(where: { $0.id == id }) else { return }
         endEditing()
-        let field = NSTextField(frame: viewFrame(e.frame))
+        let field = NSTextField(frame: viewFrame(editFrame(for: e)))
         field.stringValue = e.text ?? ""
         field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
         field.isBordered = false
-        field.drawsBackground = false
         field.focusRingType = .none
         field.alignment = e.kind == .text ? .left : .center
+        field.backgroundColor = .textBackgroundColor
+        field.drawsBackground = e.kind == .connector
         field.delegate = self
         addSubview(field)
         window?.makeFirstResponder(field)

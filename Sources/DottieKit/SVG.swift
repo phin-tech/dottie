@@ -17,17 +17,32 @@ extension Exporter {
             out += "<rect x=\"\(num(b.minX))\" y=\"\(num(b.minY))\" width=\"\(num(b.width))\" height=\"\(num(b.height))\" fill=\"\(color(background))\"/>\n"
         }
         for e in d.elements where visible.contains(e.layerID) {
-            out += svgElement(e, in: d)
+            out += svgElement(e, in: d, labelBackground: background)
         }
         return out + "</svg>\n"
     }
 
-    private static func svgElement(_ e: Element, in doc: DottieDocument) -> String {
+    private static func svgElement(_ e: Element, in doc: DottieDocument, labelBackground: RGBA?) -> String {
         let stroke = color(e.style.stroke)
-        let strokeAttrs = "stroke=\"\(stroke)\" stroke-width=\"\(num(e.style.strokeWidth))\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+        var strokeAttrs = "stroke=\"\(stroke)\" stroke-width=\"\(num(e.style.strokeWidth))\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
+        if let d = Renderer.dashPattern(e.style.dash, width: e.style.strokeWidth) {
+            strokeAttrs += " stroke-dasharray=\"\(d.map { num($0) }.joined(separator: " "))\""
+        }
         switch e.kind {
         case .connector:
-            return "<path d=\"\(pathData(Renderer.connectorPath(for: e, in: doc)))\" fill=\"none\" \(strokeAttrs)/>\n"
+            let (line, filled) = Renderer.connectorParts(for: e, in: doc)
+            var s = "<path d=\"\(pathData(line))\" fill=\"none\" \(strokeAttrs)/>\n"
+            if !filled.isEmpty {
+                s += "<path d=\"\(pathData(filled))\" fill=\"\(stroke)\" stroke=\"none\"/>\n"
+            }
+            if let t = e.text, !t.isEmpty {
+                let r = Renderer.labelRect(for: e, in: doc)
+                if let bg = labelBackground {
+                    s += "<rect x=\"\(num(r.minX))\" y=\"\(num(r.minY))\" width=\"\(num(r.width))\" height=\"\(num(r.height))\" fill=\"\(color(bg))\"/>\n"
+                }
+                s += textElement(t, frame: r, e: e, centered: true)
+            }
+            return s
         case .text:
             return textElement(e.text ?? "", frame: e.frame, e: e, centered: false)
         case .freehand:
@@ -35,7 +50,11 @@ extension Exporter {
         case .rectangle, .ellipse, .diamond:
             var s = ""
             if e.style.fill.a > 0 {
-                s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity")) stroke=\"none\"/>\n"
+                if e.style.fillStyle == .solid {
+                    s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity")) stroke=\"none\"/>\n"
+                } else {
+                    s += "<path d=\"\(pathData(Renderer.hachurePath(for: e)))\" fill=\"none\" stroke=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "stroke-opacity")) stroke-width=\"\(num(max(1, e.style.strokeWidth / 2)))\" stroke-linecap=\"round\"/>\n"
+                }
             }
             s += "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
             if let t = e.text, !t.isEmpty { s += textElement(t, frame: e.frame, e: e, centered: true) }

@@ -16,14 +16,34 @@ public struct RGBA: Codable, Equatable, Sendable {
     public var cgColor: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: a) }
 }
 
+public enum FillStyle: String, Codable, Sendable, CaseIterable { case solid, hachure, crossHatch }
+public enum DashStyle: String, Codable, Sendable, CaseIterable { case solid, dashed, dotted }
+
 public struct Style: Codable, Equatable, Sendable {
     public var stroke: RGBA = .black
     public var fill: RGBA = .clear
+    public var fillStyle: FillStyle = .solid
     public var strokeWidth: Double = 2
+    public var dash: DashStyle = .solid
     /// 0 = precise geometry, 1 = hand-drawn, 2 = very sketchy.
     public var roughness: Double = 1
+    /// Sideways bow of sketchy lines, independent of roughness. 0 is straight but shaky.
+    public var bowing: Double = 1
     public var fontSize: Double = 18
     public init() {}
+
+    // Every field is optional on disk so hand- or agent-written files stay valid as the style grows.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        stroke = try c.decodeIfPresent(RGBA.self, forKey: .stroke) ?? .black
+        fill = try c.decodeIfPresent(RGBA.self, forKey: .fill) ?? .clear
+        fillStyle = try c.decodeIfPresent(FillStyle.self, forKey: .fillStyle) ?? .solid
+        strokeWidth = try c.decodeIfPresent(Double.self, forKey: .strokeWidth) ?? 2
+        dash = try c.decodeIfPresent(DashStyle.self, forKey: .dash) ?? .solid
+        roughness = try c.decodeIfPresent(Double.self, forKey: .roughness) ?? 1
+        bowing = try c.decodeIfPresent(Double.self, forKey: .bowing) ?? 1
+        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 18
+    }
 }
 
 public enum ElementKind: String, Codable, Sendable {

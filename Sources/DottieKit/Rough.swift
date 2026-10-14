@@ -53,10 +53,10 @@ public enum Rough {
         }
     }
 
-    public static func polygon(_ pts: [CGPoint], rng: inout SeededRNG, roughness: Double) -> CGPath {
+    public static func polygon(_ pts: [CGPoint], rng: inout SeededRNG, roughness: Double, bowing: Double = 1) -> CGPath {
         let path = CGMutablePath()
         for i in pts.indices {
-            line(pts[i], pts[(i + 1) % pts.count], rng: &rng, roughness: roughness, into: path)
+            line(pts[i], pts[(i + 1) % pts.count], rng: &rng, roughness: roughness, bowing: bowing, into: path)
         }
         return path
     }
@@ -93,5 +93,41 @@ public enum Rough {
             let c2 = CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6)
             path.addCurve(to: p2, control1: c1, control2: c2)
         }
+    }
+}
+
+/// Hachure fill: parallel scanlines clipped to a polygon, as rough.js draws a pen-shaded fill.
+public enum Hachure {
+    /// rough.js's default hachure angle.
+    public static let angle = -41.0 * Double.pi / 180
+
+    /// Segments of parallel lines `gap` apart at `angle` (radians) that lie inside `polygon`.
+    /// Deterministic, and aligned to the polygon so the pattern doesn't swim when it is resized.
+    public static func lines(in polygon: [CGPoint], angle: Double = angle, gap: Double) -> [(CGPoint, CGPoint)] {
+        guard polygon.count >= 3, gap > 0 else { return [] }
+        let c = cos(angle), s = sin(angle)
+        // Rotate so the hatch direction is horizontal.
+        let rot = polygon.map { CGPoint(x: $0.x * c + $0.y * s, y: -$0.x * s + $0.y * c) }
+        guard let minY = rot.map(\.y).min(), let maxY = rot.map(\.y).max() else { return [] }
+        func back(_ x: Double, _ y: Double) -> CGPoint { CGPoint(x: x * c - y * s, y: x * s + y * c) }
+        var out: [(CGPoint, CGPoint)] = []
+        var y = minY + gap / 2
+        while y < maxY {
+            var xs: [Double] = []
+            for i in rot.indices {
+                let a = rot[i], b = rot[(i + 1) % rot.count]
+                if (a.y <= y && y < b.y) || (b.y <= y && y < a.y) {
+                    xs.append(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x))
+                }
+            }
+            xs.sort()
+            var k = 0
+            while k + 1 < xs.count {
+                if xs[k + 1] - xs[k] > 0.5 { out.append((back(xs[k], y), back(xs[k + 1], y))) }
+                k += 2
+            }
+            y += gap
+        }
+        return out
     }
 }

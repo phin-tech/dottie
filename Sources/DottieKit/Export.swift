@@ -21,7 +21,7 @@ public enum Exporter {
         // Flip to top-left origin, then map document bounds to the bitmap.
         ctx.translateBy(x: 0, y: CGFloat(h)); ctx.scaleBy(x: scale, y: -scale)
         ctx.translateBy(x: -b.minX, y: -b.minY)
-        Renderer.draw(doc.resolvingInk(to: .black), in: ctx)
+        Renderer.draw(doc.resolvingInk(to: .black), in: ctx, background: background)
         guard let img = ctx.makeImage() else { return nil }
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
@@ -38,7 +38,7 @@ public enum Exporter {
         ctx.beginPDFPage(nil)
         ctx.translateBy(x: 0, y: b.height); ctx.scaleBy(x: 1, y: -1)
         ctx.translateBy(x: -b.minX, y: -b.minY)
-        Renderer.draw(doc.resolvingInk(to: .black), in: ctx)
+        Renderer.draw(doc.resolvingInk(to: .black), in: ctx, background: CGColor(gray: 1, alpha: 1))
         ctx.endPDFPage(); ctx.closePDF()
         return data as Data
     }

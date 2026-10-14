@@ -14,14 +14,14 @@ public enum Renderer {
             if rough <= 0 { return CGPath(rect: r, transform: nil) }
             return Rough.polygon([CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY),
                                   CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)],
-                                 rng: &rng, roughness: rough)
+                                 rng: &rng, roughness: rough, bowing: e.style.bowing)
         case .diamond:
             let pts = [CGPoint(x: r.midX, y: r.minY), CGPoint(x: r.maxX, y: r.midY),
                        CGPoint(x: r.midX, y: r.maxY), CGPoint(x: r.minX, y: r.midY)]
             if rough <= 0 {
                 let p = CGMutablePath(); p.addLines(between: pts); p.closeSubpath(); return p
             }
-            return Rough.polygon(pts, rng: &rng, roughness: rough)
+            return Rough.polygon(pts, rng: &rng, roughness: rough, bowing: e.style.bowing)
         case .ellipse:
             if rough <= 0 { return CGPath(ellipseIn: r, transform: nil) }
             return Rough.ellipse(in: r, rng: &rng, roughness: rough)
@@ -61,19 +61,22 @@ public enum Renderer {
         return path
     }
 
-    /// Stroked path for a connector, including arrowheads. Sketchy when roughness > 0.
-    public static func connectorPath(for e: Element, in doc: DottieDocument) -> CGPath {
-        guard let c = e.connector else { return CGMutablePath() }
+    /// Connector geometry split into the stroked line (with open arrowheads) and the closed shapes
+    /// (triangle and dot heads) that are also filled with the stroke color. Sketchy when roughness > 0.
+    public static func connectorParts(for e: Element, in doc: DottieDocument) -> (line: CGPath, filled: CGPath) {
+        guard let c = e.connector else { return (CGMutablePath(), CGMutablePath()) }
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
+        let bow = e.style.bowing
         let path = CGMutablePath()
+        let solid = CGMutablePath()
         let route = Connector.route(of: e, in: doc)
 
         switch route {
         case .polyline(let pts):
             for i in 0..<max(pts.count - 1, 0) {
                 if rough <= 0 { path.move(to: pts[i]); path.addLine(to: pts[i + 1]) }
-                else { Rough.line(pts[i], pts[i + 1], rng: &rng, roughness: rough, preserveEnds: true, into: path) }
+                else { Rough.line(pts[i], pts[i + 1], rng: &rng, roughness: rough, bowing: bow, preserveEnds: true, into: path) }
             }
         case .cubic(let a, let b, let c2, let d):
             path.move(to: a)
@@ -84,18 +87,131 @@ public enum Renderer {
 
         let pts = route.points
         let size = max(10, e.style.strokeWidth * 5)
-        func head(tip: CGPoint, from: CGPoint) {
+        func line(_ a: CGPoint, _ b: CGPoint) {
+            if rough <= 0 { path.move(to: a); path.addLine(to: b) }
+            else { Rough.line(a, b, rng: &rng, roughness: rough * 0.5, bowing: 0, preserveEnds: true, into: path) }
+        }
+        func head(_ kind: Arrowhead, tip: CGPoint, from: CGPoint) {
             let (w1, w2) = Connector.arrowhead(tip: tip, from: from, size: size)
-            if rough <= 0 {
-                path.move(to: w1); path.addLine(to: tip); path.addLine(to: w2)
-            } else {
-                Rough.line(w1, tip, rng: &rng, roughness: rough * 0.5, into: path)
-                Rough.line(w2, tip, rng: &rng, roughness: rough * 0.5, into: path)
+            switch kind {
+            case .none: break
+            case .arrow:
+                line(w1, tip); line(w2, tip)
+            case .triangle:
+                line(w1, tip); line(w2, tip); line(w1, w2)
+                solid.move(to: tip); solid.addLine(to: w1); solid.addLine(to: w2); solid.closeSubpath()
+            case .dot:
+                let r = size * 0.32
+                let ang = atan2(tip.y - from.y, tip.x - from.x)
+                let ctr = CGPoint(x: tip.x - r * cos(ang), y: tip.y - r * sin(ang))
+                solid.addEllipse(in: CGRect(x: ctr.x - r, y: ctr.y - r, width: 2 * r, height: 2 * r))
+            case .bar:
+                let ang = atan2(tip.y - from.y, tip.x - from.x) + .pi / 2
+                let h = size * 0.5
+                line(CGPoint(x: tip.x - h * cos(ang), y: tip.y - h * sin(ang)),
+                     CGPoint(x: tip.x + h * cos(ang), y: tip.y + h * sin(ang)))
             }
         }
-        if c.endArrow, pts.count > 1 { head(tip: pts[pts.count - 1], from: pts[pts.count - 2]) }
-        if c.startArrow, pts.count > 1 { head(tip: pts[0], from: pts[1]) }
+        if pts.count > 1 {
+            head(c.endHead, tip: pts[pts.count - 1], from: pts[pts.count - 2])
+            head(c.startHead, tip: pts[0], from: pts[1])
+        }
+        return (path, solid)
+    }
+
+    /// Everything a connector paints, as one path (selection halo, bounds, hit areas).
+    public static func connectorPath(for e: Element, in doc: DottieDocument) -> CGPath {
+        let (line, filled) = connectorParts(for: e, in: doc)
+        let all = CGMutablePath()
+        all.addPath(line); all.addPath(filled)
+        return all
+    }
+
+    // MARK: Connector labels
+
+    /// Point halfway along the connector's route.
+    public static func midpoint(of e: Element, in doc: DottieDocument) -> CGPoint {
+        let pts = Connector.route(of: e, in: doc).points
+        guard pts.count > 1 else { return pts.first ?? .zero }
+        var lengths: [CGFloat] = []
+        var total: CGFloat = 0
+        for i in 0..<(pts.count - 1) {
+            let l = hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y)
+            lengths.append(l); total += l
+        }
+        var remaining = total / 2
+        for (i, l) in lengths.enumerated() {
+            if remaining <= l || i == lengths.count - 1 {
+                let t = l == 0 ? 0 : remaining / l
+                return CGPoint(x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t)
+            }
+            remaining -= l
+        }
+        return pts[0]
+    }
+
+    /// Where a connector's label sits (and where its in-place editor goes).
+    public static func labelRect(for e: Element, in doc: DottieDocument) -> CGRect {
+        let m = midpoint(of: e, in: doc)
+        let text = e.text ?? ""
+        let size = textSize(text.isEmpty ? "Label" : text, fontSize: e.style.fontSize, maxWidth: 200)
+        let w = max(size.width + 12, 44), h = size.height + 6
+        return CGRect(x: m.x - w / 2, y: m.y - h / 2, width: w, height: h)
+    }
+
+    static func textSize(_ s: String, fontSize: Double, maxWidth: Double) -> CGSize {
+        let font = CTFontCreateWithName("Helvetica Neue" as CFString, fontSize, nil)
+        let str = CFAttributedStringCreate(nil, s as CFString, [kCTFontAttributeName: font] as CFDictionary)!
+        let setter = CTFramesetterCreateWithAttributedString(str)
+        let size = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(), nil, CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil)
+        return CGSize(width: ceil(size.width), height: ceil(size.height))
+    }
+
+    // MARK: Fills
+
+    /// Straight-edged outline of a filled shape; an ellipse is approximated closely enough to hatch.
+    static func fillPolygon(for e: Element) -> [CGPoint] {
+        let r = e.frame
+        switch e.kind {
+        case .ellipse:
+            return (0..<48).map { i in
+                let t = 2 * Double.pi * Double(i) / 48
+                return CGPoint(x: r.midX + r.width / 2 * cos(t), y: r.midY + r.height / 2 * sin(t))
+            }
+        case .diamond:
+            return [CGPoint(x: r.midX, y: r.minY), CGPoint(x: r.maxX, y: r.midY),
+                    CGPoint(x: r.midX, y: r.maxY), CGPoint(x: r.minX, y: r.midY)]
+        default:
+            return [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY),
+                    CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
+        }
+    }
+
+    /// Pen-shaded fill for `fillStyle` hachure / crossHatch; empty for solid fills.
+    public static func hachurePath(for e: Element) -> CGPath {
+        let path = CGMutablePath()
+        guard e.style.fillStyle != .solid, e.kind != .freehand, e.kind != .connector, e.kind != .text else { return path }
+        let poly = fillPolygon(for: e)
+        let gap = max(4, e.style.strokeWidth * 4)
+        var angles = [Hachure.angle]
+        if e.style.fillStyle == .crossHatch { angles.append(Hachure.angle + .pi / 2) }
+        var rng = SeededRNG(seed: e.seed ^ 0x5bd1e995)
+        for angle in angles {
+            for (a, b) in Hachure.lines(in: poly, angle: angle, gap: gap) {
+                if e.style.roughness <= 0 { path.move(to: a); path.addLine(to: b) }
+                else { Rough.line(a, b, rng: &rng, roughness: e.style.roughness * 0.6, bowing: 0.5, into: path) }
+            }
+        }
         return path
+    }
+
+    /// Dash lengths for a stroke width; nil for a solid line.
+    public static func dashPattern(_ dash: DashStyle, width: Double) -> [Double]? {
+        switch dash {
+        case .solid: return nil
+        case .dashed: return [max(8, width * 4), max(6, width * 3)]
+        case .dotted: return [0.01, max(5, width * 2.6)]
+        }
     }
 
     /// Precise shape used for fills and hit areas.
@@ -112,23 +228,42 @@ public enum Renderer {
         }
     }
 
+    // MARK: Drawing
+
     /// Draws with a top-left origin (y down). Callers must flip the context if needed.
-    public static func draw(_ doc: DottieDocument, in ctx: CGContext) {
+    /// `background` is painted behind connector labels so the line doesn't strike through the text.
+    public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         for e in doc.elements where visible.contains(e.layerID) {
-            draw(e, in: ctx, document: doc)
+            draw(e, in: ctx, document: doc, background: background)
         }
     }
 
-    public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil) {
+    public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil, background: CGColor? = nil) {
         ctx.saveGState(); defer { ctx.restoreGState() }
-        if e.kind == .connector {
-            guard let document else { return }
-            ctx.addPath(connectorPath(for: e, in: document))
+        func applyStroke() {
             ctx.setStrokeColor(e.style.stroke.cgColor)
             ctx.setLineWidth(e.style.strokeWidth)
             ctx.setLineCap(.round); ctx.setLineJoin(.round)
+            if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) { ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) }) }
+        }
+        if e.kind == .connector {
+            guard let document else { return }
+            let (line, filled) = connectorParts(for: e, in: document)
+            ctx.addPath(line); ctx.addPath(filled)
+            applyStroke()
             ctx.strokePath()
+            if !filled.isEmpty {
+                ctx.setLineDash(phase: 0, lengths: [])
+                ctx.addPath(filled)
+                ctx.setFillColor(e.style.stroke.cgColor)
+                ctx.fillPath()
+            }
+            if let t = e.text, !t.isEmpty {
+                let r = labelRect(for: e, in: document)
+                if let background { ctx.setFillColor(background); ctx.fill(r) }
+                drawText(t, in: r, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
+            }
             return
         }
         if e.kind == .text {
@@ -136,14 +271,22 @@ public enum Renderer {
             return
         }
         if e.style.fill.a > 0, e.kind != .freehand {
-            ctx.addPath(fillPath(for: e))
-            ctx.setFillColor(e.style.fill.cgColor)
-            ctx.fillPath()
+            if e.style.fillStyle == .solid {
+                ctx.addPath(fillPath(for: e))
+                ctx.setFillColor(e.style.fill.cgColor)
+                ctx.fillPath()
+            } else {
+                ctx.saveGState()
+                ctx.addPath(hachurePath(for: e))
+                ctx.setStrokeColor(e.style.fill.cgColor)
+                ctx.setLineWidth(max(1, e.style.strokeWidth / 2))
+                ctx.setLineCap(.round)
+                ctx.strokePath()
+                ctx.restoreGState()
+            }
         }
         ctx.addPath(outline(for: e))
-        ctx.setStrokeColor(e.style.stroke.cgColor)
-        ctx.setLineWidth(e.style.strokeWidth)
-        ctx.setLineCap(.round); ctx.setLineJoin(.round)
+        applyStroke()
         ctx.strokePath()
         if let t = e.text, !t.isEmpty {
             drawText(t, in: e.frame.insetBy(dx: 6, dy: 6), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
