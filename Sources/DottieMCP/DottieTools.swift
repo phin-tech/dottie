@@ -138,7 +138,7 @@ actor DottieTools {
              description: "Add one shape at an exact position. Returns its element id.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
-                "kind": prop("string", "Shape type. A note is a sticky note whose text is Markdown (headings, lists, - [ ] tasks, **bold**, `code`), yellow unless fill is set", enum: kindValues),
+                "kind": prop("string", "Shape type. A note is a sticky note whose text is GitHub Flavored Markdown (headings, lists, - [ ] tasks, tables, **bold**, `code`; a single newline is a line break), yellow unless fill is set", enum: kindValues),
                 "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
                 "width": prop("number", "Width; auto-sized from text if omitted"),
                 "height": prop("number", "Height"),

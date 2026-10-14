@@ -546,7 +546,8 @@ public enum DottieScript {
 
     Drawing (each returns the new element)
       dottie.rect/ellipse/diamond/text/note({x, y, width?, height?, text?, fill?, stroke?, sketchy?, ...look})
-        (a note is a sticky note: its text is Markdown, drawn from the top left; the fill defaults to yellow)
+        (a note is a sticky note: its text is GitHub Flavored Markdown, tables included, drawn from the top left;
+         a single newline is a line break; the fill defaults to yellow)
       dottie.shape({kind, ...})        same, with kind as a field
       dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, ...look})   routing: straight | curved | elbow
       dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}

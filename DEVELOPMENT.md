@@ -41,8 +41,10 @@ rather than in Xcode's Signing & Capabilities pane, which is lost when the proje
 A `.dottie` file is JSON (sorted keys, pretty-printed, rounded frames, so it diffs well in git): a `DottieFile`
 with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme.
 Element ids are unique across the file, which is what lets a link point at a shape on another page.
-A `note` element is a sticky note whose `text` is Markdown; `Note` parses it and lays it out with CoreText,
-and the renderer and SVG export share that layout. Dottie 0.1.1 and earlier cannot open a file containing a note.
+A `note` element is a sticky note whose `text` is GitHub Flavored Markdown; `Note` parses it with
+[swift-markdown](https://github.com/swiftlang/swift-markdown) (cmark-gfm), DottieKit's only dependency, and lays
+it out with CoreText, and the renderer and SVG export share that layout. A single newline is a line break, as in
+GitHub comments, and bare URLs are underlined by `Note` itself (swift-markdown leaves cmark's autolink extension off). Dottie 0.1.1 and earlier cannot open a file containing a note.
 
 ## MCP server
 

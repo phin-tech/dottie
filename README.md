@@ -59,9 +59,10 @@ Pick a tool from the toolbar or press its letter:
 
 Double-click a shape to give it a label. Connectors stay attached when you move shapes around.
 
-- **Sticky notes.** Click with the Note tool (or drag out a size) and type Markdown: headings, bullet,
-  numbered and `- [ ]` task lists, quotes, code, and **bold**, *italic*, `code` and ~~struck~~ text. Return
-  starts a new line; Escape or clicking away finishes, and the note shows the rendered text.
+- **Sticky notes.** Click with the Note tool (or drag out a size) and type GitHub Flavored Markdown:
+  headings, bullet, numbered and `- [ ]` task lists, tables, quotes, code, links, and **bold**, *italic*,
+  `code` and ~~struck~~ text. A new line in the text is a new line in the note, as in GitHub comments. Return
+  starts a new line; ⇧Return, ⌘Return, Escape or clicking away finishes, and the note shows the rendered text.
 
 - **Sketchy or clean.** The inspector on the right switches the look, and sets colors, fill patterns,
   dashed lines and arrowheads. Themes like Blueprint and Chalkboard change the whole page.

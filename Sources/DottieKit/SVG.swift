@@ -103,16 +103,10 @@ extension Exporter {
             var spans = ""
             for run in CTLineGetGlyphRuns(l.line) as! [CTRun] {
                 let range = CTRunGetStringRange(run)
-                let piece = string.substring(with: NSRange(location: range.location, length: range.length))
-                    .replacingOccurrences(of: "\t", with: "").replacingOccurrences(of: "\n", with: "")
-                guard !piece.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
-                var first = CGPoint.zero
-                CTRunGetPositions(run, CFRange(location: 0, length: 1), &first)
-                // A marker run like "•\t" starts at the marker, so the tab dropped above moves nothing.
                 let attrs = CTRunGetAttributes(run) as NSDictionary
                 let font = attrs[kCTFontAttributeName as String] as! CTFont
                 let traits = CTFontGetSymbolicTraits(font)
-                var a = "x=\"\(num(l.origin.x + first.x))\" font-size=\"\(num(Double(CTFontGetSize(font))))\""
+                var a = "font-size=\"\(num(Double(CTFontGetSize(font))))\""
                 if traits.contains(.traitMonoSpace) { a += " font-family=\"Menlo, Consolas, monospace\"" }
                 if traits.contains(.traitBold) { a += " font-weight=\"bold\"" }
                 if traits.contains(.traitItalic) { a += " font-style=\"italic\"" }
@@ -121,7 +115,17 @@ extension Exporter {
                    (c as! CGColor).alpha < 1 {
                     a += " fill-opacity=\"\(num(Double((c as! CGColor).alpha)))\""
                 }
-                spans += "<tspan \(a)>\(escape(piece))</tspan>"
+                // A run can span tabs (a list marker, or table cells in the same style): each piece between
+                // them gets its own x, where CoreText put it.
+                var start = range.location
+                for piece in string.substring(with: NSRange(location: range.location, length: range.length)).components(separatedBy: "\t") {
+                    let length = (piece as NSString).length
+                    defer { start += length + 1 }
+                    let shown = piece.replacingOccurrences(of: "\n", with: "").replacingOccurrences(of: Note.lineSeparator, with: "")
+                    guard !shown.trimmingCharacters(in: .whitespaces).isEmpty else { continue }
+                    let x = l.origin.x + CTLineGetOffsetForStringIndex(l.line, start, nil)
+                    spans += "<tspan x=\"\(num(x))\" \(a)>\(escape(shown))</tspan>"
+                }
             }
             guard !spans.isEmpty else { continue }
             s += "<text y=\"\(num(l.origin.y))\" font-family=\"Helvetica Neue, Helvetica, Arial, sans-serif\" fill=\"\(color(e.style.stroke))\" xml:space=\"preserve\">\(spans)</text>\n"

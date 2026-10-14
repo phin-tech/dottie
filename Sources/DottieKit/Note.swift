@@ -1,13 +1,15 @@
 import Foundation
 import CoreGraphics
 import CoreText
+import Markdown
 
-/// A sticky note: a filled card whose text is Markdown, laid out top-left with CoreText.
+/// A sticky note: a filled card whose text is GitHub Flavored Markdown, laid out top-left with CoreText.
 /// The renderer and SVG export both lay out through `layout(_:in:fontSize:color:)`, so they wrap identically.
 ///
-/// Supported: `#` to `######` headings, paragraphs, `-` / `*` / `+` and `1.` lists (nested by indent),
-/// `- [ ]` / `- [x]` tasks, `>` quotes, fenced code, `---` rules, and inline bold, italic, `code`,
-/// ~~strikethrough~~ and links. Text that does not fit is cut off at the note's edge.
+/// Parsed by swift-markdown (cmark-gfm): headings, paragraphs, nested bullet, numbered and task lists,
+/// quotes, fenced and indented code, rules, tables, and inline bold, italic, `code`, ~~strikethrough~~,
+/// links and bare URLs. A single newline is a line break, as in GitHub comments. Text that does not fit is
+/// cut off at the note's edge.
 public enum Note {
     /// Inset from the note's edge to its text, on every side.
     public static let padding: Double = 12
@@ -33,99 +35,22 @@ public enum Note {
     /// Offset of the soft shadow drawn under a filled note.
     static let shadowOffset = CGSize(width: 2, height: 3)
 
-    // MARK: Blocks
-
-    enum Block: Equatable {
-        case heading(level: Int, text: String)
-        case paragraph(String)
-        /// `marker` is what is drawn before the item: a bullet, `3.`, or a checkbox.
-        case item(depth: Int, marker: String, text: String)
-        case quote(String)
-        case code(String)
-        case rule
-    }
-
-    /// Splits Markdown into blocks, one line-based pass. Consecutive plain lines join into one paragraph.
-    static func blocks(_ source: String) -> [Block] {
-        var out: [Block] = []
-        var para: [String] = []
-        var fence: [String]?
-        func flush() {
-            if !para.isEmpty { out.append(.paragraph(para.joined(separator: " "))); para = [] }
-        }
-        for raw in source.replacingOccurrences(of: "\r\n", with: "\n").split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = String(raw)
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            if var f = fence {
-                if trimmed.hasPrefix("```") { out.append(.code(f.joined(separator: "\n"))); fence = nil }
-                else { f.append(line); fence = f }
-                continue
-            }
-            if trimmed.hasPrefix("```") { flush(); fence = []; continue }
-            if trimmed.isEmpty { flush(); continue }
-            if let h = heading(trimmed) { flush(); out.append(h); continue }
-            if isRule(trimmed) { flush(); out.append(.rule); continue }
-            if trimmed.hasPrefix(">") {
-                flush()
-                out.append(.quote(String(trimmed.dropFirst()).trimmingCharacters(in: .whitespaces)))
-                continue
-            }
-            if let i = item(line) { flush(); out.append(i); continue }
-            para.append(trimmed)
-        }
-        flush()
-        if let f = fence { out.append(.code(f.joined(separator: "\n"))) } // unclosed fence runs to the end
-        return out
-    }
-
-    private static func heading(_ s: String) -> Block? {
-        let hashes = s.prefix { $0 == "#" }.count
-        guard (1...6).contains(hashes) else { return nil }
-        let rest = s.dropFirst(hashes)
-        guard rest.isEmpty || rest.first == " " else { return nil }
-        return .heading(level: hashes, text: rest.trimmingCharacters(in: .whitespaces))
-    }
-
-    private static func isRule(_ s: String) -> Bool {
-        let chars = s.filter { $0 != " " }
-        guard chars.count >= 3, let c = chars.first, "-*_".contains(c) else { return false }
-        return chars.allSatisfy { $0 == c }
-    }
-
-    private static func item(_ line: String) -> Block? {
-        let indent = line.prefix { $0 == " " || $0 == "\t" }.reduce(0) { $0 + ($1 == "\t" ? 4 : 1) }
-        let s = line.drop { $0 == " " || $0 == "\t" }
-        let depth = indent / 2
-        var marker: String
-        var rest: Substring
-        if let c = s.first, "-*+".contains(c), s.dropFirst().first == " " {
-            marker = depth % 2 == 0 ? "•" : "◦"
-            rest = s.dropFirst(2)
-        } else {
-            let digits = s.prefix { $0.isNumber }
-            let after = s.dropFirst(digits.count)
-            guard !digits.isEmpty, digits.count <= 9, let p = after.first, p == "." || p == ")",
-                  after.dropFirst().first == " " else { return nil }
-            marker = "\(digits)."
-            rest = after.dropFirst(2)
-        }
-        if rest.hasPrefix("[ ] ") || rest == "[ ]" { marker = "☐"; rest = rest.dropFirst(4) }
-        else if rest.lowercased().hasPrefix("[x] ") || rest.lowercased() == "[x]" { marker = "☑"; rest = rest.dropFirst(4) }
-        return .item(depth: depth, marker: marker, text: rest.trimmingCharacters(in: .whitespaces))
-    }
-
-    // MARK: Attributed text
+    // MARK: Attributes
 
     /// Marks a run to be struck through; CoreText has no strikethrough of its own.
     static let strikeAttribute = NSAttributedString.Key("DottieStrike")
-    /// Marks the placeholder of a `---` rule, drawn as a line across the note.
+    /// Marks the placeholder of a `---` rule, drawn as a line across the note from the value's x offset.
     static let ruleAttribute = NSAttributedString.Key("DottieRule")
-    /// Marks quoted text, which gets a bar down its left side.
+    /// Marks quoted text, which gets a bar down its left side at the value's x offset.
     static let quoteAttribute = NSAttributedString.Key("DottieQuote")
+    /// Marks a table's header row, ruled underneath from x offset `value[0]`, `value[1]` wide.
+    static let tableRuleAttribute = NSAttributedString.Key("DottieTableRule")
     private static let fontKey = NSAttributedString.Key(kCTFontAttributeName as String)
     private static let colorKey = NSAttributedString.Key(kCTForegroundColorAttributeName as String)
     private static let paragraphKey = NSAttributedString.Key(kCTParagraphStyleAttributeName as String)
     private static let underlineKey = NSAttributedString.Key(kCTUnderlineStyleAttributeName as String)
+    /// Breaks a line without ending the paragraph, so spacing and list indents carry on.
+    static let lineSeparator = "\u{2028}"
 
     static func font(_ size: Double, bold: Bool = false, italic: Bool = false, mono: Bool = false) -> CTFont {
         let base = CTFontCreateWithName((mono ? "Menlo" : "Helvetica Neue") as CFString, size, nil)
@@ -137,14 +62,14 @@ public enum Note {
     }
 
     private static func paragraphStyle(spacingBefore: Double, firstIndent: Double = 0, indent: Double = 0,
-                                       tab: Double? = nil) -> CTParagraphStyle {
+                                       tabs: [(CTTextAlignment, Double)] = []) -> CTParagraphStyle {
         var before = CGFloat(spacingBefore), first = CGFloat(firstIndent), head = CGFloat(indent)
-        let hasTabs = tab != nil
-        var tabs = tab.map { [CTTextTabCreate(.left, $0, nil)] as CFArray }
+        let hasTabs = !tabs.isEmpty
+        var stops = tabs.map { CTTextTabCreate($0.0, $0.1, nil) } as CFArray
         return withUnsafeBytes(of: &before) { b in
             withUnsafeBytes(of: &first) { f in
                 withUnsafeBytes(of: &head) { h in
-                    withUnsafeBytes(of: &tabs) { t in
+                    withUnsafeBytes(of: &stops) { t in
                         var settings = [
                             CTParagraphStyleSetting(spec: .paragraphSpacingBefore, valueSize: MemoryLayout<CGFloat>.size, value: b.baseAddress!),
                             CTParagraphStyleSetting(spec: .firstLineHeadIndent, valueSize: MemoryLayout<CGFloat>.size, value: f.baseAddress!),
@@ -160,84 +85,233 @@ public enum Note {
         }
     }
 
-    /// Inline Markdown (`**bold**`, `*italic*`, `` `code` ``, `~~strike~~`, links) styled on top of `size`.
-    private static func inline(_ s: String, size: Double, bold: Bool = false, italic: Bool = false,
-                               color: CGColor) -> NSMutableAttributedString {
-        let out = NSMutableAttributedString()
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace,
-                                                              failurePolicy: .returnPartiallyParsedIfPossible)
-        guard let parsed = try? AttributedString(markdown: s, options: options) else {
-            out.append(NSAttributedString(string: s, attributes: [fontKey: font(size, bold: bold, italic: italic), colorKey: color]))
-            return out
-        }
-        for run in parsed.runs {
-            let text = String(parsed[run.range].characters)
-            let intent = run.inlinePresentationIntent ?? []
-            let mono = intent.contains(.code)
-            var attrs: [NSAttributedString.Key: Any] = [
-                fontKey: font(mono ? size * 0.9 : size, bold: bold || intent.contains(.stronglyEmphasized),
-                              italic: italic || intent.contains(.emphasized), mono: mono),
-                colorKey: color,
-            ]
-            if intent.contains(.strikethrough) { attrs[strikeAttribute] = true }
-            if run.link != nil { attrs[underlineKey] = CTUnderlineStyle.single.rawValue }
-            out.append(NSAttributedString(string: text, attributes: attrs))
-        }
-        return out
+    static func width(of s: NSAttributedString) -> Double {
+        Double(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(s as CFAttributedString), nil, nil, nil))
     }
 
-    /// The whole note as one attributed string, a paragraph per block.
-    static func attributed(_ source: String, fontSize: Double, color: CGColor) -> NSAttributedString {
-        let out = NSMutableAttributedString()
-        let gap = fontSize * 0.5
-        let faded = color.copy(alpha: color.alpha * 0.7) ?? color
-        let all = blocks(source)
+    // MARK: Markdown to attributed text
+
+    /// How inline text is styled where it appears.
+    private struct Inline {
+        var size: Double
+        var bold = false, italic = false, mono = false, strike = false, link = false
+        var color: CGColor
+    }
+
+    /// Where a block sits: its indent, and the list marker its first paragraph carries.
+    private struct Context {
+        var indent: Double = 0
+        var marker: (text: String, start: Double, hang: Double)?
+        var quote: Double?
+        var listDepth = 0
+    }
+
+    /// Builds the note as one attributed string, a CoreText paragraph per block.
+    private struct Builder {
+        let fontSize: Double
+        let color: CGColor
+        let faded: CGColor
+        let width: Double
+        var out = NSMutableAttributedString()
         var previous: CTParagraphStyle?
-        for (n, block) in all.enumerated() {
-            let before = n == 0 ? 0 : gap
-            var piece: NSMutableAttributedString
-            var para: CTParagraphStyle
-            switch block {
-            case .heading(let level, let text):
-                let scale = [1.5, 1.3, 1.15, 1.05, 1, 1][level - 1]
-                piece = inline(text, size: fontSize * scale, bold: true, color: color)
-                para = paragraphStyle(spacingBefore: n == 0 ? 0 : gap * 1.4)
-            case .paragraph(let text):
-                piece = inline(text, size: fontSize, color: color)
-                para = paragraphStyle(spacingBefore: before)
-            case .item(let depth, let marker, let text):
-                // A list continues without a gap; the marker sits in a hanging indent.
-                let continues: Bool = {
-                    guard n > 0, case .item = all[n - 1] else { return false }
-                    return true
-                }()
-                let start = Double(depth) * fontSize * 1.2
-                let hang = start + fontSize * (marker.count > 2 ? 0.6 * Double(marker.count) + 0.4 : 1.2)
-                piece = NSMutableAttributedString(string: marker + "\t", attributes: [fontKey: font(fontSize), colorKey: color])
-                piece.append(inline(text, size: fontSize, color: color))
-                para = paragraphStyle(spacingBefore: continues ? fontSize * 0.15 : before, firstIndent: start, indent: hang, tab: hang)
-            case .quote(let text):
-                piece = inline(text, size: fontSize, italic: true, color: faded)
-                piece.addAttribute(quoteAttribute, value: true, range: NSRange(location: 0, length: piece.length))
-                para = paragraphStyle(spacingBefore: before, firstIndent: fontSize, indent: fontSize)
-            case .code(let text):
-                piece = NSMutableAttributedString(string: text.isEmpty ? " " : text,
-                                                  attributes: [fontKey: font(fontSize * 0.85, mono: true), colorKey: color])
-                para = paragraphStyle(spacingBefore: before, firstIndent: fontSize * 0.5, indent: fontSize * 0.5)
-            case .rule:
-                piece = NSMutableAttributedString(string: " ", attributes: [fontKey: font(fontSize * 0.6), colorKey: color,
-                                                                           ruleAttribute: true])
-                para = paragraphStyle(spacingBefore: before)
-            }
+        /// Spacing before the next paragraph, when a list item asks for tight spacing.
+        var nextSpacing: Double?
+
+        var gap: Double { fontSize * 0.5 }
+
+        mutating func paragraph(_ content: NSMutableAttributedString, _ style: CTParagraphStyle, quote: Double?) {
+            if let quote { content.addAttribute(quoteAttribute, value: quote, range: NSRange(location: 0, length: content.length)) }
             // The newline that joins two blocks ends, and so belongs to, the earlier paragraph.
             if let previous {
                 out.append(NSAttributedString(string: "\n", attributes: [fontKey: font(fontSize), colorKey: color, paragraphKey: previous]))
             }
-            piece.addAttribute(paragraphKey, value: para, range: NSRange(location: 0, length: piece.length))
-            out.append(piece)
-            previous = para
+            content.addAttribute(paragraphKey, value: style, range: NSRange(location: 0, length: content.length))
+            out.append(content)
+            previous = style
+            nextSpacing = nil
         }
-        return out
+
+        func spacing(_ normal: Double) -> Double { out.length == 0 ? 0 : nextSpacing ?? normal }
+
+        mutating func block(_ node: Markup, _ ctx: Context) {
+            var ctx = ctx
+            let base = Inline(size: fontSize, italic: ctx.quote != nil, color: ctx.quote != nil ? faded : color)
+            switch node {
+            case let h as Heading:
+                let scale = [1.5, 1.3, 1.15, 1.05, 1, 1][min(max(h.level, 1), 6) - 1]
+                var style = base; style.size *= scale; style.bold = true
+                text(inline(h, style), ctx, spacing: spacing(gap * 1.4))
+            case let p as Paragraph:
+                text(inline(p, base), ctx, spacing: spacing(gap))
+            case let list as ListItemContainer:
+                let items = Array(list.listItems)
+                let ordered = (list as? OrderedList).map { Int($0.startIndex) }
+                let markers = items.enumerated().map { i, item -> String in
+                    switch item.checkbox {
+                    case .checked?: return "☑"
+                    case .unchecked?: return "☐"
+                    case nil: return ordered.map { "\($0 + i)." } ?? (ctx.listDepth % 2 == 0 ? "•" : "◦")
+                    }
+                }
+                let widest = markers.map { Note.width(of: NSAttributedString(string: $0, attributes: [fontKey: font(fontSize)])) }.max() ?? 0
+                let hang = ctx.indent + max(widest + fontSize * 0.45, fontSize * 1.2)
+                for (i, item) in items.enumerated() {
+                    if i > 0 || ctx.listDepth > 0 || ctx.marker != nil { nextSpacing = fontSize * 0.15 }
+                    var inner = ctx
+                    inner.marker = (markers[i], ctx.indent, hang)
+                    inner.indent = hang
+                    inner.listDepth += 1
+                    let children = Array(item.children)
+                    if children.isEmpty { text(NSMutableAttributedString(), inner, spacing: spacing(gap)) }
+                    for child in children {
+                        block(child, inner)
+                        inner.marker = nil
+                        // Blocks after the first in an item follow it closely.
+                        nextSpacing = fontSize * 0.3
+                    }
+                    nextSpacing = nil
+                }
+            case let q as BlockQuote:
+                ctx.quote = ctx.indent + 3
+                ctx.indent += fontSize
+                for child in q.children { block(child, ctx) }
+            case let code as CodeBlock:
+                let body = code.code.hasSuffix("\n") ? String(code.code.dropLast()) : code.code
+                let s = NSMutableAttributedString(string: body.isEmpty ? " " : body.replacingOccurrences(of: "\n", with: lineSeparator),
+                                                  attributes: [fontKey: font(fontSize * 0.85, mono: true), colorKey: base.color])
+                ctx.indent += fontSize * 0.5
+                text(s, ctx, spacing: spacing(gap))
+            case is ThematicBreak:
+                let s = NSMutableAttributedString(string: " ", attributes: [fontKey: font(fontSize * 0.6), colorKey: color,
+                                                                           ruleAttribute: ctx.indent])
+                text(s, ctx, spacing: spacing(gap))
+            case let table as Table:
+                self.table(table, ctx)
+            case let html as HTMLBlock:
+                let raw = html.rawHTML.trimmingCharacters(in: .newlines).replacingOccurrences(of: "\n", with: lineSeparator)
+                text(NSMutableAttributedString(string: raw, attributes: [fontKey: font(fontSize), colorKey: base.color]), ctx, spacing: spacing(gap))
+            default:
+                for child in node.children { block(child, ctx) }
+            }
+        }
+
+        /// A paragraph at the context's indent, led by its list marker if it is an item's first block.
+        mutating func text(_ content: NSMutableAttributedString, _ ctx: Context, spacing: Double) {
+            if let m = ctx.marker {
+                let lead = NSMutableAttributedString(string: m.text + "\t", attributes: [fontKey: font(fontSize), colorKey: color])
+                lead.append(content)
+                paragraph(lead, paragraphStyle(spacingBefore: spacing, firstIndent: m.start, indent: m.hang, tabs: [(.left, m.hang)]),
+                          quote: ctx.quote)
+            } else {
+                paragraph(content, paragraphStyle(spacingBefore: spacing, firstIndent: ctx.indent, indent: ctx.indent), quote: ctx.quote)
+            }
+        }
+
+        /// Rows as paragraphs with a tab stop per column, aligned as the table asks. A table wider than the
+        /// note is set in a smaller font, so cells stay in their columns instead of wrapping.
+        mutating func table(_ table: Table, _ ctx: Context) {
+            let rows: [(cells: [Table.Cell], header: Bool)] = [(Array(table.head.cells), true)] + table.body.rows.map { (Array($0.cells), false) }
+            let columns = max(table.maxColumnCount, 1)
+            func cell(_ c: Table.Cell, header: Bool, size: Double) -> NSMutableAttributedString {
+                let s = inline(c, Inline(size: size, bold: header, italic: ctx.quote != nil, color: ctx.quote != nil ? faded : color))
+                s.mutableString.replaceOccurrences(of: lineSeparator, with: " ", range: NSRange(location: 0, length: s.length))
+                return s
+            }
+            func widths(size: Double) -> [Double] {
+                var w = [Double](repeating: 0, count: columns)
+                for row in rows { for (i, c) in row.cells.enumerated() where i < columns { w[i] = max(w[i], Note.width(of: cell(c, header: row.header, size: size))) } }
+                return w
+            }
+            let available = max(width - ctx.indent, 1)
+            var size = fontSize
+            var w = widths(size: size)
+            var gutter = size * 1.2
+            let natural = w.reduce(0, +) + gutter * Double(columns - 1)
+            if natural > available {
+                size = max(fontSize * available / natural, min(fontSize, 9))
+                w = widths(size: size)
+                gutter = size * 1.2
+            }
+            var starts: [Double] = []
+            var x = ctx.indent
+            for wi in w { starts.append(x); x += wi + gutter }
+            let total = x - gutter - ctx.indent
+            // Column 0 starts at the indent unless it is centered or right-aligned, which needs a tab to get there.
+            var tabs: [(CTTextAlignment, Double)] = []
+            var leadingTab = false
+            for i in 0..<columns {
+                let align = i < table.columnAlignments.count ? table.columnAlignments[i] : nil
+                switch align {
+                case .center?: tabs.append((.center, starts[i] + w[i] / 2))
+                case .right?: tabs.append((.right, starts[i] + w[i]))
+                default: if i > 0 { tabs.append((.left, starts[i])) }
+                }
+                if i == 0, align == .center || align == .right { leadingTab = true }
+            }
+            for (n, row) in rows.enumerated() {
+                let line = NSMutableAttributedString()
+                let plain: [NSAttributedString.Key: Any] = [fontKey: font(size), colorKey: color]
+                if leadingTab { line.append(NSAttributedString(string: "\t", attributes: plain)) }
+                for i in 0..<columns {
+                    if i > 0 { line.append(NSAttributedString(string: "\t", attributes: plain)) }
+                    if i < row.cells.count { line.append(cell(row.cells[i], header: row.header, size: size)) }
+                }
+                if line.length == 0 { line.append(NSAttributedString(string: " ", attributes: plain)) }
+                if row.header {
+                    line.addAttribute(tableRuleAttribute, value: [ctx.indent, total], range: NSRange(location: 0, length: line.length))
+                }
+                let before = n == 0 ? spacing(gap) : n == 1 ? size * 0.45 : size * 0.2
+                paragraph(line, paragraphStyle(spacingBefore: before, firstIndent: ctx.indent, indent: ctx.indent, tabs: tabs),
+                          quote: ctx.quote)
+            }
+        }
+
+        func inline(_ node: Markup, _ style: Inline) -> NSMutableAttributedString {
+            let out = NSMutableAttributedString()
+            func plain(_ s: String, _ style: Inline) {
+                var attrs: [NSAttributedString.Key: Any] = [
+                    fontKey: font(style.mono ? style.size * 0.9 : style.size, bold: style.bold, italic: style.italic, mono: style.mono),
+                    colorKey: style.color,
+                ]
+                if style.strike { attrs[strikeAttribute] = true }
+                if style.link { attrs[underlineKey] = CTUnderlineStyle.single.rawValue }
+                let piece = NSMutableAttributedString(string: s, attributes: attrs)
+                // cmark-gfm's autolink extension is off in swift-markdown, so underline bare URLs here.
+                if !style.link, !style.mono, s.contains("://") || s.contains("www."), let detector = linkDetector {
+                    for m in detector.matches(in: s, range: NSRange(location: 0, length: (s as NSString).length)) {
+                        piece.addAttribute(underlineKey, value: CTUnderlineStyle.single.rawValue, range: m.range)
+                    }
+                }
+                out.append(piece)
+            }
+            func walk(_ node: Markup, _ style: Inline) {
+                var style = style
+                switch node {
+                case let t as Markdown.Text: plain(t.string, style)
+                case let c as InlineCode: style.mono = true; plain(c.code, style)
+                case is SoftBreak, is LineBreak: plain(lineSeparator, style)
+                case let h as InlineHTML: plain(h.rawHTML, style)
+                case let img as Markdown.Image: plain(img.plainText, style)
+                default:
+                    if node is Strong { style.bold = true }
+                    if node is Emphasis { style.italic = true }
+                    if node is Strikethrough { style.strike = true }
+                    if node is Markdown.Link { style.link = true }
+                    for child in node.children { walk(child, style) }
+                }
+            }
+            for child in node.children { walk(child, style) }
+            return out
+        }
+    }
+
+    nonisolated(unsafe) private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
+    /// The whole note as one attributed string, a paragraph per block, for text up to `width` wide.
+    static func attributed(_ source: String, fontSize: Double, color: CGColor, width: Double = .greatestFiniteMagnitude) -> NSAttributedString {
+        var b = Builder(fontSize: fontSize, color: color, faded: color.copy(alpha: color.alpha * 0.7) ?? color, width: width)
+        b.block(Document(parsing: source), Context())
+        return b.out
     }
 
     // MARK: Layout
@@ -249,7 +323,7 @@ public enum Note {
         // for every note on screen; everything the layout depends on is in the key.
         let key = LayoutKey(source: source, fontSize: fontSize, color: color.components ?? [], rect: rect)
         return cache.layout(key) {
-            let text = attributed(source, fontSize: fontSize, color: color)
+            let text = attributed(source, fontSize: fontSize, color: color, width: rect.width)
             let setter = CTFramesetterCreateWithAttributedString(text as CFAttributedString)
             return (text, CTFramesetterCreateFrame(setter, CFRange(), CGPath(rect: rect, transform: nil), nil))
         }
@@ -300,30 +374,35 @@ public enum Note {
         return zip(lines, origins).map { Line(line: $0, origin: CGPoint(x: rect.minX + $1.x, y: rect.maxY - $1.y)) }
     }
 
-    /// Strikethroughs, rules and quote bars as line segments in top-left coordinates, drawn after the text.
+    /// Strikethroughs, rules, quote bars and table header rules as line segments in top-left coordinates,
+    /// drawn after the text.
     static func decorations(_ lines: [Line], in rect: CGRect) -> [(CGPoint, CGPoint)] {
         var out: [(CGPoint, CGPoint)] = []
         for l in lines {
-            for run in CTLineGetGlyphRuns(l.line) as! [CTRun] {
-                let attrs = CTRunGetAttributes(run) as NSDictionary
-                if attrs[quoteAttribute] != nil, run == (CTLineGetGlyphRuns(l.line) as! [CTRun]).first {
-                    var ascent: CGFloat = 0, descent: CGFloat = 0
-                    _ = CTLineGetTypographicBounds(l.line, &ascent, &descent, nil)
-                    let x = rect.minX + 3
-                    out.append((CGPoint(x: x, y: l.origin.y - ascent), CGPoint(x: x, y: l.origin.y + descent)))
+            let runs = CTLineGetGlyphRuns(l.line) as! [CTRun]
+            var ascent: CGFloat = 0, descent: CGFloat = 0
+            _ = CTLineGetTypographicBounds(l.line, &ascent, &descent, nil)
+            if let first = runs.first {
+                let attrs = CTRunGetAttributes(first) as NSDictionary
+                if let x = attrs[quoteAttribute] as? Double {
+                    out.append((CGPoint(x: rect.minX + x, y: l.origin.y - ascent), CGPoint(x: rect.minX + x, y: l.origin.y + descent)))
                 }
-                if attrs[ruleAttribute] != nil {
-                    out.append((CGPoint(x: rect.minX, y: l.origin.y - 3), CGPoint(x: rect.maxX, y: l.origin.y - 3)))
-                } else if attrs[strikeAttribute] != nil {
-                    let range = CTRunGetStringRange(run)
-                    var start: CGFloat = 0, end: CGFloat = 0
-                    start = CTLineGetOffsetForStringIndex(l.line, range.location, nil)
-                    end = CTLineGetOffsetForStringIndex(l.line, range.location + range.length, nil)
-                    var ascent: CGFloat = 0
-                    _ = CTRunGetTypographicBounds(run, CFRange(), &ascent, nil, nil)
-                    let y = l.origin.y - ascent * 0.32
-                    out.append((CGPoint(x: l.origin.x + start, y: y), CGPoint(x: l.origin.x + end, y: y)))
+                if let x = attrs[ruleAttribute] as? Double {
+                    out.append((CGPoint(x: rect.minX + x, y: l.origin.y - 3), CGPoint(x: rect.maxX, y: l.origin.y - 3)))
                 }
+                if let span = attrs[tableRuleAttribute] as? [Double], span.count == 2 {
+                    let y = l.origin.y + descent + 2
+                    out.append((CGPoint(x: rect.minX + span[0], y: y), CGPoint(x: min(rect.maxX, rect.minX + span[0] + span[1]), y: y)))
+                }
+            }
+            for run in runs where (CTRunGetAttributes(run) as NSDictionary)[strikeAttribute] != nil {
+                let range = CTRunGetStringRange(run)
+                let start = CTLineGetOffsetForStringIndex(l.line, range.location, nil)
+                let end = CTLineGetOffsetForStringIndex(l.line, range.location + range.length, nil)
+                var runAscent: CGFloat = 0
+                _ = CTRunGetTypographicBounds(run, CFRange(), &runAscent, nil, nil)
+                let y = l.origin.y - runAscent * 0.32
+                out.append((CGPoint(x: l.origin.x + start, y: y), CGPoint(x: l.origin.x + end, y: y)))
             }
         }
         return out
