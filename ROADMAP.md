@@ -25,9 +25,15 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Stencil libraries: `.dottielib` files, built-in Basics set, Library sidebar tab (search, click/drag to place, SVG folders to library, add selection), `list_stencils` / `add_stencil` over MCP
 - [x] Excalidraw (`.excalidraw`, `.excalidrawlib`) and draw.io (`.drawio`, compressed or not) import: File menu, drop, or into a library
 
+- [x] Themes (Paper, White, Sepia, Blueprint, Chalkboard, Midnight): stored per drawing, used by the canvas and every export
+- [x] Rulers (⇧⌘R) with guides you drag out of them: persisted in the file, snapped to by moves and resizes
+- [x] Layers panel unfolds to elements: drag to restack, or onto a layer to move
+
 ## Next
-2. Rulers, themes
-3. Per-element layer drag-and-drop in the layers panel
+- Custom themes and a color palette per theme
+- Guides: lock, numeric entry, and a cursor-position marker on the rulers
+- Stencil libraries: rename items, reorder, tags editor, share via file association
+- Visio (`.vsdx`) import
 
 ## Agents (MCP)
 - [x] Live mode (see README); `export_svg`

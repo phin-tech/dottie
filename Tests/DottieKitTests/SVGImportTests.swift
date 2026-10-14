@@ -378,3 +378,43 @@ final class ThemeAndGuideTests: XCTestCase {
         XCTAssertEqual(rs.dx, 2, accuracy: 0.001)
     }
 }
+
+final class LayerDragTests: XCTestCase {
+    func make() -> (DottieDocument, [UUID]) {
+        var doc = DottieDocument()
+        let top = doc.addLayer(name: "Top")
+        let base = doc.layers[0].id
+        let els = (0..<5).map { i in
+            Element(kind: .rectangle, frame: CGRect(x: Double(i), y: 0, width: 10, height: 10), seed: 1,
+                    layerID: i < 3 ? base : top)
+        }
+        doc.elements = els
+        return (doc, els.map(\.id))
+    }
+
+    func testMoveInFrontOfTargetKeepsOrderAndChangesLayer() {
+        var (doc, id) = make()
+        // Put element 4 (top layer) just in front of element 0 (base layer).
+        doc.move([id[4]], toLayer: doc.layers[0].id, inFrontOf: id[0])
+        XCTAssertEqual(doc.elements.map(\.id), [id[0], id[4], id[1], id[2], id[3]])
+        XCTAssertEqual(doc.elements[1].layerID, doc.layers[0].id)
+    }
+
+    func testMoveToLayerWithoutTargetGoesOnTopOfThatLayer() {
+        var (doc, id) = make()
+        doc.move([id[0], id[1]], toLayer: doc.layers[1].id, inFrontOf: nil)
+        let onTop = doc.elements.filter { $0.layerID == doc.layers[1].id }.map(\.id)
+        XCTAssertEqual(onTop, [id[3], id[4], id[0], id[1]])
+        XCTAssertEqual(doc.elements.count, 5)
+    }
+
+    func testIgnoresTargetInsideTheMovedSetAndUnknownLayers() {
+        var (doc, id) = make()
+        let before = doc.elements
+        doc.move([id[1]], toLayer: UUID(), inFrontOf: nil)
+        XCTAssertEqual(doc.elements, before)
+        doc.move([id[1]], toLayer: doc.layers[0].id, inFrontOf: id[1]) // dropped onto itself
+        XCTAssertEqual(Set(doc.elements.map(\.id)), Set(id))
+        XCTAssertEqual(doc.elements.firstIndex { $0.id == id[1] }, 2) // went to the top of its layer; order preserved otherwise
+    }
+}

@@ -27,6 +27,13 @@ Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connect
 `export_svg`, `create_diagram`, `open_document`, `list_stencils` and `add_stencil` (place shapes from the
 built-in and user stencil libraries).
 
+### Themes, rulers, layers
+
+The Canvas section of the inspector sets a per-drawing theme (page color and ink; exports match) and shows
+rulers (⇧⌘R). Drag out of a ruler to pull a guide: moves and resizes snap to it, and dropping it back on the
+ruler removes it. The Layers section unfolds each layer to its elements; drag one onto another to restack,
+or onto a layer to move it there.
+
 ### Stencils
 
 The Library tab in the sidebar holds stencil libraries: the built-in Basics set (flowchart symbols and common

@@ -239,6 +239,26 @@ extension DottieDocument {
         change(&layers[i])
     }
 
+    /// Moves `ids` to `layer`, in front of `target` (just above it in z-order), or on top of the layer when
+    /// `target` is nil. Their relative order is kept. A target inside `ids` is ignored.
+    public mutating func move(_ ids: Set<UUID>, toLayer layer: UUID, inFrontOf target: UUID?) {
+        guard layers.contains(where: { $0.id == layer }) else { return }
+        var picked = elements.filter { ids.contains($0.id) }
+        guard !picked.isEmpty else { return }
+        for i in picked.indices { picked[i].layerID = layer }
+        var rest = elements.filter { !ids.contains($0.id) }
+        let at: Int
+        if let target, !ids.contains(target), let i = rest.firstIndex(where: { $0.id == target }) {
+            at = i + 1
+        } else if let last = rest.lastIndex(where: { $0.layerID == layer }) {
+            at = last + 1
+        } else {
+            at = rest.count
+        }
+        rest.insert(contentsOf: picked, at: at)
+        elements = rest
+    }
+
     public mutating func move(_ ids: Set<UUID>, toLayer layer: UUID) {
         guard layers.contains(where: { $0.id == layer }) else { return }
         for k in elements.indices where ids.contains(elements[k].id) { elements[k].layerID = layer }

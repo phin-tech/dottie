@@ -32,7 +32,8 @@ struct ContentView: View {
                     .padding([.horizontal, .top], 12)
                     switch sidebarTab {
                     case .inspector:
-                        Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager)
+                        Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager,
+                                  onSelect: { selection = $0 })
                     case .library:
                         LibraryPanel(document: document, selection: selection) { item, keep in
                             placeRequest = PlaceRequest(item: item, keepOriginalColors: keep)
@@ -95,6 +96,7 @@ struct Inspector: View {
     @Binding var newRouting: Routing
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
+    var onSelect: (Set<UUID>) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(Pref.showRulers) private var showRulers = false
 
@@ -126,7 +128,8 @@ struct Inspector: View {
 
     var body: some View {
         Form {
-            LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager)
+            LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager,
+                          onSelect: onSelect)
             Section("Canvas") {
                 Picker("Theme", selection: themeBinding) {
                     Text("Automatic").tag("")
@@ -231,12 +234,19 @@ struct Inspector: View {
     }
 }
 
-/// Add / hide / lock / rename / reorder layers. The highlighted layer receives new shapes.
+/// Add / hide / lock / rename / reorder layers. The highlighted layer receives new shapes. Each layer
+/// unfolds to its elements, front first; drag elements onto another element to restack them, or onto
+/// a layer to move them there.
 struct LayersSection: View {
     @ObservedObject var document: DrawingDocument
     var selection: Set<UUID>
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
+    var onSelect: (Set<UUID>) -> Void
+    @State private var expanded: Set<UUID> = []
+
+    private static let dragPrefix = "dottie-elements:"
+    private static let rowLimit = 300
 
     private var layers: [Layer] { document.model.layers }
     private var current: UUID { activeLayer.flatMap { id in layers.first { $0.id == id }?.id } ?? layers.last?.id ?? UUID() }
@@ -247,16 +257,56 @@ struct LayersSection: View {
         document.commit(next, actionName: name, undoManager: undoManager)
     }
 
+    /// Element ids carried by a drop, groups expanded.
+    private func dropped(_ items: [String]) -> Set<UUID> {
+        var ids = Set<UUID>()
+        for s in items where s.hasPrefix(Self.dragPrefix) {
+            for part in s.dropFirst(Self.dragPrefix.count).split(separator: ",") { if let u = UUID(uuidString: String(part)) { ids.insert(u) } }
+        }
+        return document.model.expandingGroups(ids)
+    }
+
+    private func dragString(for id: UUID) -> String {
+        let ids = selection.contains(id) ? selection : [id]
+        return Self.dragPrefix + ids.map(\.uuidString).joined(separator: ",")
+    }
+
     var body: some View {
+        let byLayer = Dictionary(grouping: document.model.elements, by: \.layerID)
         Section("Layers") {
             // Front-most layer first, like every layers panel.
             ForEach(layers.reversed()) { layer in
-                LayerRow(layer: layer, isActive: layer.id == current,
-                         count: document.model.elements.filter { $0.layerID == layer.id }.count,
+                let members = byLayer[layer.id] ?? []
+                LayerRow(layer: layer, isActive: layer.id == current, count: members.count,
+                         isExpanded: expanded.contains(layer.id),
+                         toggleExpanded: { if !expanded.insert(layer.id).inserted { expanded.remove(layer.id) } },
                          select: { activeLayer = layer.id },
                          rename: { n in edit("Rename Layer") { $0.editLayer(layer.id) { $0.name = n } } },
                          toggleVisible: { edit("Toggle Layer Visibility") { $0.editLayer(layer.id) { $0.visible.toggle() } } },
                          toggleLocked: { edit("Toggle Layer Lock") { $0.editLayer(layer.id) { $0.locked.toggle() } } })
+                    .dropDestination(for: String.self) { items, _ in
+                        let ids = dropped(items)
+                        guard !ids.isEmpty else { return false }
+                        edit("Move to Layer") { $0.move(ids, toLayer: layer.id, inFrontOf: nil) }
+                        return true
+                    }
+                if expanded.contains(layer.id) {
+                    ForEach(Array(members.reversed().prefix(Self.rowLimit))) { e in
+                        ElementRow(element: e, isSelected: selection.contains(e.id))
+                            .onTapGesture { onSelect(document.model.expandingGroups([e.id])) }
+                            .draggable(dragString(for: e.id))
+                            .dropDestination(for: String.self) { items, _ in
+                                let ids = dropped(items)
+                                guard !ids.isEmpty else { return false }
+                                edit("Reorder") { $0.move(ids, toLayer: layer.id, inFrontOf: e.id) }
+                                return true
+                            }
+                    }
+                    if members.count > Self.rowLimit {
+                        Text("and \(members.count - Self.rowLimit) more").font(.caption).foregroundStyle(.secondary)
+                            .padding(.leading, 22)
+                    }
+                }
             }
             HStack {
                 Button { edit("Add Layer") { activeLayer = $0.addLayer(above: current) } } label: { Image(systemName: "plus") }
@@ -277,10 +327,51 @@ struct LayersSection: View {
     }
 }
 
+private struct ElementRow: View {
+    var element: Element
+    var isSelected: Bool
+
+    private var symbol: String {
+        switch element.kind {
+        case .rectangle: "rectangle"
+        case .ellipse: "circle"
+        case .diamond: "diamond"
+        case .text: "textformat"
+        case .connector: "arrow.right"
+        case .freehand: "scribble"
+        case .path: "scribble.variable"
+        }
+    }
+
+    private var title: String {
+        if let t = element.text?.split(separator: "\n").first, !t.isEmpty { return String(t.prefix(28)) }
+        switch element.kind {
+        case .path: return "Shape"
+        case .freehand: return "Stroke"
+        default: return element.kind.rawValue.capitalized
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: symbol).frame(width: 16).foregroundStyle(.secondary)
+            Text(title).lineLimit(1).font(.callout)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 1)
+        .padding(.leading, 22)
+        .padding(.horizontal, 4)
+        .background(isSelected ? Color.accentColor.opacity(0.18) : .clear, in: RoundedRectangle(cornerRadius: 5))
+        .contentShape(Rectangle())
+    }
+}
+
 private struct LayerRow: View {
     var layer: Layer
     var isActive: Bool
     var count: Int
+    var isExpanded: Bool
+    var toggleExpanded: () -> Void
     var select: () -> Void
     var rename: (String) -> Void
     var toggleVisible: () -> Void
@@ -289,6 +380,8 @@ private struct LayerRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
+            Button(action: toggleExpanded) { Image(systemName: isExpanded ? "chevron.down" : "chevron.right").frame(width: 10) }
+                .help(isExpanded ? "Hide elements" : "Show elements")
             Button(action: toggleVisible) { Image(systemName: layer.visible ? "eye" : "eye.slash") }
                 .help(layer.visible ? "Hide layer" : "Show layer")
             Button(action: toggleLocked) { Image(systemName: layer.locked ? "lock.fill" : "lock.open") }

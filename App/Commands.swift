@@ -16,6 +16,7 @@ extension FocusedValues {
 struct DottieCommands: Commands {
     @FocusedBinding(\.tool) private var tool
     @FocusedValue(\.editor) private var editor
+    @AppStorage(Pref.showRulers) private var showRulers = false
 
     private func send(_ action: Selector) { NSApp.sendAction(action, to: nil, from: nil) }
 
@@ -27,6 +28,8 @@ struct DottieCommands: Commands {
                 .keyboardShortcut("-")
             Button("Actual Size") { send(#selector(CanvasNSView.zoomActualSize(_:))) }
                 .keyboardShortcut("0")
+            Toggle("Show Rulers", isOn: $showRulers)
+                .keyboardShortcut("r", modifiers: [.command, .shift])
             Divider()
         }
         InspectorCommands()
