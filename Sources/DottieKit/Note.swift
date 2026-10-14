@@ -32,6 +32,16 @@ public enum Note {
         frame.insetBy(dx: min(padding, frame.width / 2), dy: min(padding, frame.height / 2))
     }
 
+    /// Note colors offered as swatches, the default first. All light, so the ink stays dark on them.
+    public static let colors: [(name: String, fill: RGBA)] = [
+        ("Yellow", defaultFill),
+        ("Orange", RGBA(r: 1, g: 0.8, b: 0.55)),
+        ("Pink", RGBA(r: 1, g: 0.78, b: 0.85)),
+        ("Purple", RGBA(r: 0.85, g: 0.8, b: 1)),
+        ("Blue", RGBA(r: 0.73, g: 0.88, b: 1)),
+        ("Green", RGBA(r: 0.78, g: 0.95, b: 0.7)),
+    ]
+
     /// Offset of the soft shadow drawn under a filled note.
     static let shadowOffset = CGSize(width: 2, height: 3)
 
@@ -45,6 +55,8 @@ public enum Note {
     static let quoteAttribute = NSAttributedString.Key("DottieQuote")
     /// Marks a table's header row, ruled underneath from x offset `value[0]`, `value[1]` wide.
     static let tableRuleAttribute = NSAttributedString.Key("DottieTableRule")
+    /// Marks a task item's checkbox; the value is the 1-based source line of its `[ ]` or `[x]`.
+    static let checkboxAttribute = NSAttributedString.Key("DottieCheckbox")
     private static let fontKey = NSAttributedString.Key(kCTFontAttributeName as String)
     private static let colorKey = NSAttributedString.Key(kCTForegroundColorAttributeName as String)
     private static let paragraphKey = NSAttributedString.Key(kCTParagraphStyleAttributeName as String)
@@ -101,7 +113,7 @@ public enum Note {
     /// Where a block sits: its indent, and the list marker its first paragraph carries.
     private struct Context {
         var indent: Double = 0
-        var marker: (text: String, start: Double, hang: Double)?
+        var marker: (text: String, start: Double, hang: Double, line: Int?)?
         var quote: Double?
         var listDepth = 0
     }
@@ -158,7 +170,7 @@ public enum Note {
                 for (i, item) in items.enumerated() {
                     if i > 0 || ctx.listDepth > 0 || ctx.marker != nil { nextSpacing = fontSize * 0.15 }
                     var inner = ctx
-                    inner.marker = (markers[i], ctx.indent, hang)
+                    inner.marker = (markers[i], ctx.indent, hang, item.checkbox == nil ? nil : item.range?.lowerBound.line)
                     inner.indent = hang
                     inner.listDepth += 1
                     let children = Array(item.children)
@@ -199,6 +211,9 @@ public enum Note {
         mutating func text(_ content: NSMutableAttributedString, _ ctx: Context, spacing: Double) {
             if let m = ctx.marker {
                 let lead = NSMutableAttributedString(string: m.text + "\t", attributes: [fontKey: font(fontSize), colorKey: color])
+                if let line = m.line {
+                    lead.addAttribute(checkboxAttribute, value: line, range: NSRange(location: 0, length: (m.text as NSString).length))
+                }
                 lead.append(content)
                 paragraph(lead, paragraphStyle(spacingBefore: spacing, firstIndent: m.start, indent: m.hang, tabs: [(.left, m.hang)]),
                           quote: ctx.quote)
@@ -406,6 +421,45 @@ public enum Note {
             }
         }
         return out
+    }
+
+    // MARK: Checkboxes
+
+    /// The source line of the task checkbox drawn at `p` (in the note's own, unrotated frame), if any.
+    public static func checkboxLine(at p: CGPoint, in e: Element) -> Int? {
+        guard e.kind == .note, let source = e.text, source.contains("[") else { return nil }
+        let rect = textRect(e.frame)
+        guard rect.insetBy(dx: -4, dy: -4).contains(p) else { return nil }
+        let (_, frame) = layout(source, in: rect, fontSize: e.style.fontSize, color: e.style.stroke.cgColor)
+        let slop = 4.0
+        for l in lines(of: frame, in: rect) {
+            var ascent: CGFloat = 0, descent: CGFloat = 0
+            _ = CTLineGetTypographicBounds(l.line, &ascent, &descent, nil)
+            guard p.y >= l.origin.y - ascent - slop, p.y <= l.origin.y + descent + slop else { continue }
+            for run in CTLineGetGlyphRuns(l.line) as! [CTRun] {
+                guard let line = (CTRunGetAttributes(run) as NSDictionary)[checkboxAttribute] as? Int else { continue }
+                let range = CTRunGetStringRange(run)
+                let start = l.origin.x + CTLineGetOffsetForStringIndex(l.line, range.location, nil)
+                let end = l.origin.x + CTLineGetOffsetForStringIndex(l.line, range.location + range.length, nil)
+                if p.x >= start - slop, p.x <= end + slop { return line }
+            }
+        }
+        return nil
+    }
+
+    /// `source` with the task checkbox on 1-based `line` ticked or unticked.
+    public static func togglingCheckbox(line: Int, in source: String) -> String {
+        var lines = source.components(separatedBy: "\n")
+        guard lines.indices.contains(line - 1) else { return source }
+        let text = lines[line - 1]
+        // The list marker, maybe inside quotes, then the box.
+        let pattern = #"^(\s*(?:>\s*)*(?:[-*+]|\d+[.)])\s+)\[([ xX])\]"#
+        guard let re = try? NSRegularExpression(pattern: pattern),
+              let m = re.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) else { return source }
+        let box = m.range(at: 2)
+        let ticked = (text as NSString).substring(with: box) != " "
+        lines[line - 1] = (text as NSString).replacingCharacters(in: box, with: ticked ? " " : "x")
+        return lines.joined(separator: "\n")
     }
 
     /// Draws a note's text into `rect` of a top-left-origin context, clipped to it.

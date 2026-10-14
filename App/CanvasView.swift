@@ -549,6 +549,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// The target of the link badge under `p`, front-most first.
+    /// Ticks or unticks the task checkbox in a note under `p`, as one undo step. False if there is none.
+    private func toggleCheckbox(at p: CGPoint) -> Bool {
+        guard let hit = spatial.element(at: p, in: model), hit.kind == .note,
+              let line = Note.checkboxLine(at: hit.unrotated(p), in: hit),
+              let i = model.elements.firstIndex(where: { $0.id == hit.id }) else { return false }
+        var next = model
+        next.elements[i].text = Note.togglingCheckbox(line: line, in: hit.text ?? "")
+        guard next != model else { return false }
+        selection = [hit.id]
+        onCommit?(next, "Check Item")
+        return true
+    }
+
     private func badgeHit(_ p: CGPoint) -> UUID? {
         linkBadges.last { b in
             let c = badgeCenter(b)
@@ -1203,6 +1216,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             jump(to: target)
             return
         }
+        if tool == .select, event.clickCount == 1, toggleCheckbox(at: p) { return }
         baseline = model
         if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model) == nil {
             gesture = .guide(vertical: hit.vertical, index: hit.index)
@@ -1617,6 +1631,27 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     func controlTextDidEndEditing(_ obj: Notification) { endEditing() }
 
+    /// Tab and Shift-Tab in a note: indent or outdent the caret's line by two spaces, which nests a list item.
+    private func indentLine(in textView: NSTextView, out: Bool) {
+        let text = textView.string as NSString
+        let sel = textView.selectedRange()
+        let start = text.lineRange(for: NSRange(location: sel.location, length: 0)).location
+        let change: NSRange, replacement: String
+        if out {
+            var n = 0
+            while n < 2, start + n < text.length, text.character(at: start + n) == 32 { n += 1 }
+            guard n > 0 else { return }
+            change = NSRange(location: start, length: n); replacement = ""
+        } else {
+            change = NSRange(location: start, length: 0); replacement = "  "
+        }
+        guard textView.shouldChangeText(in: change, replacementString: replacement) else { return }
+        textView.replaceCharacters(in: change, with: replacement)
+        textView.didChangeText()
+        let delta = replacement.count - change.length
+        textView.setSelectedRange(NSRange(location: max(start, sel.location + delta), length: sel.length))
+    }
+
     /// Escape inside the text editor finishes editing and returns to the arrow. In a note, Return starts a
     /// new line, since Markdown needs them, and Shift- or Command-Return finishes like Escape.
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
@@ -1627,6 +1662,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             } ?? false
             if !finishing, selector == #selector(NSResponder.insertNewline(_:)) {
                 textView.insertNewlineIgnoringFieldEditor(nil)
+                return true
+            }
+            if selector == #selector(NSResponder.insertTab(_:)) || selector == #selector(NSResponder.insertBacktab(_:)) {
+                indentLine(in: textView, out: selector == #selector(NSResponder.insertBacktab(_:)))
                 return true
             }
             guard finishing || selector == #selector(NSResponder.cancelOperation(_:)) else { return false }

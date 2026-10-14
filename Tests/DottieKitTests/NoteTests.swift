@@ -127,4 +127,35 @@ final class NoteTests: XCTestCase {
         XCTAssertEqual(try x(of: "a"), xs[0], accuracy: 0.5)
         XCTAssertFalse(svg.contains("\u{2028}"))
     }
+
+    func testTogglingACheckboxFlipsOnlyThatLine() {
+        let md = "# Todo\n- [ ] one\n- [x] two\n> 1. [ ] quoted\n- [ ] link [x](y)"
+        XCTAssertEqual(Note.togglingCheckbox(line: 2, in: md), "# Todo\n- [x] one\n- [x] two\n> 1. [ ] quoted\n- [ ] link [x](y)")
+        XCTAssertEqual(Note.togglingCheckbox(line: 3, in: md), "# Todo\n- [ ] one\n- [ ] two\n> 1. [ ] quoted\n- [ ] link [x](y)")
+        XCTAssertEqual(Note.togglingCheckbox(line: 4, in: md), "# Todo\n- [ ] one\n- [x] two\n> 1. [x] quoted\n- [ ] link [x](y)")
+        XCTAssertEqual(Note.togglingCheckbox(line: 1, in: md), md, "not a task")
+        XCTAssertEqual(Note.togglingCheckbox(line: 9, in: md), md)
+    }
+
+    func testCheckboxHitIsTheBoxNotTheItemText() throws {
+        let e = Element(kind: .note, frame: CGRect(x: 100, y: 50, width: 240, height: 200), style: Note.style(from: Style()),
+                        layerID: UUID(), text: "Intro\n\n- [ ] first\n- [x] second")
+        let rect = Note.textRect(e.frame)
+        let (_, frame) = Note.layout(e.text!, in: rect, fontSize: e.style.fontSize, color: e.style.stroke.cgColor)
+        let lines = Note.lines(of: frame, in: rect)
+        XCTAssertEqual(lines.count, 3)
+        let box = CGPoint(x: rect.minX + 5, y: lines[1].origin.y - 5)
+        XCTAssertEqual(Note.checkboxLine(at: box, in: e), 3)
+        XCTAssertEqual(Note.checkboxLine(at: CGPoint(x: rect.minX + 5, y: lines[2].origin.y - 5), in: e), 4)
+        XCTAssertNil(Note.checkboxLine(at: CGPoint(x: rect.minX + 120, y: lines[1].origin.y - 5), in: e), "the item's text")
+        XCTAssertNil(Note.checkboxLine(at: CGPoint(x: rect.minX + 5, y: lines[0].origin.y - 5), in: e), "a plain paragraph")
+    }
+
+    func testNoteColorsKeepDarkInk() {
+        for (_, fill) in Note.colors {
+            var s = Note.style(from: Style()); s.fill = fill
+            let e = Element(kind: .note, frame: .zero, style: s, layerID: UUID())
+            XCTAssertEqual(e.resolvingInk(to: .inkOnDark).style.stroke, .black)
+        }
+    }
 }

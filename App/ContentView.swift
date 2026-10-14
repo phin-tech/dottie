@@ -183,6 +183,9 @@ struct Inspector: View {
                 Slider(value: binding(\.bowing, "Change Bowing"), in: 0...3) { Text("Bowing") }
                     .disabled(binding(\.roughness, "").wrappedValue == 0)
             }
+            if tool == .note || (!selected.isEmpty && selected.allSatisfy { $0.kind == .note }) {
+                Section("Note") { NoteSwatches(fill: binding(\.fill, "Change Note Color")) }
+            }
             if selected.count == 1, let e = selected.first {
                 Section("Element") {
                     AnchorField(element: e) { anchor in

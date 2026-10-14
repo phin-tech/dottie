@@ -502,6 +502,43 @@ final class CanvasGestureTests: XCTestCase {
         }
     }
 
+    func testClickingANotesCheckboxTicksItInOneUndoStepWithoutMovingIt() throws {
+        let note = add(.note, CGRect(x: 100, y: 100, width: 220, height: 160), text: "- [ ] ship it\n- [x] test it")
+        let rect = Note.textRect(note.frame)
+        // Where each box is drawn: down the marker column until the hit test names its source line.
+        func box(_ line: Int) throws -> CGPoint {
+            let y = try XCTUnwrap(stride(from: rect.minY, to: rect.maxY, by: 1).first {
+                Note.checkboxLine(at: CGPoint(x: rect.minX + 5, y: $0), in: note) == line
+            })
+            return CGPoint(x: rect.minX + 5, y: y + 6)
+        }
+        let first = try box(1), second = try box(2)
+        click(first)
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(commits.last?.name, "Check Item")
+        XCTAssertEqual(element(note.id).text, "- [x] ship it\n- [x] test it")
+        XCTAssertEqual(element(note.id).frame, note.frame)
+        click(second)
+        XCTAssertEqual(element(note.id).text, "- [x] ship it\n- [ ] test it")
+        click(CGPoint(x: rect.midX + 40, y: first.y)) // the item's text just selects
+        XCTAssertEqual(commits.count, 2)
+    }
+
+    func testTabIndentsTheLineInANoteAndShiftTabOutdents() throws {
+        _ = add(.note, CGRect(x: 100, y: 100, width: 220, height: 160), text: "- one\n- two")
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 200, y: 200), clicks: 2))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 200, y: 200), clicks: 2))
+        let field = try XCTUnwrap(view.textEditor)
+        let editor = try XCTUnwrap(field.currentEditor() as? NSTextView)
+        editor.setSelectedRange(NSRange(location: 9, length: 0)) // in "two"
+        XCTAssertTrue(view.control(field, textView: editor, doCommandBy: #selector(NSResponder.insertTab(_:))))
+        XCTAssertEqual(editor.string, "- one\n  - two")
+        XCTAssertEqual(editor.selectedRange().location, 11, "the caret stays in the word")
+        XCTAssertNotNil(view.textEditor, "Tab did not end editing")
+        XCTAssertTrue(view.control(field, textView: editor, doCommandBy: #selector(NSResponder.insertBacktab(_:))))
+        XCTAssertEqual(editor.string, "- one\n- two")
+    }
+
     func testANewNoteLeftEmptyDisappearsButOneEmptiedLaterStays() throws {
         view.tool = .note
         click(CGPoint(x: 120, y: 100))
