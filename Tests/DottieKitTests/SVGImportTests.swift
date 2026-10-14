@@ -123,3 +123,71 @@ final class InsertArtTests: XCTestCase {
         XCTAssertTrue(doc.elements.allSatisfy { $0.layerID == doc.layers[0].id })
     }
 }
+
+final class StencilLibraryTests: XCTestCase {
+    func testStarterItemsAreDrawableAndStable() throws {
+        let lib = StencilLibrary.starter
+        XCTAssertGreaterThanOrEqual(lib.items.count, 12)
+        XCTAssertEqual(Set(lib.items.map(\.id)).count, lib.items.count)
+        XCTAssertEqual(lib.items.map(\.id), StencilLibrary.starter.items.map(\.id))
+        for item in lib.items {
+            XCTAssertFalse(item.elements.isEmpty, item.name)
+            XCTAssertNotNil(Exporter.png(item.document(), scale: 1), item.name)
+            for e in item.elements {
+                XCTAssertGreaterThanOrEqual(e.x, -0.5, item.name); XCTAssertGreaterThanOrEqual(e.y, -0.5, item.name)
+                XCTAssertLessThanOrEqual(e.frame.maxX, item.width + 1.5, item.name)
+                XCTAssertLessThanOrEqual(e.frame.maxY, item.height + 1.5, item.name)
+            }
+        }
+    }
+
+    func testLibraryRoundTripsThroughJSON() throws {
+        let lib = StencilLibrary.starter
+        XCTAssertEqual(try StencilLibrary.decode(lib.encoded()).items.count, lib.items.count)
+        XCTAssertEqual(try StencilLibrary.decode(lib.encoded()).name, "Basics")
+    }
+
+    func testFromSVGsNamesItemsAndReportsFailures() {
+        let ok = Data(##"<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg>"##.utf8)
+        let (lib, failed) = StencilLibrary.fromSVGs(name: "Icons", files: [("circle", ok), ("broken", Data("x".utf8))])
+        XCTAssertEqual(lib.items.map(\.name), ["circle"])
+        XCTAssertEqual(failed, ["broken"])
+        XCTAssertEqual(lib.items[0].width, 24)
+        XCTAssertGreaterThan(lib.items[0].readableScale, 3.9) // 24 -> 96
+    }
+
+    func testItemFromSelectionNormalizesToOriginAndPlacesCentered() throws {
+        var doc = DottieDocument()
+        let l = doc.layers[0].id
+        let a = Element(kind: .rectangle, frame: CGRect(x: 300, y: 400, width: 100, height: 50), layerID: l)
+        let b = Element(kind: .ellipse, frame: CGRect(x: 500, y: 420, width: 40, height: 40), layerID: l)
+        var link = Element(kind: .connector, frame: .zero, layerID: l,
+                           connector: ConnectorData(start: .bound(a.id), end: .bound(b.id)))
+        link.seed = 3
+        doc.elements = [a, b, link]
+        let item = try XCTUnwrap(StencilLibrary.item(from: doc, ids: Set([a.id, b.id, link.id]), name: "Pair"))
+        XCTAssertEqual(item.width, 240, accuracy: 0.5)
+        XCTAssertEqual(item.elements.first { $0.id == a.id }?.x, 0)
+        XCTAssertFalse(item.imported)
+
+        var target = DottieDocument()
+        let ids = target.place(item, center: CGPoint(x: 1000, y: 1000), layerID: target.layers[0].id, keepOriginalColors: false)
+        XCTAssertEqual(ids.count, 3)
+        let placed = target.elements.filter { ids.contains($0.id) && $0.kind != .connector }
+        XCTAssertEqual(placed.map(\.frame.minX).min()!, 1000 - item.width * item.readableScale / 2, accuracy: 0.5)
+        // The new connector is bound to the new copies, not the originals.
+        let c = try XCTUnwrap(target.elements.first { $0.kind == .connector })
+        XCTAssertTrue(ids.contains(c.connector!.start.elementID!))
+        XCTAssertFalse(doc.elements.contains { $0.id == c.connector!.start.elementID })
+    }
+
+    func testRestyleOnlyTouchesImportedItems() {
+        var st = Style(); st.roughness = 0; st.stroke = RGBA(r: 1, g: 0, b: 0)
+        let e = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), style: st, layerID: UUID())
+        let imported = StencilItem(name: "i", width: 10, height: 10, elements: [e], imported: true)
+        let native = StencilItem(name: "n", width: 10, height: 10, elements: [e], imported: false)
+        XCTAssertTrue(imported.placed(keepOriginalColors: false)[0].style.stroke.isAutomaticInk)
+        XCTAssertEqual(imported.placed(keepOriginalColors: true)[0].style.stroke, RGBA(r: 1, g: 0, b: 0))
+        XCTAssertEqual(native.placed(keepOriginalColors: false)[0].style.stroke, RGBA(r: 1, g: 0, b: 0))
+    }
+}
