@@ -43,18 +43,21 @@ public struct ConnectorData: Codable, Equatable, Sendable {
 public enum Connector {
     public static func portPoint(_ shape: Element, _ port: Port) -> CGPoint {
         let r = shape.frame
+        let p: CGPoint
         switch port {
-        case .top: return CGPoint(x: r.midX, y: r.minY)
-        case .right: return CGPoint(x: r.maxX, y: r.midY)
-        case .bottom: return CGPoint(x: r.midX, y: r.maxY)
-        case .left: return CGPoint(x: r.minX, y: r.midY)
+        case .top: p = CGPoint(x: r.midX, y: r.minY)
+        case .right: p = CGPoint(x: r.maxX, y: r.midY)
+        case .bottom: p = CGPoint(x: r.midX, y: r.maxY)
+        case .left: p = CGPoint(x: r.minX, y: r.midY)
         }
+        return shape.rotated(p)
     }
 
     /// Where the line from the shape's center toward `target` crosses its outline.
     public static func edgePoint(_ shape: Element, toward target: CGPoint) -> CGPoint {
         let r = shape.frame
         let c = CGPoint(x: r.midX, y: r.midY)
+        let target = shape.unrotated(target) // work in the shape's own frame, then rotate the answer back
         let dx = target.x - c.x, dy = target.y - c.y
         guard (dx != 0 || dy != 0), r.width > 0, r.height > 0 else { return c }
         let hw = r.width / 2, hh = r.height / 2
@@ -67,7 +70,7 @@ public enum Connector {
         default:
             t = min(dx != 0 ? hw / abs(dx) : .infinity, dy != 0 ? hh / abs(dy) : .infinity)
         }
-        return CGPoint(x: c.x + dx * t, y: c.y + dy * t)
+        return shape.rotated(CGPoint(x: c.x + dx * t, y: c.y + dy * t))
     }
 
     /// Nearest port of `shape` within `radius` of `p`, if any (used to snap on drop).

@@ -85,6 +85,7 @@ private enum Gesture {
     case drawing(id: UUID)
     case erasing
     case editingPoint(id: UUID, index: Int)
+    case rotating(id: UUID)
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
@@ -114,6 +115,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var baseline: DottieDocument?
     private var marqueeRect: CGRect?
     private var guides: [Snap.Guide] = []
+    private var spacingGuides: [Snap.SpacingGuide] = []
     private var strokePoints: [CGPoint] = []
     private var pasteStep = 0
     private var lastPasteChangeCount = -1
@@ -151,7 +153,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 ctx.strokePath()
                 ctx.setStrokeColor(accent.cgColor); ctx.setLineWidth(1.5 / zoom)
             } else {
+                ctx.saveGState()
+                ctx.translateBy(x: e.frame.midX, y: e.frame.midY); ctx.rotate(by: e.angle)
+                ctx.translateBy(x: -e.frame.midX, y: -e.frame.midY)
                 ctx.stroke(e.frame.insetBy(dx: -4, dy: -4))
+                ctx.restoreGState()
             }
         }
         if let id = hoverShapeID, let e = model.elements.first(where: { $0.id == id }) {
@@ -174,10 +180,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         } else if let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
             ctx.setFillColor(NSColor.white.cgColor)
             for h in Handle.all {
-                let p = h.point(in: e.frame.insetBy(dx: -4, dy: -4))
+                let p = e.rotated(h.point(in: e.frame.insetBy(dx: -4, dy: -4)))
                 let r = CGRect(x: p.x - hs / 2, y: p.y - hs / 2, width: hs, height: hs)
                 ctx.fill(r); ctx.stroke(r)
             }
+            // Rotation knob on a stem above the top edge.
+            let stemTop = e.rotated(CGPoint(x: e.frame.midX, y: e.frame.minY - 4))
+            let knob = rotationKnob(for: e)
+            ctx.move(to: stemTop); ctx.addLine(to: knob); ctx.strokePath()
+            let kr = CGRect(x: knob.x - hs / 2, y: knob.y - hs / 2, width: hs, height: hs)
+            ctx.fillEllipse(in: kr); ctx.strokeEllipse(in: kr)
         }
         if tool == .select, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
            let cp = e.strokeControlPoints {
@@ -194,6 +206,29 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 if i % 3 == 0 { ctx.setFillColor(NSColor.white.cgColor); ctx.fill(r); ctx.stroke(r) }
                 else { ctx.setFillColor(accent.cgColor); ctx.fillEllipse(in: r.insetBy(dx: 1 / zoom, dy: 1 / zoom)) }
             }
+        }
+        if !spacingGuides.isEmpty {
+            ctx.setStrokeColor(NSColor.systemPink.cgColor)
+            ctx.setLineWidth(1 / zoom)
+            let tick = 4 / zoom
+            for g in spacingGuides {
+                for span in g.spans {
+                    switch g.axis {
+                    case .horizontal:
+                        ctx.move(to: CGPoint(x: span.lowerBound, y: g.cross)); ctx.addLine(to: CGPoint(x: span.upperBound, y: g.cross))
+                        for x in [span.lowerBound, span.upperBound] {
+                            ctx.move(to: CGPoint(x: x, y: g.cross - tick)); ctx.addLine(to: CGPoint(x: x, y: g.cross + tick))
+                        }
+                    case .vertical:
+                        ctx.move(to: CGPoint(x: g.cross, y: span.lowerBound)); ctx.addLine(to: CGPoint(x: g.cross, y: span.upperBound))
+                        for y in [span.lowerBound, span.upperBound] {
+                            ctx.move(to: CGPoint(x: g.cross - tick, y: y)); ctx.addLine(to: CGPoint(x: g.cross + tick, y: y))
+                        }
+                    }
+                }
+            }
+            ctx.strokePath()
+            ctx.setStrokeColor(accent.cgColor)
         }
         if !guides.isEmpty {
             ctx.setStrokeColor(NSColor.systemPink.cgColor)
@@ -232,11 +267,23 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private func handle(at p: CGPoint) -> (UUID, Handle, CGRect)? {
         guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }), e.kind != .connector else { return nil }
         let box = e.frame.insetBy(dx: -4, dy: -4)
+        let local = e.unrotated(p)
         for h in Handle.all {
             let c = h.point(in: box)
-            if abs(p.x - c.x) <= hs, abs(p.y - c.y) <= hs { return (id, h, e.frame) }
+            if abs(local.x - c.x) <= hs, abs(local.y - c.y) <= hs { return (id, h, e.frame) }
         }
         return nil
+    }
+
+    /// Canvas position of the rotation knob: above the top edge, in the element's rotated frame.
+    private func rotationKnob(for e: Element) -> CGPoint {
+        e.rotated(CGPoint(x: e.frame.midX, y: e.frame.minY - 4 - 24 / zoom))
+    }
+
+    private func rotationHit(_ p: CGPoint) -> UUID? {
+        guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }), e.kind != .connector else { return nil }
+        let k = rotationKnob(for: e)
+        return hypot(p.x - k.x, p.y - k.y) <= hs ? id : nil
     }
 
     /// Eraser reach in model units; constant on screen at any zoom.
@@ -493,6 +540,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             model.elements.append(e)
             selection = [e.id]
             onPreview?(model)
+        } else if tool == .select, let id = rotationHit(p) {
+            gesture = .rotating(id: id)
         } else if let (id, h, frame) = handle(at: p) {
             gesture = .resizing(id: id, handle: h, original: frame)
         } else if let hit = model.element(at: p) {
@@ -522,16 +571,17 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if case .moving = g {
             // Moving snaps the whole selection's bounds (objects first, then grid); ⌘ bypasses.
             d = CGPoint(x: point(event).x - dragStart.x, y: point(event).y - dragStart.y)
-            guides = []
+            guides = []; spacingGuides = []
             let layersOK = Set(next.layers.filter { $0.visible && !$0.locked }.map(\.id))
-            let moving = next.elements.filter { selection.contains($0.id) && $0.kind != .connector }.map(\.frame)
+            let moving = next.elements.filter { selection.contains($0.id) && $0.kind != .connector }.map(\.rotatedBounds)
                 .reduce(CGRect.null) { $0.union($1) }
             if !moving.isNull, !event.modifierFlags.contains(.command) {
-                let others = next.elements.filter { !selection.contains($0.id) && $0.kind != .connector && layersOK.contains($0.layerID) }.map(\.frame)
+                let others = next.elements.filter { !selection.contains($0.id) && $0.kind != .connector && layersOK.contains($0.layerID) }.map(\.rotatedBounds)
                 let r = Snap.move(moving.offsetBy(dx: d.x, dy: d.y), others: snapToObjects ? others : [],
                                   threshold: 6 / zoom, gridSize: gridSize)
                 d.x += r.dx; d.y += r.dy
                 guides = r.guides
+                spacingGuides = r.spacing
             }
         }
 
@@ -572,12 +622,43 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                     if h.hy < 0 { d.y = Snap.grid(original.minY + d.y, size: grid) - original.minY }
                     if h.hy > 0 { d.y = Snap.grid(original.maxY + d.y, size: grid) - original.maxY }
                 }
+                let angle = next.elements[i].angle
+                if angle != 0 { d = Element.rotate(d, about: .zero, by: -angle) } // drag in the shape's own axes
                 var f = h.resized(original, by: d)
                 f.size.width = max(f.width, 4); f.size.height = max(f.height, 4)
+                guides = []; spacingGuides = []
+                if angle == 0, snapToObjects, !event.modifierFlags.contains(.command) {
+                    let ok = Set(next.layers.filter { $0.visible && !$0.locked }.map(\.id))
+                    let others = next.elements.filter { $0.id != id && $0.kind != .connector && ok.contains($0.layerID) }.map(\.rotatedBounds)
+                    let r = Snap.resize(f, hx: h.hx, hy: h.hy, others: others, threshold: 6 / zoom)
+                    if h.hx < 0 { f.origin.x += r.dx; f.size.width -= r.dx }
+                    if h.hx > 0 { f.size.width += r.dx }
+                    if h.hy < 0 { f.origin.y += r.dy; f.size.height -= r.dy }
+                    if h.hy > 0 { f.size.height += r.dy }
+                    f.size.width = max(f.width, 4); f.size.height = max(f.height, 4)
+                    guides = r.guides
+                }
+                if angle != 0 {
+                    // Keep the opposite corner fixed on the canvas.
+                    f = Element.reanchored(f, original: original, angle: angle,
+                                           fx: h.hx < 0 ? 1 : h.hx > 0 ? 0 : 0.5, fy: h.hy < 0 ? 1 : h.hy > 0 ? 0 : 0.5)
+                }
                 next.elements[i].frame = f
             }
         case .panning, .erasing:
             return
+        case .rotating(let id):
+            if let i = next.elements.firstIndex(where: { $0.id == id }) {
+                let f = next.elements[i].frame
+                let q = point(event)
+                var a = atan2(q.y - f.midY, q.x - f.midX) + .pi / 2
+                // Snap to 15° steps: always with Shift, otherwise when within 3° of one.
+                let step = Double.pi / 12
+                let near = (a / step).rounded() * step
+                if event.modifierFlags.contains(.shift) || abs(a - near) < .pi / 60 { a = near }
+                a = a.truncatingRemainder(dividingBy: 2 * .pi)
+                next.elements[i].rotation = abs(a) < 1e-9 ? nil : a
+            }
         case .editingPoint(let id, let index):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
                 next.elements[i].moveStrokeControlPoint(index, to: point(event))
@@ -597,7 +678,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .marquee:
             let r = CGRect(x: min(dragStart.x, p.x), y: min(dragStart.y, p.y), width: abs(d.x), height: abs(d.y))
             marqueeRect = r
-            selection = next.expandingGroups(Set(next.elements.filter { r.intersects($0.frame) }.map(\.id)))
+            selection = next.expandingGroups(Set(next.elements.filter { r.intersects($0.rotatedBounds) }.map(\.id)))
             needsDisplay = true
             return
         }
@@ -607,7 +688,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func mouseUp(with event: NSEvent) {
         defer {
-            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; guides = []; strokePoints = []; needsDisplay = true
+            gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; guides = []; spacingGuides = []; strokePoints = []; needsDisplay = true
             if spaceDown { window?.invalidateCursorRects(for: self) }
         }
         guard let base = baseline, let g = gesture else { return }
@@ -630,6 +711,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             commit(base, "Draw")
         case .erasing where model != base: commit(base, "Erase")
         case .editingPoint where model != base: commit(base, "Edit Stroke")
+        case .rotating where model != base: commit(base, "Rotate")
         case .endpoint where model != base: commit(base, "Move Connector End")
         case .moving where model != base: commit(base, "Move")
         case .resizing where model != base: commit(base, "Resize")

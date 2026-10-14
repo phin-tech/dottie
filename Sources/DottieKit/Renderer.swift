@@ -266,6 +266,11 @@ public enum Renderer {
             }
             return
         }
+        if e.angle != 0 { // rotate the whole shape (fill, outline, label) about its center
+            ctx.translateBy(x: e.frame.midX, y: e.frame.midY)
+            ctx.rotate(by: e.angle)
+            ctx.translateBy(x: -e.frame.midX, y: -e.frame.midY)
+        }
         if e.kind == .text {
             drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
             return

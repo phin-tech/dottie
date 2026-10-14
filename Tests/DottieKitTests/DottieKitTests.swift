@@ -586,3 +586,65 @@ final class StrokeEditTests: XCTestCase {
         XCTAssertNil(e.points)
     }
 }
+
+final class RotationAndSnapTests: XCTestCase {
+    func testRotationMovesHitAreaPortsAndExportBounds() throws {
+        var doc = DottieDocument()
+        var e = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 100, height: 20), layerID: doc.layers[0].id)
+        doc.elements = [e]
+        XCTAssertNotNil(doc.element(at: CGPoint(x: 95, y: 10)))
+        e.rotation = .pi / 2
+        doc.elements = [e]
+        // A wide bar turned a quarter-turn is tall: the old right end is no longer under the cursor.
+        XCTAssertNil(doc.element(at: CGPoint(x: 95, y: 10)))
+        XCTAssertNotNil(doc.element(at: CGPoint(x: 50, y: 55)))
+        let top = Connector.portPoint(e, .top)
+        XCTAssertEqual(top.x, 50 + 10, accuracy: 0.01) // top edge midpoint swings to the right
+        XCTAssertEqual(top.y, 10, accuracy: 0.01)
+        let edge = Connector.edgePoint(e, toward: CGPoint(x: 50, y: 500))
+        XCTAssertEqual(edge.x, 50, accuracy: 0.01)
+        XCTAssertEqual(edge.y, 10 + 50, accuracy: 0.01)
+        XCTAssertEqual(e.rotatedBounds.height, 100, accuracy: 0.01)
+        XCTAssertTrue(Exporter.svg(doc).contains("rotate(90"))
+        XCTAssertNotNil(Exporter.png(doc))
+        let round = try DottieDocument.decode(doc.encoded())
+        XCTAssertEqual(round.elements[0].rotation ?? 0, .pi / 2, accuracy: 1e-9)
+    }
+
+    func testResizeSnapsMovingEdgeAndMoveSnapsToEqualSpacing() {
+        let other = CGRect(x: 200, y: 0, width: 50, height: 50)
+        let r = Snap.resize(CGRect(x: 0, y: 0, width: 197, height: 50), hx: 1, hy: 0, others: [other], threshold: 6)
+        XCTAssertEqual(r.dx, 3, accuracy: 0.001)
+        XCTAssertFalse(r.guides.isEmpty)
+        XCTAssertEqual(Snap.resize(CGRect(x: 0, y: 0, width: 100, height: 50), hx: 1, hy: 0, others: [other], threshold: 6).dx, 0)
+
+        // A at x 0..50, B at 200..250; moving box 40 wide drifting near the middle snaps to equal 55pt gaps.
+        let a = CGRect(x: 0, y: 0, width: 50, height: 40), b = CGRect(x: 205, y: 5, width: 50, height: 40)
+        let moving = CGRect(x: 104, y: 100, width: 40, height: 40)
+        let s = Snap.move(moving, others: [a, b], threshold: 6)
+        // Different rows, so no cross-axis overlap and no spacing: nothing should be claimed.
+        XCTAssertTrue(s.spacing.isEmpty)
+        let inRow = CGRect(x: 104, y: 0, width: 40, height: 40)
+        let t = Snap.move(inRow, others: [a, b], threshold: 6)
+        XCTAssertFalse(t.spacing.isEmpty)
+        let final = inRow.offsetBy(dx: t.dx, dy: 0)
+        XCTAssertEqual(final.minX - a.maxX, b.minX - final.maxX, accuracy: 0.01)
+    }
+}
+
+final class RotatedResizeTests: XCTestCase {
+    func testResizingARotatedShapeKeepsTheOppositeCornerFixed() {
+        let original = CGRect(x: 100, y: 100, width: 80, height: 40)
+        let angle = Double.pi / 6
+        var e = Element(kind: .rectangle, frame: original, layerID: UUID()); e.rotation = angle
+        let anchorBefore = e.rotated(CGPoint(x: original.minX, y: original.minY)) // top-left, untouched
+        // Drag the bottom-right handle 30 wider and 10 taller in the shape's own axes.
+        let grown = CGRect(x: original.minX, y: original.minY, width: original.width + 30, height: original.height + 10)
+        var moved = e
+        moved.frame = Element.reanchored(grown, original: original, angle: angle, fx: 0, fy: 0)
+        let anchorAfter = moved.rotated(CGPoint(x: moved.frame.minX, y: moved.frame.minY))
+        XCTAssertEqual(anchorAfter.x, anchorBefore.x, accuracy: 0.001)
+        XCTAssertEqual(anchorAfter.y, anchorBefore.y, accuracy: 0.001)
+        XCTAssertEqual(moved.frame.width, 110, accuracy: 0.001)
+    }
+}

@@ -86,6 +86,8 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Only set for `.freehand`. Fitted cubic Béziers as flat normalized `x, y` pairs:
     /// the start point, then `c1, c2, end` per segment (`2 + 6n` numbers).
     public var path: [Double]?
+    /// Clockwise rotation in radians about the frame's center. nil is unrotated; connectors ignore it.
+    public var rotation: Double?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,
@@ -95,6 +97,44 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
         self.x = frame.origin.x; self.y = frame.origin.y
         self.width = frame.width; self.height = frame.height
         self.style = style; self.seed = seed; self.layerID = layerID; self.text = text; self.connector = connector
+    }
+
+    /// `rotation`, with nil read as 0.
+    public var angle: Double { rotation ?? 0 }
+
+    /// Maps a point from the element's own (unrotated) frame to the canvas.
+    public func rotated(_ p: CGPoint) -> CGPoint { Element.rotate(p, about: CGPoint(x: frame.midX, y: frame.midY), by: angle) }
+    /// Maps a canvas point into the element's own (unrotated) frame.
+    public func unrotated(_ p: CGPoint) -> CGPoint { Element.rotate(p, about: CGPoint(x: frame.midX, y: frame.midY), by: -angle) }
+
+    /// After resizing a rotated shape in its own axes (`resized`), slides the frame so the corner or edge
+    /// at fractions (`fx`, `fy`) of the frame, which the user did not touch, stays put on the canvas.
+    public static func reanchored(_ resized: CGRect, original: CGRect, angle: Double, fx: Double, fy: Double) -> CGRect {
+        guard angle != 0 else { return resized }
+        let oc = CGPoint(x: original.midX, y: original.midY)
+        let pivot = CGPoint(x: original.minX + original.width * fx, y: original.minY + original.height * fy)
+        let world = rotate(pivot, about: oc, by: angle)
+        let c = CGPoint(x: resized.midX, y: resized.midY)
+        let local = CGPoint(x: resized.minX + resized.width * fx, y: resized.minY + resized.height * fy)
+        let off = rotate(CGPoint(x: local.x - c.x, y: local.y - c.y), about: .zero, by: angle)
+        let center = CGPoint(x: world.x - off.x, y: world.y - off.y)
+        return CGRect(x: center.x - resized.width / 2, y: center.y - resized.height / 2, width: resized.width, height: resized.height)
+    }
+
+    public static func rotate(_ p: CGPoint, about c: CGPoint, by a: Double) -> CGPoint {
+        guard a != 0 else { return p }
+        let dx = p.x - c.x, dy = p.y - c.y
+        return CGPoint(x: c.x + dx * cos(a) - dy * sin(a), y: c.y + dx * sin(a) + dy * cos(a))
+    }
+
+    /// Bounding box of the frame after rotation.
+    public var rotatedBounds: CGRect {
+        let r = frame
+        guard angle != 0 else { return r }
+        let corners = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY),
+                       CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)].map(rotated)
+        let xs = corners.map(\.x), ys = corners.map(\.y)
+        return CGRect(x: xs.min()!, y: ys.min()!, width: xs.max()! - xs.min()!, height: ys.max()! - ys.min()!)
     }
 
     public var frame: CGRect {
@@ -118,7 +158,7 @@ public struct DottieDocument: Codable, Equatable, Sendable {
         orderedElements.last { e in
             guard let layer = layers.first(where: { $0.id == e.layerID }), layer.visible, !layer.locked else { return false }
             if e.kind == .connector { return Connector.distance(from: point, to: e, in: self) <= 6 }
-            return e.frame.insetBy(dx: -4, dy: -4).contains(point)
+            return e.frame.insetBy(dx: -4, dy: -4).contains(e.unrotated(point))
         }
     }
 

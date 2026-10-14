@@ -17,7 +17,12 @@ extension Exporter {
             out += "<rect x=\"\(num(b.minX))\" y=\"\(num(b.minY))\" width=\"\(num(b.width))\" height=\"\(num(b.height))\" fill=\"\(color(background))\"/>\n"
         }
         for e in d.orderedElements where visible.contains(e.layerID) {
-            out += svgElement(e, in: d, labelBackground: background)
+            let body = svgElement(e, in: d, labelBackground: background)
+            if e.angle != 0, e.kind != .connector {
+                out += "<g transform=\"rotate(\(num(e.angle * 180 / .pi)) \(num(e.frame.midX)) \(num(e.frame.midY)))\">\n\(body)</g>\n"
+            } else {
+                out += body
+            }
         }
         return out + "</svg>\n"
     }
