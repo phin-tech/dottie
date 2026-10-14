@@ -68,13 +68,14 @@ public enum DottieScript {
     static let operationLimit = 50_000
     static let logLimit = 200_000
 
-    /// Runs `source`. `selection` is what `dottie.selection` returns (the app passes the selected ids).
-    /// `libraries` are the stencil libraries `dottie.stencils()` and `dottie.stencil()` see.
-    public static func run(_ source: String, on doc: inout DottieDocument, selection: [UUID] = [],
+    /// Runs `source` on one page. `selection` is what `dottie.selection` returns (the app passes the selected ids).
+    /// `libraries` are the stencil libraries `dottie.stencils()` and `dottie.stencil()` see. `file` is the drawing
+    /// the page belongs to, for `dottie.pages()` and links to other pages; it is read, never changed.
+    public static func run(_ source: String, on doc: inout DottieDocument, in file: DottieFile? = nil, selection: [UUID] = [],
                            libraries: [StencilLibrary]? = nil, modules: [String: String] = [:],
                            modulesDirectory: URL? = DottieScript.modulesDirectory,
                            timeLimit: TimeInterval = defaultTimeLimit) -> ScriptResult {
-        let host = Host(doc: doc, selection: selection, libraries: libraries,
+        let host = Host(doc: doc, file: file, selection: selection, libraries: libraries,
                         modules: modules, modulesDirectory: modulesDirectory)
         guard let context = JSContext() else {
             return ScriptResult(logs: [], value: nil, error: "JavaScript is unavailable", operations: 0)
@@ -123,6 +124,7 @@ public enum DottieScript {
     /// Native half of the `dottie` object. Every bridge call is one string in, one string out.
     final class Host: @unchecked Sendable {
         var doc: DottieDocument
+        let file: DottieFile?
         let selection: [UUID]
         let libraries: [StencilLibrary]?
         var logs: [String] = []
@@ -134,9 +136,9 @@ public enum DottieScript {
         let modules: [String: String]
         let modulesDirectory: URL?
 
-        init(doc: DottieDocument, selection: [UUID], libraries: [StencilLibrary]?,
+        init(doc: DottieDocument, file: DottieFile?, selection: [UUID], libraries: [StencilLibrary]?,
              modules: [String: String], modulesDirectory: URL?) {
-            self.doc = doc; self.selection = selection; self.libraries = libraries
+            self.doc = doc; self.file = file; self.selection = selection; self.libraries = libraries
             self.modules = modules; self.modulesDirectory = modulesDirectory
         }
 
@@ -298,6 +300,9 @@ public enum DottieScript {
             return d
         }
 
+        /// The file's other pages, as they were when the script started.
+        private var otherPages: [DottieDocument] { file?.pages.filter { $0.id != doc.id } ?? [] }
+
         private func libs() -> [StencilLibrary] {
             libraries ?? ([StencilLibrary.starter] + StencilLibrary.load(directory: StencilLibrary.defaultDirectory).map(\.library))
         }
@@ -346,8 +351,21 @@ public enum DottieScript {
                                       width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
                                       routing: try a.enumValue("routing", as: Routing.self), look: try a.look(),
-                                      link: link, anchor: a.has("anchor") ? .some(a.string("anchor")) : nil)
+                                      link: link, anchor: a.has("anchor") ? .some(a.string("anchor")) : nil,
+                                      otherPages: otherPages)
                 return describe(try element(id))
+
+            case "pages":
+                let pages = file?.pages.map { $0.id == doc.id ? doc : $0 } ?? [doc]
+                return pages.map { p -> [String: Any] in
+                    let shapes = p.elements.filter { $0.kind != .connector }.map { e -> [String: Any] in
+                        var d: [String: Any] = ["id": e.id.uuidString, "kind": e.kind.rawValue]
+                        if let t = e.text { d["text"] = t }
+                        if let n = e.anchor { d["anchor"] = n }
+                        return d
+                    }
+                    return ["id": p.id.uuidString, "name": p.name, "current": p.id == doc.id, "shapes": shapes]
+                }
 
             case "remove":
                 var ids: [UUID] = []
@@ -460,6 +478,7 @@ public enum DottieScript {
         bounds: function () { return call("bounds"); },
         stencils: function (o) { return call("stencils", o); },
         stencil: function (o) { return call("stencil", o); },
+        pages: function () { return call("pages"); },
         selection: call("selection"),
       };
       var fmt = function (v) {
@@ -520,6 +539,8 @@ public enum DottieScript {
       dottie.elements({kind?, text?, anchor?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
       dottie.get(id)                   one element
       dottie.selection                 ids selected in the app (empty when run from an agent)
+      dottie.pages()                   every page (tab) in order: {id, name, current, shapes: [{id, kind, text?, anchor?}]}; \
+    the script edits only the current page
       dottie.bounds()                  {x, y, width, height} of all content
       dottie.stencils({query?, library?})  stencil items: {library, name, tags, width, height}
 
@@ -533,7 +554,8 @@ public enum DottieScript {
 
     Changing
       dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, link?, anchor?, ...look})  returns the element
-      link: another shape (id or element) this one jumps to when its badge is clicked in the app; null removes it
+      link: another shape (id or element) this one jumps to when its badge is clicked in the app, on this page or \
+    another (find it with dottie.pages()); null removes it
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
       dottie.layout({direction?})      re-arranges all shapes into ranks along their connectors

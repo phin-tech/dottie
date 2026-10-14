@@ -114,11 +114,12 @@ extension ContentView {
         scriptOutput = ""
         let source = scriptSource
         let original = document.model
+        let file = document.file
         let ids = Array(selection)
         Task {
             let (doc, result) = await Task.detached(priority: .userInitiated) { () -> (DottieDocument, ScriptResult) in
                 var working = original
-                let r = DottieScript.run(source, on: &working, selection: ids)
+                let r = DottieScript.run(source, on: &working, in: file, selection: ids)
                 return (working, r)
             }.value
             if result.succeeded { document.commit(doc, actionName: "Run Script", undoManager: undoManager) }

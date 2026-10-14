@@ -172,9 +172,11 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// Array order of `elements` is z-order, back to front.
-public struct DottieDocument: Codable, Equatable, Sendable {
-    public var version: Int = 1
+/// One page (a tab) of a drawing. Array order of `elements` is z-order, back to front.
+/// A `.dottie` file is a `DottieFile`, which holds one or more of these.
+public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
+    public var id: UUID
+    public var name: String
     public var layers: [Layer]
     public var elements: [Element]
     /// A `Theme` id (page color and ink); nil follows the system appearance and exports on white.
@@ -185,7 +187,9 @@ public struct DottieDocument: Codable, Equatable, Sendable {
     /// Locked guides still snap, but cannot be dragged or created from the rulers.
     public var guidesLocked: Bool?
 
-    public init(layers: [Layer]? = nil, elements: [Element] = []) {
+    public init(id: UUID = UUID(), name: String = "Page 1", layers: [Layer]? = nil, elements: [Element] = []) {
+        self.id = id
+        self.name = name
         self.layers = layers ?? [Layer(name: "Layer 1")]
         self.elements = elements
     }
@@ -238,7 +242,8 @@ public struct DottieDocument: Codable, Equatable, Sendable {
 
     // MARK: JSON (git-friendly: sorted keys, pretty, rounded floats)
 
-    public func encoded() throws -> Data {
+    /// Frames rounded to hundredths, as they are saved.
+    var rounded: DottieDocument {
         var copy = self
         for i in copy.elements.indices {
             func r(_ v: Double) -> Double { (v * 100).rounded() / 100 }
@@ -247,9 +252,14 @@ public struct DottieDocument: Codable, Equatable, Sendable {
             copy.elements[i].width = r(copy.elements[i].width)
             copy.elements[i].height = r(copy.elements[i].height)
         }
+        return copy
+    }
+
+    /// This page alone as JSON. A `.dottie` file is `DottieFile.encoded()`.
+    public func encoded() throws -> Data {
         let enc = JSONEncoder()
         enc.outputFormatting = [.sortedKeys, .prettyPrinted]
-        return try enc.encode(copy)
+        return try enc.encode(rounded)
     }
 
     public static func decode(_ data: Data) throws -> DottieDocument {

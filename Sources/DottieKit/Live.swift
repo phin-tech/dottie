@@ -10,20 +10,21 @@ public struct LiveRequest: Codable, Sendable {
     public enum Op: String, Codable, Sendable { case ping, get, put }
     public var op: Op
     public var path: String?
-    public var document: DottieDocument?
+    /// The whole file, every page, for `put`.
+    public var file: DottieFile?
     public var actionName: String?
-    public init(op: Op, path: String? = nil, document: DottieDocument? = nil, actionName: String? = nil) {
-        self.op = op; self.path = path; self.document = document; self.actionName = actionName
+    public init(op: Op, path: String? = nil, file: DottieFile? = nil, actionName: String? = nil) {
+        self.op = op; self.path = path; self.file = file; self.actionName = actionName
     }
 }
 
 public struct LiveResponse: Codable, Sendable {
     /// True when the app has the requested document open and handled the request.
     public var open: Bool
-    public var document: DottieDocument?
+    public var file: DottieFile?
     public var error: String?
-    public init(open: Bool, document: DottieDocument? = nil, error: String? = nil) {
-        self.open = open; self.document = document; self.error = error
+    public init(open: Bool, file: DottieFile? = nil, error: String? = nil) {
+        self.open = open; self.file = file; self.error = error
     }
 }
 
@@ -114,13 +115,13 @@ public enum LiveClient {
         return try? JSONDecoder().decode(LiveResponse.self, from: line)
     }
 
-    public static func get(path: String) -> DottieDocument? {
+    public static func get(path: String) -> DottieFile? {
         let r = send(LiveRequest(op: .get, path: LiveSocket.key(forPath: path)))
-        return r?.open == true ? r?.document : nil
+        return r?.open == true ? r?.file : nil
     }
 
     /// True when the open document accepted the edit; otherwise the caller writes the file.
-    public static func put(_ doc: DottieDocument, path: String, actionName: String) -> Bool {
-        send(LiveRequest(op: .put, path: LiveSocket.key(forPath: path), document: doc, actionName: actionName))?.open == true
+    public static func put(_ file: DottieFile, path: String, actionName: String) -> Bool {
+        send(LiveRequest(op: .put, path: LiveSocket.key(forPath: path), file: file, actionName: actionName))?.open == true
     }
 }

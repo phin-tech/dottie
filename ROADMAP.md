@@ -28,6 +28,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Themes (Paper, White, Sepia, Blueprint, Chalkboard, Midnight): stored per drawing, used by the canvas and every export
 - [x] Rulers (⇧⌘R) with guides you drag out of them: persisted in the file, snapped to by moves and resizes
 - [x] Layers panel unfolds to elements: drag to restack, or onto a layer to move
+- [x] Pages: tabs under the canvas (add, rename, reorder, duplicate, delete), links and Back/Forward across pages, `page` on MCP tools and `dottie render --page`
 
 - [x] Library viewer: `.dottielib` opens in its own window (Finder double-click or Library ▸ Open in Viewer); copy, export PNG/SVG, install
 - [x] Guides by number (type, add, remove) and lock; stencil items rename, tag, duplicate, reorder; library rename

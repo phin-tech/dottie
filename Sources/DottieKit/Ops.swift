@@ -162,10 +162,10 @@ public enum DiagramOps {
     public static func update(_ doc: inout DottieDocument, id: UUID, text: String?? = nil, x: Double? = nil, y: Double? = nil,
                               width: Double? = nil, height: Double? = nil, fill: RGBA? = nil, stroke: RGBA? = nil,
                               roughness: Double? = nil, routing: Routing? = nil, look: Look = Look(),
-                              link: UUID?? = nil, anchor: String?? = nil) throws {
+                              link: UUID?? = nil, anchor: String?? = nil, otherPages: [DottieDocument] = []) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
         if let anchor { doc.elements[i].anchor = anchor.flatMap { $0.isEmpty ? nil : $0 } }
-        if let link { try doc.setLink([id], to: link) }
+        if let link { try doc.setLink([id], to: link, otherPages: otherPages) }
         if let text { doc.elements[i].text = text }
         if doc.elements[i].kind != .connector {
             if let x { doc.elements[i].x = x }

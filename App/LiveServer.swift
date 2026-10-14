@@ -43,11 +43,11 @@ final class LiveRegistry {
             guard let path = request.path, let doc = entry(forPath: path)?.document else {
                 return LiveResponse(open: false)
             }
-            return LiveResponse(open: true, document: doc.model)
+            return LiveResponse(open: true, file: doc.file)
         case .put:
             guard let path = request.path, let entry = entry(forPath: path), let doc = entry.document,
-                  let new = request.document else { return LiveResponse(open: false) }
-            doc.commit(new, actionName: request.actionName ?? "Agent Edit", undoManager: entry.undoManager)
+                  let new = request.file else { return LiveResponse(open: false) }
+            doc.commitFile(new, actionName: request.actionName ?? "Agent Edit", undoManager: entry.undoManager)
             return LiveResponse(open: true)
         }
     }

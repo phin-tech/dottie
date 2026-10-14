@@ -55,6 +55,23 @@ struct DottieCommands: Commands {
             }
             .disabled(editor == nil)
         }
+        CommandMenu("Page") {
+            let pages = editor?.pageCount ?? 0
+            Button("New Page") { editor?.newPage() }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(editor == nil)
+            Button("Duplicate Page") { editor?.duplicatePage() }
+                .disabled(editor == nil)
+            Button("Delete Page") { editor?.deletePage() }
+                .disabled(pages < 2)
+            Divider()
+            Button("Previous Page") { editor?.showPage(-1) }
+                .keyboardShortcut("[", modifiers: [.command, .shift])
+                .disabled(pages < 2)
+            Button("Next Page") { editor?.showPage(1) }
+                .keyboardShortcut("]", modifiers: [.command, .shift])
+                .disabled(pages < 2)
+        }
         CommandMenu("Arrange") {
             let n = editor?.selectionCount ?? 0
             Button("Group") { editor?.group() }

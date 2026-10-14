@@ -115,7 +115,11 @@ private enum Gesture {
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
 final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var model = DottieDocument() {
-        didSet { needsDisplay = true; spatialStale = true; badgeCache = nil }
+        willSet { if newValue.id != model.id { leavePage() } }
+        didSet {
+            needsDisplay = true; spatialStale = true; badgeCache = nil
+            if model.id != oldValue.id { enterPage() }
+        }
     }
     /// Built lazily for the current `model`. Panning and zooming reuse it; an edit marks it stale and
     /// the next use folds the changed elements in (or rebuilds when the structure changed).
@@ -145,6 +149,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var onPreview: ((DottieDocument) -> Void)?
     var onCommit: ((DottieDocument, String) -> Void)?
     var onSelectionChange: ((Set<UUID>) -> Void)?
+    /// Shows another page; `model` is that page when it returns.
+    var onShowPage: ((UUID) -> Void)?
+    /// The page holding a followable shape (on a visible layer), searching the whole file.
+    var findPage: ((UUID) -> UUID?)?
+    /// Whether an element exists anywhere in the file, so a paste keeps links to other pages.
+    var elementExists: ((UUID) -> Bool)?
+    /// Links shapes on page `page` (not the one on screen) to `target`, as one undo step.
+    var onLinkOtherPage: ((_ sources: Set<UUID>, _ page: UUID, _ target: UUID) -> Bool)?
 
     /// Viewport offset in view points; model coordinates are unchanged by panning.
     private var pan: CGPoint = .zero { didSet { viewportChanged() } }
@@ -179,11 +191,18 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// The link of the shape under a ⌘-press, followed on release if the press did not turn into a drag.
     private var pressedLink: UUID?
     /// While set, the next click on a shape links these elements to it (Link to Element… in the context menu).
+    /// It survives a page switch, so the target can be on another page.
     private var linkSources: Set<UUID>? {
-        didSet { needsDisplay = true; window?.invalidateCursorRects(for: self) }
+        didSet { needsDisplay = true; window?.invalidateCursorRects(for: self); if linkSources == nil { linkSourcePage = nil } }
     }
+    /// The page `linkSources` are on.
+    private var linkSourcePage: UUID?
+    /// Pan and zoom of the pages not on screen, restored when they come back.
+    private var pageViewports: [UUID: Viewport] = [:]
     /// The last `JumpRequest` acted on, so a repeated SwiftUI update does not jump twice.
     var handledJump: UUID?
+    /// The document revision the link badges were last checked against.
+    var fileRevision = -1
 
     private let handleSize: CGFloat = 8
     /// Handle size in model units so handles stay the same size on screen at any zoom.
@@ -350,7 +369,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.restoreGState()
 
         if showRulers { drawRulers(ctx) }
-        if linkSources != nil { drawHint("Click the shape to link to   ·   Esc to cancel") }
+        if linkSources != nil { drawHint("Click the shape to link to (on any page)   ·   Esc to cancel") }
 
         if zoom != 1 {
             let label = "\(Int((zoom * 100).rounded()))%" as NSString
@@ -460,7 +479,28 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     // MARK: Links
 
-    private struct Viewport { var pan: CGPoint; var zoom: CGFloat }
+    private struct Viewport { var page: UUID? = nil; var pan: CGPoint; var zoom: CGFloat }
+
+    /// Called while `model` still holds the page being left.
+    private func leavePage() {
+        if editor != nil { endEditing(deferCommit: true) }
+        stopJumpAnimation()
+        pageViewports[model.id] = Viewport(pan: pan, zoom: zoom)
+    }
+
+    /// Called once `model` holds the new page.
+    private func enterPage() {
+        gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; pressedLink = nil
+        guides = []; spacingGuides = []; strokePoints = []; flashIDs = []
+        if !selection.isEmpty { selection = [] }
+        let v = pageViewports[model.id] ?? Viewport(pan: .zero, zoom: 1)
+        zoom = v.zoom; pan = v.pan
+    }
+
+    private var here: Viewport { Viewport(page: model.id, pan: pan, zoom: zoom) }
+
+    /// Must be called when another page's shapes or layers may have changed, since badges point across pages.
+    func linksElsewhereChanged() { badgeCache = nil; needsDisplay = true }
 
     /// A link badge: `corner` is the top-right of the linked element (or of its group, which shares one badge).
     private struct LinkBadge { var corner: CGPoint; var target: UUID; var broken: Bool }
@@ -487,7 +527,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                     b = e.kind == .connector ? Connector.bounds(of: e, in: model) : e.rotatedBounds
                 }
                 out.append(LinkBadge(corner: CGPoint(x: b.maxX, y: b.minY), target: target,
-                                     broken: !reachable.contains(target)))
+                                     broken: !reachable.contains(target) && findPage?(target) == nil))
             }
         }
         badgeCache = out
@@ -540,12 +580,17 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// Follows a link: brings `target` (with its group) to the middle of the view, zooming out if it does not
-    /// fit and in to at most 100% when the view was further out. Beeps and stays put on a broken link.
+    /// fit and in to at most 100% when the view was further out. A target on another page switches to that
+    /// page first. Beeps and stays put on a broken link.
     @discardableResult
     func jump(to target: UUID, animated: Bool = true) -> Bool {
+        let from = here
+        if model.linkBounds(to: target) == nil, let page = findPage?(target), page != model.id {
+            onShowPage?(page)
+        }
         guard let b = model.linkBounds(to: target) else { NSSound.beep(); return false }
         stopJumpAnimation()
-        backStack.append(Viewport(pan: pan, zoom: zoom))
+        backStack.append(from)
         if backStack.count > 50 { backStack.removeFirst() }
         forwardStack = []
         let area = canvasArea, margin: CGFloat = 60
@@ -606,8 +651,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     @discardableResult
     private func step(from: inout [Viewport], to: inout [Viewport], animated: Bool) -> Bool {
         guard let dest = from.popLast() else { NSSound.beep(); return false }
-        to.append(Viewport(pan: pan, zoom: zoom))
+        to.append(here)
         flashIDs = []
+        var animated = animated
+        if let page = dest.page, page != model.id {
+            onShowPage?(page)
+            guard model.id == page else { NSSound.beep(); return false } // the page was deleted
+            animated = false
+        }
         show(dest, animated: animated)
         return true
     }
@@ -738,7 +789,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         lastPasteChangeCount = pb.changeCount
         let step = Double(pasteStep) * 16
         var next = model
-        let added = next.paste(data, offset: CGPoint(x: step, y: step))
+        let added = next.paste(data, offset: CGPoint(x: step, y: step), keepsLink: { [elementExists] in elementExists?($0) ?? false })
         guard !added.isEmpty else { return }
         selection = added
         onCommit?(next, "Paste")
@@ -964,6 +1015,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard !selection.isEmpty else { return }
         if tool != .select { switchTool(.select) }
         linkSources = selection
+        linkSourcePage = model.id
     }
 
     @objc func removeLink(_ sender: Any?) {
@@ -989,7 +1041,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard let sources = linkSources else { return }
         guard let hit = spatial.element(at: p, in: model) else { linkSources = nil; return }
         guard hit.kind != .connector, !sources.contains(hit.id) else { NSSound.beep(); return }
+        let sourcePage = linkSourcePage
         linkSources = nil
+        if let sourcePage, sourcePage != model.id {
+            // Picked on another page: link there, then go back to where the links start.
+            guard onLinkOtherPage?(sources, sourcePage, hit.id) == true else { NSSound.beep(); return }
+            onShowPage?(sourcePage)
+            selection = sources.intersection(model.elements.map(\.id))
+            return
+        }
         var next = model
         guard (try? next.setLink(sources, to: hit.id)) != nil else { NSSound.beep(); return }
         onCommit?(next, "Link")
@@ -1468,7 +1528,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         editBase = isNew ? baseline : nil
     }
 
-    private func endEditing() {
+    /// `deferCommit` is for a page switch, which happens during a SwiftUI update that must not change the document.
+    private func endEditing(deferCommit: Bool = false) {
         guard let field = editor, let id = editingID else { return }
         let text = field.stringValue
         field.removeFromSuperview()
@@ -1486,8 +1547,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 next.elements[i].width = max(next.elements[i].width, ceil(w))
             }
         }
-        if let base = editBase { onPreview?(base); editBase = nil }
-        onCommit?(next, "Edit Text")
+        let base = editBase
+        editBase = nil
+        let finish = { [onPreview, onCommit] in
+            if let base { onPreview?(base) }
+            onCommit?(next, "Edit Text")
+        }
+        if deferCommit { DispatchQueue.main.async(execute: finish) } else { finish() }
         window?.makeFirstResponder(self)
     }
 
@@ -1519,12 +1585,27 @@ struct CanvasView: NSViewRepresentable {
         v.onPreview = { [document] in document.preview($0) }
         v.onToolChange = { t in DispatchQueue.main.async { tool = t } }
         v.onSelectionChange = { sel in DispatchQueue.main.async { selection = sel } }
+        v.onShowPage = { [document, weak v] page in
+            guard document.file.index(of: page) != nil else { return }
+            document.currentPageID = page
+            v?.model = document.model
+        }
+        v.findPage = { [document] id in document.linkTargetPages[id] }
+        v.elementExists = { [document] id in document.file.pageIndex(containing: id) != nil }
         return v
     }
 
     func updateNSView(_ v: CanvasNSView, context: Context) {
         v.onCommit = { [document, undoManager] new, name in document.commit(new, actionName: name, undoManager: undoManager) }
+        v.onLinkOtherPage = { [document, undoManager] sources, page, target in
+            var next = document.file
+            guard let i = next.index(of: page),
+                  (try? next.pages[i].setLink(sources, to: target, otherPages: next.pages)) != nil else { return false }
+            document.commitFile(next, actionName: "Link", undoManager: undoManager)
+            return true
+        }
         if v.model != document.model { v.model = document.model }
+        if v.fileRevision != document.revision { v.fileRevision = document.revision; v.linksElsewhereChanged() }
         v.tool = tool
         v.style = style
         v.routing = routing

@@ -25,8 +25,11 @@ extension DottieDocument {
     }
 
     /// Adds clipboard contents with fresh ids, offset by `offset`. Returns the new element ids.
+    /// A link to an element outside the clipboard survives when the target is on this page or `keepsLink` says
+    /// it exists elsewhere in the file.
     @discardableResult
-    public mutating func paste(_ data: Data, offset: CGPoint = CGPoint(x: 16, y: 16)) -> Set<UUID> {
+    public mutating func paste(_ data: Data, offset: CGPoint = CGPoint(x: 16, y: 16),
+                               keepsLink: (UUID) -> Bool = { _ in false }) -> Set<UUID> {
         guard let items = try? JSONDecoder().decode([Element].self, from: data), !items.isEmpty else { return [] }
         var idMap: [UUID: UUID] = [:]
         var groupMap: [UUID: UUID] = [:]
@@ -36,8 +39,8 @@ extension DottieDocument {
         var added: [Element] = []
         for var e in items {
             e.id = idMap[e.id]!
-            // A link follows its target into the copy; otherwise it survives only if the target is in this drawing.
-            if let t = e.link { e.link = idMap[t] ?? (existing.contains(t) ? t : nil) }
+            // A link follows its target into the copy; otherwise it survives only if the target is still in the file.
+            if let t = e.link { e.link = idMap[t] ?? (existing.contains(t) || keepsLink(t) ? t : nil) }
             e.seed = .random(in: 1...UInt32.max)
             if !layers.contains(where: { $0.id == e.layerID && !$0.locked }) { e.layerID = fallback }
             if let g = e.groupID { e.groupID = groupMap[g, default: UUID()]; groupMap[g] = e.groupID }
@@ -101,10 +104,13 @@ extension DottieDocument {
 
     // MARK: Links
 
-    /// Points every element in `ids` at `target`, or clears their links when it is nil.
-    public mutating func setLink(_ ids: Set<UUID>, to target: UUID?) throws {
+    /// Points every element in `ids` at `target`, or clears their links when it is nil. The target may be on
+    /// this page or on any of `otherPages`.
+    public mutating func setLink(_ ids: Set<UUID>, to target: UUID?, otherPages: [DottieDocument] = []) throws {
         if let target {
-            guard let t = elements.first(where: { $0.id == target }) else { throw OpsError.notFound("No element \(target.uuidString)") }
+            guard let t = elements.first(where: { $0.id == target })
+                    ?? otherPages.lazy.compactMap({ $0.elements.first { $0.id == target } }).first
+            else { throw OpsError.notFound("No element \(target.uuidString)") }
             guard t.kind != .connector else { throw OpsError.invalid("A link must point at a shape, not a connector") }
             guard !ids.contains(target) else { throw OpsError.invalid("An element cannot link to itself") }
         }

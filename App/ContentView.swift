@@ -24,9 +24,18 @@ struct ContentView: View {
     @AppStorage(Pref.scriptSource) var scriptSource = ""
 
     var body: some View {
-        CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
-                   activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest)
+        VStack(spacing: 0) {
+            CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
+                       activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest)
+            Divider()
+            PageBar(document: document, undoManager: undoManager)
+        }
             .frame(minWidth: 400)
+            .onChange(of: document.currentPageID) { _, _ in
+                // Keep only what is on the new page: a link picked on another page brings its sources back selected.
+                selection = selection.intersection(document.model.elements.map(\.id))
+                activeLayer = nil
+            }
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
                     Picker("Sidebar", selection: $sidebarTab) {
@@ -189,9 +198,9 @@ struct Inspector: View {
                     Picker("Jumps to", selection: linkBinding) {
                         Text("None").tag(UUID?.none)
                         if let id = selectedLink, !linkTargets.contains(where: { $0.id == id }) {
-                            Text(document.model.elements.first { $0.id == id }?.displayTitle ?? "Missing element").tag(UUID?.some(id))
+                            Text(linkTitle(id) ?? "Missing element").tag(UUID?.some(id))
                         }
-                        ForEach(linkTargets) { e in Text(e.displayTitle).tag(UUID?.some(e.id)) }
+                        ForEach(linkTargets) { t in Text(t.title).tag(UUID?.some(t.id)) }
                     }
                     .help("Click the badge beside the shape, or ⌘-click the shape, to go there")
                     if let id = selectedLink {
@@ -225,19 +234,38 @@ struct Inspector: View {
         return first
     }
 
-    /// Shapes with an anchor or text, outside the selection, by title: what a link can point at.
-    private var linkTargets: [Element] {
-        Array(document.model.elements
-            .filter { $0.kind != .connector && !selection.contains($0.id) && !(($0.anchor ?? $0.text) ?? "").isEmpty }
-            .sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
-            .prefix(Self.linkTargetLimit))
+    private struct LinkTarget: Identifiable { var id: UUID; var title: String }
+
+    /// Shapes with an anchor or text, outside the selection, by title: what a link can point at. This page's
+    /// come first; other pages' follow in tab order, prefixed with the page name.
+    private var linkTargets: [LinkTarget] {
+        let here = document.model.id
+        let pages = [document.model] + document.file.pages.filter { $0.id != here }
+        var out: [LinkTarget] = []
+        for page in pages {
+            let prefix = page.id == here ? "" : page.name + " › "
+            out += page.elements
+                .filter { $0.kind != .connector && !selection.contains($0.id) && !(($0.anchor ?? $0.text) ?? "").isEmpty }
+                .sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
+                .map { LinkTarget(id: $0.id, title: prefix + $0.displayTitle) }
+            if out.count >= Self.linkTargetLimit { break }
+        }
+        return Array(out.prefix(Self.linkTargetLimit))
+    }
+
+    /// The title of an element anywhere in the file, with its page name when it is not on this page.
+    private func linkTitle(_ id: UUID) -> String? {
+        guard let i = document.file.pageIndex(containing: id), let e = document.file.pages[i].elements.first(where: { $0.id == id })
+        else { return nil }
+        let page = document.file.pages[i]
+        return page.id == document.model.id ? e.displayTitle : page.name + " › " + e.displayTitle
     }
 
     private var linkBinding: Binding<UUID?> {
         Binding(get: { selectedLink },
                 set: { target in
                     var next = document.model
-                    guard (try? next.setLink(selection, to: target)) != nil else { return }
+                    guard (try? next.setLink(selection, to: target, otherPages: document.file.pages)) != nil else { return }
                     document.commit(next, actionName: target == nil ? "Remove Link" : "Link", undoManager: undoManager)
                 })
     }

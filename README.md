@@ -22,6 +22,7 @@ dottie render diagram.dottie                      # diagram.png next to it
 dottie render diagram.dottie -o diagram.svg       # png, svg, pdf or html, from the extension
 dottie render a.dottie b.dottie -f html -d out/   # several files into a directory
 dottie render diagram.dottie --clean --scale 3 -o - > clean.png
+dottie render diagram.dottie --page Details       # a page other than the first, by name or number
 dottie library list
 dottie library install shapes.dottielib
 ```
@@ -43,7 +44,9 @@ claude mcp add dottie -- "$(swift build -c release --product dottie-mcp --show-b
 Tools: `build_diagram` (nodes + edges, auto-laid-out), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its work),
 `export_svg`, `create_diagram`, `open_document`, `list_stencils` and `add_stencil` (place shapes from the
-built-in and user stencil libraries), and `run_script` / `script_api` (see below).
+built-in and user stencil libraries), `list_pages` / `add_page` / `rename_page`, and `run_script` /
+`script_api` (see below). Tools that draw, list or export take an optional `page` (name or 1-based number) and
+default to the first page; tools given an element id find its page themselves.
 
 ### Scripting
 
@@ -88,23 +91,34 @@ root.each(n => { ids[n.data.name] = dottie.rect({ x: n.x + 300, y: n.y, text: n.
 root.links().forEach(l => dottie.connect(ids[l.source.data.name], ids[l.target.data.name]));
 ```
 
+### Pages
+
+A drawing has one or more pages, shown as tabs under the canvas. Click a tab to show it, double-click to rename,
+drag to reorder, and right-click to duplicate or delete; **+** or Page ▸ New Page (⌥⌘N) adds one, and ⇧⌘[ / ⇧⌘]
+step through them. Each page has its own layers, guides and theme, and keeps its own scroll and zoom. Undo
+switches back to the page it changes. Element ids are unique across the file, so links work between pages
+(see below); connectors join shapes on one page.
+
 ### Themes, rulers, layers
 
-The Canvas section of the inspector sets a per-drawing theme (page color and ink; exports match) and shows
+The Canvas section of the inspector sets a per-page theme (page color and ink; exports match) and shows
 rulers (⇧⌘R). Drag out of a ruler to pull a guide: moves and resizes snap to it, and dropping it back on the
 ruler removes it. The Layers section unfolds each layer to its elements; drag one onto another to restack,
 or onto a layer to move it there. Guides can be typed in exactly, added at a position, and locked.
 
 ### Links
 
-Any element can link to a labelled shape elsewhere in the drawing: select it and choose a target under **Jumps to**
-in the inspector's Link section. A small arrow badge appears beside the linked element (grey with a cross when the
-target is deleted or on a hidden layer). Right-click ▸ Link to Element… and then a click on any shape does the same,
-including shapes with no text. The inspector's **Anchor** field gives an element a hidden label, never drawn or
+Any element can link to a labelled shape elsewhere in the drawing, on its own page or another: select it and
+choose a target under **Jumps to** in the inspector's Link section (other pages' shapes are listed as
+"Page › Shape"). A small arrow badge appears beside the linked element (grey with a cross when the target is
+deleted or on a hidden layer). Right-click ▸ Link to Element… and then a click on any shape does the same,
+including shapes with no text; switch tabs first to pick a shape on another page, and the view comes back. The inspector's **Anchor** field gives an element a hidden label, never drawn or
 exported, that the Layers panel and the Link list show. Click the badge, ⌘-click the element, or use View ▸ Follow Link to go
 there: the view glides to the target, and to its whole group if it has one. It zooms out if the target does not
-fit, and zooms in to at most 100%. View ▸ Back (⌘[) and Forward (⌘]) retrace your jumps. A copied link follows its
-target if the target was copied too. Agents and scripts set `link` on `update_element` / `dottie.update`.
+fit, and zooms in to at most 100%. A target on another page switches to that tab first. View ▸ Back (⌘[) and
+Forward (⌘]) retrace your jumps, across pages too. A copied link follows its target if the target was copied too,
+and otherwise survives as long as the target is still in the file. Agents and scripts set `link` on
+`update_element` / `dottie.update` (scripts find shapes on other pages with `dottie.pages()`).
 
 ### Stencils
 
@@ -121,7 +135,7 @@ shapes and connectors take `fill_style` (solid, hachure, crossHatch), `dash`, `s
 `rotation` (degrees) and `start_head` / `end_head` (none, arrow, triangle, dot, bar).
 
 **Live mode.** If the Dottie app has the file open, tool calls edit that open document (one undo step each,
-shown as "Agent: <tool>" in Edit ▸ Undo) instead of the file on disk, and `export_png` renders what is on screen.
+shown as "Agent: <tool>" in Edit ▸ Undo) instead of the file on disk, and `export_png` renders the open document (its first page, unless `page` says otherwise).
 The app listens on `~/Library/Application Support/Dottie/live.sock`; when it isn't running or the file isn't
 open, tools fall back to reading and writing the file. Save in the app to persist agent edits.
 

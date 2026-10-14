@@ -100,9 +100,9 @@ final class DottieKitTests: XCTestCase {
         XCTAssertEqual(doc.elements.map(\.id), [b, a, c])
     }
 
-    func testOldFilesWithoutNewFieldsStillDecode() throws {
+    func testPagesWithoutNewElementFieldsStillDecode() throws {
         let json = """
-        {"version":1,"layers":[{"id":"00000000-0000-0000-0000-000000000001","name":"L","visible":true,"locked":false}],
+        {"id":"00000000-0000-0000-0000-0000000000AA","name":"P","layers":[{"id":"00000000-0000-0000-0000-000000000001","name":"L","visible":true,"locked":false}],
          "elements":[{"id":"00000000-0000-0000-0000-000000000002","kind":"rectangle","x":1,"y":2,"width":3,"height":4,
          "seed":7,"layerID":"00000000-0000-0000-0000-000000000001",
          "style":{"stroke":{"r":0.12,"g":0.12,"b":0.13,"a":1},"fill":{"r":0,"g":0,"b":0,"a":0},"strokeWidth":2,"roughness":1,"fontSize":18}}]}

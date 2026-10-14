@@ -20,6 +20,11 @@ struct EditorActions {
     var export: (ExportFormat) -> Void
     var openScriptConsole: () -> Void
     var runScriptFile: (URL) -> Void
+    var pageCount: Int
+    var newPage: () -> Void
+    var duplicatePage: () -> Void
+    var deletePage: () -> Void
+    var showPage: (_ offset: Int) -> Void
 }
 
 private struct EditorActionsKey: FocusedValueKey { typealias Value = EditorActions }
@@ -52,7 +57,12 @@ extension ContentView {
             reorder: { move in edit("Arrange") { $0.reorder(ids, move) } },
             export: { format in exportDocument(format) },
             openScriptConsole: { openScriptConsole() },
-            runScriptFile: { openScriptConsole(running: $0) })
+            runScriptFile: { openScriptConsole(running: $0) },
+            pageCount: document.file.pages.count,
+            newPage: { document.addPage(undoManager: undoManager) },
+            duplicatePage: { document.duplicatePage(document.currentPageID, undoManager: undoManager) },
+            deletePage: { document.deletePage(document.currentPageID, undoManager: undoManager) },
+            showPage: { document.showPage(offset: $0) })
     }
 
     @MainActor
@@ -61,7 +71,8 @@ extension ContentView {
         guard !model.elements.isEmpty else { NSSound.beep(); return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.contentType]
-        panel.nameFieldStringValue = "Drawing.\(format.rawValue.lowercased())"
+        let base = document.file.pages.count > 1 ? model.name : "Drawing"
+        panel.nameFieldStringValue = "\(base).\(format.rawValue.lowercased())"
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let data: Data?

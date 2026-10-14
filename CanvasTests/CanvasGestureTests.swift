@@ -484,4 +484,139 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertNil(element(b.id).link)
         XCTAssertTrue(commits.isEmpty)
     }
+
+    // MARK: Pages
+
+    /// Pages not on screen, by id, standing in for the document's file.
+    var offscreen: [UUID: DottieDocument] = [:]
+    var otherPageLinks: [(sources: Set<UUID>, page: UUID, target: UUID)] = []
+
+    /// Adds a page holding one labelled box and wires the page callbacks the way CanvasView does.
+    func addPage(box frame: CGRect, text: String) -> (page: UUID, box: Element) {
+        var page = DottieDocument(name: "Other")
+        var st = Style(); st.roughness = 0
+        let e = Element(kind: .rectangle, frame: frame, style: st, layerID: page.layers[0].id, text: text)
+        page.elements.append(e)
+        offscreen[page.id] = page
+        view.onShowPage = { [unowned self] id in
+            guard let next = offscreen.removeValue(forKey: id) else { return }
+            offscreen[view.model.id] = view.model
+            view.model = next
+        }
+        view.findPage = { [unowned self] id in
+            ([view.model] + Array(offscreen.values)).first { $0.elements.contains { $0.id == id } }?.id
+        }
+        view.onLinkOtherPage = { [unowned self] sources, page, target in
+            otherPageLinks.append((sources, page, target))
+            return true
+        }
+        return (page.id, e)
+    }
+
+    func testBadgeToAnotherPageSwitchesPagesAndBackReturns() {
+        let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
+        let first = view.model.id
+        let (other, far) = addPage(box: CGRect(x: 2000, y: 1500, width: 200, height: 100), text: "Billing")
+        view.model.elements[0].link = far.id
+        click(badge(of: toc))
+        XCTAssertEqual(view.model.id, other)
+        XCTAssertEqual(viewCenter.x, far.frame.midX, accuracy: 0.5)
+        XCTAssertEqual(viewCenter.y, far.frame.midY, accuracy: 0.5)
+        XCTAssertTrue(commits.isEmpty)
+        XCTAssertTrue(view.jumpBack(animated: false))
+        XCTAssertEqual(view.model.id, first)
+        XCTAssertEqual(view.viewport.pan, .zero)
+        XCTAssertTrue(view.jumpForward(animated: false))
+        XCTAssertEqual(view.model.id, other)
+        XCTAssertEqual(viewCenter.x, far.frame.midX, accuracy: 0.5)
+    }
+
+    func testEachPageKeepsItsOwnViewport() {
+        let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
+        let far = add(.rectangle, CGRect(x: 3000, y: 2000, width: 200, height: 100), text: "Billing")
+        view.model.elements[0].link = far.id
+        let first = view.model.id
+        let (other, _) = addPage(box: CGRect(x: 0, y: 0, width: 50, height: 50), text: "X")
+        click(badge(of: toc)) // pans this page far away
+        let moved = view.viewport.pan
+        view.onShowPage?(other)
+        XCTAssertEqual(view.viewport.pan, .zero, "a page seen for the first time starts at the origin")
+        view.onShowPage?(first)
+        XCTAssertEqual(view.viewport.pan, moved)
+    }
+
+    func testLinkToElementCanPickATargetOnAnotherPage() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let first = view.model.id
+        let (other, target) = addPage(box: CGRect(x: 300, y: 300, width: 120, height: 60), text: "There")
+        view.selection = [a.id]
+        view.linkToElement(nil)
+        view.onShowPage?(other) // the person clicks the other tab
+        click(CGPoint(x: 360, y: 330))
+        XCTAssertEqual(otherPageLinks.count, 1)
+        XCTAssertEqual(otherPageLinks.first?.sources, [a.id])
+        XCTAssertEqual(otherPageLinks.first?.page, first)
+        XCTAssertEqual(otherPageLinks.first?.target, target.id)
+        XCTAssertTrue(commits.isEmpty, "the link lands on the source page, not the one on screen")
+        XCTAssertEqual(view.model.id, first, "it goes back to where the link starts")
+        XCTAssertEqual(view.selection, [a.id])
+    }
+
+    func testSwitchingPagesClearsTheSelection() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let (other, _) = addPage(box: CGRect(x: 0, y: 0, width: 50, height: 50), text: "X")
+        view.selection = [a.id]
+        view.onShowPage?(other)
+        XCTAssertTrue(view.selection.isEmpty)
+    }
+}
+
+/// Undo and redo in a multi-page document land on the page they change.
+@MainActor
+final class PageUndoTests: XCTestCase {
+    var doc: DrawingDocument!
+    var undo: UndoManager!
+
+    override func setUp() async throws {
+        doc = DrawingDocument()
+        undo = UndoManager()
+        undo.groupsByEvent = false
+    }
+
+    func step(_ action: () -> Void) { undo.beginUndoGrouping(); action(); undo.endUndoGrouping() }
+
+    func testUndoShowsTheChangedPageAndAFreshEditDoesNot() {
+        step { doc.addPage(undoManager: undo) }
+        let first = doc.file.pages[0].id, second = doc.file.pages[1].id
+        doc.currentPageID = first
+        var next = doc.file
+        next.pages[1].elements.append(Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10),
+                                              style: Style(), layerID: next.pages[1].layers[0].id))
+        step { doc.commitFile(next, actionName: "Agent Edit", undoManager: undo) }
+        XCTAssertEqual(doc.currentPageID, first, "an edit to another page does not pull the view there")
+        undo.undo()
+        XCTAssertEqual(doc.currentPageID, second)
+        XCTAssertTrue(doc.file.pages[1].elements.isEmpty)
+        undo.redo()
+        XCTAssertEqual(doc.currentPageID, second)
+        XCTAssertEqual(doc.file.pages[1].elements.count, 1)
+    }
+
+    func testUndoingNewPageLandsOnThePageBefore() {
+        let first = doc.currentPageID
+        step { doc.addPage(undoManager: undo) }
+        XCTAssertNotEqual(doc.currentPageID, first, "a new page is shown")
+        undo.undo()
+        XCTAssertEqual(doc.file.pages.count, 1)
+        XCTAssertEqual(doc.currentPageID, first)
+    }
+
+    func testUndoingDeleteShowsTheRestoredPage() {
+        step { doc.addPage(undoManager: undo) }
+        let doomed = doc.currentPageID
+        step { doc.deletePage(doomed, undoManager: undo) }
+        XCTAssertNotEqual(doc.currentPageID, doomed)
+        undo.undo()
+        XCTAssertEqual(doc.currentPageID, doomed)
+    }
 }

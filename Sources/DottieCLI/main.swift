@@ -20,6 +20,7 @@ RENDER
   -o, --output <path>   Output file, or "-" for stdout. Needs a single input.
   -d, --out-dir <dir>   Directory for the results of one or more inputs.
   -f, --format <fmt>    png (default), svg, pdf or html.
+  -p, --page <page>     Page (tab) to render, by name or 1-based number (default the first).
   -s, --scale <n>       PNG pixel scale, 0.25 to 8 (default 2).
       --clean           Render precisely instead of sketchy.
       --sketchy         Render sketchy even if the drawing is clean.
@@ -60,6 +61,7 @@ struct RenderOptions {
     var output: String?
     var outDir: String?
     var format: Format?
+    var page: String?
     var scale = 2.0
     var roughness: Double?
     var transparent = false
@@ -84,6 +86,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
                 throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html)", code: 2)
             }
             o.format = f
+        case "-p", "--page": o.page = try value(a)
         case "-s", "--scale":
             let v = try value(a)
             guard let n = Double(v), n > 0 else { throw CLIError(message: "--scale must be a positive number", code: 2) }
@@ -162,9 +165,16 @@ func runRender(_ args: [String]) -> Int32 {
                 name = url.deletingPathExtension().lastPathComponent
                 directory = url.deletingLastPathComponent()
             }
-            let doc: DottieDocument
-            do { doc = try DottieDocument.decode(data) }
+            let file: DottieFile
+            do { file = try DottieFile.decode(data) }
             catch { throw CLIError(message: "\(input): not a Dottie drawing (\(error.localizedDescription))") }
+            var doc = file.pages[0]
+            if let spec = o.page {
+                guard let i = file.pageIndex(matching: spec) else {
+                    throw CLIError(message: "\(input): no page '\(spec)' (pages: \(file.pages.map(\.name).joined(separator: ", ")))")
+                }
+                doc = file.pages[i]
+            }
             let bytes = try render(doc, as: format, title: name, o)
 
             if o.output == "-" {
