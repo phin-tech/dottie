@@ -37,6 +37,8 @@ cd "$(dirname "$0")/.."
 if ! git diff --quiet || ! git diff --cached --quiet; then die "there are uncommitted changes"; fi
 git fetch --quiet origin main
 [[ $(git rev-parse HEAD) == $(git rev-parse origin/main) ]] || die "main is not the same as origin/main; push or pull first"
+project=$(sed -n 's/^ *MARKETING_VERSION: "\(.*\)"$/\1/p' project.yml)
+[[ $project == "$version" ]] || die "the app is $version but project.yml is $project; archive again from this commit"
 if gh release view "$tag" >/dev/null 2>&1; then
     die "release $tag already exists; bump MARKETING_VERSION in project.yml"
 fi
