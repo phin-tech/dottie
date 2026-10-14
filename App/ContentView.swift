@@ -14,13 +14,31 @@ struct ContentView: View {
     @AppStorage(Pref.routing) private var prefRouting = Pref.routingDefault
     @State private var showInspector = true
     @State private var activeLayer: UUID?
+    @State private var placeRequest: PlaceRequest?
+    @State private var sidebarTab: SidebarTab = .inspector
 
     var body: some View {
-        CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting, activeLayerID: activeLayer)
+        CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
+                   activeLayerID: activeLayer, placeRequest: $placeRequest)
             .frame(minWidth: 400)
             .inspector(isPresented: $showInspector) {
-                Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager)
-                    .inspectorColumnWidth(min: 250, ideal: 270, max: 360)
+                VStack(spacing: 0) {
+                    Picker("Sidebar", selection: $sidebarTab) {
+                        ForEach(SidebarTab.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .padding([.horizontal, .top], 12)
+                    switch sidebarTab {
+                    case .inspector:
+                        Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager)
+                    case .library:
+                        LibraryPanel(document: document, selection: selection) { item, keep in
+                            placeRequest = PlaceRequest(item: item, keepOriginalColors: keep)
+                        }
+                    }
+                }
+                .inspectorColumnWidth(min: 250, ideal: 270, max: 360)
             }
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -61,6 +79,11 @@ struct ContentView: View {
         .onChange(of: prefRouting, initial: true) { _, v in newRouting = Routing(rawValue: v) ?? .straight }
         .onChange(of: newRouting) { _, r in prefRouting = r.rawValue }
     }
+}
+
+enum SidebarTab: String, CaseIterable, Identifiable {
+    case inspector = "Inspector", library = "Library"
+    var id: String { rawValue }
 }
 
 struct Inspector: View {

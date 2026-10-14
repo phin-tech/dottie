@@ -2,6 +2,20 @@ import AppKit
 import SwiftUI
 import DottieKit
 
+/// A stencil item dragged out of the library panel.
+struct DraggedStencil: Codable {
+    static let typeIdentifier = "tech.phin.dottie.stencil"
+    var item: StencilItem
+    var keepOriginalColors: Bool
+}
+
+/// Asks the canvas to put a stencil item at the middle of the view (or at `at`, in model coordinates).
+struct PlaceRequest: Equatable {
+    var id = UUID()
+    var item: StencilItem
+    var keepOriginalColors: Bool
+}
+
 enum Tool: String, CaseIterable, Identifiable {
     case select, rectangle, ellipse, diamond, text, connector, pencil, eraser
     var id: String { rawValue }
@@ -486,7 +500,28 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        registerForDraggedTypes([.fileURL])
+        registerForDraggedTypes([.fileURL, NSPasteboard.PasteboardType(DraggedStencil.typeIdentifier)])
+    }
+
+    private func draggedStencil(_ info: NSDraggingInfo) -> DraggedStencil? {
+        guard let data = info.draggingPasteboard.data(forType: NSPasteboard.PasteboardType(DraggedStencil.typeIdentifier))
+        else { return nil }
+        return try? JSONDecoder().decode(DraggedStencil.self, from: data)
+    }
+
+    /// Puts a stencil on the canvas centered at `center` (the view's middle by default), as one undo step.
+    @discardableResult
+    func placeStencil(_ item: StencilItem, keepOriginalColors: Bool, at center: CGPoint? = nil) -> Bool {
+        let usable = model.layers.filter { !$0.locked && $0.visible }
+        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
+        var next = model
+        let added = next.place(item, center: center ?? viewportCenter, layerID: layer.id, keepOriginalColors: keepOriginalColors)
+        guard !added.isEmpty else { return false }
+        selection = added
+        tool = .select
+        onToolChange?(.select)
+        onCommit?(next, "Place \(item.name)")
+        return true
     }
 
     private func droppedSVGs(_ info: NSDraggingInfo) -> [URL] {
@@ -496,10 +531,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedSVGs(sender).isEmpty ? [] : .copy
+        draggedStencil(sender) != nil || !droppedSVGs(sender).isEmpty ? .copy : []
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if let dragged = draggedStencil(sender) {
+            let raw = convert(sender.draggingLocation, from: nil)
+            let at = CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom)
+            return placeStencil(dragged.item, keepOriginalColors: dragged.keepOriginalColors, at: at)
+        }
         let files = droppedSVGs(sender).compactMap { try? Data(contentsOf: $0) }
         guard !files.isEmpty else { return false }
         let raw = convert(sender.draggingLocation, from: nil)
@@ -963,6 +1003,7 @@ struct CanvasView: NSViewRepresentable {
     var style: Style
     var routing: Routing
     var activeLayerID: UUID?
+    @Binding var placeRequest: PlaceRequest?
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
@@ -981,5 +1022,12 @@ struct CanvasView: NSViewRepresentable {
         v.routing = routing
         v.activeLayerID = activeLayerID
         if v.selection != selection { v.selection = selection }
+        if let req = placeRequest {
+            // Applying it changes the model and bindings, so do it after this update pass.
+            DispatchQueue.main.async {
+                v.placeStencil(req.item, keepOriginalColors: req.keepOriginalColors)
+                if placeRequest == req { placeRequest = nil }
+            }
+        }
     }
 }

@@ -251,4 +251,17 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertFalse(view.importSVGs([Data("nope".utf8)], at: .zero, keepOriginalColors: true))
         XCTAssertEqual(commits.count, 1)
     }
+
+    func testPlacingAStencilIsOneUndoStepAtTheRequestedPoint() throws {
+        let item = try XCTUnwrap(StencilLibrary.starter.items.first { $0.name == "Database" })
+        XCTAssertTrue(view.placeStencil(item, keepOriginalColors: false, at: CGPoint(x: 400, y: 300)))
+        XCTAssertEqual(commits.count, 1)
+        XCTAssertEqual(commits[0].name, "Place Database")
+        XCTAssertEqual(view.model.elements.count, item.elements.count)
+        let box = view.model.elements.map(\.frame).reduce(CGRect.null) { $0.union($1) }
+        XCTAssertEqual(box.midX, 400, accuracy: 1)
+        XCTAssertEqual(box.midY, 300, accuracy: 1)
+        XCTAssertTrue(view.model.elements.allSatisfy { $0.style.roughness > 0 }, "restyled to the sketchy default")
+        XCTAssertEqual(view.selection.count, item.elements.count)
+    }
 }
