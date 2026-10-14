@@ -201,6 +201,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var pageViewports: [UUID: Viewport] = [:]
     /// The last `JumpRequest` acted on, so a repeated SwiftUI update does not jump twice.
     var handledJump: UUID?
+    /// The last `PlaceRequest` acted on, so a stencil is placed once however many update passes see it.
+    var handledPlace: UUID?
     /// The document revision the link badges were last checked against.
     var fileRevision = -1
 
@@ -1643,7 +1645,8 @@ struct CanvasView: NSViewRepresentable {
         v.activeLayerID = activeLayerID
         v.showRulers = showRulers
         if v.selection != selection { v.selection = selection }
-        if let req = placeRequest {
+        if let req = placeRequest, v.handledPlace != req.id {
+            v.handledPlace = req.id
             // Applying it changes the model and bindings, so do it after this update pass.
             DispatchQueue.main.async {
                 v.placeStencil(req.item, keepOriginalColors: req.keepOriginalColors)
