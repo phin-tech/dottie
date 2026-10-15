@@ -37,6 +37,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 - [x] Pictures (`image` kind): paste, drop or File ▸ Insert Image…; embedded as PNG/JPEG (EXIF-rotated, capped at 2048 px), optional sketchy border, in every export; `add_image` over MCP
 - [x] Sticky notes (`note` kind, N): GitHub Flavored Markdown (swift-markdown) laid out with CoreText, tables included; click-to-tick task boxes, color swatches, identical in PNG, PDF and SVG; `note` over MCP and scripts
+- [x] Quick Look: Space in Finder previews a drawing (every page, as a PDF) or a stencil library; Finder thumbnails show the first page on its theme's color
 
 ## Next
 - Custom themes and a color palette per theme

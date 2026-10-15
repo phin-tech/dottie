@@ -21,6 +21,21 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 
 `Dottie.xcodeproj` is generated from `project.yml` and gitignored, so change settings there, not in Xcode.
 
+**Targets.** `Dottie` (the app) embeds `DottieCLI` and `DottieMCP` in `Contents/Helpers` and two Quick Look
+app extensions in `Contents/PlugIns`, all linking DottieKit:
+
+- `DottieQuickLookPreview` (`QuickLook/Preview`): a data-based `QLPreviewProvider` that answers Space in Finder
+  with `Exporter.pdf(_: DottieFile)`, one PDF page per Dottie page. A `.dottielib` previews as
+  `StencilLibrary.sheet()`, its items in a grid.
+- `DottieQuickLookThumbnail` (`QuickLook/Thumbnail`): a `QLThumbnailProvider` that draws the first page (or the
+  library sheet) with `Exporter.draw(_:in:size:)`, sized by `Exporter.fittedSize` so Finder doesn't letterbox it.
+
+Both are sandboxed (Quick Look requires it; the previewed file is readable without further entitlements) and
+use `Signing.xcconfig` like the other targets. Their version comes from the project-level `MARKETING_VERSION`
+and `CURRENT_PROJECT_VERSION`, which must match the app's. To try them, build, then register the built app with
+`lsregister -f -R -trusted <Dottie.app>` (or launch it once) and check `pluginkit -m -A -i tech.phin.dottie.QuickLookThumbnail`.
+A plus sign in that listing means the extension is enabled.
+
 **Signing.** Builds are signed to run locally unless a gitignored `Signing.local.xcconfig` sets
 `DEVELOPMENT_TEAM` and `CODE_SIGN_IDENTITY = Apple Development` (see `Signing.xcconfig`). Set the team there
 rather than in Xcode's Signing & Capabilities pane, which is lost when the project is regenerated.
