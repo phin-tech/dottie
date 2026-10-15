@@ -14,13 +14,14 @@ USAGE
   dottie --help | --version
 
 RENDER
-  Writes png, svg, pdf or html. The format comes from the extension of -o, or --format.
+  Writes png, svg, pdf, html or mermaid (.mmd, a flowchart of the shapes and connectors).
+  The format comes from the extension of -o, or --format.
   With no -o the result is written next to the input (drawing.dottie -> drawing.png).
   A Mermaid flowchart (.mmd, .mermaid, or flowchart text on stdin) is laid out and rendered too.
 
   -o, --output <path>   Output file, or "-" for stdout. Needs a single input.
   -d, --out-dir <dir>   Directory for the results of one or more inputs.
-  -f, --format <fmt>    png (default), svg, pdf or html.
+  -f, --format <fmt>    png (default), svg, pdf, html or mermaid.
   -p, --page <page>     Page (tab) to render, by name or 1-based number (default the first).
   -s, --scale <n>       PNG pixel scale, 0.25 to 8 (default 2).
       --clean           Render precisely instead of sketchy.
@@ -48,13 +49,15 @@ func warn(_ message: String) {
 }
 
 enum Format: String, CaseIterable {
-    case png, svg, pdf, html
+    case png, svg, pdf, html, mermaid
     init?(extension ext: String) {
         switch ext.lowercased() {
         case "htm": self = .html
+        case "mmd": self = .mermaid
         default: self.init(rawValue: ext.lowercased())
         }
     }
+    var fileExtension: String { self == .mermaid ? "mmd" : rawValue }
 }
 
 struct RenderOptions {
@@ -84,7 +87,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "-f", "--format":
             let v = try value(a)
             guard let f = Format(extension: v) else {
-                throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html)", code: 2)
+                throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html, mermaid)", code: 2)
             }
             o.format = f
         case "-p", "--page": o.page = try value(a)
@@ -134,6 +137,8 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
         return Data(Exporter.svg(doc, background: o.transparent ? nil : white).utf8)
     case .html:
         return Data(Exporter.html(doc, title: title, background: o.transparent ? nil : white).utf8)
+    case .mermaid:
+        return Data(Exporter.mermaid(doc).utf8)
     }
 }
 
@@ -144,7 +149,7 @@ func runRender(_ args: [String]) -> Int32 {
     var format = o.format
     if format == nil, let out = o.output, out != "-" { format = Format(extension: URL(fileURLWithPath: out).pathExtension) }
     guard let format = format ?? (o.output == nil || o.output == "-" ? .png : nil) else {
-        fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html or --format", code: 2)
+        fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html, .mmd or --format", code: 2)
     }
     if o.output == "-", format == .png || format == .pdf, isatty(STDOUT_FILENO) != 0 {
         fail("refusing to write binary \(format.rawValue) to a terminal; redirect it or use -o <file>", code: 2)
@@ -192,7 +197,7 @@ func runRender(_ args: [String]) -> Int32 {
             }
             let target: URL
             if let out = o.output { target = absolute(out) }
-            else { target = (o.outDir.map(absolute) ?? directory).appendingPathComponent(name + "." + format.rawValue) }
+            else { target = (o.outDir.map(absolute) ?? directory).appendingPathComponent(name + "." + format.fileExtension) }
             try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
             try bytes.write(to: target, options: .atomic)
             print(target.path)

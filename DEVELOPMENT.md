@@ -58,6 +58,11 @@ and edges, so an import lays out exactly like `build_diagram`. Shapes map to the
 stadiums to ellipses, `{}` to a diamond, the rest to rectangles). BT and RL draw as TB and LR, subgraphs are
 flattened, and only `fill` survives from `style` / `classDef`. Other diagram types are refused with a clear error.
 
+`Exporter.mermaid` goes the other way (File ▸ Export As ▸ Mermaid, `dottie render -f mermaid`, `export_mermaid`):
+shapes become nodes with ids `n1`, `n2`, ... (or the element's `anchor` when it is a valid id), connectors attached
+at both ends become links, and the direction is guessed from the layout. Everything else is skipped and counted
+in a `%%` comment. Import, export and import again gives the same graph (`MermaidExportTests`).
+
 ## MCP server
 
 A stdio MCP server; every tool takes an absolute `path` to a `.dottie` file, or `"current"` for the drawing in
@@ -66,7 +71,7 @@ front in the app.
 Tools: `build_diagram` (nodes + edges, auto-laid-out), `import_mermaid` (a Mermaid flowchart, laid out the same
 way), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
-work, plus each element's id and pixel box), `export_svg`, `create_diagram`, `open_document`, `list_stencils`,
+work, plus each element's id and pixel box), `export_svg`, `export_mermaid`, `create_diagram`, `open_document`, `list_stencils`,
 `add_stencil`, `list_pages`, `add_page`, `rename_page`, `run_script` and `script_api`. Tools that draw, list or
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element
 id find its page themselves. `add_shape` and `build_diagram` take kind `note` for a sticky note
@@ -100,6 +105,7 @@ dottie render a.dottie b.dottie -f html -d out/   # several files into a directo
 dottie render diagram.dottie --clean --scale 3 -o - > clean.png
 dottie render diagram.dottie --page Details
 dottie render flow.mmd -o flow.svg                # a Mermaid flowchart, laid out like import_mermaid
+dottie render diagram.dottie -f mermaid -o -       # shapes and connectors as Mermaid text
 dottie library list
 dottie library install shapes.dottielib
 ```

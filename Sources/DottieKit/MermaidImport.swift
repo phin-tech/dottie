@@ -47,7 +47,8 @@ public enum MermaidImporter {
     /// Whether `text` looks like a Mermaid flowchart: its first real token is `flowchart` or `graph`
     /// (after an optional ```` ```mermaid ```` fence, front matter, comments and `%%{init}%%` directives).
     public static func isFlowchart(_ text: String) -> Bool {
-        guard let first = statements(in: text).first else { return false }
+        // Only the start matters; the app asks this of the whole clipboard every time a menu validates.
+        guard let first = statements(in: String(text.prefix(4096))).first else { return false }
         let word = first.text.prefix { !$0.isWhitespace && $0 != ";" }
         return word == "flowchart" || word == "graph" || word == "flowchart-elk"
     }
@@ -352,15 +353,13 @@ public enum MermaidImporter {
         if s.count >= 2, s.hasPrefix("`"), s.hasSuffix("`") { s = String(s.dropFirst().dropLast()) } // Markdown string
         s = s.replacingOccurrences(of: #"<br\s*/?>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
         s = s.replacingOccurrences(of: #"</?[A-Za-z][^>]*>"#, with: "", options: .regularExpression)
-        for (entity, char) in [("#quot;", "\""), ("&quot;", "\""), ("&lt;", "<"), ("&gt;", ">"), ("&nbsp;", " "),
-                               ("#59;", ";"), ("#35;", "#"), ("&amp;", "&")] {
-            s = s.replacingOccurrences(of: entity, with: char)
-        }
-        // Remaining numeric entities: #9829; or &#9829;
-        while let r = s.range(of: #"&?#[0-9]+;"#, options: .regularExpression) {
-            let digits = s[r].filter(\.isNumber)
-            let scalar = UInt32(digits).flatMap(Unicode.Scalar.init).map { String(Character($0)) } ?? ""
-            s.replaceSubrange(r, with: scalar)
+        // Entities in one pass (so a decoded `#` never starts another): Mermaid's #quot; #35; #9829; and HTML's &amp; &#9829;.
+        let named = ["quot": "\"", "lt": "<", "gt": ">", "amp": "&", "nbsp": " ", "apos": "'"]
+        let entity = /&#?([A-Za-z]+|[0-9]+);|#([A-Za-z]+|[0-9]+);/
+        s = s.replacing(entity) { m -> String in
+            let name = String(m.output.1 ?? m.output.2 ?? "")
+            if let n = UInt32(name), let scalar = Unicode.Scalar(n) { return String(Character(scalar)) }
+            return named[name] ?? String(m.output.0)
         }
         return s.split(separator: "\n", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespaces) }.joined(separator: "\n")

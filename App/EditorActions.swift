@@ -4,8 +4,16 @@ import UniformTypeIdentifiers
 import DottieKit
 
 enum ExportFormat: String, CaseIterable {
-    case png = "PNG", svg = "SVG", pdf = "PDF"
-    var contentType: UTType { switch self { case .png: .png; case .svg: .svg; case .pdf: .pdf } }
+    case png = "PNG", svg = "SVG", pdf = "PDF", mermaid = "Mermaid"
+    var contentType: UTType {
+        switch self {
+        case .png: .png
+        case .svg: .svg
+        case .pdf: .pdf
+        case .mermaid: UTType(filenameExtension: "mmd", conformingTo: .plainText) ?? .plainText
+        }
+    }
+    var fileExtension: String { self == .mermaid ? "mmd" : rawValue.lowercased() }
 }
 
 /// Window-level commands that act on the document and selection. Reached from the menu bar through
@@ -72,7 +80,7 @@ extension ContentView {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.contentType]
         let base = document.file.pages.count > 1 ? model.name : "Drawing"
-        panel.nameFieldStringValue = "\(base).\(format.rawValue.lowercased())"
+        panel.nameFieldStringValue = "\(base).\(format.fileExtension)"
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let data: Data?
@@ -80,6 +88,7 @@ extension ContentView {
         case .png: data = Exporter.png(model)
         case .svg: data = Exporter.svg(model).data(using: .utf8)
         case .pdf: data = Exporter.pdf(model)
+        case .mermaid: data = Data(Exporter.mermaid(model).utf8)
         }
         do {
             guard let data else { throw CocoaError(.fileWriteUnknown) }

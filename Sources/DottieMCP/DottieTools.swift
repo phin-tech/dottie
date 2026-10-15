@@ -257,6 +257,14 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Override the look for this render only"),
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
              ], required: ["path"])),
+        Tool(name: "export_mermaid",
+             description: "Export the diagram as Mermaid flowchart text: shapes become nodes and attached connectors links "
+                + "(labels, dashes, thick lines and arrowheads kept). Freehand strokes and paths are skipped. Returns the "
+                + "text, or writes it to out_path.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "out_path": prop("string", "Optional absolute path ending in .mmd to write the file to"),
+             ], required: ["path"])),
         Tool(name: "export_svg",
              description: "Export the diagram as SVG using the same sketchy paths as the app. Returns the SVG text, "
                 + "or writes it to out_path (preferred for large diagrams).",
@@ -623,6 +631,17 @@ actor DottieTools {
             let map = DiagramOps.annotations(doc, scale: scale)
             return .init(content: [.png(png),
                                    .plain(note + "\nElements in the image (pixels from its top-left):\n" + (try json(map)))])
+
+        case "export_mermaid":
+            let file = try load(try fileURL(a))
+            let doc = file.pages[try pageIndex(file, a)]
+            guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
+            let mermaid = Exporter.mermaid(doc)
+            guard a.string("out_path") != nil else { return text(mermaid) }
+            let out = try fileURL(a, key: "out_path", ext: "mmd")
+            try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try mermaid.write(to: out, atomically: true, encoding: .utf8)
+            return text("Exported Mermaid to \(out.path)")
 
         case "export_svg":
             let file = try load(try fileURL(a))

@@ -36,6 +36,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Canvas context menu (edit, link, arrange); hidden element anchors (`anchor`)
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 - [x] Mermaid flowchart import: File ▸ Import Mermaid…, ⌘V of flowchart text, `.mmd` drop, `import_mermaid` over MCP, `dottie render flow.mmd`
+- [x] Mermaid flowchart export: File ▸ Export As ▸ Mermaid, `dottie render -f mermaid`, `export_mermaid` over MCP; round-trips with import
 - [x] Sticky notes (`note` kind, N): GitHub Flavored Markdown (swift-markdown) laid out with CoreText, tables included; click-to-tick task boxes, color swatches, identical in PNG, PDF and SVG; `note` over MCP and scripts
 
 ## Next
