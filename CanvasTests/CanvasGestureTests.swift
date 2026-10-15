@@ -471,6 +471,17 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(view.selection, [e.id])
     }
 
+    func testImportingMermaidLaysOutConnectedShapesInOneStep() throws {
+        XCTAssertTrue(view.importMermaid("flowchart LR\n  A[Start] --> B{OK?}\n  B -->|yes| C((Done))", at: CGPoint(x: 400, y: 300)))
+        XCTAssertEqual(commits.map(\.name), ["Import Mermaid"])
+        let kinds = view.model.elements.map(\.kind)
+        XCTAssertEqual(kinds.filter { $0 == .connector }.count, 2)
+        XCTAssertEqual(Set(kinds.filter { $0 != .connector }), [.rectangle, .diamond, .ellipse])
+        XCTAssertEqual(view.selection.count, view.model.elements.count)
+        let c = try XCTUnwrap(view.model.elements.first { $0.text == "yes" })
+        XCTAssertNotNil(c.connector?.start.elementID)
+    }
+
     func testDoubleClickingAPictureDoesNotEditALabel() throws {
         var doc = view.model
         let e = try DiagramOps.addImage(&doc, data: pngData(width: 100, height: 100), at: CGPoint(x: 100, y: 100))

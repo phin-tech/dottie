@@ -54,6 +54,7 @@ struct DottieCommands: Commands {
                 .keyboardShortcut("i", modifiers: [.command, .shift])
             Button("Import Excalidraw…") { send(#selector(CanvasNSView.importExcalidrawScene(_:))) }
             Button("Import draw.io…") { send(#selector(CanvasNSView.importDrawioFile(_:))) }
+            Button("Import Mermaid…") { send(#selector(CanvasNSView.importMermaidFile(_:))) }
             Menu("Export As") {
                 ForEach(ExportFormat.allCases, id: \.self) { f in
                     Button("\(f.rawValue)…") { editor?.export(f) }
