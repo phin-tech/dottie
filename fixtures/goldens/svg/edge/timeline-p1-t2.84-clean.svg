@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="588" height="415.47" viewBox="16 -11.47 588 415.47">
+<rect x="16" y="-11.47" width="588" height="415.47" fill="#ffffff"/>
+<g transform="rotate(68.75 170.33 70)">
+<path d="M120.33 40 L220.33 40 L220.33 100 L120.33 100 Z" fill="#33cc4d" fill-opacity="0.5" stroke="none"/>
+<path d="M120.33 40 L220.33 40 L220.33 100 L120.33 100 Z" fill="none" stroke="#cc1a1a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="170.33" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#cc1a1a" text-anchor="middle"><tspan x="170.33" y="76.48">box</tspan></text>
+</g>
+<g opacity="0.91">
+<path d="M460 60 C460 71.05 424.18 80 380 80 C335.82 80 300 71.05 300 60 C300 48.95 335.82 40 380 40 C424.18 40 460 48.95 460 60 Z" fill="#99d9ff" stroke="none"/>
+<path d="M460 60 C460 71.05 424.18 80 380 80 C335.82 80 300 71.05 300 60 C300 48.95 335.82 40 380 40 C424.18 40 460 48.95 460 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path d="M350 220 L400 260 L350 300 L300 260 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="350" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="350" y="266.48">gone</tspan></text>
+<path d="M40 220 L140 220 L140 280 L40 280 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="90" y="256.48">late</tspan></text>
+<g opacity="0.37">
+<path d="M207.42 109.22 L207.42 173.23 M207.42 173.23 L328.47 173.23 M328.47 173.23 L328.47 237.23 M332.8 228.22 L328.47 237.23 M324.13 228.22 L328.47 237.23" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path d="M377 79.99 L355.36 224.29 M360.98 216.02 L355.36 224.29 M352.4 214.73 L355.36 224.29" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M153.13 108.55 C153.13 164.27 103.39 164.27 103.39 220 M108.06 211.16 L103.39 220 M99.39 210.83 L103.39 220" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="40" y="357.28">Typing out a title</tspan></text>
+<path d="M500 40 L580 40 L580 100 L500 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M560 190 C560 206.57 546.57 220 530 220 C513.43 220 500 206.57 500 190 C500 173.43 513.43 160 530 160 C546.57 160 560 173.43 560 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -9,3 +9,6 @@ Signing.local.xcconfig
 # mkdocs output
 website/site/
 _site/
+
+# Built from web/ for the Pages site (just site, or the Pages workflow)
+website/docs/assets/dottie-player.min.js

@@ -1,0 +1,442 @@
+{
+  "pages" : [
+    {
+      "elements" : [
+        {
+          "height" : 70,
+          "id" : "E0052E34-0310-482E-AC43-D1BF17AA994F",
+          "kind" : "ellipse",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 3179421314,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.8392156862745098,
+              "g" : 0.9607843137254902,
+              "r" : 0.8392156862745098
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Visitor arrives",
+          "width" : 244.12,
+          "x" : 40,
+          "y" : 90
+        },
+        {
+          "height" : 60,
+          "id" : "75FC896D-8123-438B-A46C-D19CC4C5F547",
+          "kind" : "rectangle",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 4022348049,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.7686274509803922,
+              "g" : 0.9529411764705882,
+              "r" : 1
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Fill in signup form",
+          "width" : 231.52,
+          "x" : 374.12,
+          "y" : 95
+        },
+        {
+          "height" : 90,
+          "id" : "38986BB3-D944-4D68-AA35-BD9344E4B318",
+          "kind" : "diamond",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 19199312,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.8,
+              "g" : 0.8784313725490196,
+              "r" : 1
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Email valid?",
+          "width" : 245.63,
+          "x" : 695.64,
+          "y" : 80
+        },
+        {
+          "height" : 60,
+          "id" : "52BA09E3-26B3-4A8E-9626-3C25EE30D444",
+          "kind" : "rectangle",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 2411528152,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.8392156862745098,
+              "g" : 0.8392156862745098,
+              "r" : 1
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Show error",
+          "width" : 140.8,
+          "x" : 1071.59,
+          "y" : 40
+        },
+        {
+          "height" : 60,
+          "id" : "741211C0-097B-4063-BDC8-C4FBD3DCEDA0",
+          "kind" : "rectangle",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 1916862901,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 1,
+              "g" : 0.9098039215686274,
+              "r" : 0.8588235294117647
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Send welcome email",
+          "width" : 221.44,
+          "x" : 1031.27,
+          "y" : 150
+        },
+        {
+          "height" : 70,
+          "id" : "25310BC6-6F67-4ED4-8ED3-E8F65BAEE509",
+          "kind" : "ellipse",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 1918606593,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.8392156862745098,
+              "g" : 0.9607843137254902,
+              "r" : 0.8392156862745098
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Account ready",
+          "width" : 216.9,
+          "x" : 1342.71,
+          "y" : 90
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "75FC896D-8123-438B-A46C-D19CC4C5F547",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "E0052E34-0310-482E-AC43-D1BF17AA994F",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "13532411-D26F-497A-A626-D9D9C8B95161",
+          "kind" : "connector",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 709335550,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "38986BB3-D944-4D68-AA35-BD9344E4B318",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "75FC896D-8123-438B-A46C-D19CC4C5F547",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "0928AE8B-0979-49E6-912D-EE53352EE788",
+          "kind" : "connector",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 1357836241,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "741211C0-097B-4063-BDC8-C4FBD3DCEDA0",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "38986BB3-D944-4D68-AA35-BD9344E4B318",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "6CDA61C5-0BA3-45F7-AADB-116CFCA496DC",
+          "kind" : "connector",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 1430370856,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "yes",
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "52BA09E3-26B3-4A8E-9626-3C25EE30D444",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "38986BB3-D944-4D68-AA35-BD9344E4B318",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "232D95C8-A09D-472F-91C7-0D08B5BC2C6B",
+          "kind" : "connector",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 230624769,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "no",
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "25310BC6-6F67-4ED4-8ED3-E8F65BAEE509",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "741211C0-097B-4063-BDC8-C4FBD3DCEDA0",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "272D11F9-397F-4CC9-A57F-F74D7B286E3D",
+          "kind" : "connector",
+          "layerID" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "seed" : 105910815,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        }
+      ],
+      "id" : "E553D54F-E929-4679-9E96-9A3E80BD277F",
+      "layers" : [
+        {
+          "id" : "D0135D9F-DF7A-4757-AB02-69780F209D54",
+          "locked" : false,
+          "name" : "Layer 1",
+          "visible" : true
+        }
+      ],
+      "name" : "Page 1"
+    }
+  ],
+  "version" : 2
+}

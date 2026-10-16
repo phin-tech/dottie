@@ -1,0 +1,1222 @@
+{
+  "futureTopLevel": true,
+  "images": {
+    "23dd1ad395c05c0fc898ab30c79f8644e862bc1b5749edf3933c814fc789bc74": {
+      "data": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAIAAAA7ljmRAAAAEElEQVR4nGM4YaMBRww4OQAZ7g4RX8PtlgAAAABJRU5ErkJggg==",
+      "format": "png"
+    }
+  },
+  "pages": [
+    {
+      "elements": [
+        {
+          "height": 70,
+          "id": "00000022-0000-4000-8000-000000000022",
+          "kind": "rectangle",
+          "layerID": "00000003-0000-4000-8000-000000000003",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.9,
+              "g": 0.5,
+              "r": 0.9
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "On top",
+          "width": 120,
+          "x": 60,
+          "y": 50
+        },
+        {
+          "futureField": {
+            "anything": [
+              1,
+              2,
+              3
+            ]
+          },
+          "height": 70,
+          "id": "00000004-0000-4000-8000-000000000004",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.4,
+              "g": 0.85,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "futureStyle": 7,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Rectangle",
+          "width": 120,
+          "x": 20,
+          "y": 20
+        },
+        {
+          "height": 70,
+          "id": "00000005-0000-4000-8000-000000000005",
+          "kind": "ellipse",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 1,
+              "g": 0.85,
+              "r": 0.6
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Ellipse",
+          "width": 120,
+          "x": 170,
+          "y": 20
+        },
+        {
+          "height": 90,
+          "id": "00000006-0000-4000-8000-000000000006",
+          "kind": "diamond",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.7,
+              "g": 0.95,
+              "r": 0.7
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Diamond",
+          "width": 120,
+          "x": 320,
+          "y": 10
+        },
+        {
+          "height": 60,
+          "id": "00000007-0000-4000-8000-000000000007",
+          "kind": "text",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Free text\nover two lines",
+          "width": 140,
+          "x": 470,
+          "y": 25
+        },
+        {
+          "height": 70,
+          "id": "00000008-0000-4000-8000-000000000008",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.3,
+              "g": 0.4,
+              "r": 0.9
+            },
+            "fillStyle": "hachure",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1
+          },
+          "width": 120,
+          "x": 20,
+          "y": 130
+        },
+        {
+          "height": 70,
+          "id": "00000009-0000-4000-8000-000000000009",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 4109647057,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.3,
+              "g": 0.4,
+              "r": 0.9
+            },
+            "fillStyle": "crossHatch",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 170,
+          "y": 130
+        },
+        {
+          "height": 70,
+          "id": "0000000A-0000-4000-8000-00000000000A",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 198874155,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.3,
+              "g": 0.4,
+              "r": 0.9
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 3
+          },
+          "width": 120,
+          "x": 320,
+          "y": 130
+        },
+        {
+          "height": 70,
+          "id": "0000000B-0000-4000-8000-00000000000B",
+          "kind": "ellipse",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 951240724,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.9,
+              "g": 0.5,
+              "r": 0.3
+            },
+            "fillStyle": "hachure",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 470,
+          "y": 130
+        },
+        {
+          "height": 90,
+          "id": "0000000C-0000-4000-8000-00000000000C",
+          "kind": "diamond",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 3110341368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.4,
+              "g": 0.7,
+              "r": 0.3
+            },
+            "fillStyle": "crossHatch",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 100,
+          "x": 620,
+          "y": 120
+        },
+        {
+          "height": 60,
+          "id": "0000000D-0000-4000-8000-00000000000D",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 3437918875,
+          "style": {
+            "bowing": 1,
+            "dash": "dashed",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 20,
+          "y": 240
+        },
+        {
+          "height": 60,
+          "id": "0000000E-0000-4000-8000-00000000000E",
+          "kind": "ellipse",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 3880974472,
+          "style": {
+            "bowing": 1,
+            "dash": "dotted",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 3
+          },
+          "width": 120,
+          "x": 170,
+          "y": 240
+        },
+        {
+          "height": 60,
+          "id": "0000000F-0000-4000-8000-00000000000F",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 2959719643,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.4,
+              "g": 0.85,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Clean",
+          "width": 120,
+          "x": 320,
+          "y": 240
+        },
+        {
+          "height": 60,
+          "id": "00000010-0000-4000-8000-000000000010",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 3818116956,
+          "style": {
+            "bowing": 0,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 2,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Rough, no bow",
+          "width": 120,
+          "x": 470,
+          "y": 240
+        },
+        {
+          "height": 60,
+          "id": "00000011-0000-4000-8000-000000000011",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 51711270,
+          "style": {
+            "bowing": 4,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 620,
+          "y": 240
+        },
+        {
+          "height": 60,
+          "id": "00000012-0000-4000-8000-000000000012",
+          "kind": "rectangle",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "rotation": 0.4,
+          "seed": 2404517688,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.4,
+              "g": 0.85,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Rotated",
+          "width": 120,
+          "x": 20,
+          "y": 340
+        },
+        {
+          "height": 60,
+          "id": "00000013-0000-4000-8000-000000000013",
+          "kind": "ellipse",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "rotation": -1.1,
+          "seed": 2307821821,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 1,
+              "g": 0.85,
+              "r": 0.6
+            },
+            "fillStyle": "hachure",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 170,
+          "y": 340
+        },
+        {
+          "height": 80,
+          "id": "00000014-0000-4000-8000-000000000014",
+          "kind": "diamond",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 323340304,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.4,
+              "g": 0.85,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "opacity": 0.4,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "40%",
+          "width": 100,
+          "x": 320,
+          "y": 330
+        },
+        {
+          "height": 40,
+          "id": "00000015-0000-4000-8000-000000000015",
+          "kind": "text",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "rotation": 0.25,
+          "seed": 1556970342,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Tilted text",
+          "width": 140,
+          "x": 470,
+          "y": 340
+        },
+        {
+          "height": 80,
+          "id": "00000016-0000-4000-8000-000000000016",
+          "kind": "freehand",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "path": [
+            0,
+            0.5,
+            0.2,
+            0,
+            0.4,
+            0,
+            0.5,
+            0.5,
+            0.6,
+            1,
+            0.8,
+            1,
+            1,
+            0.5
+          ],
+          "seed": 3979549976,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 160,
+          "x": 20,
+          "y": 440
+        },
+        {
+          "height": 80,
+          "id": "00000017-0000-4000-8000-000000000017",
+          "kind": "freehand",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "points": [
+            {
+              "x": 0,
+              "y": 1
+            },
+            {
+              "x": 0.25,
+              "y": 0.2
+            },
+            {
+              "x": 0.5,
+              "y": 0.8
+            },
+            {
+              "x": 0.75,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 0.6
+            }
+          ],
+          "seed": 1525251685,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 160,
+          "x": 200,
+          "y": 440
+        },
+        {
+          "height": 40,
+          "id": "00000018-0000-4000-8000-000000000018",
+          "kind": "freehand",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "seed": 3050722024,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 40,
+          "x": 380,
+          "y": 440
+        },
+        {
+          "evenOdd": true,
+          "height": 100,
+          "id": "00000019-0000-4000-8000-000000000019",
+          "kind": "path",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 2861403552,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.2,
+              "g": 0.75,
+              "r": 0.95
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "subpaths": [
+            {
+              "closed": true,
+              "coords": [
+                0.5,
+                0.0,
+                0.5,
+                0.0,
+                0.6175570504584946,
+                0.3381966011250105,
+                0.6175570504584946,
+                0.3381966011250105,
+                0.6175570504584946,
+                0.3381966011250105,
+                0.9755282581475768,
+                0.3454915028125263,
+                0.9755282581475768,
+                0.3454915028125263,
+                0.9755282581475768,
+                0.3454915028125263,
+                0.6902113032590307,
+                0.5618033988749895,
+                0.6902113032590307,
+                0.5618033988749895,
+                0.6902113032590307,
+                0.5618033988749895,
+                0.7938926261462366,
+                0.9045084971874737,
+                0.7938926261462366,
+                0.9045084971874737,
+                0.7938926261462366,
+                0.9045084971874737,
+                0.5,
+                0.7,
+                0.5,
+                0.7,
+                0.5,
+                0.7,
+                0.2061073738537635,
+                0.9045084971874737,
+                0.2061073738537635,
+                0.9045084971874737,
+                0.2061073738537635,
+                0.9045084971874737,
+                0.3097886967409693,
+                0.5618033988749895,
+                0.3097886967409693,
+                0.5618033988749895,
+                0.3097886967409693,
+                0.5618033988749895,
+                0.02447174185242318,
+                0.3454915028125264,
+                0.02447174185242318,
+                0.3454915028125264,
+                0.02447174185242318,
+                0.3454915028125264,
+                0.3824429495415054,
+                0.3381966011250105,
+                0.3824429495415054,
+                0.3381966011250105,
+                0.3824429495415054,
+                0.3381966011250105,
+                0.5,
+                0.0,
+                0.5,
+                0.0
+              ]
+            },
+            {
+              "closed": true,
+              "coords": [
+                0.45,
+                0.45,
+                0.45,
+                0.45,
+                0.55,
+                0.45,
+                0.55,
+                0.45,
+                0.55,
+                0.45,
+                0.55,
+                0.55,
+                0.55,
+                0.55,
+                0.55,
+                0.55,
+                0.45,
+                0.55,
+                0.45,
+                0.55,
+                0.45,
+                0.55,
+                0.45,
+                0.45,
+                0.45,
+                0.45
+              ]
+            }
+          ],
+          "width": 100,
+          "x": 450,
+          "y": 430
+        },
+        {
+          "height": 80,
+          "id": "0000001A-0000-4000-8000-00000000001A",
+          "kind": "path",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 3292956367,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "subpaths": [
+            {
+              "closed": false,
+              "coords": [
+                0,
+                1,
+                0.2,
+                0,
+                0.8,
+                0,
+                1,
+                1
+              ]
+            }
+          ],
+          "width": 140,
+          "x": 580,
+          "y": 440
+        },
+        {
+          "height": 80,
+          "id": "0000001B-0000-4000-8000-00000000001B",
+          "kind": "path",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "rotation": 0.2,
+          "seed": 3730466533,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 1,
+              "g": 0.85,
+              "r": 0.6
+            },
+            "fillStyle": "hachure",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "subpaths": [
+            {
+              "closed": true,
+              "coords": [
+                0,
+                1,
+                0.2,
+                0,
+                0.8,
+                0,
+                1,
+                1,
+                1,
+                1,
+                0,
+                1,
+                0,
+                1
+              ]
+            }
+          ],
+          "width": 140,
+          "x": 580,
+          "y": 540
+        },
+        {
+          "height": 150,
+          "id": "0000001C-0000-4000-8000-00000000001C",
+          "kind": "note",
+          "layerID": "00000003-0000-4000-8000-000000000003",
+          "seed": 261865618,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.52,
+              "g": 0.91,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1
+          },
+          "text": "# Heading\nSome **bold** and *italic* text with `code`.\n\n- one\n- two\n  - nested",
+          "width": 200,
+          "x": 20,
+          "y": 560
+        },
+        {
+          "height": 100,
+          "id": "0000001D-0000-4000-8000-00000000001D",
+          "kind": "note",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 821484056,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 14,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1
+          },
+          "text": "Plain note with a long line that wraps at the edge of the card",
+          "width": 160,
+          "x": 240,
+          "y": 560
+        },
+        {
+          "height": 60,
+          "id": "0000001E-0000-4000-8000-00000000001E",
+          "image": {
+            "ref": "23dd1ad395c05c0fc898ab30c79f8644e862bc1b5749edf3933c814fc789bc74"
+          },
+          "kind": "image",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 352675059,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "strokeWidth": 2
+          },
+          "width": 80,
+          "x": 420,
+          "y": 560
+        },
+        {
+          "height": 60,
+          "id": "0000001F-0000-4000-8000-00000000001F",
+          "image": {
+            "ref": "23dd1ad395c05c0fc898ab30c79f8644e862bc1b5749edf3933c814fc789bc74"
+          },
+          "kind": "image",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "rotation": 0.3,
+          "seed": 2046917095,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 3
+          },
+          "width": 80,
+          "x": 520,
+          "y": 560
+        },
+        {
+          "height": 60,
+          "id": "00000020-0000-4000-8000-000000000020",
+          "image": {
+            "ref": "0000000000000000000000000000000000000000000000000000000000000000"
+          },
+          "kind": "image",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 4062963181,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "strokeWidth": 2
+          },
+          "width": 80,
+          "x": 620,
+          "y": 560
+        },
+        {
+          "height": 30,
+          "id": "00000021-0000-4000-8000-000000000021",
+          "image": {
+            "data": "iVBORw0KGgoAAAANSUhEUgAAAAQAAAADCAIAAAA7ljmRAAAAEElEQVR4nGM4YaMBRww4OQAZ7g4RX8PtlgAAAABJRU5ErkJggg==",
+            "format": "png"
+          },
+          "kind": "image",
+          "layerID": "00000002-0000-4000-8000-000000000002",
+          "seed": 3056140225,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "strokeWidth": 2
+          },
+          "width": 40,
+          "x": 420,
+          "y": 640
+        },
+        {
+          "height": 40,
+          "id": "00000024-0000-4000-8000-000000000024",
+          "kind": "rectangle",
+          "layerID": "00000023-0000-4000-8000-000000000023",
+          "seed": 3349903787,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0,
+              "g": 0,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 60,
+          "x": 300,
+          "y": 600
+        }
+      ],
+      "id": "00000001-0000-4000-8000-000000000001",
+      "layers": [
+        {
+          "id": "00000002-0000-4000-8000-000000000002",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        },
+        {
+          "id": "00000003-0000-4000-8000-000000000003",
+          "locked": false,
+          "name": "Layer 2",
+          "visible": true
+        },
+        {
+          "id": "00000023-0000-4000-8000-000000000023",
+          "locked": false,
+          "name": "Hidden",
+          "visible": false
+        }
+      ],
+      "name": "Page 1"
+    }
+  ],
+  "version": 2
+}

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="264.51" height="108" viewBox="16 71 264.51 108">
+<rect x="16" y="71" width="264.51" height="108" fill="#ffffff"/>
+<path d="M40 95 L160 95 L160 155 L40 155 Z" fill="#ffd966" stroke="none"/>
+<path d="M40 95 L160 95 L160 155 L40 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="131.48">Browser</tspan></text>
+<path d="M160 125 L205 125 M205 125 L205 125 M205 125 L250 125 M240.99 120.66 L250 125 M240.99 129.34 L249.46 125.26" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M256.51 125 C256.51 128.87 253.37 132 249.51 132 C245.64 132 242.51 128.87 242.51 125 C242.51 121.13 245.64 118 249.51 118 C253.37 118 256.51 121.13 256.51 125 Z" fill="#f25c54" stroke="none"/>
+<path d="M256.51 125 C256.51 128.87 253.37 132 249.51 132 C245.64 132 242.51 128.87 242.51 125 C242.51 121.13 245.64 118 249.51 118 C253.37 118 256.51 121.13 256.51 125 Z" fill="none" stroke="#f25c54" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,83 @@
+# Keeps dottie.js (web/) and Dottie drawing the same thing.
+#
+# - On a Mac: the committed goldens (fixtures/goldens) must be what DottieKit says today, the edge-case fixtures
+#   what scripts/make-fixtures.py writes, and the schema must cover the Swift model. A change to resolved(at:),
+#   routing or the SVG export therefore has to update the goldens (`just goldens`) in the same PR...
+# - On Linux: ...which makes dottie.js's contract, SVG and visual tests fail until the port catches up.
+name: dottie.js
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - Sources/**
+      - Tests/**
+      - Package.swift
+      - Package.resolved
+      - Design/**
+      - fixtures/**
+      - schema/**
+      - web/**
+      - scripts/make-fixtures.py
+      - scripts/make-goldens.py
+      - .github/workflows/web.yml
+  pull_request:
+    paths:
+      - Sources/**
+      - Tests/**
+      - Package.swift
+      - Package.resolved
+      - Design/**
+      - fixtures/**
+      - schema/**
+      - web/**
+      - scripts/make-fixtures.py
+      - scripts/make-goldens.py
+      - .github/workflows/web.yml
+  workflow_dispatch:
+
+jobs:
+  goldens:
+    name: Goldens match DottieKit (macOS)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift --version
+      - name: Edge-case fixtures match their generator
+        run: |
+          scripts/make-fixtures.py
+          git diff --exit-code -- fixtures/ || { echo "::error::fixtures/edge is stale: run just goldens and commit fixtures/"; exit 1; }
+      - name: Goldens match what DottieKit draws now
+        run: |
+          swift build --product dottie
+          scripts/make-goldens.py --check
+      - name: The schema covers the model
+        run: swift test --filter SchemaTests
+
+  web:
+    name: dottie.js tests (Linux)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - name: Types, unit, contract and SVG tests
+        run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: Visual comparison with Dottie's renders
+        run: npm run visual
+      - name: The player in Chromium
+        run: npm run test:browser
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diff
+          path: web/test-results/
+          if-no-files-found: ignore

@@ -22,9 +22,10 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 `Dottie.xcodeproj` is generated from `project.yml` and gitignored, so change settings there, not in Xcode.
 
 **Website.** `website/` is the GitHub Pages site (Material for MkDocs), published by
-`.github/workflows/pages.yml` on pushes to `main` that touch it. Its demo players in `website/docs/players` are
-made by `just demos` (and `just readme-animation`) on a Mac and committed. Preview it with
-`pip install -r website/requirements.txt && mkdocs serve -f website/mkdocs.yml`.
+`.github/workflows/pages.yml` on pushes to `main` that touch it or `web/`. Its demos are the drawings in
+`website/docs/drawings`, made by `just demos` (and `just readme-animation`) on a Mac and committed, and played
+live by `<dottie-player>`, which the workflow builds from `web/`. Preview it with
+`pip install -r website/requirements.txt && just site`.
 
 **Looking at the running app.** `just debug-app file.dottie` launches a Debug build in the background on its own
 live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and
@@ -51,6 +52,51 @@ A plus sign in that listing means the extension is enabled.
 **Signing.** Builds are signed to run locally unless a gitignored `Signing.local.xcconfig` sets
 `DEVELOPMENT_TEAM` and `CODE_SIGN_IDENTITY = Apple Development` (see `Signing.xcconfig`). Set the team there
 rather than in Xcode's Signing & Capabilities pane, which is lost when the project is regenerated.
+
+## dottie.js
+
+`web/` is a TypeScript library that reads `.dottie` files and draws and plays them in the browser
+(`<dottie-player src="…">`); its [README](web/README.md) covers using it. It ports what draws a page rather than
+wrapping a picture of it: `resolved(at:)` and everything under it (keys, eases, visibility, reveal, follows,
+repeats, boil, settle, camera, scenes), connector routing, and `SVG.swift` with `Rough.swift`, hatching and
+dungeon grids (ported rather than taken from rough.js, so the same seeds give the same strokes). Labels and
+sticky notes are measured with Helvetica Neue widths, kerning and line metrics taken from CoreText by
+`scripts/font-metrics.swift` (output: `web/src/metrics.ts`), so they wrap where Dottie wraps them.
+
+The risk is drift: Dottie gains a feature or changes routing and dottie.js quietly draws something else. Four
+things guard against it:
+
+1. **Fixtures.** `fixtures/` holds the drawings both sides read: copies of `Design/` and the demos
+   (`fixtures/design`), and small edge cases written by `scripts/make-fixtures.py` (`fixtures/edge`: every kind,
+   routing, arrowhead, fill, transition, follow, repeat, camera, theme, note layout, and damaged timelines).
+   Files only dottie.js has to survive (unknown kinds, newer versions) are in `fixtures/js-only`. A bug fixed on
+   either side adds a fixture.
+2. **Goldens.** `dottie inspect file.dottie [--page P] [--at T]...` prints what a page resolves to with no drawing:
+   each element's frame, rotation, opacity, reveal, seed and stacking order, each connector's endpoints and
+   route, the camera's view and the scene. `just goldens` regenerates the fixtures and writes, for each one,
+   that structure at a spread of times (`fixtures/goldens/<group>/<name>.json`) and Dottie's own SVG of every
+   page at a few moments, clean and sketchy (`fixtures/goldens/svg`). dottie.js's tests compare its own
+   `inspect` with the first within 0.002, and its SVG with the second line by line; today they are identical.
+   `npm run visual` also rasterizes both SVGs in Chromium and compares pixels (a looser net for when exact
+   output stops being the goal), writing a side-by-side report to `web/test-results/visual/report.html`.
+3. **Schema.** `schema/dottie.schema.json` describes the format. `SchemaTests` checks that every fixture and a
+   drawing with every optional field set validate, and that every stored property of the model types is in the
+   schema; dottie.js has a test that it reads exactly the schema's fields. Changing the model without the schema
+   fails the first, and changing the schema fails the second until dottie.js is updated. dottie.js itself reads
+   leniently: anything it doesn't know is drawn as a labelled placeholder or ignored, and listed in `warnings`.
+4. **CI** (`.github/workflows/web.yml`). A macOS job regenerates the fixtures and goldens and fails if they
+   differ from what's committed ("run just goldens"), and runs `SchemaTests`; a Linux job runs dottie.js's unit,
+   contract, SVG, visual and browser tests against the committed goldens. A PR that changes `resolved(at:)`,
+   routing or the SVG export therefore has to update the goldens, which makes the dottie.js tests fail until the
+   port catches up, in the same PR.
+
+[`web/PARITY.md`](web/PARITY.md) lists each feature as supported, partial or missing with its fixture; a new app
+feature lands there as a missing row.
+
+```sh
+just goldens        # fixtures and goldens, after a change to DottieKit's drawing or animation (Mac only)
+just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm run visual / test:browser)
+```
 
 ## Releasing
 
@@ -144,5 +190,6 @@ dottie library list
 dottie library install shapes.dottielib
 ```
 
+`dottie inspect diagram.dottie --at 1.5` prints the page's resolved geometry as JSON (see dottie.js above).
 `--clean` / `--sketchy` override the look and `--transparent` drops the background. It reads the file on disk,
 not unsaved edits in the app.

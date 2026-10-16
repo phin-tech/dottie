@@ -1,9 +1,9 @@
-/* Demo players are whole pages of their own, embedded at a fixed height with room for their controls. */
+/* Demo players: drawings played live by <dottie-player> (dottie.js), on their own page color. */
 .player {
   width: 100%;
   border: 1px solid var(--md-default-fg-color--lightest);
   border-radius: 8px;
-  background: #fff;
+  overflow: hidden;
   display: block;
   margin: 0.5rem 0 1.5rem;
 }

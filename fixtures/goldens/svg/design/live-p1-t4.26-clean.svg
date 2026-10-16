@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="639.68" height="336.57" viewBox="16 7.43 639.68 336.57">
+<rect x="16" y="7.43" width="639.68" height="336.57" fill="#ffffff"/>
+<path d="M40 150 L211.04 150 L211.04 210 L40 210 Z" fill="#ffd966" stroke="none"/>
+<path d="M40 150 L211.04 150 L211.04 210 L40 210 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="125.52" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="125.52" y="186.48">Load balancer</tspan></text>
+<path d="M301.04 40 L421.04 40 L421.04 100 L301.04 100 Z" fill="#8cbfff" stroke="none"/>
+<path d="M301.04 40 L421.04 40 L421.04 100 L301.04 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="361.04" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="361.04" y="76.48">web-1</tspan></text>
+<path d="M301.04 150 L421.04 150 L421.04 210 L301.04 210 Z" fill="#8cbfff" stroke="none"/>
+<path d="M301.04 150 L421.04 150 L421.04 210 L301.04 210 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="361.04" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="361.04" y="186.48">web-2</tspan></text>
+<path d="M301.04 260 L421.04 260 L421.04 320 L301.04 320 Z" fill="#8cbfff" stroke="none"/>
+<path d="M301.04 260 L421.04 260 L421.04 320 L301.04 320 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="361.04" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="361.04" y="296.48">web-3</tspan></text>
+<path d="M511.04 150 L631.68 150 L631.68 210 L511.04 210 Z" fill="#ff99b3" stroke="none"/>
+<path d="M511.04 150 L631.68 150 L631.68 210 L511.04 210 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="571.36" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="571.36" y="186.48">Postgres</tspan></text>
+<path d="M211.04 180 L256.04 180 M256.04 180 L256.04 70 M256.04 70 L301.04 70 M292.03 65.66 L301.04 70 M292.03 74.34 L301.04 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M211.04 180 L256.04 180 M256.04 180 L256.04 180 M256.04 180 L301.04 180 M292.03 175.66 L301.04 180 M292.03 184.34 L301.04 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M211.04 180 L256.04 180 M256.04 180 L256.04 290 M256.04 290 L301.04 290 M292.03 285.66 L301.04 290 M292.03 294.34 L301.04 290" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M421.04 70 L466.04 70 M466.04 70 L466.04 180 M466.04 180 L511.04 180 M502.03 175.66 L511.04 180 M502.03 184.34 L511.04 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M421.04 180 L466.04 180 M466.04 180 L466.04 180 M466.04 180 L511.04 180 M502.03 175.66 L511.04 180 M502.03 184.34 L511.04 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M421.04 290 L466.04 290 M466.04 290 L466.04 180 M466.04 180 L511.04 180 M502.03 175.66 L511.04 180 M502.03 184.34 L511.04 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M433.87 180 C433.87 183.31 431.18 186 427.87 186 C424.55 186 421.87 183.31 421.87 180 C421.87 176.69 424.55 174 427.87 174 C431.18 174 433.87 176.69 433.87 180 Z" fill="#7048e8" stroke="none"/>
+<path d="M433.87 180 C433.87 183.31 431.18 186 427.87 186 C424.55 186 421.87 183.31 421.87 180 C421.87 176.69 424.55 174 427.87 174 C431.18 174 433.87 176.69 433.87 180 Z" fill="none" stroke="#7048e8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M263.04 200.1 C263.04 203.96 259.91 207.1 256.04 207.1 C252.17 207.1 249.04 203.96 249.04 200.1 C249.04 196.23 252.17 193.1 256.04 193.1 C259.91 193.1 263.04 196.23 263.04 200.1 Z" fill="#e8590c" stroke="none"/>
+<path d="M263.04 200.1 C263.04 203.96 259.91 207.1 256.04 207.1 C252.17 207.1 249.04 203.96 249.04 200.1 C249.04 196.23 252.17 193.1 256.04 193.1 C259.91 193.1 263.04 196.23 263.04 200.1 Z" fill="none" stroke="#e8590c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M419.57 40 C419.57 44.73 415.73 48.57 411 48.57 C406.27 48.57 402.43 44.73 402.43 40 C402.43 35.27 406.27 31.43 411 31.43 C415.73 31.43 419.57 35.27 419.57 40 Z" fill="#2f9e44" stroke="none"/>
+<path d="M419.57 40 C419.57 44.73 415.73 48.57 411 48.57 C406.27 48.57 402.43 44.73 402.43 40 C402.43 35.27 406.27 31.43 411 31.43 C415.73 31.43 419.57 35.27 419.57 40 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M419.93 150 C419.93 154.93 415.93 158.93 411 158.93 C406.07 158.93 402.07 154.93 402.07 150 C402.07 145.07 406.07 141.07 411 141.07 C415.93 141.07 419.93 145.07 419.93 150 Z" fill="#2f9e44" stroke="none"/>
+<path d="M419.93 150 C419.93 154.93 415.93 158.93 411 158.93 C406.07 158.93 402.07 154.93 402.07 150 C402.07 145.07 406.07 141.07 411 141.07 C415.93 141.07 419.93 145.07 419.93 150 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M419.01 260 C419.01 264.42 415.42 268.01 411 268.01 C406.58 268.01 402.99 264.42 402.99 260 C402.99 255.58 406.58 251.99 411 251.99 C415.42 251.99 419.01 255.58 419.01 260 Z" fill="#2f9e44" stroke="none"/>
+<path d="M419.01 260 C419.01 264.42 415.42 268.01 411 268.01 C406.58 268.01 402.99 264.42 402.99 260 C402.99 255.58 406.58 251.99 411 251.99 C415.42 251.99 419.01 255.58 419.01 260 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

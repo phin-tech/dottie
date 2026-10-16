@@ -1,0 +1,468 @@
+// The .dottie format, read the way DottieKit reads it: the same defaults, clamps, filters and sorting, so a
+// damaged or hand-written file means the same thing in both. Anything dottie.js doesn't know (a newer kind,
+// fill or field) is kept and reported through `warnings` instead of failing the whole file.
+
+export interface RGBA { r: number; g: number; b: number; a: number }
+export type FillStyle = "solid" | "hachure" | "crossHatch" | "grid";
+export type DashStyle = "solid" | "dashed" | "dotted";
+export type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connector" | "freehand" | "path" | "note" | "image";
+export type Port = "top" | "right" | "bottom" | "left";
+export type Routing = "straight" | "curved" | "elbow";
+export type Arrowhead = "none" | "arrow" | "triangle" | "dot" | "bar";
+export type Ease = "linear" | "easeIn" | "easeOut" | "easeInOut" | "hold";
+
+export interface Style {
+  stroke: RGBA;
+  fill: RGBA;
+  fillStyle: FillStyle;
+  strokeWidth: number;
+  dash: DashStyle;
+  roughness: number;
+  bowing: number;
+  fontSize: number;
+  gridSize: number | null;
+  opacity: number | null;
+}
+
+export interface Endpoint { elementID: string | null; port: Port | null; x: number; y: number }
+
+export interface ConnectorData {
+  start: Endpoint;
+  end: Endpoint;
+  routing: Routing;
+  startHead: Arrowhead;
+  endHead: Arrowhead;
+}
+
+export interface PathSubpath { closed: boolean; coords: number[] }
+export interface StrokePoint { x: number; y: number }
+export interface EmbeddedImage { data: string; format: string }
+
+export interface Element {
+  id: string;
+  /** A kind dottie.js doesn't know is kept as written and drawn as a labelled placeholder. */
+  kind: ElementKind | string;
+  x: number; y: number; width: number; height: number;
+  style: Style;
+  seed: number;
+  layerID: string;
+  text: string | null;
+  connector: ConnectorData | null;
+  groupID: string | null;
+  points: StrokePoint[] | null;
+  path: number[] | null;
+  subpaths: PathSubpath[] | null;
+  evenOdd: boolean | null;
+  rotation: number | null;
+  link: string | null;
+  anchor: string | null;
+  /** Base64 bytes; an empty `data` is a picture that couldn't be found (drawn crossed out). */
+  image: EmbeddedImage | null;
+  reveal: number | null;
+}
+
+export interface Layer { id: string; name: string; visible: boolean; locked: boolean }
+
+export interface Keyframe {
+  t: number;
+  x?: number; y?: number; width?: number; height?: number;
+  rotation?: number;
+  strokeWidth?: number;
+  stroke?: RGBA; fill?: RGBA;
+  visible?: boolean;
+  reveal?: number;
+  opacity?: number;
+  ease?: Ease;
+}
+
+export interface Follow {
+  path: string;
+  start: number; end: number;
+  ease: Ease | null;
+  reverse: boolean | null;
+  orient: boolean | null;
+  laps: number | null;
+}
+
+export interface Repeat { start: number; end: number; count: number | null }
+
+export interface Track {
+  element: string;
+  keys: Keyframe[];
+  boil: boolean | null;
+  follow: Follow[] | null;
+  repeats: Repeat[] | null;
+}
+
+export interface CameraKey { t: number; x: number; y: number; width: number; height: number; ease: Ease | null }
+export interface Marker { t: number; name: string }
+
+export interface Timeline {
+  fps: number;
+  duration: number;
+  boil: number | null;
+  settle: boolean | null;
+  poster: number | null;
+  tracks: Track[];
+  camera: CameraKey[] | null;
+  markers: Marker[] | null;
+}
+
+export interface Page {
+  id: string;
+  name: string;
+  layers: Layer[];
+  elements: Element[];
+  theme: string | null;
+  timeline: Timeline | null;
+}
+
+export interface DottieFile {
+  version: number;
+  pages: Page[];
+  /** What was skipped or guessed while reading. Empty for a file Dottie wrote. */
+  warnings: string[];
+}
+
+/** The newest file version this library was written for. Newer files still load, with a warning. */
+export const SUPPORTED_VERSION = 2;
+export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image"];
+const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold"];
+
+/** The fields dottie.js reads, per object; the schema test checks they're exactly the schema's. Anything else
+ * in a file is newer than this version and is reported in `warnings`. */
+export const KNOWN_FIELDS: Record<string, readonly string[]> = {
+  file: ["version", "pages", "images"],
+  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline"],
+  layer: ["id", "name", "visible", "locked"],
+  rgba: ["r", "g", "b", "a"],
+  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity"],
+  element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
+    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "image", "reveal"],
+  strokePoint: ["x", "y"],
+  subpath: ["closed", "coords"],
+  inlineImage: ["data", "format"],
+  endpoint: ["elementID", "port", "x", "y"],
+  connector: ["start", "end", "routing", "startHead", "endHead"],
+  timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
+  track: ["element", "keys", "boil", "follow", "repeats"],
+  keyframe: ["t", "x", "y", "width", "height", "rotation", "strokeWidth", "stroke", "fill", "visible", "reveal", "opacity", "ease"],
+  follow: ["path", "start", "end", "ease", "reverse", "orient", "laps"],
+  repeat: ["start", "end", "count"],
+  cameraKey: ["t", "x", "y", "width", "height", "ease"],
+  marker: ["t", "name"],
+};
+
+export const MAX_DURATION = 3600;
+export const BOIL_DRAWINGS = 3;
+
+export const black: RGBA = { r: 0.12, g: 0.12, b: 0.13, a: 1 };
+export const clear: RGBA = { r: 0, g: 0, b: 0, a: 0 };
+export const inkOnDark: RGBA = { r: 0.93, g: 0.93, b: 0.94, a: 1 };
+
+export class DottieFormatError extends Error {}
+
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
+const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
+const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
+/** UUIDs compare by value in Swift; uppercase them so string comparison agrees. */
+const uuid = (v: unknown): string | undefined => (typeof v === "string" ? v.toUpperCase() : undefined);
+
+export function clampTime(t: number): number {
+  if (!Number.isFinite(t)) return t === Infinity ? MAX_DURATION : 0;
+  return Math.min(Math.max(t, 0), MAX_DURATION);
+}
+
+export function clampFPS(f: number): number {
+  return Number.isFinite(f) ? Math.min(Math.max(f, 1), 60) : 12;
+}
+
+function rgba(v: unknown): RGBA | undefined {
+  if (!isObj(v)) return undefined;
+  const r = num(v.r), g = num(v.g), b = num(v.b);
+  if (r === undefined || g === undefined || b === undefined) return undefined;
+  return { r, g, b, a: num(v.a) ?? 1 };
+}
+
+class Reader {
+  warnings: string[] = [];
+  private seen = new Set<string>();
+  warn(message: string): void {
+    if (!this.seen.has(message)) { this.seen.add(message); this.warnings.push(message); }
+  }
+
+  /** Reports fields this version doesn't read (they're ignored, as Dottie ignores them). */
+  fields(v: Obj, kind: string): void {
+    const known = KNOWN_FIELDS[kind];
+    for (const k of Object.keys(v)) if (!known.includes(k)) this.warn(`Unknown field "${k}" on ${kind}, ignored`);
+  }
+
+  style(v: unknown): Style {
+    const s = isObj(v) ? v : {};
+    this.fields(s, "style");
+    const fillStyle = str(s.fillStyle) ?? "solid";
+    const dash = str(s.dash) ?? "solid";
+    if (!["solid", "hachure", "crossHatch", "grid"].includes(fillStyle)) this.warn(`Unknown fill style "${fillStyle}", drawn solid`);
+    if (!["solid", "dashed", "dotted"].includes(dash)) this.warn(`Unknown dash "${dash}", drawn solid`);
+    return {
+      stroke: rgba(s.stroke) ?? { ...black },
+      fill: rgba(s.fill) ?? { ...clear },
+      fillStyle: (["solid", "hachure", "crossHatch", "grid"].includes(fillStyle) ? fillStyle : "solid") as FillStyle,
+      strokeWidth: num(s.strokeWidth) ?? 2,
+      dash: (["solid", "dashed", "dotted"].includes(dash) ? dash : "solid") as DashStyle,
+      roughness: num(s.roughness) ?? 1,
+      bowing: num(s.bowing) ?? 1,
+      fontSize: num(s.fontSize) ?? 18,
+      gridSize: num(s.gridSize) ?? null,
+      opacity: num(s.opacity) ?? null,
+    };
+  }
+
+  endpoint(v: unknown): Endpoint {
+    const e = isObj(v) ? v : {};
+    const port = str(e.port);
+    return {
+      elementID: uuid(e.elementID) ?? null,
+      port: port && ["top", "right", "bottom", "left"].includes(port) ? (port as Port) : null,
+      x: num(e.x) ?? 0,
+      y: num(e.y) ?? 0,
+    };
+  }
+
+  connector(v: unknown): ConnectorData | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "connector");
+    const head = (h: unknown, d: Arrowhead): Arrowhead => {
+      const s = str(h);
+      return s && ["none", "arrow", "triangle", "dot", "bar"].includes(s) ? (s as Arrowhead) : d;
+    };
+    const routing = str(v.routing);
+    return {
+      start: this.endpoint(v.start),
+      end: this.endpoint(v.end),
+      routing: routing && ["straight", "curved", "elbow"].includes(routing) ? (routing as Routing) : "straight",
+      startHead: head(v.startHead, "none"),
+      endHead: head(v.endHead, "arrow"),
+    };
+  }
+
+  image(v: unknown, table: Record<string, EmbeddedImage>): EmbeddedImage | null {
+    if (!isObj(v)) return null;
+    const ref = str(v.ref);
+    if (ref !== undefined) return table[ref] ?? { data: "", format: "png" };
+    const data = str(v.data);
+    return data === undefined ? null : this.picture(data, str(v.format));
+  }
+
+  /** A picture's bytes, only if they really are base64: they go into an attribute of the drawn SVG. */
+  picture(data: string, format: string | undefined): EmbeddedImage {
+    if (!BASE64.test(data)) {
+      this.warn("Skipped a picture whose data isn't base64");
+      return { data: "", format: "png" };
+    }
+    return { data: data.replace(/\s+/g, ""), format: format === "jpeg" ? "jpeg" : "png" };
+  }
+
+  element(v: unknown, images: Record<string, EmbeddedImage>): Element | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "element");
+    const id = uuid(v.id), kind = str(v.kind), layerID = uuid(v.layerID);
+    if (!id || !kind || !layerID) { this.warn("Skipped an element without an id, kind or layer"); return null; }
+    if (!KINDS.includes(kind)) this.warn(`Unknown element kind "${kind}", drawn as a placeholder`);
+    const subpaths = Array.isArray(v.subpaths)
+      ? v.subpaths.filter(isObj).map((s) => ({ closed: bool(s.closed) ?? false, coords: Array.isArray(s.coords) ? s.coords.filter((c): c is number => typeof c === "number") : [] }))
+      : null;
+    return {
+      id, kind, layerID,
+      x: num(v.x) ?? 0, y: num(v.y) ?? 0, width: num(v.width) ?? 0, height: num(v.height) ?? 0,
+      style: this.style(v.style),
+      seed: (num(v.seed) ?? 1) >>> 0,
+      text: str(v.text) ?? null,
+      connector: this.connector(v.connector),
+      groupID: uuid(v.groupID) ?? null,
+      points: Array.isArray(v.points) ? v.points.filter(isObj).map((p) => ({ x: num(p.x) ?? 0, y: num(p.y) ?? 0 })) : null,
+      path: Array.isArray(v.path) ? v.path.filter((c): c is number => typeof c === "number") : null,
+      subpaths,
+      evenOdd: bool(v.evenOdd) ?? null,
+      rotation: num(v.rotation) ?? null,
+      link: uuid(v.link) ?? null,
+      anchor: str(v.anchor) ?? null,
+      image: this.image(v.image, images),
+      reveal: num(v.reveal) ?? null,
+    };
+  }
+
+  ease(v: unknown): Ease | null {
+    const s = str(v);
+    if (s === undefined) return null;
+    if (!EASES.includes(s)) { this.warn(`Unknown ease "${s}", played linear`); return null; }
+    return s as Ease;
+  }
+
+  keyframe(v: unknown): Keyframe | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "keyframe");
+    const t = num(v.t);
+    if (t === undefined) return null;
+    const k: Keyframe = { t };
+    for (const p of ["x", "y", "width", "height", "rotation", "strokeWidth", "reveal", "opacity"] as const) {
+      const n = num(v[p]);
+      if (n !== undefined) k[p] = n;
+    }
+    const stroke = rgba(v.stroke), fill = rgba(v.fill), visible = bool(v.visible), ease = this.ease(v.ease);
+    if (stroke) k.stroke = stroke;
+    if (fill) k.fill = fill;
+    if (visible !== undefined) k.visible = visible;
+    if (ease) k.ease = ease;
+    return k;
+  }
+
+  track(v: unknown): Track | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "track");
+    const element = uuid(v.element);
+    if (!element) return null;
+    const keys = (Array.isArray(v.keys) ? v.keys : []).map((k) => this.keyframe(k))
+      .filter((k): k is Keyframe => k !== null && k.t >= 0 && k.t <= MAX_DURATION);
+    stableSortBy(keys, (k) => k.t);
+    const follow = Array.isArray(v.follow)
+      ? v.follow.filter(isObj).flatMap((f): Follow[] => {
+        const path = uuid(f.path), start = num(f.start), end = num(f.end);
+        if (!path || start === undefined || end === undefined || start < 0 || end > MAX_DURATION) return [];
+        return [{ path, start, end, ease: this.ease(f.ease), reverse: bool(f.reverse) ?? null, orient: bool(f.orient) ?? null, laps: num(f.laps) ?? null }];
+      })
+      : null;
+    const repeats = Array.isArray(v.repeats)
+      ? v.repeats.filter(isObj).flatMap((r): Repeat[] => {
+        const start = num(r.start), end = num(r.end);
+        if (start === undefined || end === undefined) return [];
+        const count = num(r.count);
+        const rep: Repeat = { start, end, count: count === undefined ? null : Math.trunc(count) };
+        return repeatIsValid(rep) ? [rep] : [];
+      })
+      : null;
+    return { element, keys, boil: bool(v.boil) ?? null, follow, repeats };
+  }
+
+  timeline(v: unknown): Timeline | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "timeline");
+    const boil = num(v.boil);
+    const camera = Array.isArray(v.camera)
+      ? v.camera.filter(isObj).flatMap((c): CameraKey[] => {
+        const t = num(c.t), x = num(c.x), y = num(c.y), width = num(c.width), height = num(c.height);
+        if (t === undefined || x === undefined || y === undefined || width === undefined || height === undefined) return [];
+        if (!(width > 1 && height > 1 && t >= 0)) return [];
+        return [{ t, x, y, width, height, ease: this.ease(c.ease) }];
+      })
+      : null;
+    if (camera) stableSortBy(camera, (c) => c.t);
+    const markers = Array.isArray(v.markers)
+      ? v.markers.filter(isObj).flatMap((m): Marker[] => {
+        const t = num(m.t);
+        return t !== undefined && t >= 0 ? [{ t, name: str(m.name) ?? "" }] : [];
+      })
+      : null;
+    if (markers) stableSortBy(markers, (m) => m.t);
+    const poster = num(v.poster);
+    return {
+      fps: clampFPS(num(v.fps) ?? 12),
+      duration: clampTime(num(v.duration) ?? 0),
+      boil: boil !== undefined && Number.isInteger(boil) && boil > 0 ? Math.min(boil, 10_000) : null,
+      settle: bool(v.settle) ?? null,
+      poster: poster === undefined ? null : clampTime(poster),
+      tracks: (Array.isArray(v.tracks) ? v.tracks : []).map((t) => this.track(t)).filter((t): t is Track => t !== null),
+      camera,
+      markers,
+    };
+  }
+
+  page(v: unknown, images: Record<string, EmbeddedImage>, n: number): Page {
+    if (!isObj(v)) throw new DottieFormatError(`Page ${n} is not an object`);
+    this.fields(v, "page");
+    const layers = (Array.isArray(v.layers) ? v.layers : []).filter(isObj).flatMap((l): Layer[] => {
+      const id = uuid(l.id);
+      return id ? [{ id, name: str(l.name) ?? "", visible: bool(l.visible) ?? true, locked: bool(l.locked) ?? false }] : [];
+    });
+    if (layers.length === 0) { this.warn(`Page ${n} has no layers`); layers.push({ id: "LAYER", name: "Layer 1", visible: true, locked: false }); }
+    return {
+      id: uuid(v.id) ?? `PAGE-${n}`,
+      name: str(v.name) ?? `Page ${n}`,
+      layers,
+      elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
+      theme: str(v.theme) ?? null,
+      timeline: this.timeline(v.timeline),
+    };
+  }
+}
+
+const BASE64 = /^[A-Za-z0-9+/=\s]*$/;
+
+export function repeatIsValid(r: Repeat): boolean {
+  return Number.isFinite(r.start) && Number.isFinite(r.end) && r.start >= 0 && r.end - r.start > 1e-3 && r.end <= MAX_DURATION
+    && (r.count === null || (r.count >= 1 && r.count <= 10_000));
+}
+
+/** Sorts in place by `key`, keeping equal keys in their original order (as Swift's sort happens to for these). */
+export function stableSortBy<T>(a: T[], key: (v: T) => number): void {
+  const indexed = a.map((v, i) => [v, i] as const);
+  indexed.sort((p, q) => key(p[0]) - key(q[0]) || p[1] - q[1]);
+  for (let i = 0; i < a.length; i++) a[i] = indexed[i][0];
+}
+
+/** Reads a .dottie file from its JSON text (or the parsed object). Throws `DottieFormatError` when it isn't one. */
+export function parseDottie(source: string | unknown): DottieFile {
+  let json: unknown = source;
+  if (typeof source === "string") {
+    try { json = JSON.parse(source); } catch (e) { throw new DottieFormatError(`Not JSON: ${(e as Error).message}`); }
+  }
+  if (!isObj(json)) throw new DottieFormatError("Not a Dottie drawing");
+  const version = num(json.version);
+  if (version === undefined) throw new DottieFormatError("Not a Dottie drawing (no version)");
+  if (!Array.isArray(json.pages) || json.pages.length === 0) throw new DottieFormatError("A drawing needs at least one page");
+  const reader = new Reader();
+  reader.fields(json, "file");
+  if (version > SUPPORTED_VERSION) reader.warn(`File version ${version} is newer than this player knows (${SUPPORTED_VERSION}); some things may not show`);
+  const images: Record<string, EmbeddedImage> = {};
+  if (isObj(json.images)) {
+    for (const [k, v] of Object.entries(json.images)) {
+      if (isObj(v) && typeof v.data === "string") images[k] = reader.picture(v.data, str(v.format));
+    }
+  }
+  const pages = json.pages.map((p, i) => reader.page(p, images, i + 1));
+  if (new Set(pages.map((p) => p.id)).size !== pages.length) throw new DottieFormatError("Two pages share an id");
+  return { version, pages, warnings: reader.warnings };
+}
+
+// MARK: Small model helpers shared by the rest
+
+export function luminance(c: RGBA): number { return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b; }
+export function sameColor(a: RGBA, b: RGBA): boolean { return a.r === b.r && a.g === b.g && a.b === b.b && a.a === b.a; }
+export function isAutomaticInk(c: RGBA): boolean { return sameColor(c, black) || sameColor(c, inkOnDark); }
+
+export function cloneElement(e: Element): Element {
+  return {
+    ...e,
+    style: { ...e.style, stroke: { ...e.style.stroke }, fill: { ...e.style.fill } },
+    connector: e.connector ? { ...e.connector, start: { ...e.connector.start }, end: { ...e.connector.end } } : null,
+  };
+}
+
+/** Elements back to front: lower layers first, array order within a layer. */
+export function orderedElements(page: Page): Element[] {
+  if (page.layers.length <= 1) return page.elements;
+  const rank = new Map<string, number>();
+  page.layers.forEach((l, i) => { if (!rank.has(l.id)) rank.set(l.id, i); });
+  const buckets: Element[][] = page.layers.map(() => []);
+  for (const e of page.elements) buckets[rank.get(e.layerID) ?? 0].push(e);
+  return buckets.flat();
+}
+
+/** Elements by id; with duplicate ids the first one wins, as in Dottie. */
+export function elementIndex(page: Page): Map<string, Element> {
+  const m = new Map<string, Element>();
+  for (const e of page.elements) if (!m.has(e.id)) m.set(e.id, e);
+  return m;
+}

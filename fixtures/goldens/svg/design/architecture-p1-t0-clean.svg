@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2268" height="1012" viewBox="-24 -104 2268 1012">
+<rect x="-24" y="-104" width="2268" height="1012" fill="#ffffff"/>
+<path d="M0 120 L400 120 L400 464 L0 464 Z" fill="none" stroke="#777777" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<text x="16" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="16" y="147.28">dottie-mcp  ·  Sources/DottieMCP</tspan></text>
+<path d="M480 120 L1200 120 L1200 764 L480 764 Z" fill="none" stroke="#777777" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<text x="496" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="496" y="147.28">DottieKit  ·  Sources/DottieKit (no UI)</tspan></text>
+<path d="M1280 120 L1980 120 L1980 664 L1280 664 Z" fill="none" stroke="#777777" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<text x="1296" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="1296" y="147.28">Dottie app  ·  App/ (SwiftUI + AppKit)</tspan></text>
+<path d="M30 170 L370 170 L370 234 L30 234 Z" fill="#dbe8ff" stroke="none"/>
+<path d="M30 170 L370 170 L370 234 L30 234 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="200" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="200" y="197.68">dottie-mcp</tspan><tspan x="200" y="219.28">stdio MCP server</tspan></text>
+<path d="M30 370 L370 370 L370 434 L30 434 Z" fill="#dbe8ff" stroke="none"/>
+<path d="M30 370 L370 370 L370 434 L30 434 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="200" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="200" y="397.68">DottieTools</tspan><tspan x="200" y="419.28">tool calls, load / save</tspan></text>
+<path d="M500 170 L820 170 L820 234 L500 234 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M500 170 L820 170 L820 234 L500 234 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="660" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="660" y="197.68">Live protocol</tspan><tspan x="660" y="219.28">socket client + messages</tspan></text>
+<path d="M500 270 L820 270 L820 334 L500 334 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M500 270 L820 270 L820 334 L500 334 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="660" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="660" y="297.68">DiagramOps + Layout</tspan><tspan x="660" y="319.28">agent-level edits</tspan></text>
+<path d="M500 370 L820 370 L820 434 L500 434 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M500 370 L820 370 L820 434 L500 434 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="660" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="660" y="397.68">DottieScript</tspan><tspan x="660" y="419.28">JavaScriptCore, require()</tspan></text>
+<path d="M500 470 L820 470 L820 534 L500 534 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M500 470 L820 470 L820 534 L500 534 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="660" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="660" y="497.68">Exporter</tspan><tspan x="660" y="519.28">PNG · SVG · PDF</tspan></text>
+<path d="M500 570 L820 570 L820 634 L500 634 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M500 570 L820 570 L820 634 L500 634 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="660" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="660" y="597.68">Stencil libraries</tspan><tspan x="660" y="619.28">starter + .dottielib</tspan></text>
+<path d="M860 270 L1180 270 L1180 334 L860 334 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M860 270 L1180 270 L1180 334 L860 334 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1020" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1020" y="297.68">Model</tspan><tspan x="1020" y="319.28">DottieDocument, Element</tspan></text>
+<path d="M860 370 L1180 370 L1180 434 L860 434 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M860 370 L1180 370 L1180 434 L860 434 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1020" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1020" y="397.68">Renderer + Rough</tspan><tspan x="1020" y="419.28">sketchy drawing</tspan></text>
+<path d="M860 470 L1180 470 L1180 534 L860 534 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M860 470 L1180 470 L1180 534 L860 534 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1020" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1020" y="497.68">Snap + SpatialIndex</tspan><tspan x="1020" y="519.28">guides, grid, hit tests</tspan></text>
+<path d="M860 570 L1180 570 L1180 634 L860 634 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M860 570 L1180 570 L1180 634 L860 634 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1020" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1020" y="597.68">Connector</tspan><tspan x="1020" y="619.28">routing and ports</tspan></text>
+<path d="M860 670 L1180 670 L1180 730 L860 730 Z" fill="#dcf3dc" stroke="none"/>
+<path d="M860 670 L1180 670 L1180 730 L860 730 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1020" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1020" y="695.68">Importers</tspan><tspan x="1020" y="717.28">SVG · Excalidraw · draw.io</tspan></text>
+<path d="M1300 170 L1620 170 L1620 234 L1300 234 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1300 170 L1620 170 L1620 234 L1300 234 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1460" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1460" y="197.68">LiveServer</tspan><tspan x="1460" y="219.28">registry of open windows</tspan></text>
+<path d="M1300 270 L1620 270 L1620 334 L1300 334 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1300 270 L1620 270 L1620 334 L1300 334 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1460" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1460" y="297.68">DrawingDocument</tspan><tspan x="1460" y="319.28">model + undo</tspan></text>
+<path d="M1300 370 L1620 370 L1620 434 L1300 434 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1300 370 L1620 370 L1620 434 L1300 434 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1460" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1460" y="397.68">CanvasView</tspan><tspan x="1460" y="419.28">AppKit canvas and tools</tspan></text>
+<path d="M1300 470 L1620 470 L1620 534 L1300 534 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1300 470 L1620 470 L1620 534 L1300 534 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1460" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1460" y="497.68">ContentView</tspan><tspan x="1460" y="519.28">inspector, layers, library</tspan></text>
+<path d="M1640 170 L1940 170 L1940 234 L1640 234 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1640 170 L1940 170 L1940 234 L1640 234 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1790" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1790" y="197.68">DottieApp</tspan><tspan x="1790" y="219.28">windows, menus, settings</tspan></text>
+<path d="M1640 270 L1940 270 L1940 334 L1640 334 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1640 270 L1940 270 L1940 334 L1640 334 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1790" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1790" y="297.68">ScriptConsole</tspan><tspan x="1790" y="319.28">runs DottieScript</tspan></text>
+<path d="M1640 370 L1940 370 L1940 434 L1640 434 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1640 370 L1940 370 L1940 434 L1640 434 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1790" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1790" y="397.68">Settings</tspan><tspan x="1790" y="419.28">MCP, script libraries</tspan></text>
+<path d="M1640 470 L1940 470 L1940 534 L1640 534 Z" fill="#ffe8cc" stroke="none"/>
+<path d="M1640 470 L1940 470 L1940 534 L1640 534 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1790" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1790" y="497.68">Library panel + viewer</tspan><tspan x="1790" y="519.28">.dottielib stencils</tspan></text>
+<path d="M320 -40 C320 -17.91 270.75 0 210 0 C149.25 0 100 -17.91 100 -40 C100 -62.09 149.25 -80 210 -80 C270.75 -80 320 -62.09 320 -40 Z" fill="#eadcff" stroke="none"/>
+<path d="M320 -40 C320 -17.91 270.75 0 210 0 C149.25 0 100 -17.91 100 -40 C100 -62.09 149.25 -80 210 -80 C270.75 -80 320 -62.09 320 -40 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="210" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="210" y="-33.52">Claude / agent</tspan></text>
+<path d="M100 820 L360 820 L360 884 L100 884 Z" fill="#eadcff" stroke="none"/>
+<path d="M100 820 L360 820 L360 884 L100 884 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="230" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="230" y="847.68">.dottie file</tspan><tspan x="230" y="869.28">(JSON on disk)</tspan></text>
+<path d="M2220 400 C2220 427.61 2175.23 450 2120 450 C2064.77 450 2020 427.61 2020 400 C2020 372.39 2064.77 350 2120 350 C2175.23 350 2220 372.39 2220 400 Z" fill="#eadcff" stroke="none"/>
+<path d="M2220 400 C2220 427.61 2175.23 450 2120 450 C2064.77 450 2020 427.61 2020 400 C2020 372.39 2064.77 350 2120 350 C2175.23 350 2220 372.39 2220 400 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="2120" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="2120" y="395.68">jsDelivr</tspan><tspan x="2120" y="417.28">(optional libs)</tspan></text>
+<path d="M208.35 0 L201.32 170 M206.03 161.18 L201.32 170 M197.36 160.82 L201.32 170" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="135.83" y="71.5" width="138" height="27" fill="#ffffff"/>
+<text x="204.83" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="204.83" y="91.48">MCP over stdio</tspan></text>
+<path d="M200 234 L200 370 M204.34 360.99 L200 370 M195.66 360.99 L200 370" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M273.6 370 L586.4 234 M576.41 233.61 L586.4 234 M579.87 241.57 L586.4 234" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M347.2 370 L512.8 334 M503.07 331.67 L512.8 334 M504.92 340.15 L512.8 334" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M370 402 L500 402 M490.99 397.66 L500 402 M490.99 406.34 L500 402" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M347.2 434 L512.8 470 M504.92 463.85 L512.8 470 M503.07 472.33 L512.8 470" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M273.6 434 L586.4 570 M579.87 562.43 L586.4 570 M576.41 570.39 L586.4 570" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M202.13 434 L227.87 820 M231.6 810.72 L227.87 820 M222.94 811.3 L227.87 820" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="145" y="613.5" width="140" height="27" fill="#ffffff"/>
+<text x="215" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="215" y="633.48">app not running</tspan></text>
+<path d="M820 202 L1300 202 M1290.99 197.66 L1300 202 M1290.99 206.34 L1300 202" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1006" y="188.5" width="108" height="27" fill="#ffffff"/>
+<text x="1060" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1060" y="208.48">Unix socket</tspan></text>
+<path d="M1460 234 L1460 270 M1464.34 260.99 L1460 270 M1455.66 260.99 L1460 270" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1395.5" y="238.5" width="129" height="27" fill="#ffffff"/>
+<text x="1460" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1460" y="258.48">one undo step</tspan></text>
+<path d="M1460 370 L1460 334 M1455.66 343.01 L1460 334 M1464.34 343.01 L1460 334" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1460 470 L1460 434 M1455.66 443.01 L1460 434 M1464.34 443.01 L1460 434" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1300 302 L1180 302 M1189.01 306.34 L1180 302 M1189.01 297.66 L1180 302" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1300 402 L1180 402 M1189.01 406.34 L1180 402 M1189.01 397.66 L1180 402" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1319.2 434 L1160.8 470 M1170.55 472.23 L1160.8 470 M1168.62 463.77 L1160.8 470" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M820 302 L860 302 M850.99 297.66 L860 302 M850.99 306.34 L860 302" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M775.2 470 L904.8 434 M894.96 432.23 L904.8 434 M897.28 440.59 L904.8 434" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1940 401.09 L2020.01 400.61 M2010.97 396.32 L2020.01 400.61 M2011.02 405 L2020.01 400.61" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1929.5" y="387.35" width="101" height="27" fill="#ffffff"/>
+<text x="1980" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1980" y="407.33">downloads</tspan></text>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="808" height="398" viewBox="16 96 808 398">
+<rect x="16" y="96" width="808" height="398" fill="#ffffff"/>
+<path d="M40 120 L160 120 L160 190 L40 190 Z" fill="#ffd966" stroke="none"/>
+<path d="M40 120 L160 120 L160 190 L40 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="161.48">popIn</tspan></text>
+<path d="M200 120 L320 120 L320 190 L200 190 Z" fill="#ffd966" stroke="none"/>
+<path d="M200 120 L320 120 L320 190 L200 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="260" y="161.48">growIn</tspan></text>
+<path d="M360 120 L480 120 L480 190 L360 190 Z" fill="#ffd966" stroke="none"/>
+<path d="M360 120 L480 120 L480 190 L360 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="161.48">wipeIn</tspan></text>
+<path d="M520 120 L640 120 L640 190 L520 190 Z" fill="#ffd966" stroke="none"/>
+<path d="M520 120 L640 120 L640 190 L520 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="580" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="580" y="161.48">dropIn</tspan></text>
+<path d="M680 120 L800 120 L800 190 L680 190 Z" fill="#ffd966" stroke="none"/>
+<path d="M680 120 L800 120 L800 190 L680 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="740" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="740" y="161.48">slideIn</tspan></text>
+<path d="M40 260 L160 260 L160 330 L40 330 Z" fill="#ffd966" stroke="none"/>
+<path d="M40 260 L160 260 L160 330 L40 330 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="301.48">drawIn</tspan></text>
+<path d="M200 260 L320 260 L320 330 L200 330 Z" fill="#ffd966" stroke="none"/>
+<path d="M200 260 L320 260 L320 330 L200 330 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="260" y="301.48">fadeIn</tspan></text>
+<path d="M200 400 L320 400 L320 470 L200 470 Z" fill="#ffd966" stroke="none"/>
+<path d="M200 400 L320 400 L320 470 L200 470 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="260" y="441.48">pulse</tspan></text>
+<path d="M360 400 L480 400 L480 470 L360 470 Z" fill="#ffd966" stroke="none"/>
+<path d="M360 400 L480 400 L480 470 L360 470 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="441.48">wiggle</tspan></text>
+</svg>

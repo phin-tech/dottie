@@ -1,0 +1,270 @@
+{
+  "pages": [
+    {
+      "elements": [
+        {
+          "height": 80,
+          "id": "00000079-0000-4000-8000-000000000079",
+          "kind": "rectangle",
+          "layerID": "00000078-0000-4000-8000-000000000078",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Scene 1",
+          "width": 140,
+          "x": 40,
+          "y": 40
+        },
+        {
+          "height": 80,
+          "id": "0000007A-0000-4000-8000-00000000007A",
+          "kind": "rectangle",
+          "layerID": "00000078-0000-4000-8000-000000000078",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Scene 2",
+          "width": 140,
+          "x": 260,
+          "y": 180
+        },
+        {
+          "height": 80,
+          "id": "0000007B-0000-4000-8000-00000000007B",
+          "kind": "rectangle",
+          "layerID": "00000078-0000-4000-8000-000000000078",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Scene 3",
+          "width": 140,
+          "x": 480,
+          "y": 40
+        },
+        {
+          "height": 80,
+          "id": "0000007C-0000-4000-8000-00000000007C",
+          "kind": "rectangle",
+          "layerID": "00000078-0000-4000-8000-000000000078",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Scene 4",
+          "width": 140,
+          "x": 700,
+          "y": 180
+        }
+      ],
+      "id": "00000077-0000-4000-8000-000000000077",
+      "layers": [
+        {
+          "id": "00000078-0000-4000-8000-000000000078",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Page 1",
+      "timeline": {
+        "camera": [
+          {
+            "ease": "linear",
+            "height": 300,
+            "t": 5,
+            "width": 400,
+            "x": 400,
+            "y": 0
+          },
+          {
+            "height": 200,
+            "t": 0,
+            "width": 300,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "ease": "easeIn",
+            "height": 200,
+            "t": 2,
+            "width": 600,
+            "x": 200,
+            "y": 100
+          },
+          {
+            "height": 200,
+            "t": 3,
+            "width": 0,
+            "x": 0,
+            "y": 0
+          },
+          {
+            "ease": "hold",
+            "height": 300,
+            "t": 7,
+            "width": 1000,
+            "x": 0,
+            "y": 0
+          }
+        ],
+        "duration": 8,
+        "fps": 12,
+        "markers": [
+          {
+            "name": "Last",
+            "t": 6
+          },
+          {
+            "name": "First",
+            "t": 0
+          },
+          {
+            "name": "Never",
+            "t": -2
+          },
+          {
+            "name": "Middle",
+            "t": 3
+          }
+        ],
+        "tracks": []
+      }
+    },
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "0000007F-0000-4000-8000-00000000007F",
+          "kind": "rectangle",
+          "layerID": "0000007E-0000-4000-8000-00000000007E",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 100,
+          "x": 40,
+          "y": 40
+        }
+      ],
+      "id": "0000007D-0000-4000-8000-00000000007D",
+      "layers": [
+        {
+          "id": "0000007E-0000-4000-8000-00000000007E",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "No camera",
+      "timeline": {
+        "duration": 2,
+        "fps": 8,
+        "tracks": [
+          {
+            "element": "0000007F-0000-4000-8000-00000000007F",
+            "keys": [
+              {
+                "t": 0,
+                "visible": true,
+                "x": -100
+              },
+              {
+                "t": 2,
+                "x": 300
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "version": 2
+}

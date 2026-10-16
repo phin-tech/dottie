@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="718" height="478.86" viewBox="-4 -24 718 478.86">
+<rect x="-4" y="-24" width="718" height="478.86" fill="#ffffff"/>
+<text x="30" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="30" y="17.28">To do</tspan></text>
+<path d="M22 53 L222 53 L222 163 L22 163 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M20 50 L220 50 L220 160 L20 160 Z" fill="#fff3a3" stroke="none"/>
+<path d="M20 50 L220 50 L220 160 L20 160 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="78" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="32" font-size="16" font-weight="bold">Sketch the onboarding</tspan></text>
+<path d="M22 183 L222 183 L222 293 L22 293 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M20 180 L220 180 L220 290 L20 290 Z" fill="#fff3a3" stroke="none"/>
+<path d="M20 180 L220 180 L220 290 L20 290 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="208" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="32" font-size="16" font-weight="bold">Write the API docs</tspan></text>
+<path d="M22 313 L222 313 L222 423 L22 423 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M20 310 L220 310 L220 420 L20 420 Z" fill="#fff3a3" stroke="none"/>
+<path d="M20 310 L220 310 L220 420 L20 420 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="338" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="32" font-size="16" font-weight="bold">Pick an icon</tspan></text>
+<text x="260" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="260" y="17.28">Doing</tspan></text>
+<path d="M252 53 L452 53 L452 163 L252 163 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M250 50 L450 50 L450 160 L250 160 Z" fill="#ffd1dc" stroke="none"/>
+<path d="M250 50 L450 50 L450 160 L250 160 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="78" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="262" font-size="16" font-weight="bold">Timeline editor</tspan></text>
+<g transform="rotate(3.11 350 235)">
+<path d="M252 183 L452 183 L452 293 L252 293 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M250 180 L450 180 L450 290 L250 290 Z" fill="#ffd1dc" stroke="none"/>
+<path d="M250 180 L450 180 L450 290 L250 290 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="208" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="262" font-size="16" font-weight="bold">Camera moves</tspan></text>
+</g>
+<g transform="rotate(6.44 350 365)">
+<path d="M252 313 L452 313 L452 423 L252 423 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M250 310 L450 310 L450 420 L250 420 Z" fill="#ffd1dc" stroke="none"/>
+<path d="M250 310 L450 310 L450 420 L250 420 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="338" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="262" font-size="16" font-weight="bold">Scene markers</tspan></text>
+</g>
+<text x="490" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="490" y="17.28">Done</tspan></text>
+<path d="M482 53 L682 53 L682 163 L482 163 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M480 50 L680 50 L680 160 L480 160 Z" fill="#c8f7c5" stroke="none"/>
+<path d="M480 50 L680 50 L680 160 L480 160 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="78" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="492" font-size="16" font-weight="bold">Fades</tspan></text>
+<path d="M482 183 L682 183 L682 293 L482 293 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M480 180 L680 180 L680 290 L480 290 Z" fill="#c8f7c5" stroke="none"/>
+<path d="M480 180 L680 180 L680 290 L480 290 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="208" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="492" font-size="16" font-weight="bold">Onion skin</tspan></text>
+<path d="M482 313 L682 313 L682 423 L482 423 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M480 310 L680 310 L680 420 L480 420 Z" fill="#c8f7c5" stroke="none"/>
+<path d="M480 310 L680 310 L680 420 L480 420 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="338" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="492" font-size="16" font-weight="bold">Draw-on strokes</tspan></text>
+</svg>

@@ -27,6 +27,27 @@ demos *names:
     swift build --product dottie
     scripts/make-demos.py {{ if names == "" { "demos" } else { names } }}
 
+# Regenerate fixtures/ (edge cases from scripts/make-fixtures.py, copies of Design/) and the goldens dottie.js is tested against
+goldens:
+    swift build --product dottie
+    scripts/make-fixtures.py
+    scripts/make-goldens.py
+
+# Fail if fixtures/goldens is out of date with DottieKit (what CI runs on a Mac)
+goldens-check:
+    swift build --product dottie
+    scripts/make-goldens.py --check
+
+# Build dottie.js (web/) and run its unit and contract tests
+web-test:
+    cd web && npm ci --silent && npm test
+
+# Preview the Pages site locally, with dottie.js built from web/ (needs: pip install -r website/requirements.txt)
+site:
+    cd web && npm ci --silent && npm run build
+    cp web/dist/dottie-player.min.js website/docs/assets/
+    mkdocs serve -f website/mkdocs.yml
+
 # Launch a Debug build on its own live socket, for scripts/dottie-debug.py to drive (snapshots, playhead, actions)
 # (in the background, so it doesn't take focus; files open through the debug socket once it's up)
 debug-app *files: build

@@ -1,0 +1,185 @@
+{
+  "images": {
+    "evil": {
+      "data": "x\" onerror=\"window.__pwned=1\" y=\"",
+      "format": "png"
+    }
+  },
+  "pages": [
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "00000113-0000-4000-8000-000000000113",
+          "image": {
+            "data": "x\" onerror=\"window.__pwned=1\" y=\"",
+            "format": "png\" onload=\"window.__pwned=1"
+          },
+          "kind": "image",
+          "layerID": "00000112-0000-4000-8000-000000000112",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 80,
+          "x": 40,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "00000114-0000-4000-8000-000000000114",
+          "image": {
+            "ref": "evil"
+          },
+          "kind": "image",
+          "layerID": "00000112-0000-4000-8000-000000000112",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 80,
+          "x": 140,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "00000115-0000-4000-8000-000000000115",
+          "kind": "rectangle",
+          "layerID": "00000112-0000-4000-8000-000000000112",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "<img src=x onerror=\"window.__pwned=1\">",
+          "width": 160,
+          "x": 240,
+          "y": 40
+        },
+        {
+          "height": 100,
+          "id": "00000116-0000-4000-8000-000000000116",
+          "kind": "note",
+          "layerID": "00000112-0000-4000-8000-000000000112",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "<script>window.__pwned=1</script> **<b onmouseover=\"window.__pwned=1\">x</b>**",
+          "width": 200,
+          "x": 40,
+          "y": 140
+        },
+        {
+          "height": 60,
+          "id": "00000117-0000-4000-8000-000000000117",
+          "kind": "svg onload=\"window.__pwned=1\"",
+          "layerID": "00000112-0000-4000-8000-000000000112",
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "</text><script>window.__pwned=1</script>",
+          "width": 100,
+          "x": 260,
+          "y": 140
+        }
+      ],
+      "id": "00000111-0000-4000-8000-000000000111",
+      "layers": [
+        {
+          "id": "00000112-0000-4000-8000-000000000112",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Page 1"
+    }
+  ],
+  "version": 2
+}

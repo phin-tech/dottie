@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="828" height="138" viewBox="16 6 828 138">
+<rect x="16" y="6" width="828" height="138" fill="#ffffff"/>
+<path d="M40 40 L160 40 L160 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="76.48">Auto ink</tspan></text>
+<path d="M200 40 L320 40 L320 100 L200 100 Z" fill="#ffe885" stroke="none"/>
+<path d="M200 40 L320 40 L320 100 L200 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="260" y="76.48">Light fill</tspan></text>
+<path d="M360 45.3 L366.1 40 M360 55.9 L378.29 40 M360 66.5 L390.49 40 M360 77.1 L402.68 40 M360 87.7 L414.87 40 M360 98.3 L427.07 40 M370.24 100 L439.26 40 M382.43 100 L451.46 40 M394.63 100 L463.65 40 M406.82 100 L475.84 40 M419.02 100 L480 46.99 M431.21 100 L480 57.59 M443.4 100 L480 68.19 M455.6 100 L480 78.79 M467.79 100 L480 89.39" fill="none" stroke="#ffe885" stroke-width="1" stroke-linecap="round"/>
+<path d="M360 40 L480 40 L480 100 L360 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="76.48">Hatched</tspan></text>
+<path d="M520 40 L640 40 L640 100 L520 100 Z" fill="none" stroke="#cc1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="580" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#cc1a1a" text-anchor="middle"><tspan x="580" y="76.48">Red ink</tspan></text>
+<path d="M682 33 L822 33 L822 123 L682 123 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M680 30 L820 30 L820 120 L680 120 Z" fill="#ffe885" stroke="none"/>
+<path d="M680 30 L820 30 L820 120 L680 120 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="58" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="692" font-size="16">A </tspan><tspan x="706.82" font-size="16" font-weight="bold">note</tspan></text>
+<path d="M160 70 L200 70 M190.99 65.66 L200 70 M190.99 74.34 L200 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="155" y="56.5" width="50" height="27" fill="#ffffff"/>
+<text x="180" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="180" y="76.48">label</tspan></text>
+</svg>
