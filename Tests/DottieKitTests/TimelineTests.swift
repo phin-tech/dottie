@@ -98,6 +98,26 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(Set([seeds[0], seeds[2], seeds[4]]).count, 3)
     }
 
+    func testSettledShapesStopBoilingWhenStill() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc, roughness: 1), b = try box(&doc, x: 300, roughness: 1)
+        _ = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        var tl = Timeline(fps: 10, duration: 3, boil: 1, settle: true)
+        tl.setKey(Keyframe(t: 0, x: 0), for: a.id)
+        tl.setKey(Keyframe(t: 1, x: 100), for: a.id)
+        tl.setKey(Keyframe(t: 2, x: 100, ease: .hold), for: a.id)
+        tl.setKey(Keyframe(t: 3, x: 200), for: a.id)
+        doc.timeline = tl
+        func seeds(at t: Double) -> [UInt32] { doc.resolved(at: t).elements.map(\.seed) }
+        let base = doc.elements.map(\.seed)
+        let mid = seeds(at: 0.55)
+        XCTAssertNotEqual(mid[0], base[0], "moving shape boils")
+        XCTAssertEqual(mid[1], base[1], "unkeyed shape stays steady")
+        XCTAssertNotEqual(mid[2], base[2], "connector to a moving shape boils")
+        XCTAssertEqual(seeds(at: 1.55), base, "same value on both keys: settled")
+        XCTAssertEqual(seeds(at: 2.55), base, "held: settled")
+    }
+
     func testRoundTripsAndOldPagesStillDecode() throws {
         var doc = DottieDocument()
         let a = try box(&doc)

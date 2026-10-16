@@ -60,10 +60,14 @@ public struct Timeline: Codable, Equatable, Sendable {
     public var duration: Double
     /// Reseed sketchy strokes every `boil` frames, so lines jitter like hand-drawn animation. nil holds them steady.
     public var boil: Int?
+    /// Boil a shape only while its keys are changing it, so its lines settle once it holds still. Shapes
+    /// without keys stay steady; a connector boils while either shape it attaches to does.
+    public var settle: Bool?
     public var tracks: [Track]
 
-    public init(fps: Double = 12, duration: Double, boil: Int? = nil, tracks: [Track] = []) {
-        self.fps = fps; self.duration = duration; self.boil = boil; self.tracks = tracks
+    public init(fps: Double = 12, duration: Double, boil: Int? = nil, settle: Bool? = nil,
+                tracks: [Track] = []) {
+        self.fps = fps; self.duration = duration; self.boil = boil; self.settle = settle; self.tracks = tracks
     }
 
     public var frameCount: Int { max(1, Int((duration * fps).rounded(.up))) }
@@ -120,6 +124,18 @@ extension Track {
         }
     }
 
+    /// Whether some property is tweening at time `t`: between two keys that set it to different values,
+    /// and not held.
+    func isChanging(at t: Double) -> Bool {
+        func changing<V: Equatable>(_ prop: (Keyframe) -> V?) -> Bool {
+            guard let b = keys.last(where: { $0.t <= t && prop($0) != nil }),
+                  let a = keys.first(where: { $0.t > t && prop($0) != nil }) else { return false }
+            return b.ease != .hold && prop(b) != prop(a)
+        }
+        return changing(\.x) || changing(\.y) || changing(\.width) || changing(\.height)
+            || changing(\.rotation) || changing(\.strokeWidth) || changing(\.stroke) || changing(\.fill)
+    }
+
     /// Whether the element is shown at time `t`.
     func isVisible(at t: Double) -> Bool {
         let keyed = keys.filter { $0.visible != nil }
@@ -159,10 +175,17 @@ extension DottieDocument {
             UInt32(truncatingIfNeeded: Int((t * timeline.fps + 1e-9).rounded(.down)) / max(1, n))
         }
         let hidden = Set(tracks.values.filter { !$0.isVisible(at: t) }.map(\.element))
+        let moving: Set<UUID>? = timeline.settle == true
+            ? Set(tracks.values.filter { $0.isChanging(at: t) }.map(\.element)) : nil
+        func boils(_ e: Element) -> Bool {
+            guard let moving else { return true }
+            if let c = e.connector { return [c.start.elementID, c.end.elementID].contains { $0.map(moving.contains) ?? false } }
+            return moving.contains(e.id)
+        }
         for i in copy.elements.indices {
             let e = copy.elements[i]
             if e.kind != .connector, let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
-            if let reseed, reseed > 0 { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
+            if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
         }
         // A connector goes with either shape it is attached to.
         copy.elements.removeAll { e in
