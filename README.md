@@ -130,9 +130,10 @@ as scenes"*, then *"export it as a GIF"*.
 
 More examples, each made by a short script in [scripts/demos](scripts/demos): a sprint board whose notes
 [pop in one after another](Design/demos/stagger.gif), a service map with
-[requests that never stop flowing](Design/demos/live.gif), and a [camera tour](Design/demos/tour.gif) of the
-diagram above that is also a [click-through presentation](Design/demos/tour.html) (download it and open it in
-a browser).
+[requests that never stop flowing](Design/demos/live.gif), a checkout flow with
+[labelled requests and events](Design/demos/labels.gif) (`POST /orders`, `order.created`), and a
+[camera tour](Design/demos/tour.gif) of the diagram above that is also a
+[click-through presentation](Design/demos/tour.html) (download it and open it in a browser).
 
 ## Extras for power users
 
