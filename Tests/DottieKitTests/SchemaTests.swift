@@ -42,6 +42,8 @@ final class SchemaTests: XCTestCase {
         box.path = [0, 0, 1, 1, 1, 1, 1, 1]
         box.subpaths = [PathSubpath(closed: true, coords: [0, 0, 1, 0, 1, 1, 1, 1])]
         box.evenOdd = true; box.rotation = 0.5; box.link = UUID(); box.anchor = "a"; box.reveal = 0.5
+        box.click = ClickAction(scene: "m", url: "https://example.com")
+        box.hover = HoverLook(stroke: .black, fill: .clear, opacity: 0.5)
         box.image = EmbeddedImage(data: Data([1, 2, 3]), format: "png")
         var line = Element(kind: .connector, frame: .zero, layerID: layer.id,
                            connector: ConnectorData(start: .bound(box.id, port: .top), end: .free(CGPoint(x: 5, y: 5)), routing: .elbow))
@@ -79,6 +81,7 @@ final class SchemaTests: XCTestCase {
             ("timeline", tl), ("track", tl.tracks[0]), ("keyframe", Keyframe(t: 0)),
             ("follow", Follow(path: UUID(), start: 0, end: 1)), ("repeat", Repeat(start: 0, end: 1)),
             ("cameraKey", CameraKey(t: 0, rect: .zero)), ("marker", Marker(t: 0, name: "")),
+            ("click", ClickAction()), ("hover", HoverLook()),
         ]
         for (def, value) in models {
             let stored = Set(Mirror(reflecting: value).children.compactMap(\.label).map { $0.hasPrefix("_") ? String($0.dropFirst()) : $0 })

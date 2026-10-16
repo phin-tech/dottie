@@ -38,6 +38,7 @@ fixture, so the gap is visible rather than silent.
 | Damaged timelines (clamped, filtered, sorted) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | Read the way DottieKit's decoders read them |
 | Unknown kinds, fields and newer versions | Partial | [js-only/future](../fixtures/js-only/future.dottie) | Drawn as labelled placeholders, reported in `warnings`; Dottie refuses such files |
 | Text fonts | Partial | | Positions use Helvetica Neue's metrics; browsers without Helvetica Neue draw Helvetica or Arial in the same places, so runs of mixed styles may sit slightly apart |
-| Links between shapes and pages | Missing | | Not clickable in the player yet |
-| Interactivity (hover, clicks, editing) | Missing | | |
+| Clicks: play a scene, open a link, hover looks, keyboard | Supported | [edge/clicks](../fixtures/edge/clicks.dottie) | As the HTML export does; only http, https and mailto links are followed |
+| Links between shapes and pages | Partial | [edge/clicks](../fixtures/edge/clicks.dottie) | A link to a shape on another page shows that page; one on the same page does nothing. The HTML export holds one page, so it has neither |
+| Editing | Missing | | |
 | Ticking task boxes in notes | Missing | | Drawn, not clickable |

@@ -177,3 +177,136 @@ test("a compiled drawing shows itself where its script is, in a target, or from 
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+// MARK: Clicks
+
+const button = (label) => `dottie-player .dottie-a[aria-label="${label}"]`;
+const shown = (page, label) => page.evaluate((l) => {
+  const g = document.querySelector("dottie-player").shadowRoot.querySelector(`.dottie-a[aria-label="${l}"]`);
+  const h = g.querySelector(".dottie-h"), n = g.querySelector(".dottie-n");
+  return h ? (getComputedStyle(h).display !== "none" ? "hover" : getComputedStyle(n).display !== "none" ? "normal" : "none") : "plain";
+}, label);
+
+test("clicking an element plays its scene; hover shows its hover look", async () => {
+  const { page, errors, close } = await open(`<dottie-player src="/fixtures/edge/clicks.dottie"></dottie-player>`);
+  await ready(page);
+  let s = await state(page);
+  assert.equal(s.paused, true, "a scene at 0 waits for a click");
+  assert.equal(s.frame, 0);
+  assert.equal(await shown(page, "Auth"), "normal");
+  await page.hover(button("Auth"));
+  assert.equal(await shown(page, "Auth"), "hover");
+  assert.equal(await page.evaluate(() => getComputedStyle(document.querySelector("dottie-player").shadowRoot.querySelector(".dottie-a")).cursor), "pointer");
+  await page.click(button("Auth"));
+  await page.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame > 10; }, null, { timeout: 5000 });
+  s = await state(page);
+  assert.equal(s.frame, 20, "played from Login flow to the next scene");
+  assert.equal(s.scene, "Done");
+  assert.equal(await shown(page, "Auth"), "hover", "still under the pointer after the frames changed");
+  await page.mouse.move(0, 0);
+  assert.equal(await shown(page, "Auth"), "normal");
+  // A page can take the click over.
+  await page.evaluate(() => document.querySelector("dottie-player").addEventListener("action", (e) => { window.__action = e.detail; e.preventDefault(); }));
+  await page.click(button("Back"));
+  assert.equal((await state(page)).frame, 20, "cancelled");
+  assert.equal(await page.evaluate(() => window.__action.scene), 0);
+  assert.deepEqual(errors, []);
+  await close();
+});
+
+test("clickable elements work from the keyboard", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/edge/clicks.dottie"></dottie-player>`);
+  await ready(page);
+  await page.focus(button("Back"));
+  assert.equal(await page.evaluate(() => document.querySelector("dottie-player").shadowRoot.activeElement?.getAttribute("aria-label")), "Back");
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 10; }, null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => document.querySelector("dottie-player").shadowRoot.activeElement?.getAttribute("aria-label")), "Back",
+    "focus stays on the element as frames change");
+  await page.focus(button("Auth"));
+  await page.keyboard.press(" ");
+  assert.equal((await state(page)).paused, false, "space runs the click rather than pausing");
+  await page.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 20; }, null, { timeout: 5000 });
+  const labels = await page.evaluate(() => [...document.querySelector("dottie-player").shadowRoot.querySelectorAll(".dottie-a")]
+    .map((g) => `${g.getAttribute("role")}:${g.getAttribute("tabindex")}:${g.getAttribute("aria-label")}`));
+  assert.deepEqual(labels, ["button:0:Auth", "button:0:Docs", "button:0:Back", "button:0:Details"]);
+  await close();
+});
+
+test("a click opens a safe link in a new tab, or another page of the drawing", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/edge/clicks.dottie"></dottie-player>`);
+  await ready(page);
+  await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
+  await page.click(button("Docs"));
+  assert.deepEqual(await page.evaluate(() => window.__opened), [["https://example.com/docs", "_blank", "noopener"]]);
+  await page.click(button("Details"));
+  await page.waitForFunction(() => document.querySelector("dottie-player").playback.page.name === "Details");
+  assert.equal(await page.evaluate(() => document.querySelector("dottie-player").getAttribute("page")), "2");
+  await close();
+});
+
+test("with reduced motion a click goes straight to where its scene stops", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/edge/clicks.dottie"></dottie-player>`, { reducedMotion: "reduce" });
+  await ready(page);
+  await page.click(button("Auth"));
+  const s = await state(page);
+  assert.equal(s.frame, 20);
+  assert.equal(s.paused, true);
+  await close();
+});
+
+test("clicks from a hostile file never run script", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/js-only/hostile-clicks.dottie"></dottie-player>`);
+  await ready(page);
+  await page.evaluate(() => { window.open = () => { window.__pwned = 1; }; });
+  for (const text of ["mixed case", "data"]) await page.click(`dottie-player >> text=${text}`, { force: true });
+  const found = await page.evaluate(() => {
+    const root = document.querySelector("dottie-player").shadowRoot;
+    return { pwned: window.__pwned === 1, clickable: root.querySelectorAll(".dottie-a").length,
+      handlers: [...root.querySelectorAll("*")].flatMap((el) => [...el.attributes].filter((a) => /^on/i.test(a.name)).map((a) => a.name)) };
+  });
+  assert.deepEqual(found, { pwned: false, clickable: 0, handlers: [] });
+  await close();
+});
+
+// The HTML export (Exporter.player) is its own player, drawn ahead of time; its golden is made by `just goldens`.
+async function exported(options = {}) {
+  const context = await browser.newContext({ reducedMotion: options.reducedMotion ?? "no-preference" });
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await serve(page);
+  await page.goto("http://dottie.test/fixtures/goldens/html/clicks.html");
+  const frame = () => page.evaluate(() => [...document.querySelectorAll(".f")].findIndex((f) => f.classList.contains("on")));
+  const inFrame = (label) => `.f.on .dottie-a[aria-label="${label}"]`;
+  return { page, errors, frame, inFrame, close: () => context.close() };
+}
+
+test("the HTML export plays a clicked element's scene, with hover and keyboard", async () => {
+  const { page, errors, frame, inFrame, close } = await exported();
+  assert.equal(await frame(), 0);
+  await page.hover(inFrame("Auth"));
+  assert.equal(await page.evaluate((s) => getComputedStyle(document.querySelector(s + " .dottie-h")).display, inFrame("Auth")), "inline");
+  await page.click(inFrame("Auth"));
+  await page.waitForFunction(() => document.querySelector("#play").textContent === "▶" && document.querySelectorAll(".f")[20].classList.contains("on"), null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => document.querySelector("#scene").textContent), "Done");
+  await page.focus(inFrame("Back"));
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelector("#play").textContent === "▶" && document.querySelectorAll(".f")[10].classList.contains("on"), null, { timeout: 5000 });
+  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Back", "focus follows to the frame shown");
+  await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
+  await page.click(inFrame("Docs"));
+  assert.deepEqual(await page.evaluate(() => window.__opened), [["https://example.com/docs", "_blank", "noopener"]]);
+  assert.equal(await page.locator('.dottie-a[aria-label="Details"]').count(), 0, "one page: no page links");
+  assert.equal(await page.locator('.dottie-a[aria-label="Script"]').count(), 0);
+  assert.equal(await page.locator("defs .dottie-a").count(), 0, "never inside shared <use> markup");
+  assert.deepEqual(errors, []);
+  await close();
+});
+
+test("the HTML export with reduced motion jumps straight to the stop", async () => {
+  const { page, frame, inFrame, close } = await exported({ reducedMotion: "reduce" });
+  await page.click(inFrame("Auth"));
+  assert.equal(await frame(), 20);
+  await close();
+});

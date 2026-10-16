@@ -134,6 +134,11 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var link: UUID?
     /// A hidden label for finding and linking to the element. Never drawn or exported.
     public var anchor: String?
+    /// What clicking the element does when the drawing plays on the web (the HTML export and
+    /// `<dottie-player>`). Every other export ignores it.
+    public var click: ClickAction?
+    /// How the element looks under the pointer, or with keyboard focus, when it is clickable on the web.
+    public var hover: HoverLook?
     /// Only set for `.image`: the picture's bytes.
     public var image: EmbeddedImage?
     /// How much of the stroke is drawn, 0...1, in an animation frame (see `Keyframe.reveal`). Fill and label
@@ -203,6 +208,61 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
         get { CGRect(x: x, y: y, width: width, height: height) }
         set { x = newValue.origin.x; y = newValue.origin.y; width = newValue.width; height = newValue.height }
     }
+}
+
+/// What clicking an element in a played drawing does: jump to a scene and play on from it (Flash's
+/// `gotoAndPlay`), or open a link. A scene wins when both are set.
+public struct ClickAction: Codable, Equatable, Sendable {
+    /// The name of a scene (`Marker`) on the element's page.
+    public var scene: String?
+    /// A web or mail link, opened in a new tab. Only `http:`, `https:` and `mailto:` links are kept, since a
+    /// drawing can play on someone else's site.
+    public var url: String? { didSet { url = url.flatMap(Self.allowed) } }
+
+    public init(scene: String? = nil, url: String? = nil) {
+        self.scene = scene
+        self.url = url.flatMap(Self.allowed)
+    }
+
+    private enum CodingKeys: String, CodingKey { case scene, url }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(scene: try c.decodeIfPresent(String.self, forKey: .scene),
+                  url: try c.decodeIfPresent(String.self, forKey: .url))
+    }
+
+    /// `url` trimmed, if it is a link a page may open.
+    public static func allowed(_ url: String) -> String? {
+        let u = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = u.lowercased()
+        guard ["http://", "https://", "mailto:"].contains(where: lower.hasPrefix), u.count > 7,
+              !u.unicodeScalars.contains(where: { $0.properties.generalCategory == .control }) else { return nil }
+        return u
+    }
+
+    /// Nothing to do.
+    public var isEmpty: Bool { (scene ?? "").isEmpty && url == nil }
+}
+
+/// The look of a clickable element under the pointer: the colors and opacity it takes; nil keeps its own.
+public struct HoverLook: Codable, Equatable, Sendable {
+    public var stroke, fill: RGBA?
+    public var opacity: Double?
+    public init(stroke: RGBA? = nil, fill: RGBA? = nil, opacity: Double? = nil) {
+        self.stroke = stroke; self.fill = fill; self.opacity = opacity
+    }
+
+    /// `e` as it looks hovered.
+    public func apply(to e: Element) -> Element {
+        var e = e
+        if let stroke { e.style.stroke = stroke }
+        if let fill { e.style.fill = fill }
+        if let opacity, opacity.isFinite { let o = min(max(opacity, 0), 1); e.style.opacity = o >= 1 ? nil : o }
+        return e
+    }
+
+    public var isEmpty: Bool { stroke == nil && fill == nil && opacity == nil }
 }
 
 /// One page (a tab) of a drawing. Array order of `elements` is z-order, back to front.

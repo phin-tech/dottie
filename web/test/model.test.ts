@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DottieFormatError, KINDS, KNOWN_FIELDS, parseDottie } from "../src/model.ts";
 import { render } from "../src/index.ts";
+import { clickTargets } from "../src/clicks.ts";
 import { read } from "./helpers.ts";
 
 const schema = JSON.parse(read("..", "schema", "dottie.schema.json"));
@@ -67,4 +68,23 @@ test("picture data that isn't base64 is dropped, with a warning", () => {
   assert.deepEqual(pics.map((e) => e.image?.data), ["", ""]);
   assert.ok(f.warnings.some((w) => /base64/.test(w)));
   assert.doesNotMatch(render(f), /<script|<img|<b[ >]|<[^>]*\son\w+=/);
+});
+
+test("clicks: scenes by name in any case, safe links only, links to other pages", () => {
+  const f = parseDottie(read("edge", "clicks.dottie"));
+  const p = f.pages[0];
+  const id = (text: string): string => p.elements.find((e) => e.text === text)!.id;
+  assert.equal(p.elements.find((e) => e.text === "Script")!.click?.url, null);
+  assert.ok(f.warnings.some((w) => /click link/.test(w)));
+  const targets = clickTargets(p, f);
+  assert.deepEqual(targets.get(id("Auth")), { scene: 1 });
+  assert.deepEqual(targets.get(id("Docs")), { url: "https://example.com/docs" });
+  assert.deepEqual(targets.get(id("Back")), { scene: 0 });
+  assert.deepEqual(targets.get(id("Details")), { page: 1 });
+  assert.equal(targets.has(id("Nowhere")), false, "no such scene");
+  assert.equal(targets.has(id("Script")), false, "javascript: is never followed");
+  assert.equal(clickTargets(p).has(id("Details")), false, "a page link needs the file");
+  const hostile = parseDottie(read("js-only", "hostile-clicks.dottie"));
+  assert.deepEqual(hostile.pages[0].elements.map((e) => e.click?.url), [null, null, null]);
+  assert.equal(clickTargets(hostile.pages[0], hostile).size, 0);
 });

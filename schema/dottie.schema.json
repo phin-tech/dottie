@@ -102,6 +102,8 @@
         "rotation": { "type": "number", "description": "Radians, clockwise about the frame's center." },
         "link": { "$ref": "#/$defs/uuid" },
         "anchor": { "type": "string" },
+        "click": { "$ref": "#/$defs/click" },
+        "hover": { "$ref": "#/$defs/hover" },
         "image": { "$ref": "#/$defs/image" },
         "reveal": { "type": "number" }
       }
@@ -257,6 +259,25 @@
       "properties": {
         "t": { "type": "number" },
         "name": { "type": "string" }
+      }
+    },
+    "click": {
+      "type": "object",
+      "description": "What clicking the element does when the drawing plays on the web. A scene wins over a url.",
+      "additionalProperties": false,
+      "properties": {
+        "scene": { "type": "string", "description": "A marker's name: jump there and play on to the next scene." },
+        "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." }
+      }
+    },
+    "hover": {
+      "type": "object",
+      "description": "How a clickable element looks under the pointer or with keyboard focus.",
+      "additionalProperties": false,
+      "properties": {
+        "stroke": { "$ref": "#/$defs/rgba" },
+        "fill": { "$ref": "#/$defs/rgba" },
+        "opacity": { "type": "number" }
       }
     }
   }

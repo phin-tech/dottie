@@ -215,6 +215,7 @@ public enum DottieScript {
                 (raw[Args.normalize(k)] as? [Any])?.map { Args($0 as? [String: Any] ?? [:]) }
             }
             func has(_ k: String) -> Bool { raw[Args.normalize(k)] != nil }
+            func object(_ k: String) -> Args? { (raw[Args.normalize(k)] as? [String: Any]).map(Args.init) }
 
             func require(_ k: String) throws -> String {
                 guard let s = string(k), !s.isEmpty else { throw OpsError.invalid("Missing required argument '\(k)'") }
@@ -293,6 +294,19 @@ public enum DottieScript {
             if let g = e.groupID { d["group"] = g.uuidString }
             if let l = e.link { d["link"] = l.uuidString }
             if let n = e.anchor { d["anchor"] = n }
+            if let c = e.click {
+                var o: [String: Any] = [:]
+                if let s = c.scene { o["scene"] = s }
+                if let u = c.url { o["url"] = u }
+                d["click"] = o
+            }
+            if let h = e.hover {
+                var o: [String: Any] = [:]
+                if let c = h.stroke { o["stroke"] = hex(c) }
+                if let c = h.fill { o["fill"] = hex(c) }
+                if let v = h.opacity { o["opacity"] = v }
+                d["hover"] = o
+            }
             if let layer = doc.layers.first(where: { $0.id == e.layerID }) { d["layer"] = layer.name }
             if let c = e.connector {
                 d["routing"] = c.routing.rawValue
@@ -349,12 +363,25 @@ public enum DottieScript {
                 let text: String?? = a.has("text") ? .some(a.string("text").flatMap { $0.isEmpty ? nil : $0 }) : nil
                 var link: UUID?? = nil
                 if a.has("link") { link = .some(a.string("link") == "" ? nil : try a.uuid("link")) }
+                var click: ClickAction?? = nil
+                if a.has("click") {
+                    let c = a.object("click")
+                    click = .some(try DiagramOps.click(scene: c?.string("scene"), url: c?.string("url")))
+                }
+                var hover: HoverLook?? = nil
+                if a.has("hover") {
+                    if let h = a.object("hover") {
+                        hover = .some(try DiagramOps.hover(nil, stroke: h.string("stroke"), fill: h.string("fill"), opacity: h.double("opacity")))
+                    } else {
+                        hover = .some(nil)
+                    }
+                }
                 try DiagramOps.update(&doc, id: id, text: text, x: a.double("x"), y: a.double("y"),
                                       width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
                                       routing: try a.enumValue("routing", as: Routing.self), look: try a.look(),
                                       link: link, anchor: a.has("anchor") ? .some(a.string("anchor")) : nil,
-                                      otherPages: otherPages)
+                                      click: click, hover: hover, otherPages: otherPages)
                 return describe(try element(id))
 
             case "pages":
@@ -618,6 +645,8 @@ public enum DottieScript {
         update: function (id, changes) {
           var o = merge(changes, { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
+          if (o.click === null) o.click = "";
+          if (o.hover === null) o.hover = "";
           return call("update", o);
         },
         remove: function (idOrIds) {
@@ -735,6 +764,9 @@ public enum DottieScript {
       link: another shape (id or element) this one jumps to when its badge is clicked in the app, on this page or \
     another (find it with dottie.pages()); null removes it
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
+      click: {scene} or {url}: when the drawing plays on the web (HTML export, <dottie-player>), clicking the element \
+    jumps to that scene (see dottie.scene) and plays on to the next, or opens an http(s) or mailto link; null removes it
+      hover: {stroke?, fill?, opacity?}: how a clickable element looks under the pointer; null removes it
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
       dottie.layout({direction?})      re-arranges all shapes into ranks along their connectors
 

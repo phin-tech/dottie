@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="488" height="208" viewBox="16 16 488 208">
+<rect x="16" y="16" width="488" height="208" fill="#ffffff"/>
+<path d="M40 40 L180 40 L180 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="76.48">Auth</tspan></text>
+<path d="M220 40 L360 40 L360 100 L220 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="290" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="290" y="76.48">Docs</tspan></text>
+<path d="M480 70 C480 86.57 462.09 100 440 100 C417.91 100 400 86.57 400 70 C400 53.43 417.91 40 440 40 C462.09 40 480 53.43 480 70 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="440" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="440" y="76.48">Back</tspan></text>
+<path d="M40 140 L180 140 L180 200 L40 200 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="176.48">Nowhere</tspan></text>
+<path d="M220 140 L360 140 L360 200 L220 200 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="290" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="290" y="176.48">Script</tspan></text>
+<path d="M440 140 L480 170 L440 200 L400 170 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="440" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="440" y="176.48">Details</tspan></text>
+</svg>

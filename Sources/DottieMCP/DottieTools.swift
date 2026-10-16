@@ -197,7 +197,8 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "from_id", "to_id"])),
         Tool(name: "update_element",
-             description: "Change text (a connector's text is its label), position, size, colors, look or routing of an element. Only provided fields change.",
+             description: "Change text (a connector's text is its label), position, size, colors, look or routing of an element, "
+                + "or what clicking it does when the drawing plays on the web. Only provided fields change.",
              inputSchema: schema([
                 "path": pathProp, "id": prop("string", "Element id (its page is found from it)"),
                 "text": prop("string", "New label (Markdown for a note)"),
@@ -209,6 +210,13 @@ actor DottieTools {
                 "anchor": prop("string", "Hidden label for finding and linking to the element; never drawn. Empty string removes it"),
                 "link": prop("string", "Id of a shape this element jumps to when its link badge is clicked in the app, on any page "
                     + "(the app switches tabs to follow it); an empty string removes the link"),
+                "click_scene": prop("string", "When the drawing plays on the web (HTML export, <dottie-player>), clicking this element "
+                    + "jumps to the scene of this name (see add_scene) and plays on to the next one. Empty string removes the click"),
+                "click_url": prop("string", "When played on the web, clicking this element opens this http(s) or mailto link in a "
+                    + "new tab. Empty string removes the click"),
+                "hover_stroke": prop("string", "Hex stroke color while the pointer is over a clickable element; empty string clears it"),
+                "hover_fill": prop("string", "Hex fill color while the pointer is over a clickable element; empty string clears it"),
+                "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
         Tool(name: "run_script",
              description: "Code mode: run a JavaScript program that edits the diagram through a `dottie` object, in one call "
@@ -618,11 +626,22 @@ actor DottieTools {
             var link: UUID?? = nil
             if let s = a.string("link") { link = .some(s.isEmpty ? nil : try a.uuid("link")) }
             do {
+                var click: ClickAction?? = nil
+                if a.string("click_scene") != nil || a.string("click_url") != nil {
+                    click = .some(try DiagramOps.click(scene: a.string("click_scene"), url: a.string("click_url")))
+                }
+                var hover: HoverLook?? = nil
+                if a.string("hover_stroke") != nil || a.string("hover_fill") != nil || a.double("hover_opacity") != nil {
+                    let base = file.pages[p].elements.first { $0.id == id }?.hover
+                    hover = .some(try DiagramOps.hover(base, stroke: a.string("hover_stroke"), fill: a.string("hover_fill"),
+                                                       opacity: a.double("hover_opacity")))
+                }
                 try DiagramOps.update(&file.pages[p], id: id, text: a.string("text").map { Optional($0) },
                                       x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
                                       routing: try a.routing("routing"), look: try a.look(), link: link,
-                                      anchor: a.string("anchor").map { Optional($0) }, otherPages: file.pages)
+                                      anchor: a.string("anchor").map { Optional($0) }, click: click, hover: hover,
+                                      otherPages: file.pages)
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("Updated")
