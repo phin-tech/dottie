@@ -70,11 +70,17 @@ struct Polyline {
 }
 
 extension Track {
+    /// The path span placing the element at time `t`: the latest one started, unless an x or y key after it
+    /// has taken the element back.
+    func followSpan(at t: Double) -> Follow? {
+        guard let f = follow?.filter({ $0.start <= t }).max(by: { $0.start < $1.start }) else { return nil }
+        if keys.contains(where: { $0.t >= f.end && $0.t <= t && ($0.x != nil || $0.y != nil) }) { return nil }
+        return f
+    }
+
     /// `e` moved onto the path it is following at time `t`, if any. `doc` is the page with keys applied.
     func following(_ e: Element, at t: Double, in doc: DottieDocument) -> Element {
-        guard let f = follow?.filter({ $0.start <= t }).max(by: { $0.start < $1.start }) else { return e }
-        // An x or y key after the span has taken the element back.
-        if keys.contains(where: { $0.t >= f.end && $0.t <= t && ($0.x != nil || $0.y != nil) }) { return e }
+        guard let f = followSpan(at: t) else { return e }
         guard let pathElement = doc.elements.first(where: { $0.id == f.path }), pathElement.id != e.id else { return e }
         let line = Polyline(tracing: pathElement, in: doc)
         let span = f.end - f.start
@@ -115,8 +121,10 @@ extension DottieDocument {
         guard elements.contains(where: { $0.id == path }) else { throw OpsError.notFound("No path element \(path.uuidString)") }
         guard id != path else { throw OpsError.invalid("An element can't follow itself") }
         var tl = timeline ?? Timeline(duration: 0)
-        tl.addFollow(Follow(path: path, start: t, end: t + max(0.05, duration), ease: ease,
-                            reverse: reverse ? true : nil, orient: orient ? true : nil, laps: laps), for: id)
+        let t = Timeline.clampTime(t)
+        tl.addFollow(Follow(path: path, start: t, end: Timeline.clampTime(t + max(0.05, duration)), ease: ease,
+                            reverse: reverse ? true : nil, orient: orient ? true : nil,
+                            laps: laps.map { $0.isFinite ? min(max($0, 0), 1000) : 1 }), for: id)
         timeline = tl
     }
 
@@ -134,7 +142,8 @@ extension DottieDocument {
         let dot = Element(kind: .ellipse, frame: CGRect(x: start.x - size / 2, y: start.y - size / 2, width: size, height: size),
                           style: style, layerID: c.layerID)
         elements.append(dot)
-        let d = max(0.05, duration)
+        let t = Timeline.clampTime(t)
+        let d = min(max(0.05, duration), 60)
         var tl = timeline ?? Timeline(duration: 0)
         tl.setKey(Keyframe(t: t, visible: true), for: dot.id)
         tl.setKey(Keyframe(t: t + d, visible: false), for: dot.id)
@@ -149,6 +158,9 @@ extension DottieDocument {
     /// enters once it gets there, `travel` seconds later.
     public mutating func addBuild(_ transition: Transition = .popIn, at start: Double = 0, stagger: Double = 0.4,
                                   packets: Bool = false, drawArrows: Bool = false, travel: Double = 0.6) throws {
+        let start = Timeline.clampTime(start)
+        let stagger = stagger.isFinite ? min(max(stagger, 0), 60) : 0.4
+        let travel = travel.isFinite ? min(max(travel, 0.05), 60) : 0.6
         guard transition.isEntrance else { throw OpsError.invalid("A build needs an entrance transition") }
         let shapes = elements.filter { $0.kind != .connector }
         guard !shapes.isEmpty else { throw OpsError.invalid("The page has no shapes to build") }
@@ -165,7 +177,9 @@ extension DottieDocument {
         let targets = Set(edges.map(\.2))
         var queue = byPosition.map(\.id).filter { !targets.contains($0) }
         for id in queue { rank[id] = 0 }
-        while rank.count < shapes.count || !queue.isEmpty {
+        // Ranks are keyed by id, so count distinct ids: a file with a duplicated id would otherwise never finish.
+        let distinct = ids.count
+        while rank.count < distinct || !queue.isEmpty {
             if queue.isEmpty, let next = byPosition.first(where: { rank[$0.id] == nil }) {
                 rank[next.id] = (rank.values.max() ?? -1) + 1; queue = [next.id]
             }

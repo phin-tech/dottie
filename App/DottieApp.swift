@@ -3,6 +3,9 @@ import SwiftUI
 @main
 struct DottieApp: App {
     init() {
+        #if DEBUG
+        LiveRegistry.shared.debugHandler = { DebugDriver.shared.handle($0) }   // before any window, so `open` works
+        #endif
         LiveServer.shared.start()
         AppearanceMode.stored.apply()
     }

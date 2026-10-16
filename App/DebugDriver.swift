@@ -14,6 +14,9 @@ struct DebugHooks {
     var setPlaying: (Bool) -> Void
     var selection: () -> Set<UUID>
     var setSelection: (Set<UUID>) -> Void
+    var selectedKey: () -> KeyRef?
+    var setSelectedKey: (KeyRef?) -> Void
+    var editTimeline: (String, (inout Timeline) -> Void) -> Void
 }
 
 /// Drives a Debug build over the live socket so an agent can look at the real app without screen-recording
@@ -37,8 +40,14 @@ final class DebugDriver {
     drag <x1> <y1> <x2> <y2>     drag on the canvas, in canvas points (top-left origin)
     click <x> <y>                click on the canvas
     key <esc|delete|text>        send a key to the canvas
+    keys <text>                  list the keys of the element whose text contains <text>
+    keysel <text> <t>            select that element's key at <t> in the timeline (none: clear)
+    keymove <text> <from> <to> [copy]   retime (or copy) a key, as dragging a diamond does
+    keyease <text> <t> <ease>    set a key's ease: linear, easeIn, easeOut, easeInOut, hold
+    keydel <text> <t>            delete a key
     menu [Top/Sub/...]           list the menu bar (or a menu); items read as disabled while the app is in
                                  the background, since commands follow the focused window
+    onion on|off                 onion skinning while posing (the Animate menu's toggle)
     quit                         quit this copy of the app (unsaved changes are discarded)
     """
 
@@ -88,6 +97,10 @@ final class DebugDriver {
                 return ok("clicked")
             case "key": return ok(try key(rest.joined(separator: " ")))
             case "menu": return ok(try menu(rest.first))
+            case "keys", "keysel", "keymove", "keyease", "keydel": return ok(try keyCommand(command, rest))
+            case "onion":
+                UserDefaults.standard.set(rest.first == "on", forKey: "onionSkin")
+                return ok("onion skin \(rest.first == "on" ? "on" : "off")")
             case "quit":
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { exit(0) }
                 return ok("quitting")
@@ -200,6 +213,46 @@ final class DebugDriver {
         return "did \(a.joined(separator: " "))"
     }
 
+    /// The first element whose text contains `text` (or, failing that, whose kind is `text`).
+    private func element(_ text: String) throws -> Element {
+        let doc = try hooks().document.model
+        guard let e = doc.elements.first(where: { ($0.text ?? "").localizedCaseInsensitiveContains(text) })
+                ?? doc.elements.first(where: { $0.kind.rawValue == text }) else { throw DebugError("no element matching '\(text)'") }
+        return e
+    }
+
+    private func keyCommand(_ command: String, _ a: [String]) throws -> String {
+        let h = try hooks(), e = try element(try arg(a, 0, "element text"))
+        func time(_ i: Int) throws -> Double {
+            guard let t = Double(try arg(a, i, "time")) else { throw DebugError("not a time: \(a[i])") }
+            return t
+        }
+        switch command {
+        case "keys":
+            let keys = h.document.model.timeline?.track(for: e.id)?.keys ?? []
+            return keys.map { k in
+                let sets = TimelineRows.mark(k).sets.map(\.rawValue).sorted().joined(separator: ",")
+                return "\(k.t)s \(sets) \(k.ease?.rawValue ?? "linear")"
+            }.joined(separator: "\n").ifEmpty("no keys")
+        case "keysel":
+            h.setSelectedKey(a.count > 1 && a[1] != "none" ? KeyRef(element: e.id, t: try time(1)) : nil)
+            return "selected key"
+        case "keymove":
+            let from = try time(1), to = try time(2), copy = a.count > 3 && a[3] == "copy"
+            h.editTimeline(copy ? "Copy Key" : "Move Key") { $0.moveKey(of: e.id, from: from, to: to, copy: copy) }
+            return "moved key"
+        case "keyease":
+            guard let ease = Ease(rawValue: try arg(a, 2, "ease")) else { throw DebugError("eases: \(Ease.allCases.map(\.rawValue))") }
+            let t = try time(1)
+            h.editTimeline("Set Ease") { $0.setEase(ease, of: e.id, at: t) }
+            return "set ease"
+        default:
+            let t = try time(1)
+            h.editTimeline("Delete Key") { $0.removeKey(of: e.id, at: t) }
+            return "deleted key"
+        }
+    }
+
     private func mouse(_ type: NSEvent.EventType, _ p: CGPoint, in view: NSView, window: NSWindow) -> NSEvent {
         NSEvent.mouseEvent(with: type, location: view.convert(p, to: nil), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
@@ -253,5 +306,9 @@ final class DebugDriver {
         }
         return dump(menu, 0).joined(separator: "\n")
     }
+}
+
+private extension String {
+    func ifEmpty(_ fallback: String) -> String { isEmpty ? fallback : self }
 }
 #endif

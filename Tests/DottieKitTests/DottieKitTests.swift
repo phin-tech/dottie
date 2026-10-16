@@ -1076,4 +1076,13 @@ extension DottieKitTests {
         try DiagramOps.update(&doc, id: a, anchor: .some(""))
         XCTAssertNil(doc.elements.first { $0.id == a }!.anchor)
     }
+
+    func testHatchedLightFillsStillGetLightInkOnADarkCanvas() {
+        var st = Style(); st.fill = RGBA(r: 1, g: 0.85, b: 0.4)
+        let e = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), style: st, layerID: UUID())
+        XCTAssertEqual(e.resolvingInk(to: .inkOnDark).style.stroke, .black, "solid light fill keeps dark ink")
+        var hatched = e
+        hatched.style.fillStyle = .hachure
+        XCTAssertEqual(hatched.resolvingInk(to: .inkOnDark).style.stroke, .inkOnDark, "the dark page shows through hatching")
+    }
 }

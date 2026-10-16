@@ -26,20 +26,24 @@ struct ContentView: View {
     @State var playhead: Double?
     /// Playing through the animation; when paused with a playhead, edits on the canvas pose that frame.
     @State var playing = false
+    /// The key picked in the timeline, if any.
+    @State var selectedKey: KeyRef?
 
     var body: some View {
         VStack(spacing: 0) {
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
-                       pose: document.model.timeline == nil || playing ? nil : playhead,
+                       pose: poseTime,
                        onExitPreview: { playing = false; playhead = nil })
             if document.model.timeline != nil {
                 Divider()
-                TimelinePanel(page: document.model, playhead: $playhead, playing: $playing) { id in
-                    playing = false
-                    selection = [id]
-                }
+                TimelinePanel(page: document.model, playhead: $playhead, playing: $playing, selectedKey: $selectedKey,
+                              onSelect: { id in
+                                  playing = false
+                                  selection = [id]
+                              },
+                              onEdit: { name, change in editTimeline(name, change) })
             }
             Divider()
             PageBar(document: document, undoManager: undoManager)
@@ -51,6 +55,11 @@ struct ContentView: View {
                 activeLayer = nil
                 playing = false
                 playhead = nil
+                selectedKey = nil
+            }
+            .onChange(of: document.model.timeline == nil) { _, gone in
+                // Undo (or Remove Animation) took the timeline away: stop playing and posing.
+                if gone { playing = false; playhead = nil; selectedKey = nil }
             }
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
@@ -62,7 +71,7 @@ struct ContentView: View {
                     .padding([.horizontal, .top], 12)
                     switch sidebarTab {
                     case .inspector:
-                        Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager,
+                        Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager, pose: poseTime,
                                   onSelect: { selection = $0 }, onJump: { jumpRequest = JumpRequest(target: $0) })
                     case .library:
                         LibraryPanel(document: document, selection: selection) { item, keep in
@@ -122,16 +131,30 @@ struct ContentView: View {
 }
 
 extension ContentView {
+    /// The animation time being posed: paused on an animated page's timeline. Edits there become keys.
+    var poseTime: Double? { document.model.timeline == nil || playing ? nil : playhead }
+
+    /// Applies `change` to the page's timeline as one undo step.
+    @MainActor
+    func editTimeline(_ name: String, _ change: (inout Timeline) -> Void) {
+        var next = document.model
+        guard var tl = next.timeline else { return }
+        change(&tl)
+        next.timeline = tl
+        document.commit(next, actionName: name, undoManager: undoManager)
+    }
+
     /// Lets `scripts/dottie-debug.py` drive this window in Debug builds (see `DebugDriver`).
     @MainActor
     func registerDebugHooks() {
         #if DEBUG
-        LiveRegistry.shared.debugHandler = { DebugDriver.shared.handle($0) }
         DebugDriver.shared.front = DebugHooks(
             document: document, undoManager: undoManager, editor: { editorActions },
             playhead: { playhead }, setPlayhead: { playhead = $0 },
             playing: { playing }, setPlaying: { playing = $0 },
-            selection: { selection }, setSelection: { selection = $0 })
+            selection: { selection }, setSelection: { selection = $0 },
+            selectedKey: { selectedKey }, setSelectedKey: { selectedKey = $0 },
+            editTimeline: { name, change in editTimeline(name, change) })
         #endif
     }
 }
@@ -149,6 +172,8 @@ struct Inspector: View {
     @Binding var newRouting: Routing
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
+    /// While posing an animation, the inspector shows that frame's values and its edits become keys there.
+    var pose: Double?
     var onSelect: (Set<UUID>) -> Void = { _ in }
     var onJump: (UUID) -> Void = { _ in }
     @Environment(\.colorScheme) private var colorScheme
@@ -163,7 +188,24 @@ struct Inspector: View {
                 })
     }
 
-    private var selected: [Element] { document.model.elements.filter { selection.contains($0.id) } }
+    /// The posed frame, kept between renders: every control's binding reads it, so resolving it each time
+    /// would cost a full resolve per control.
+    @State private var frameCache = FrameCache()
+
+    /// The page as the canvas shows it: the posed frame while posing, else the page itself.
+    private var shown: DottieDocument {
+        guard let t = pose else { return document.model }
+        return frameCache.frame(of: document.model, at: t)
+    }
+    private var selected: [Element] { shown.elements.filter { selection.contains($0.id) } }
+
+    /// Edits the shown page as one undo step; while posing, animatable changes become keys (see `applyingPose`).
+    private func edit(_ name: String, _ change: (inout DottieDocument) -> Void) {
+        var next = shown
+        change(&next)
+        let page = pose.map { document.model.applyingPose(next, at: $0) } ?? next
+        document.commit(page, actionName: name, undoManager: undoManager)
+    }
 
     /// Edits the selection when there is one, otherwise the style used for new shapes.
     private func binding<T>(_ kp: WritableKeyPath<Style, T>, _ name: String) -> Binding<T> {
@@ -172,11 +214,11 @@ struct Inspector: View {
             set: { value in
                 newStyle[keyPath: kp] = value
                 guard !selection.isEmpty else { return }
-                var next = document.model
-                for i in next.elements.indices where selection.contains(next.elements[i].id) {
-                    next.elements[i].style[keyPath: kp] = value
+                edit(name) { next in
+                    for i in next.elements.indices where selection.contains(next.elements[i].id) {
+                        next.elements[i].style[keyPath: kp] = value
+                    }
                 }
-                document.commit(next, actionName: name, undoManager: undoManager)
             })
     }
 
@@ -201,6 +243,7 @@ struct Inspector: View {
                 Slider(value: binding(\.roughness, "Change Roughness"), in: 0...3) { Text("Roughness") }
                     .disabled(binding(\.roughness, "").wrappedValue == 0)
                 Slider(value: binding(\.strokeWidth, "Change Stroke Width"), in: 1...12) { Text("Width") }
+                Slider(value: binding(\.opacityLevel, "Change Opacity"), in: 0...1) { Text("Opacity") }
                 ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
                 if selected.isEmpty || !selected.allSatisfy({ $0.kind == .image }) { // a picture has no fill
                     ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
@@ -318,11 +361,11 @@ struct Inspector: View {
     }
 
     private func editConnectors(_ name: String, _ change: (inout ConnectorData) -> Void) {
-        var next = document.model
-        for i in next.elements.indices where selection.contains(next.elements[i].id) {
-            if var c = next.elements[i].connector { change(&c); next.elements[i].connector = c }
+        edit(name) { next in
+            for i in next.elements.indices where selection.contains(next.elements[i].id) {
+                if var c = next.elements[i].connector { change(&c); next.elements[i].connector = c }
+            }
         }
-        document.commit(next, actionName: name, undoManager: undoManager)
     }
 
     private var routingBinding: Binding<Routing> {
@@ -608,5 +651,27 @@ private struct LayerRow: View {
         .onAppear { name = layer.name }
         .onChange(of: layer.name) { _, n in name = n }
         .opacity(layer.visible ? 1 : 0.55)
+    }
+}
+
+extension Style {
+    /// `opacity` as a slider value: 1 (the default) is stored as nil.
+    var opacityLevel: Double {
+        get { opacity ?? 1 }
+        set { opacity = newValue >= 0.999 ? nil : max(0, newValue) }
+    }
+}
+
+/// The last resolved frame and what it was resolved from.
+final class FrameCache {
+    private var page: DottieDocument?
+    private var time = 0.0
+    private var frame: DottieDocument?
+
+    func frame(of page: DottieDocument, at t: Double) -> DottieDocument {
+        if let frame, t == time, page == self.page { return frame }
+        let f = page.resolved(at: t)
+        self.page = page; time = t; frame = f
+        return f
     }
 }

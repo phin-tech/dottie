@@ -37,6 +37,8 @@ public struct Style: Codable, Equatable, Sendable {
     public var fontSize: Double = 18
     /// Cell size of a `.grid` fill in points; nil is `Style.defaultGridSize`.
     public var gridSize: Double?
+    /// How opaque the whole element is, 0...1; nil is fully opaque. Keyable, so elements can fade.
+    public var opacity: Double?
     public init() {}
 
     public static let defaultGridSize = 50.0
@@ -58,6 +60,7 @@ public struct Style: Codable, Equatable, Sendable {
         bowing = try c.decodeIfPresent(Double.self, forKey: .bowing) ?? 1
         fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 18
         gridSize = try c.decodeIfPresent(Double.self, forKey: .gridSize)
+        opacity = try c.decodeIfPresent(Double.self, forKey: .opacity)
     }
 }
 
@@ -172,10 +175,12 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     }
 
     /// Copy with automatic ink replaced by `ink`; a light ink is not used on a light, mostly opaque fill.
+    /// Hatching leaves the page showing between its lines, so it never counts as a light fill.
     public func resolvingInk(to ink: RGBA) -> Element {
         guard style.stroke.isAutomaticInk else { return self }
         var copy = self
-        let onLightFill = style.fill.a >= 0.5 && style.fill.luminance > 0.5
+        let covers = style.fillStyle == .solid || style.fillStyle == .grid
+        let onLightFill = covers && style.fill.a >= 0.5 && style.fill.luminance > 0.5
         copy.style.stroke = (ink.luminance > 0.5 && onLightFill) ? .black : ink
         return copy
     }

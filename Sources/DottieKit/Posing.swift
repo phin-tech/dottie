@@ -5,84 +5,100 @@ import Foundation
 extension DottieDocument {
     /// The page after `edited` (an edited copy of `resolved(at: t)`) is posed at time `t`.
     ///
-    /// - A change to an element's frame, rotation, colors or stroke width becomes a key at `t`. If no key set
-    ///   that property before, the old value is also keyed at 0, so the element moves from where it was
+    /// - A change to an element's frame, rotation, colors, stroke width or opacity becomes a key at `t` (or
+    ///   on the key nearest `t`, within half a frame, so posing on a key's frame edits that key). If no key
+    ///   set that property before, its value at 0 is keyed too, so the element moves from where it was
     ///   instead of jumping there for the whole animation.
-    /// - Changes that can't be animated (text, fill style, dash, font, links, ...) apply to the element itself.
-    /// - A new element is added to the page and appears at `t`; a deleted one is hidden from `t` on (or
-    ///   removed outright at 0). Connectors follow their shapes, so only their label and look change.
+    /// - Everything else that changed (text, look, links, z-order, a connector re-attached elsewhere, ...)
+    ///   applies to the element itself.
+    /// - While an element follows a path, the path decides its position, so position edits are ignored.
+    /// - A new element is added to the page and appears at `t`, as drawn there (a copy made mid-fade keeps
+    ///   that frame's opacity); a deleted one is hidden from `t` on, or removed outright at 0.
     public func applyingPose(_ edited: DottieDocument, at t: Double) -> DottieDocument {
-        let frame = resolved(at: t)
-        let before = Dictionary(frame.elements.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let baseIndex = Dictionary(elements.indices.map { (elements[$0].id, $0) }, uniquingKeysWith: { a, _ in a })
-        var next = self
+        let t = Timeline.clampTime(t)
+        func byID(_ d: DottieDocument) -> [UUID: Element] { Dictionary(d.elements.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) }
+        let before = byID(resolved(at: t))
+        let atStart = byID(resolved(at: 0))
+        let baseByID = byID(self)
         var tl = timeline ?? Timeline(duration: max(t, 1))
         tl.duration = max(tl.duration, t)
 
-        func key(_ id: UUID, _ old: Keyframe, _ new: Keyframe) {
+        /// Keys `new` (only the properties it sets), pinning any property no key has set yet at its 0s value.
+        func key(_ id: UUID, _ new: Keyframe, base: Element) {
+            var new = new
+            if let existing = tl.key(of: id, at: t) { new.t = existing.t }
             let track = tl.track(for: id)
-            if t > 0 {
-                // Pin the old value at 0 for each property no key has set yet.
-                var start = Keyframe(t: 0)
+            if new.t > 0 {
+                let s = atStart[id] ?? base
+                var pin = Keyframe(t: 0)
                 func unset<V>(_ p: (Keyframe) -> V?) -> Bool { !(track?.keys.contains { p($0) != nil } ?? false) }
-                if new.x != nil, unset(\.x) { start.x = old.x }
-                if new.y != nil, unset(\.y) { start.y = old.y }
-                if new.width != nil, unset(\.width) { start.width = old.width }
-                if new.height != nil, unset(\.height) { start.height = old.height }
-                if new.rotation != nil, unset(\.rotation) { start.rotation = old.rotation }
-                if new.fill != nil, unset(\.fill) { start.fill = old.fill }
-                if new.stroke != nil, unset(\.stroke) { start.stroke = old.stroke }
-                if new.strokeWidth != nil, unset(\.strokeWidth) { start.strokeWidth = old.strokeWidth }
-                if start != Keyframe(t: 0) { tl.setKey(start, for: id) }
+                if new.x != nil, unset(\.x) { pin.x = s.x }
+                if new.y != nil, unset(\.y) { pin.y = s.y }
+                if new.width != nil, unset(\.width) { pin.width = s.width }
+                if new.height != nil, unset(\.height) { pin.height = s.height }
+                if new.rotation != nil, unset(\.rotation) { pin.rotation = s.angle }
+                if new.fill != nil, unset(\.fill) { pin.fill = s.style.fill }
+                if new.stroke != nil, unset(\.stroke) { pin.stroke = s.style.stroke }
+                if new.strokeWidth != nil, unset(\.strokeWidth) { pin.strokeWidth = s.style.strokeWidth }
+                if new.opacity != nil, unset(\.opacity) { pin.opacity = s.style.opacity ?? 1 }
+                if pin != Keyframe(t: 0) { tl.setKey(pin, for: id) }
             }
             tl.setKey(new, for: id)
         }
 
+        var merged: [UUID: Element] = [:]
+        var added: [Element] = []
         for e in edited.elements {
-            guard let i = baseIndex[e.id] else {
-                // Drawn while posing: on the page, appearing here.
-                var added = e
-                added.reveal = nil
-                next.elements.append(added)
+            guard let base = baseByID[e.id] else {
+                var drawn = e
+                drawn.reveal = nil
+                added.append(drawn)
                 if t > 0 { tl.setKey(Keyframe(t: t, visible: true), for: e.id) }
                 continue
             }
             guard let was = before[e.id] else { continue }   // hidden at t, so it can't have been edited
-            // What can't be animated goes straight onto the element.
-            var base = next.elements[i]
-            base.text = e.text; base.link = e.link; base.anchor = e.anchor; base.groupID = e.groupID
-            base.layerID = e.layerID
-            base.style.fillStyle = e.style.fillStyle; base.style.dash = e.style.dash
-            base.style.roughness = e.style.roughness; base.style.bowing = e.style.bowing
-            base.style.fontSize = e.style.fontSize; base.style.gridSize = e.style.gridSize
-            if e.kind == .connector {
-                base.connector?.routing = e.connector?.routing ?? .straight
-                base.connector?.startHead = e.connector?.startHead ?? .none
-                base.connector?.endHead = e.connector?.endHead ?? .arrow
-                base.style.stroke = e.style.stroke; base.style.strokeWidth = e.style.strokeWidth
-                next.elements[i] = base
-                continue
-            }
-            if e.kind == .freehand || e.kind == .path { base.points = e.points; base.path = e.path; base.subpaths = e.subpaths }
-            next.elements[i] = base
-            // What can, becomes keys.
-            var old = Keyframe(t: 0), new = Keyframe(t: t)
+            // Start from the edit; put back what the animation drives, which becomes keys below.
+            var m = e
+            m.x = base.x; m.y = base.y; m.width = base.width; m.height = base.height; m.rotation = base.rotation
+            m.style.fill = base.style.fill; m.style.opacity = base.style.opacity
+            m.seed = base.seed; m.reveal = base.reveal
+            var new = Keyframe(t: t)
             func diff(_ a: Double, _ b: Double, _ set: (inout Keyframe, Double) -> Void) {
-                if abs(a - b) > 1e-6 { set(&old, a); set(&new, b) }
+                if abs(a - b) > 1e-6 { set(&new, b) }
             }
-            diff(was.x, e.x) { $0.x = $1 }
-            diff(was.y, e.y) { $0.y = $1 }
-            diff(was.width, e.width) { $0.width = $1 }
-            diff(was.height, e.height) { $0.height = $1 }
-            diff(was.angle, e.angle) { $0.rotation = $1 }
-            diff(was.style.strokeWidth, e.style.strokeWidth) { $0.strokeWidth = $1 }
-            if was.style.fill != e.style.fill { old.fill = was.style.fill; new.fill = e.style.fill }
-            if was.style.stroke != e.style.stroke { old.stroke = was.style.stroke; new.stroke = e.style.stroke }
-            if new != Keyframe(t: t) { key(e.id, old, new) }
+            if e.kind == .connector {
+                // A connector's ends come from its shapes; the frame may have pinned them where a hidden shape
+                // waits. Keep the page's ends unless the edit re-attached or moved them. Its stroke isn't keyed.
+                if let c = e.connector, let w = was.connector, let b = base.connector {
+                    if c.start == w.start { m.connector?.start = b.start }
+                    if c.end == w.end { m.connector?.end = b.end }
+                }
+                diff(was.style.opacity ?? 1, e.style.opacity ?? 1) { $0.opacity = $1 }
+            } else {
+                m.style.stroke = base.style.stroke; m.style.strokeWidth = base.style.strokeWidth
+                let path = tl.track(for: e.id)?.followSpan(at: t)
+                if path == nil {
+                    diff(was.x, e.x) { $0.x = $1 }
+                    diff(was.y, e.y) { $0.y = $1 }
+                }
+                diff(was.width, e.width) { $0.width = $1 }
+                diff(was.height, e.height) { $0.height = $1 }
+                if path?.orient != true { diff(was.angle, e.angle) { $0.rotation = $1 } }
+                diff(was.style.strokeWidth, e.style.strokeWidth) { $0.strokeWidth = $1 }
+                if was.style.fill != e.style.fill { new.fill = e.style.fill }
+                if was.style.stroke != e.style.stroke { new.stroke = e.style.stroke }
+                diff(was.style.opacity ?? 1, e.style.opacity ?? 1) { $0.opacity = $1 }
+            }
+            merged[e.id] = m
+            if new != Keyframe(t: t) { key(e.id, new, base: base) }
         }
 
-        let kept = Set(edited.elements.map(\.id))
-        let deleted = Set(before.keys).subtracting(kept)
+        // Elements the frame showed keep their new stacking order; hidden ones keep their place.
+        var order = edited.elements.lazy.map(\.id).filter { merged[$0] != nil }.makeIterator()
+        var next = self
+        next.elements = elements.map { b in merged[b.id] != nil ? merged[order.next()!]! : b } + added
+
+        let deleted = Set(before.keys).subtracting(edited.elements.map(\.id))
         if t <= 0 {
             next.remove(deleted)
         } else {
@@ -109,7 +125,7 @@ extension DottieDocument {
                                        stagger: Double = 0.15, duration: Double? = nil) throws -> Int {
         let targets = ids.filter { id in
             guard let e = elements.first(where: { $0.id == id }) else { return false }
-            return e.kind != .connector || transition == .drawIn
+            return e.kind != .connector || transition.appliesToConnectors
         }
         for (i, id) in targets.enumerated() {
             try addTransition(transition, to: id, at: t + Double(i) * stagger, duration: duration)

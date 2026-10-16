@@ -30,12 +30,13 @@ extension Exporter {
             out += "<path d=\"\(pathData(rock.path))\" fill=\"none\" stroke=\"\(color(rock.ink))\"\(opacity(rock.ink, attr: "stroke-opacity")) stroke-width=\"\(num(rock.width))\" stroke-linecap=\"round\"/>\n"
         }
         for e in d.orderedElements where visible.contains(e.layerID) {
-            let body = svgElement(e, in: d, index: index, labelBackground: background)
+            let alpha = min(max(e.style.opacity ?? 1, 0), 1)
+            if alpha <= 0 { continue }
+            var body = svgElement(e, in: d, index: index, labelBackground: background)
             if e.angle != 0, e.kind != .connector {
-                out += "<g transform=\"rotate(\(num(e.angle * 180 / .pi)) \(num(e.frame.midX)) \(num(e.frame.midY)))\">\n\(body)</g>\n"
-            } else {
-                out += body
+                body = "<g transform=\"rotate(\(num(e.angle * 180 / .pi)) \(num(e.frame.midX)) \(num(e.frame.midY)))\">\n\(body)</g>\n"
             }
+            out += alpha < 1 ? "<g opacity=\"\(num(alpha))\">\n\(body)</g>\n" : body
         }
         return out + "</svg>\n"
     }

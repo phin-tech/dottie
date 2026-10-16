@@ -27,7 +27,7 @@ public struct TimelineRows: Equatable, Sendable {
     }
 
     public enum Property: String, Sendable, CaseIterable {
-        case position, size, rotation, color, stroke, visibility, reveal
+        case position, size, rotation, color, stroke, visibility, reveal, opacity
     }
 
     public struct Span: Equatable, Sendable {
@@ -67,7 +67,7 @@ public struct TimelineRows: Equatable, Sendable {
         }
     }
 
-    static func mark(_ k: Keyframe) -> Mark {
+    public static func mark(_ k: Keyframe) -> Mark {
         var sets: Set<Property> = []
         if k.x != nil || k.y != nil { sets.insert(.position) }
         if k.width != nil || k.height != nil { sets.insert(.size) }
@@ -76,6 +76,7 @@ public struct TimelineRows: Equatable, Sendable {
         if k.strokeWidth != nil { sets.insert(.stroke) }
         if k.visible != nil { sets.insert(.visibility) }
         if k.reveal != nil { sets.insert(.reveal) }
+        if k.opacity != nil { sets.insert(.opacity) }
         return Mark(t: k.t, sets: sets, ease: k.ease ?? .linear)
     }
 

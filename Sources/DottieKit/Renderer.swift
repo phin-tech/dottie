@@ -389,13 +389,13 @@ public enum Renderer {
     /// without visiting the rest. `zoom` enables level of detail; `ink` resolves automatic ink per drawn
     /// element instead of copying the whole document.
     public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil, clip: CGRect? = nil,
-                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil) {
+                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil, skipping: Set<UUID> = []) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         let lod = zoom.map(DetailLevel.init)
         let index = spatial?.byID ?? doc.elementIndex
 
         func paint(_ e: Element) {
-            guard visible.contains(e.layerID) else { return }
+            guard visible.contains(e.layerID), !skipping.contains(e.id) else { return }
             if let lod, e.kind != .connector, !lod.isVisible(e.rotatedBounds) { return }
             draw(ink.map { e.resolvingInk(to: $0) } ?? e, in: ctx, document: doc, background: background, index: index, lod: lod)
         }
@@ -435,7 +435,12 @@ public enum Renderer {
                             index: [UUID: Element]? = nil, lod: DetailLevel? = nil) {
         var e = e
         if let lod, !lod.sketchy, e.style.roughness > 0 { e.style.roughness = 0 } // clean geometry is cheaper and unseen far out
+        let alpha = min(max(e.style.opacity ?? 1, 0), 1)
+        if alpha <= 0 { return }
         ctx.saveGState(); defer { ctx.restoreGState() }
+        // A translucent element fades as a whole: overlapping stroke, fill and label don't add up.
+        if alpha < 1 { ctx.setAlpha(alpha); ctx.beginTransparencyLayer(auxiliaryInfo: nil) }
+        defer { if alpha < 1 { ctx.endTransparencyLayer() } }
         func applyStroke() {
             ctx.setStrokeColor(e.style.stroke.cgColor)
             ctx.setLineWidth(e.style.strokeWidth)

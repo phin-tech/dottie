@@ -32,15 +32,17 @@ public struct Keyframe: Codable, Equatable, Sendable {
     public var visible: Bool?
     /// How much of the stroke is drawn, 0...1: tweening it up draws the element on. Also keys connectors.
     public var reveal: Double?
+    /// How opaque the element is, 0...1 (`Style.opacity`). Also keys connectors.
+    public var opacity: Double?
     /// The curve towards the next key; nil is `.linear`.
     public var ease: Ease?
 
     public init(t: Double, x: Double? = nil, y: Double? = nil, width: Double? = nil, height: Double? = nil,
                 rotation: Double? = nil, strokeWidth: Double? = nil, stroke: RGBA? = nil, fill: RGBA? = nil,
-                visible: Bool? = nil, reveal: Double? = nil, ease: Ease? = nil) {
+                visible: Bool? = nil, reveal: Double? = nil, opacity: Double? = nil, ease: Ease? = nil) {
         self.t = t; self.x = x; self.y = y; self.width = width; self.height = height
         self.rotation = rotation; self.strokeWidth = strokeWidth; self.stroke = stroke; self.fill = fill
-        self.visible = visible; self.reveal = reveal; self.ease = ease
+        self.visible = visible; self.reveal = reveal; self.opacity = opacity; self.ease = ease
     }
 }
 
@@ -59,32 +61,87 @@ public struct Track: Codable, Equatable, Sendable {
         self.boil = boil
         self.follow = follow
     }
+
+    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow }
+
+    /// Hand- or agent-written files may list keys out of order or with impossible times: keep the usable
+    /// keys, in time order, so interpolation (which walks them in order) stays right.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        element = try c.decode(UUID.self, forKey: .element)
+        keys = (try c.decodeIfPresent([Keyframe].self, forKey: .keys) ?? [])
+            .filter { $0.t.isFinite && $0.t >= 0 && $0.t <= Timeline.maxDuration }
+            .sorted { $0.t < $1.t }
+        boil = try c.decodeIfPresent(Bool.self, forKey: .boil)
+        follow = try c.decodeIfPresent([Follow].self, forKey: .follow)?
+            .filter { $0.start.isFinite && $0.end.isFinite && $0.start >= 0 && $0.end <= Timeline.maxDuration }
+    }
 }
 
 /// A page's animation. The page's elements are the base pose; tracks override their properties over time.
 /// Connectors are never keyed: their endpoints follow the shapes they attach to.
 public struct Timeline: Codable, Equatable, Sendable {
-    public var fps: Double
-    /// Seconds.
-    public var duration: Double
+    /// The longest animation, in seconds. Everything that sets a time clamps to it, so a stray huge number
+    /// from a file or a script can't turn into billions of frames.
+    public static let maxDuration = 3600.0
+    public static let fpsRange = 1.0...60.0
+
+    /// Frames per second, kept within `fpsRange`.
+    public var fps: Double { didSet { fps = Self.clampFPS(fps) } }
+    /// Seconds, kept within 0...`maxDuration`.
+    public var duration: Double { didSet { duration = Self.clampTime(duration) } }
     /// Reseed sketchy strokes every `boil` frames, so lines jitter like hand-drawn animation. nil holds them steady.
-    public var boil: Int?
+    public var boil: Int? { didSet { boil = boil.flatMap { $0 > 0 ? min($0, 10_000) : nil } } }
     /// Boil a shape only while its keys are changing it, so its lines settle once it holds still. Shapes
     /// without keys stay steady; a connector boils while either shape it attaches to does.
     public var settle: Bool?
     /// The moment a still picture of the page shows (exports, previews, thumbnails); nil is the end.
-    public var poster: Double?
+    public var poster: Double? { didSet { poster = poster.map(Self.clampTime) } }
     public var tracks: [Track]
 
     public init(fps: Double = 12, duration: Double, boil: Int? = nil, settle: Bool? = nil,
                 tracks: [Track] = []) {
-        self.fps = fps; self.duration = duration; self.boil = boil; self.settle = settle; self.tracks = tracks
+        self.fps = Self.clampFPS(fps); self.duration = Self.clampTime(duration)
+        self.boil = boil.flatMap { $0 > 0 ? min($0, 10_000) : nil }
+        self.settle = settle; self.tracks = tracks
     }
 
-    public var frameCount: Int { max(1, Int((duration * fps).rounded(.up))) }
+    /// A time in seconds made safe: finite and within 0...`maxDuration` (NaN is 0).
+    public static func clampTime(_ t: Double) -> Double {
+        guard t.isFinite else { return t == .infinity ? maxDuration : 0 }
+        return min(max(t, 0), maxDuration)
+    }
+
+    static func clampFPS(_ f: Double) -> Double {
+        f.isFinite ? min(max(f, fpsRange.lowerBound), fpsRange.upperBound) : 12
+    }
+
+    private enum CodingKeys: String, CodingKey { case fps, duration, boil, settle, poster, tracks }
+
+    /// Every field is optional on disk, and out-of-range numbers are clamped rather than rejected, so a
+    /// hand-written or damaged timeline still opens.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(fps: try c.decodeIfPresent(Double.self, forKey: .fps) ?? 12,
+                  duration: try c.decodeIfPresent(Double.self, forKey: .duration) ?? 0,
+                  boil: try c.decodeIfPresent(Int.self, forKey: .boil),
+                  settle: try c.decodeIfPresent(Bool.self, forKey: .settle),
+                  tracks: try c.decodeIfPresent([Track].self, forKey: .tracks) ?? [])
+        poster = try c.decodeIfPresent(Double.self, forKey: .poster).map(Self.clampTime)
+    }
+
+    public var frameCount: Int { max(1, Int((Self.clampTime(duration) * Self.clampFPS(fps)).rounded(.up))) }
 
     /// The time of frame `i`, for export and playback.
-    public func time(ofFrame i: Int) -> Double { Double(i) / fps }
+    public func time(ofFrame i: Int) -> Double { Double(i) / Self.clampFPS(fps) }
+
+    /// The times exports and playback draw: every frame, plus the end itself when it falls between frames,
+    /// so a loop reaches the rest pose the still shows.
+    public var frameTimes: [Double] {
+        var times = (0..<frameCount).map(time(ofFrame:))
+        if let last = times.last, duration - last > 1e-6 { times.append(duration) }
+        return times
+    }
 
     /// Sets the element's boil override (see `Track.boil`), creating an empty track if needed.
     public mutating func setBoil(_ boil: Bool?, for id: UUID) {
@@ -95,19 +152,63 @@ public struct Timeline: Codable, Equatable, Sendable {
     /// The element's keyframes, or nil if it isn't animated.
     public func track(for id: UUID) -> Track? { tracks.first { $0.element == id } }
 
-    /// Adds or replaces the properties `key` sets at its time, creating the track if needed.
-    /// Keys within half a frame of each other are the same key.
+    /// Adds or replaces the properties `key` sets at its time, creating the track if needed. Only a key at
+    /// the same time (to a microsecond) is merged into, so a transition's closely spaced keys stay distinct
+    /// at any frame rate.
     public mutating func setKey(_ key: Keyframe, for id: UUID) {
+        var key = key
+        key.t = Self.clampTime(key.t)
         guard let ti = tracks.firstIndex(where: { $0.element == id }) else {
             tracks.append(Track(element: id, keys: [key])); return
         }
         var keys = tracks[ti].keys
-        if let ki = keys.firstIndex(where: { abs($0.t - key.t) < 0.5 / fps }) {
+        if let ki = keys.firstIndex(where: { abs($0.t - key.t) < 1e-6 }) {
             keys[ki] = keys[ki].merging(key)
         } else {
             keys.append(key)
         }
         tracks[ti].keys = keys.sorted { $0.t < $1.t }
+    }
+
+    // MARK: Editing keys (the timeline editor)
+
+    /// Where the element's key nearest `t` is, if one lies within half a frame: one key, never several.
+    private func keyIndex(of id: UUID, at t: Double) -> (track: Int, key: Int)? {
+        guard let ti = tracks.firstIndex(where: { $0.element == id }) else { return nil }
+        let keys = tracks[ti].keys
+        guard let ki = keys.indices.min(by: { abs(keys[$0].t - t) < abs(keys[$1].t - t) }),
+              abs(keys[ki].t - t) <= 0.5 / Self.clampFPS(fps) else { return nil }
+        return (ti, ki)
+    }
+
+    /// The element's key at `t` (the nearest within half a frame), if any.
+    public func key(of id: UUID, at t: Double) -> Keyframe? {
+        keyIndex(of: id, at: t).map { tracks[$0.track].keys[$0.key] }
+    }
+
+    /// Moves the element's key at `from` to `to` (snapped to a frame, 0 and up), merging into a key already
+    /// exactly there. With `copy`, the key at `from` stays and a copy lands at `to`. The timeline grows to fit.
+    public mutating func moveKey(of id: UUID, from: Double, to: Double, copy: Bool = false) {
+        guard let (ti, ki) = keyIndex(of: id, at: from) else { return }
+        var k = tracks[ti].keys[ki]
+        let to = (Self.clampTime(to) * Self.clampFPS(fps)).rounded() / Self.clampFPS(fps)
+        if !copy { tracks[ti].keys.remove(at: ki) }
+        k.t = to
+        setKey(k, for: id)
+        duration = max(duration, to)
+    }
+
+    /// Removes the element's key at `t`; a track left with nothing on it goes too.
+    public mutating func removeKey(of id: UUID, at t: Double) {
+        guard let (ti, ki) = keyIndex(of: id, at: t) else { return }
+        tracks[ti].keys.remove(at: ki)
+        if tracks[ti].keys.isEmpty, (tracks[ti].follow ?? []).isEmpty, tracks[ti].boil == nil { tracks.remove(at: ti) }
+    }
+
+    /// Sets the curve from the element's key at `t` to the next one.
+    public mutating func setEase(_ ease: Ease, of id: UUID, at t: Double) {
+        guard let (ti, ki) = keyIndex(of: id, at: t) else { return }
+        tracks[ti].keys[ki].ease = ease == .linear ? nil : ease
     }
 }
 
@@ -118,7 +219,8 @@ extension Keyframe {
         k.x = other.x ?? x; k.y = other.y ?? y; k.width = other.width ?? width; k.height = other.height ?? height
         k.rotation = other.rotation ?? rotation; k.strokeWidth = other.strokeWidth ?? strokeWidth
         k.stroke = other.stroke ?? stroke; k.fill = other.fill ?? fill
-        k.visible = other.visible ?? visible; k.reveal = other.reveal ?? reveal; k.ease = other.ease ?? ease
+        k.visible = other.visible ?? visible; k.reveal = other.reveal ?? reveal
+        k.opacity = other.opacity ?? opacity; k.ease = other.ease ?? ease
         return k
     }
 }
@@ -151,7 +253,7 @@ extension Track {
         }
         return changing(\.x) || changing(\.y) || changing(\.width) || changing(\.height)
             || changing(\.rotation) || changing(\.strokeWidth) || changing(\.stroke) || changing(\.fill)
-            || changing(\.reveal)
+            || changing(\.reveal) || changing(\.opacity)
     }
 
     /// Whether the element is shown at time `t`.
@@ -176,7 +278,11 @@ extension Track {
             let r = num(\.reveal, e.reveal ?? 1)
             e.reveal = r >= 1 ? nil : max(0, r)
         }
-        // A connector's geometry comes from its shapes; only its drawing-on is keyed.
+        if keys.contains(where: { $0.opacity != nil }) {
+            let o = min(max(num(\.opacity, e.style.opacity ?? 1), 0), 1)
+            e.style.opacity = o >= 1 ? nil : o
+        }
+        // A connector's geometry comes from its shapes; only its drawing-on and opacity are keyed.
         if e.kind == .connector { return e }
         e.x = num(\.x, e.x); e.y = num(\.y, e.y)
         e.width = num(\.width, e.width); e.height = num(\.height, e.height)
@@ -193,11 +299,13 @@ extension DottieDocument {
     /// unchanged; a page without a timeline is returned as is.
     public func resolved(at t: Double) -> DottieDocument {
         guard let timeline else { return self }
+        let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
         let tracks = Dictionary(timeline.tracks.map { ($0.element, $0) }, uniquingKeysWith: { a, _ in a })
         let reseed: UInt32? = timeline.boil.map { n in
-            UInt32(truncatingIfNeeded: Int((t * timeline.fps + 1e-9).rounded(.down)) / max(1, n))
+            // t and fps are both clamped, so this frame number is always a small finite integer.
+            UInt32(truncatingIfNeeded: Int((t * Timeline.clampFPS(timeline.fps) + 1e-9).rounded(.down)) / max(1, n))
         }
         let hidden = Set(tracks.values.filter { !$0.isVisible(at: t) }.map(\.element))
         let moving: Set<UUID>? = timeline.settle == true

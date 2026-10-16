@@ -51,12 +51,14 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(doc.resolved(at: 1).elements[0].x, 100)
     }
 
-    func testSetKeyMergesKeysAtTheSameFrame() throws {
+    func testSetKeyMergesOnlyKeysAtTheSameTime() throws {
         var tl = Timeline(fps: 10, duration: 1)
         let id = UUID()
         tl.setKey(Keyframe(t: 0.5, x: 1), for: id)
-        tl.setKey(Keyframe(t: 0.52, y: 2), for: id)
+        tl.setKey(Keyframe(t: 0.5, y: 2), for: id)
         XCTAssertEqual(tl.tracks[0].keys, [Keyframe(t: 0.5, x: 1, y: 2)])
+        tl.setKey(Keyframe(t: 0.52, y: 3), for: id)
+        XCTAssertEqual(tl.tracks[0].keys.map(\.t), [0.5, 0.52], "closer than a frame, still two keys")
     }
 
     func testConnectorFollowsAnimatedShape() throws {
@@ -182,7 +184,7 @@ final class TimelineTests: XCTestCase {
         doc.timeline = tl
         let data = try XCTUnwrap(Exporter.gif(doc))
         let src = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
-        XCTAssertEqual(CGImageSourceGetCount(src), 5)
+        XCTAssertEqual(CGImageSourceGetCount(src), 6, "five frames, then the end pose itself")
         let first = try XCTUnwrap(CGImageSourceCreateImageAtIndex(src, 0, nil))
         XCTAssertGreaterThan(first.width, 300, "every frame is framed to the whole motion")
     }

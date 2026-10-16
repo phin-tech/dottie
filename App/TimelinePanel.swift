@@ -6,11 +6,20 @@ import DottieKit
 /// Dragging anywhere on the ruler or rows scrubs. While playing, the canvas shows the frame at `playhead`
 /// and takes no edits; paused there, edits on the canvas pose that frame (they become keyframes). Done (or
 /// Esc) goes back to editing the page itself. Clicking a row's name selects that element.
+///
+/// Keys are edited here too: click a diamond to select it (the playhead jumps there), drag it to retime it
+/// (Option-drag copies it), and change its ease or delete it from the header or the row's context menu.
 struct TimelinePanel: View {
     let page: DottieDocument
     @Binding var playhead: Double?
     @Binding var playing: Bool
+    @Binding var selectedKey: KeyRef?
     var onSelect: (UUID) -> Void
+    /// Applies a change to the page's timeline as one undo step, named for the Edit menu.
+    var onEdit: (String, (inout Timeline) -> Void) -> Void
+    /// A key being dragged: drawn at `to` until the drag ends, then moved (or copied) there in one step.
+    @State private var keyDrag: KeyDrag?
+    @State private var scrubbing = false
     @AppStorage("timelineCollapsed") private var collapsed = false
     @State private var collapsedLayers: Set<UUID> = []
 
@@ -69,6 +78,9 @@ struct TimelinePanel: View {
             } else {
                 Spacer()
             }
+            if let k = selectedKey, let key = timeline.key(of: k.element, at: k.t) {
+                keyControls(k, key)
+            }
             if playhead != nil {
                 Button("Done") { stop() }
                     .controlSize(.small)
@@ -78,6 +90,42 @@ struct TimelinePanel: View {
         .font(.callout)
         .padding(.horizontal, 10)
         .frame(height: 30)
+    }
+
+    /// The selected key's ease and a delete button.
+    @ViewBuilder
+    private func keyControls(_ k: KeyRef, _ key: Keyframe) -> some View {
+        Divider().frame(height: 16)
+        Image(systemName: "diamond.fill").font(.system(size: 9)).foregroundStyle(Color.accentColor)
+        Text("\(key.t.formatted(.number.precision(.fractionLength(1))))s").monospacedDigit().foregroundStyle(.secondary)
+        Picker("Ease", selection: Binding(get: { key.ease ?? .linear }, set: { e in
+            onEdit("Set Ease") { $0.setEase(e, of: k.element, at: k.t) }
+        })) {
+            ForEach(Ease.allCases, id: \.self) { Text(Self.title($0)).tag($0) }
+        }
+        .labelsHidden()
+        .controlSize(.small)
+        .fixedSize()
+        .help("How it moves from this key to the next")
+        Button { deleteSelectedKey() } label: { Image(systemName: "trash") }
+            .buttonStyle(.borderless)
+            .help("Delete Key")
+    }
+
+    private func deleteSelectedKey() {
+        guard let k = selectedKey else { return }
+        onEdit("Delete Key") { $0.removeKey(of: k.element, at: k.t) }
+        selectedKey = nil
+    }
+
+    static func title(_ e: Ease) -> String {
+        switch e {
+        case .linear: "Linear"
+        case .easeIn: "Ease In"
+        case .easeOut: "Ease Out"
+        case .easeInOut: "Ease In and Out"
+        case .hold: "Hold"
+        }
     }
 
     private var timeText: String {
@@ -181,7 +229,18 @@ struct TimelinePanel: View {
             Divider()
             Canvas { ctx, size in drawTrack(row, in: &ctx, size: size) }
                 .contentShape(Rectangle())
-                .gesture(scrubGesture)
+                .gesture(rowGesture(row))
+                .contextMenu {
+                    if let k = selectedKey, k.element == row.element, timeline.key(of: k.element, at: k.t) != nil {
+                        Picker("Ease", selection: Binding(get: { timeline.key(of: k.element, at: k.t)?.ease ?? .linear },
+                                                          set: { e in onEdit("Set Ease") { $0.setEase(e, of: k.element, at: k.t) } })) {
+                            ForEach(Ease.allCases, id: \.self) { Text(Self.title($0)).tag($0) }
+                        }
+                        Button("Delete Key") { deleteSelectedKey() }
+                    } else {
+                        Text("Click a key to select it").foregroundStyle(.secondary)
+                    }
+                }
         }
         .frame(height: rowHeight)
     }
@@ -212,14 +271,26 @@ struct TimelinePanel: View {
                 ctx.stroke(p, with: .color(.orange), style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 3]))
             }
         }
-        for key in row.keys {
+        let dragging = keyDrag.flatMap { $0.element == row.element ? $0 : nil }
+        var marks = row.keys
+        if let d = dragging, let i = marks.firstIndex(where: { abs($0.t - d.from) < 0.5 / timeline.fps }) {
+            var moved = marks[i]
+            moved.t = d.to
+            if d.copy { marks.append(moved) } else { marks[i] = moved }
+        }
+        for key in marks {
             let c = CGPoint(x: x(key.t, size.width), y: mid)
-            let r: CGFloat = 4.5
+            let selected = dragging.map { abs(key.t - $0.to) < 1e-9 }
+                ?? selectedKey.map { $0.element == row.element && abs($0.t - key.t) < 0.5 / timeline.fps } ?? false
+            let r: CGFloat = selected ? 6 : 4.5
             var d = Path()
             d.move(to: CGPoint(x: c.x, y: c.y - r)); d.addLine(to: CGPoint(x: c.x + r, y: c.y))
             d.addLine(to: CGPoint(x: c.x, y: c.y + r)); d.addLine(to: CGPoint(x: c.x - r, y: c.y)); d.closeSubpath()
-            // Hollow when the key only shows or hides the element.
-            if key.sets == [.visibility] {
+            // Selected: accent, a size up. Hollow when the key only shows or hides the element.
+            if selected {
+                ctx.fill(d, with: .color(.accentColor))
+                ctx.stroke(d, with: .color(.white.opacity(0.9)), lineWidth: 1)
+            } else if key.sets == [.visibility] {
                 ctx.fill(d, with: .color(Color(nsColor: .windowBackgroundColor)))
                 ctx.stroke(d, with: .color(.primary.opacity(0.7)), lineWidth: 1.2)
             } else {
@@ -241,6 +312,41 @@ struct TimelinePanel: View {
     }
 
     // MARK: Interaction
+
+    /// On a key: select it on click, retime it on drag (Option copies it). Elsewhere: scrub.
+    private func rowGesture(_ row: TimelineRows.Row) -> some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { v in
+                if keyDrag == nil, !scrubbing {
+                    if let k = row.keys.min(by: { abs(x($0.t, trackWidth) - v.startLocation.x) < abs(x($1.t, trackWidth) - v.startLocation.x) }),
+                       abs(x(k.t, trackWidth) - v.startLocation.x) <= 7 {
+                        keyDrag = KeyDrag(element: row.element, from: k.t, to: k.t,
+                                          copy: NSEvent.modifierFlags.contains(.option))
+                    } else {
+                        scrubbing = true
+                        selectedKey = nil
+                    }
+                }
+                if var d = keyDrag { d.to = time(atX: v.location.x); keyDrag = d } else { scrub(toX: v.location.x) }
+            }
+            .onEnded { _ in
+                defer { keyDrag = nil; scrubbing = false }
+                guard let d = keyDrag else { return }
+                if abs(d.to - d.from) >= 0.5 / timeline.fps {
+                    onEdit(d.copy ? "Copy Key" : "Move Key") { $0.moveKey(of: d.element, from: d.from, to: d.to, copy: d.copy) }
+                }
+                selectedKey = KeyRef(element: d.element, t: d.to)
+                scrub(to: d.to)
+            }
+    }
+
+    /// The frame time under a point in a track, clamped to the timeline.
+    private func time(atX px: CGFloat) -> Double {
+        let inset: CGFloat = 6
+        let u = Double((px - inset) / max(trackWidth - inset * 2, 1))
+        let t = min(max(u * timeline.duration, 0), timeline.duration)
+        return (t * timeline.fps).rounded() / timeline.fps
+    }
 
     private var scrubGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
@@ -281,4 +387,18 @@ struct TimelinePanel: View {
         case .image: return "photo"
         }
     }
+}
+
+/// A key picked in the timeline: the element's key at time `t`.
+struct KeyRef: Equatable {
+    var element: UUID
+    var t: Double
+}
+
+/// A key being dragged in the timeline.
+private struct KeyDrag: Equatable {
+    var element: UUID
+    var from: Double
+    var to: Double
+    var copy: Bool
 }

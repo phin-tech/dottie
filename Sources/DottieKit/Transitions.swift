@@ -16,6 +16,8 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
     case slideIn
     /// Its outline is sketched on, then it fills in; a connector draws from its start to its arrowhead.
     case drawIn
+    /// Fades up from transparent.
+    case fadeIn
     // Exits: the element starts in its pose and is hidden once the transition ends.
     /// Swells a little, then shrinks away.
     case popOut
@@ -23,6 +25,8 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
     case shrinkOut
     /// Shrinks leftwards into its left edge.
     case wipeOut
+    /// Fades away.
+    case fadeOut
     // Emphasis: the element starts and ends in its pose.
     /// Swells and settles back.
     case pulse
@@ -38,8 +42,10 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    var isEntrance: Bool { [.popIn, .growIn, .wipeIn, .dropIn, .slideIn, .drawIn].contains(self) }
-    var isExit: Bool { [.popOut, .shrinkOut, .wipeOut].contains(self) }
+    var isEntrance: Bool { [.popIn, .growIn, .wipeIn, .dropIn, .slideIn, .drawIn, .fadeIn].contains(self) }
+    var isExit: Bool { [.popOut, .shrinkOut, .wipeOut, .fadeOut].contains(self) }
+    /// Transitions that don't move or resize anything, so they work on connectors too.
+    var appliesToConnectors: Bool { [.drawIn, .fadeIn, .fadeOut].contains(self) }
 }
 
 extension DottieDocument {
@@ -49,15 +55,17 @@ extension DottieDocument {
     public mutating func addTransition(_ transition: Transition, to id: UUID, at t: Double,
                                        duration: Double? = nil) throws {
         guard let e = elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
-        guard e.kind != .connector || transition == .drawIn else {
-            throw OpsError.invalid("Connectors follow their shapes; only drawIn applies to them")
+        guard e.kind != .connector || transition.appliesToConnectors else {
+            throw OpsError.invalid("Connectors follow their shapes; only drawIn, fadeIn and fadeOut apply to them")
         }
-        let d = max(0.05, duration ?? transition.defaultDuration)
+        let t = Timeline.clampTime(t)
+        let d = min(max(0.05, duration ?? transition.defaultDuration), Timeline.maxDuration - t + 0.05)
         var tl = timeline ?? Timeline(duration: t + d)
         tl.duration = max(tl.duration, t + d)
         let restT = transition.isEntrance ? t + d : t
         let f = (tl.track(for: id)?.apply(to: e, at: restT) ?? e).frame
         let angle = tl.track(for: id)?.apply(to: e, at: restT).rotation ?? e.rotation ?? 0
+        let restOpacity = (tl.track(for: id)?.apply(to: e, at: restT) ?? e).style.opacity ?? 1
 
         func scaled(_ at: Double, _ s: Double, _ ease: Ease? = nil, visible: Bool? = nil) -> Keyframe {
             Keyframe(t: at, x: f.midX - f.width * s / 2, y: f.midY - f.height * s / 2,
@@ -89,6 +97,10 @@ extension DottieDocument {
             keys = [at(t, x: f.minX - max(120, f.width), .easeOut, visible: true), at(t + d, x: f.minX)]
         case .drawIn:
             keys = [Keyframe(t: t, visible: true, reveal: 0, ease: .easeInOut), Keyframe(t: t + d, reveal: 1)]
+        case .fadeIn:
+            keys = [Keyframe(t: t, visible: true, opacity: 0, ease: .easeOut), Keyframe(t: t + d, opacity: restOpacity)]
+        case .fadeOut:
+            keys = [Keyframe(t: t, opacity: restOpacity, ease: .easeIn), Keyframe(t: t + d, visible: false, opacity: 0)]
         case .popOut:
             keys = [scaled(t, 1, .easeOut), scaled(t + 0.35 * d, 1.15, .easeIn), scaled(t + d, 0.2, visible: false)]
         case .shrinkOut:

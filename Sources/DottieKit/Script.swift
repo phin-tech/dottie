@@ -459,10 +459,14 @@ public enum DottieScript {
             case "key":
                 let id = try a.uuid("id")
                 _ = try element(id)
-                guard let t = a.double("t"), t >= 0 else { throw OpsError.invalid("'t' (seconds, 0 or more) is required") }
+                guard let t = a.double("t"), t.isFinite, t >= 0, t <= Timeline.maxDuration else {
+                    throw OpsError.invalid("'t' (seconds, 0 to \(Int(Timeline.maxDuration))) is required")
+                }
                 let k = Keyframe(t: t, x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                  rotation: a.double("rotation").map { $0 * .pi / 180 }, strokeWidth: a.double("strokeWidth"),
                                  stroke: try a.color("stroke"), fill: try a.color("fill"), visible: a.bool("visible"),
+                                 reveal: a.double("reveal").map { min(max($0, 0), 1) },
+                                 opacity: a.double("opacity").map { min(max($0, 0), 1) },
                                  ease: try a.enumValue("ease", as: Ease.self))
                 var tl = doc.timeline ?? Timeline(duration: t)
                 tl.duration = max(tl.duration, t)
@@ -636,13 +640,13 @@ public enum DottieScript {
       dottie.timeline({fps?, duration?, boil?, settle?, poster?})  sets and returns {fps, duration, boil, settle, \
     frames, poster?}. boil: reseed sketchy lines every n frames (0 off). settle: boil a shape only while it moves. \
     poster: the second exports and previews show (default the end; the editor shows the page unanimated)
-      dottie.key(id, t, {x?, y?, width?, height?, rotation?, strokeWidth?, stroke?, fill?, visible?, reveal?, ease?})  \
+      dottie.key(id, t, {x?, y?, width?, height?, rotation?, strokeWidth?, stroke?, fill?, visible?, reveal?, opacity?, ease?})  \
     a keyframe at t seconds; each property tweens between the keys that set it. ease (towards the next key): \
     linear | easeIn | easeOut | easeInOut | hold. visible switches at the key: a lone visible:true key is where the \
-    element appears. reveal 0-1 draws the stroke on (fill and text follow once it is complete). Connectors follow \
-    their shapes and hide with them; key only their visible and reveal.
-      dottie.transition(id, name, t, {duration?})  canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn (enter), \
-    popOut, shrinkOut, wipeOut (exit), pulse, wiggle (emphasis)
+    element appears. reveal 0-1 draws the stroke on (fill and text follow once it is complete); opacity 0-1 fades. \
+    Connectors follow their shapes and hide with them; key only their visible, reveal and opacity.
+      dottie.transition(id, name, t, {duration?})  canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
+    (enter), popOut, shrinkOut, wipeOut, fadeOut (exit), pulse, wiggle (emphasis); arrows take drawIn, fadeIn, fadeOut
       dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
     path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
