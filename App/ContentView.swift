@@ -29,7 +29,7 @@ struct ContentView: View {
         VStack(spacing: 0) {
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
-                       playhead: document.model.timeline == nil ? nil : playhead)
+                       playhead: document.model.timeline == nil ? nil : playhead, onExitPreview: { playhead = nil })
             if let timeline = document.model.timeline {
                 Divider()
                 TimelineBar(timeline: timeline, playhead: $playhead)

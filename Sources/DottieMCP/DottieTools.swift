@@ -676,7 +676,7 @@ actor DottieTools {
 
         case "export_mermaid":
             let file = try load(try fileURL(a))
-            let doc = file.pages[try pageIndex(file, a)]
+            let doc = file.pages[try pageIndex(file, a)].still
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
             let mermaid = Exporter.mermaid(doc)
             guard a.string("out_path") != nil else { return text(mermaid) }
