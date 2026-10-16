@@ -13,6 +13,7 @@ arrow keys.
 
 [Get Dottie on GitHub](https://github.com/phin-tech/dottie#get-dottie){ .md-button .md-button--primary }
 [See the animation demos](demos.md){ .md-button }
+[Put one on your site](dottie-js.md){ .md-button }
 
 ## What it does
 

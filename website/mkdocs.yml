@@ -29,6 +29,7 @@ theme:
 nav:
   - Home: index.md
   - Animation demos: demos.md
+  - dottie.js: dottie-js.md
 
 extra_css:
   - assets/site.css

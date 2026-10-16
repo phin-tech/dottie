@@ -1,5 +1,7 @@
 # dottie.js
 
+`npm install @phin-tech/dottie` · [Live demos](https://phin-tech.github.io/dottie/dottie-js/)
+
 Render and play [Dottie](https://github.com/phin-tech/dottie) drawings in the browser, straight from the
 `.dottie` file: stills or animations, sketchy or clean, with no pre-rendered frames. It draws what Dottie draws:
 the same sketchy strokes from the same seeds, the same routing, timing, camera and scenes (see

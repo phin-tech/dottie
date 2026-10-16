@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url)));
-const banner = { js: `/*! dottie.js ${version} | MIT | https://github.com/phin-tech/dottie */` };
+const banner = { js: `/*! dottie.js ${version} | Apache-2.0 | https://github.com/phin-tech/dottie */` };
 const common = { bundle: true, target: "es2020", banner, logLevel: "warning", legalComments: "none" };
 
 await Promise.all([
