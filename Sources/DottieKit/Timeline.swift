@@ -32,15 +32,17 @@ public struct Keyframe: Codable, Equatable, Sendable {
     public var visible: Bool?
     /// How much of the stroke is drawn, 0...1: tweening it up draws the element on. Also keys connectors.
     public var reveal: Double?
+    /// How opaque the element is, 0...1 (`Style.opacity`). Also keys connectors.
+    public var opacity: Double?
     /// The curve towards the next key; nil is `.linear`.
     public var ease: Ease?
 
     public init(t: Double, x: Double? = nil, y: Double? = nil, width: Double? = nil, height: Double? = nil,
                 rotation: Double? = nil, strokeWidth: Double? = nil, stroke: RGBA? = nil, fill: RGBA? = nil,
-                visible: Bool? = nil, reveal: Double? = nil, ease: Ease? = nil) {
+                visible: Bool? = nil, reveal: Double? = nil, opacity: Double? = nil, ease: Ease? = nil) {
         self.t = t; self.x = x; self.y = y; self.width = width; self.height = height
         self.rotation = rotation; self.strokeWidth = strokeWidth; self.stroke = stroke; self.fill = fill
-        self.visible = visible; self.reveal = reveal; self.ease = ease
+        self.visible = visible; self.reveal = reveal; self.opacity = opacity; self.ease = ease
     }
 }
 
@@ -150,7 +152,8 @@ extension Keyframe {
         k.x = other.x ?? x; k.y = other.y ?? y; k.width = other.width ?? width; k.height = other.height ?? height
         k.rotation = other.rotation ?? rotation; k.strokeWidth = other.strokeWidth ?? strokeWidth
         k.stroke = other.stroke ?? stroke; k.fill = other.fill ?? fill
-        k.visible = other.visible ?? visible; k.reveal = other.reveal ?? reveal; k.ease = other.ease ?? ease
+        k.visible = other.visible ?? visible; k.reveal = other.reveal ?? reveal
+        k.opacity = other.opacity ?? opacity; k.ease = other.ease ?? ease
         return k
     }
 }
@@ -183,7 +186,7 @@ extension Track {
         }
         return changing(\.x) || changing(\.y) || changing(\.width) || changing(\.height)
             || changing(\.rotation) || changing(\.strokeWidth) || changing(\.stroke) || changing(\.fill)
-            || changing(\.reveal)
+            || changing(\.reveal) || changing(\.opacity)
     }
 
     /// Whether the element is shown at time `t`.
@@ -208,7 +211,11 @@ extension Track {
             let r = num(\.reveal, e.reveal ?? 1)
             e.reveal = r >= 1 ? nil : max(0, r)
         }
-        // A connector's geometry comes from its shapes; only its drawing-on is keyed.
+        if keys.contains(where: { $0.opacity != nil }) {
+            let o = min(max(num(\.opacity, e.style.opacity ?? 1), 0), 1)
+            e.style.opacity = o >= 1 ? nil : o
+        }
+        // A connector's geometry comes from its shapes; only its drawing-on and opacity are keyed.
         if e.kind == .connector { return e }
         e.x = num(\.x, e.x); e.y = num(\.y, e.y)
         e.width = num(\.width, e.width); e.height = num(\.height, e.height)

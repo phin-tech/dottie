@@ -33,6 +33,7 @@ extension DottieDocument {
                 if new.fill != nil, unset(\.fill) { start.fill = old.fill }
                 if new.stroke != nil, unset(\.stroke) { start.stroke = old.stroke }
                 if new.strokeWidth != nil, unset(\.strokeWidth) { start.strokeWidth = old.strokeWidth }
+                if new.opacity != nil, unset(\.opacity) { start.opacity = old.opacity }
                 if start != Keyframe(t: 0) { tl.setKey(start, for: id) }
             }
             tl.setKey(new, for: id)
@@ -78,6 +79,7 @@ extension DottieDocument {
             diff(was.style.strokeWidth, e.style.strokeWidth) { $0.strokeWidth = $1 }
             if was.style.fill != e.style.fill { old.fill = was.style.fill; new.fill = e.style.fill }
             if was.style.stroke != e.style.stroke { old.stroke = was.style.stroke; new.stroke = e.style.stroke }
+            diff(was.style.opacity ?? 1, e.style.opacity ?? 1) { $0.opacity = $1 }
             if new != Keyframe(t: t) { key(e.id, old, new) }
         }
 
@@ -109,7 +111,7 @@ extension DottieDocument {
                                        stagger: Double = 0.15, duration: Double? = nil) throws -> Int {
         let targets = ids.filter { id in
             guard let e = elements.first(where: { $0.id == id }) else { return false }
-            return e.kind != .connector || transition == .drawIn
+            return e.kind != .connector || transition.appliesToConnectors
         }
         for (i, id) in targets.enumerated() {
             try addTransition(transition, to: id, at: t + Double(i) * stagger, duration: duration)

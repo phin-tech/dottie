@@ -68,8 +68,8 @@ extension DottieKit.Transition {
             s += s.isEmpty ? c.uppercased() : String(c)
         }
     }
-    static let entrances: [DottieKit.Transition] = [.popIn, .growIn, .wipeIn, .dropIn, .slideIn, .drawIn]
-    static let exits: [DottieKit.Transition] = [.popOut, .shrinkOut, .wipeOut]
+    static let entrances: [DottieKit.Transition] = [.popIn, .growIn, .wipeIn, .dropIn, .slideIn, .drawIn, .fadeIn]
+    static let exits: [DottieKit.Transition] = [.popOut, .shrinkOut, .wipeOut, .fadeOut]
     static let emphasis: [DottieKit.Transition] = [.pulse, .wiggle]
 }
 

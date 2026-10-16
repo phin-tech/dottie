@@ -27,7 +27,7 @@ public struct TimelineRows: Equatable, Sendable {
     }
 
     public enum Property: String, Sendable, CaseIterable {
-        case position, size, rotation, color, stroke, visibility, reveal
+        case position, size, rotation, color, stroke, visibility, reveal, opacity
     }
 
     public struct Span: Equatable, Sendable {
@@ -76,6 +76,7 @@ public struct TimelineRows: Equatable, Sendable {
         if k.strokeWidth != nil { sets.insert(.stroke) }
         if k.visible != nil { sets.insert(.visibility) }
         if k.reveal != nil { sets.insert(.reveal) }
+        if k.opacity != nil { sets.insert(.opacity) }
         return Mark(t: k.t, sets: sets, ease: k.ease ?? .linear)
     }
 

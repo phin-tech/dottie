@@ -435,7 +435,12 @@ public enum Renderer {
                             index: [UUID: Element]? = nil, lod: DetailLevel? = nil) {
         var e = e
         if let lod, !lod.sketchy, e.style.roughness > 0 { e.style.roughness = 0 } // clean geometry is cheaper and unseen far out
+        let alpha = min(max(e.style.opacity ?? 1, 0), 1)
+        if alpha <= 0 { return }
         ctx.saveGState(); defer { ctx.restoreGState() }
+        // A translucent element fades as a whole: overlapping stroke, fill and label don't add up.
+        if alpha < 1 { ctx.setAlpha(alpha); ctx.beginTransparencyLayer(auxiliaryInfo: nil) }
+        defer { if alpha < 1 { ctx.endTransparencyLayer() } }
         func applyStroke() {
             ctx.setStrokeColor(e.style.stroke.cgColor)
             ctx.setLineWidth(e.style.strokeWidth)
