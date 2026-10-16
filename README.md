@@ -103,7 +103,8 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 ![An architecture diagram drawing itself, arrows sketching out and dots running along them](Design/animation.gif)
 
 Any page can be animated, and exported as a GIF, an animated PNG (full color, optionally transparent), an MP4
-([this one](Design/animation.mp4)) or a web page with a play button. The Animate menu does the common things in one go:
+([this one](Design/animation.mp4)), a web page with a play button, or Lottie: vector animation for websites and
+iOS and Android apps, either smooth (tweened by the player) or exact (every frame as Dottie draws it). The Animate menu does the common things in one go:
 
 - **Build Diagram** reveals the shapes in the order the arrows connect them, sketching each one in, drawing
   the arrows out, or sending a dot along each arrow to the next shape.
@@ -146,8 +147,8 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
 - **Scripting.** Script ▸ Script Console… (⌥⌘J) runs JavaScript to draw or change many things at once, such as
   a grid of boxes or restyling everything labelled "TODO". The console includes a full reference.
 - **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
-  from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng` or
-  `.mp4`) for an animated page. Run `dottie --help` for more.
+  from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng`,
+  `.mp4`, or `.json` for Lottie) for an animated page. Run `dottie --help` for more.
 
 ## Help and feedback
 
