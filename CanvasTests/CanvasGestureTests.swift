@@ -780,6 +780,20 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(element(e.id).frame, e.frame)
         XCTAssertNil(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 150))))
     }
+
+    func testPreviewClearsSelectionAndEscLeavesIt() {
+        let e = redBox()
+        view.selection = [e.id]
+        var exited = false
+        view.onExitPreview = { exited = true }
+        view.playhead = 0
+        XCTAssertTrue(view.selection.isEmpty)
+        let esc = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                   windowNumber: window.windowNumber, context: nil, characters: "\u{1b}",
+                                   charactersIgnoringModifiers: "\u{1b}", isARepeat: false, keyCode: 53)!
+        view.keyDown(with: esc)
+        XCTAssertTrue(exited)
+    }
 }
 
 /// Undo and redo in a multi-page document land on the page they change.

@@ -146,7 +146,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var playhead: Double? {
         didSet {
             guard playhead != oldValue else { return }
-            if oldValue == nil { endEditing(); gesture = nil; marqueeRect = nil }
+            // Nothing stays selected: menu commands would act on shapes the frame may not even show.
+            if oldValue == nil { endEditing(); gesture = nil; marqueeRect = nil; if !selection.isEmpty { selection = [] } }
             needsDisplay = true
         }
     }
@@ -162,6 +163,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var onPreview: ((DottieDocument) -> Void)?
     var onCommit: ((DottieDocument, String) -> Void)?
     var onSelectionChange: ((Set<UUID>) -> Void)?
+    /// Leaves an animation preview (Esc).
+    var onExitPreview: (() -> Void)?
     /// Shows another page; `model` is that page when it returns.
     var onShowPage: ((UUID) -> Void)?
     /// The page holding a followable shape (on a visible layer), searching the whole file.
@@ -1683,6 +1686,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func keyDown(with event: NSEvent) {
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        if playhead != nil, event.keyCode == 53 { onExitPreview?(); return }
         if playhead != nil, !(event.keyCode == 49 && plain) { return super.keyDown(with: event) } // previewing: only space-panning
         if event.keyCode == 49, plain { // space: hold to pan
             if !event.isARepeat { spaceDown = true }
@@ -1844,6 +1848,7 @@ struct CanvasView: NSViewRepresentable {
     var showRulers = false
     @Binding var jumpRequest: JumpRequest?
     var playhead: Double?
+    var onExitPreview: () -> Void = {}
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
@@ -1877,6 +1882,7 @@ struct CanvasView: NSViewRepresentable {
         v.routing = routing
         v.activeLayerID = activeLayerID
         v.showRulers = showRulers
+        v.onExitPreview = onExitPreview
         if v.playhead != playhead { v.playhead = playhead }
         if v.selection != selection { v.selection = selection }
         if let req = placeRequest, v.handledPlace != req.id {
