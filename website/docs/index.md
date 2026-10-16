@@ -21,8 +21,9 @@ arrow keys.
   links, layers and themes. Sketchy or clean.
 - **Ask your assistant to draw it.** Dottie works with Claude and other assistants that support MCP: describe a
   diagram and watch it appear in the window, one undoable change at a time.
-- **Make it move.** Build a diagram up shape by shape, send requests along its arrows, pan and zoom a camera
-  around it, and step through it scene by scene. Export a GIF, an MP4, or a web page like the ones here.
+- **Make it move.** Build a diagram up shape by shape, send requests along its arrows, set them marching, pan
+  and zoom a camera around it, step through it scene by scene, or draw two pages and Magic Move from one to the
+  other. Export a GIF, an animated PNG, an MP4, Lottie, or a web page like the ones here.
 - **Bring diagrams in and send them out:** Mermaid, Excalidraw, draw.io and SVG in; PNG, SVG, PDF, Mermaid
   and HTML out.
 

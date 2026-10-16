@@ -21,6 +21,18 @@ struct DottieCommands: Commands {
 
     private func send(_ action: Selector) { NSApp.sendAction(action, to: nil, from: nil) }
 
+    /// The page's animation as a GIF, movie, web page or Lottie: in the File menu and again in Animate.
+    private var exportAnimationMenu: some View {
+        Menu("Export Animation") {
+            ForEach(AnimationExportFormat.allCases, id: \.self) { f in
+                Button("\(f.title)…") { editor?.exportAnimation(f) }
+                    .help(f.help)
+                if f == .player { Divider() }
+            }
+        }
+        .disabled(editor?.hasAnimation != true)
+    }
+
     var body: some Commands {
         CommandGroup(after: .appInfo) {
             Button("Check for Updates…") { Task { await UpdateChecker.shared.check(userInitiated: true) } }
@@ -62,6 +74,7 @@ struct DottieCommands: Commands {
                 }
             }
             .disabled(editor == nil)
+            exportAnimationMenu
         }
         CommandMenu("Page") {
             let pages = editor?.pageCount ?? 0
@@ -164,6 +177,8 @@ struct DottieCommands: Commands {
                 .disabled(n == 0 || editor?.hasAnimation != true)
             Button("Remove Animation") { editor?.removeAnimation() }
                 .disabled(editor?.hasAnimation != true)
+            Divider()
+            exportAnimationMenu
         }
         CommandMenu("Script") {
             Button("Script Console…") { editor?.openScriptConsole() }

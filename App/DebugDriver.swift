@@ -49,6 +49,8 @@ final class DebugDriver {
     menu [Top/Sub/...]           list the menu bar (or a menu); items read as disabled while the app is in
                                  the background, since commands follow the focused window
     onion on|off                 onion skinning while posing (the Animate menu's toggle)
+    exportanim <format> <path>   write the page's animation as File > Export Animation does, without the
+                                 save panel: gif, apng, mp4, player, lottieSmooth, lottieExact
     quit                         quit this copy of the app (unsaved changes are discarded)
     """
 
@@ -99,6 +101,13 @@ final class DebugDriver {
             case "key": return ok(try key(rest.joined(separator: " ")))
             case "menu": return ok(try menu(rest.first))
             case "keys", "keysel", "keymove", "keyease", "keydel": return ok(try keyCommand(command, rest))
+            case "exportanim":
+                let name = try arg(rest, 0, "format"), path = try arg(rest, 1, "path")
+                guard let format = AnimationExportFormat.allCases.first(where: { "\($0)" == name }) else {
+                    throw DebugError("formats: " + AnimationExportFormat.allCases.map { "\($0)" }.joined(separator: ", "))
+                }
+                try format.write(try hooks().document.model, to: URL(fileURLWithPath: path))
+                return ok("wrote \(path)")
             case "onion":
                 UserDefaults.standard.set(rest.first == "on", forKey: "onionSkin")
                 return ok("onion skin \(rest.first == "on" ? "on" : "off")")

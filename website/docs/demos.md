@@ -32,9 +32,40 @@ Repeating packets and status lights that keep pulsing.
 
 <dottie-player class="player" src="../drawings/live.dottie" label="Live service map"></dottie-player>
 
+## Magic Move
+
+A sprint board, drawn twice: as it is now on the first page, and two days on on a second. Animate ▸ Magic Move
+to Next Page (or `dottie.magicMove`) tweens one into the other, Keynote-style: cards with the same text slide to
+their new column and change color, on a spring; the new card fades in and the dropped one fades out.
+
+<dottie-player class="player" src="../drawings/board.dottie" label="Magic Move"></dottie-player>
+
+## Marching ants
+
+An event stream whose parts drop in with a bounce, and whose arrows draw on and then keep marching: Animate ▸
+March Selected Lines sets the dashes of a line travelling along it, for anything that flows.
+
+<dottie-player class="player" src="../drawings/stream.dottie" label="Marching ants"></dottie-player>
+
 ## One after another
 
 Shapes that enter, and wiggle, in turn.
 
 <dottie-player class="player" src="../drawings/stagger.dottie" label="Staggered transitions"></dottie-player>
 
+
+## As Lottie
+
+File ▸ Export Animation ▸ Lottie saves an animation as [Lottie](https://airbnb.io/lottie/) JSON, which websites
+and iOS and Android apps play with Lottie's own players, all vector. This is the diagram on the home page,
+exported in smooth mode ([build.json](lottie/build.json), 250 KB) and played by lottie-web:
+
+<div id="lottie-build" class="player" role="img" aria-label="The home page's diagram building itself, played by lottie-web"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie_svg.min.js"></script>
+<script>
+  lottie.loadAnimation({ container: document.getElementById("lottie-build"), renderer: "svg", loop: true,
+                         autoplay: !matchMedia("(prefers-reduced-motion: reduce)").matches, path: "../lottie/build.json" });
+</script>
+
+Smooth mode lets the player tween between moments and holds the sketchy lines still; exact mode keeps every
+frame as Dottie draws it, boil and all.
