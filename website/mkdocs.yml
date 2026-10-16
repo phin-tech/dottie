@@ -4,7 +4,7 @@ site_url: https://phin-tech.github.io/dottie/
 repo_url: https://github.com/phin-tech/dottie
 repo_name: phin-tech/dottie
 edit_uri: ""
-copyright: Dottie is open source under the MIT license.
+copyright: Dottie is open source under the Apache License 2.0.
 
 theme:
   name: material
