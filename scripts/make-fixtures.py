@@ -441,6 +441,31 @@ def transitions():
     write(EDGE / "transitions.dottie", [p])
 
 
+def notes():
+    """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
+    p = Page()
+    texts = ["# H1\npara", "## H2\npara", "### H3\npara", "A\nB\nC", "para\n\npara2", "# H1\n## H2\n### H3",
+             "**bold**\nplain", "plain\n**bold**", "x\n# H1", "- a\n- b\n\npara", "1. one\n2. two", "> quote\n> more",
+             "```\ncode\nmore\n```\nafter", "---\nafter", "| a | b |\n|---|---|\n| 1 | 2 |\nafter",
+             "- [ ] task\n- [x] done", "- a\n  - b\n    - c", "*it* ~~st~~ [ln](http://x)",
+             "| left | mid | right |\n|:--|:-:|--:|\n| 1 | two | 3 |\n| four | 5 | six six |",
+             "See https://example.com/path, or www.phin.tech now",
+             "A very long paragraph that keeps on going well past the bottom edge of this small note so it is cut off "
+             "at the edge rather than spilling out of the card, the way Dottie cuts it.",
+             "Supercalifragilisticexpialidociousness overflows",
+             "Arrows → and ← ✓ done… “quoted” — dash",
+             "3. three\n4. four\n\n   continued",
+             "> # Quoted heading\n> - item\n> \n> ```\n> code\n> ```",
+             "Setext\n======\nbody\n\nSub\n---", "Line one  \nhard break\\\nback\\slash \\*not em\\*", "`` a ` b ``"]
+    for i, t in enumerate(texts):
+        for big in (True, False):
+            fs = 16 if big else 13
+            p.add("note", (i % 7) * 250, (i // 7) * 300 + (0 if big else 1200), 230, 280 if i != 20 else 90, text=t,
+                  style=style(fill=rgba(1, 0.91, 0.52), strokeWidth=1, fontSize=fs, roughness=1 if big else 0))
+    p.elements[3]["rotation"] = 0.2
+    write(EDGE / "notes.dottie", [p])
+
+
 def js_only():
     p = Page()
     p.add("rectangle", 40, 40, 120, 60, text="known")
@@ -458,6 +483,7 @@ def main():
     themes()
     dungeon()
     transitions()
+    notes()
     js_only()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 

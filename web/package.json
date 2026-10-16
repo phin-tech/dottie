@@ -1,0 +1,45 @@
+{
+  "name": "@phin-tech/dottie",
+  "version": "0.1.0",
+  "description": "Render and play Dottie (.dottie) drawings and animations in the browser",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phin-tech/dottie.git",
+    "directory": "web"
+  },
+  "homepage": "https://github.com/phin-tech/dottie/tree/main/web#readme",
+  "main": "./dist/dottie.js",
+  "module": "./dist/dottie.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/dottie.js"
+    },
+    "./player": {
+      "types": "./dist/types/player.d.ts",
+      "default": "./dist/dottie-player.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": [
+    "./dist/dottie-player.js",
+    "./dist/dottie-player.min.js"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc -p .",
+    "test": "tsc -p . && node --test test/*.test.ts",
+    "visual": "node build.mjs && node test/visual/run.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.25.12",
+    "typescript": "^5.9.3"
+  }
+}
