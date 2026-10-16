@@ -109,6 +109,38 @@ public struct Timeline: Codable, Equatable, Sendable {
         }
         tracks[ti].keys = keys.sorted { $0.t < $1.t }
     }
+
+    // MARK: Editing keys (the timeline editor)
+
+    /// The element's key at `t` (within half a frame), if any.
+    public func key(of id: UUID, at t: Double) -> Keyframe? {
+        track(for: id)?.keys.first { abs($0.t - t) < 0.5 / fps }
+    }
+
+    /// Moves the element's key at `from` to `to` (clamped to 0 and up), merging into a key already there.
+    /// With `copy`, the key at `from` stays and a copy lands at `to`. The timeline grows to fit.
+    public mutating func moveKey(of id: UUID, from: Double, to: Double, copy: Bool = false) {
+        guard var k = key(of: id, at: from), let ti = tracks.firstIndex(where: { $0.element == id }) else { return }
+        let to = (max(0, to) * fps).rounded() / fps
+        if !copy { tracks[ti].keys.removeAll { abs($0.t - from) < 0.5 / fps } }
+        k.t = to
+        setKey(k, for: id)
+        duration = max(duration, to)
+    }
+
+    /// Removes the element's key at `t`; a track left with nothing on it goes too.
+    public mutating func removeKey(of id: UUID, at t: Double) {
+        guard let ti = tracks.firstIndex(where: { $0.element == id }) else { return }
+        tracks[ti].keys.removeAll { abs($0.t - t) < 0.5 / fps }
+        if tracks[ti].keys.isEmpty, (tracks[ti].follow ?? []).isEmpty, tracks[ti].boil == nil { tracks.remove(at: ti) }
+    }
+
+    /// Sets the curve from the element's key at `t` to the next one.
+    public mutating func setEase(_ ease: Ease, of id: UUID, at t: Double) {
+        guard let ti = tracks.firstIndex(where: { $0.element == id }),
+              let ki = tracks[ti].keys.firstIndex(where: { abs($0.t - t) < 0.5 / fps }) else { return }
+        tracks[ti].keys[ki].ease = ease == .linear ? nil : ease
+    }
 }
 
 extension Keyframe {

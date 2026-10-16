@@ -67,7 +67,7 @@ public struct TimelineRows: Equatable, Sendable {
         }
     }
 
-    static func mark(_ k: Keyframe) -> Mark {
+    public static func mark(_ k: Keyframe) -> Mark {
         var sets: Set<Property> = []
         if k.x != nil || k.y != nil { sets.insert(.position) }
         if k.width != nil || k.height != nil { sets.insert(.size) }

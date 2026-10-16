@@ -26,6 +26,8 @@ struct ContentView: View {
     @State var playhead: Double?
     /// Playing through the animation; when paused with a playhead, edits on the canvas pose that frame.
     @State var playing = false
+    /// The key picked in the timeline, if any.
+    @State var selectedKey: KeyRef?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,10 +38,12 @@ struct ContentView: View {
                        onExitPreview: { playing = false; playhead = nil })
             if document.model.timeline != nil {
                 Divider()
-                TimelinePanel(page: document.model, playhead: $playhead, playing: $playing) { id in
-                    playing = false
-                    selection = [id]
-                }
+                TimelinePanel(page: document.model, playhead: $playhead, playing: $playing, selectedKey: $selectedKey,
+                              onSelect: { id in
+                                  playing = false
+                                  selection = [id]
+                              },
+                              onEdit: { name, change in editTimeline(name, change) })
             }
             Divider()
             PageBar(document: document, undoManager: undoManager)
@@ -51,6 +55,7 @@ struct ContentView: View {
                 activeLayer = nil
                 playing = false
                 playhead = nil
+                selectedKey = nil
             }
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
@@ -122,16 +127,27 @@ struct ContentView: View {
 }
 
 extension ContentView {
+    /// Applies `change` to the page's timeline as one undo step.
+    @MainActor
+    func editTimeline(_ name: String, _ change: (inout Timeline) -> Void) {
+        var next = document.model
+        guard var tl = next.timeline else { return }
+        change(&tl)
+        next.timeline = tl
+        document.commit(next, actionName: name, undoManager: undoManager)
+    }
+
     /// Lets `scripts/dottie-debug.py` drive this window in Debug builds (see `DebugDriver`).
     @MainActor
     func registerDebugHooks() {
         #if DEBUG
-        LiveRegistry.shared.debugHandler = { DebugDriver.shared.handle($0) }
         DebugDriver.shared.front = DebugHooks(
             document: document, undoManager: undoManager, editor: { editorActions },
             playhead: { playhead }, setPlayhead: { playhead = $0 },
             playing: { playing }, setPlaying: { playing = $0 },
-            selection: { selection }, setSelection: { selection = $0 })
+            selection: { selection }, setSelection: { selection = $0 },
+            selectedKey: { selectedKey }, setSelectedKey: { selectedKey = $0 },
+            editTimeline: { name, change in editTimeline(name, change) })
         #endif
     }
 }
