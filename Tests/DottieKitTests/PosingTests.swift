@@ -93,4 +93,16 @@ final class PosingTests: XCTestCase {
         doc.clearAnimation(of: [a.id, c.id])
         XCTAssertEqual(doc.timeline?.tracks.map(\.element), [b.id])
     }
+
+    func testAddKeyTweensFromHowTheElementWas() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        doc.addKey(Keyframe(t: 4, x: 200, fill: RGBA(r: 0, g: 1, b: 0)), for: a.id)
+        XCTAssertEqual(doc.resolved(at: 0).elements[0].x, 0, "starts where it was")
+        XCTAssertEqual(doc.resolved(at: 2).elements[0].x, 100, accuracy: 1e-9)
+        XCTAssertEqual(doc.resolved(at: 4).elements[0].style.fill, RGBA(r: 0, g: 1, b: 0))
+        XCTAssertEqual(doc.timeline?.duration, 4)
+        doc.addKey(Keyframe(t: 6, x: 300), for: a.id)
+        XCTAssertEqual(doc.timeline?.track(for: a.id)?.keys.map(\.t), [0, 4, 6], "x was keyed already: no second pin")
+    }
 }

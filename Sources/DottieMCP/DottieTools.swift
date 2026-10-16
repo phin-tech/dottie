@@ -15,6 +15,9 @@ private func schema(_ props: [String: Value], required: [String] = []) -> Value 
     .object(["type": "object", "properties": .object(props), "required": .array(required.map { .string($0) })])
 }
 
+private let transitionValues = Transition.allCases.map(\.rawValue)
+private let entranceValues = ["popIn", "growIn", "wipeIn", "dropIn", "slideIn", "drawIn", "fadeIn"]
+private let easeValues = Ease.allCases.map(\.rawValue)
 private let pathProp = prop("string", "Absolute path to a .dottie file, or \"current\" for the frontmost open Dottie window (needs the app running)")
 private let pageProp = prop("string", "Page (tab) to work on, by name or 1-based number; default the first page. "
     + "Tools given an element id find its page themselves.")
@@ -79,6 +82,22 @@ private struct Args {
         return u
     }
     var roughness: Double? { bool("sketchy").map { $0 ? 1 : 0 } }
+    /// A list of element ids (or a single one given as a string).
+    func uuids(_ k: String) throws -> [UUID]? {
+        guard let v = raw[k] else { return nil }
+        let strings = v.arrayValue?.compactMap(\.stringValue) ?? v.stringValue.map { [$0] } ?? []
+        return try strings.map { s in
+            guard let u = UUID(uuidString: s) else { throw ToolFailure(message: "'\(k)' has an invalid element id: \(s)") }
+            return u
+        }
+    }
+    /// Seconds into an animation: required, finite, within the longest timeline.
+    func time(_ k: String) throws -> Double {
+        guard let t = double(k), t.isFinite, t >= 0, t <= Timeline.maxDuration else {
+            throw ToolFailure(message: "'\(k)' must be a time in seconds, 0 to \(Int(Timeline.maxDuration))")
+        }
+        return t
+    }
 
     private func enumValue<T: RawRepresentable>(_ k: String, _ values: [String]) throws -> T? where T.RawValue == String {
         guard let s = string(k) else { return nil }
@@ -288,11 +307,110 @@ actor DottieTools {
                 "out_path": prop("string", "Optional absolute path ending in .svg to write the file to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
              ], required: ["path"])),
+        Tool(name: "set_timeline",
+             description: "Animate a page, or adjust its animation: frame rate, length, hand-drawn line boil and more. "
+                + "With only path (and page), reports the page's animation: length, each animated element's keys, "
+                + "camera keys and scenes. Animation tools: animate_build, add_transition, add_keyframe, send_packet, "
+                + "set_camera, add_scene, clear_animation; check with export_animation's preview or export_png's at.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "fps": prop("number", "Frames per second, 1-60 (default 15 for a new animation)"),
+                "duration": prop("number", "Length in seconds (the tools lengthen it as they add things)"),
+                "boil": prop("number", "Redraw sketchy lines every n frames so they jitter like hand-drawn animation; 0 is off"),
+                "settle": prop("boolean", "Boil a shape only while it moves"),
+                "poster": prop("number", "The second stills (PNG, SVG, thumbnails) show; default the end"),
+             ], required: ["path"])),
+        Tool(name: "animate_build",
+             description: "Make the page build itself: shapes appear in the order the connectors join them, each with an "
+                + "entrance, optionally drawing each arrow on or sending a dot along it first. The quickest way to "
+                + "animate a diagram. Creates the timeline if there is none.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "transition": prop("string", "Entrance for each shape (default popIn)", enum: transitionValues.filter { entranceValues.contains($0) }),
+                "draw_arrows": prop("boolean", "Draw each arrow on before the shape it points to enters"),
+                "packets": prop("boolean", "Send a dot along each arrow before the shape it points to enters"),
+                "start": prop("number", "Second to start at (default 0)"),
+                "stagger": prop("number", "Seconds between ranks (default 0.4)"),
+                "travel": prop("number", "Seconds an arrow takes to draw or a dot to travel (default 0.6)"),
+             ], required: ["path"])),
+        Tool(name: "add_transition",
+             description: "Give elements a canned entrance, exit or emphasis starting at t: " + transitionValues.joined(separator: ", ")
+                + ". Several ids start one after another (stagger). Connectors take drawIn, fadeIn and fadeOut only.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "ids": .object(["type": "array", "items": .object(["type": "string"]), "description": "Element ids, in the order they start"]),
+                "name": prop("string", "The transition", enum: transitionValues),
+                "t": prop("number", "Second it starts"),
+                "duration": prop("number", "Seconds it takes (default depends on the transition)"),
+                "stagger": prop("number", "Seconds between one element's start and the next (default 0.15)"),
+                "repeat": prop("number", "Play it this many times in all, or 0 for forever (pulse, wiggle)"),
+             ], required: ["path", "ids", "name", "t"])),
+        Tool(name: "add_keyframe",
+             description: "Pose an element at time t: each property given tweens from its previous key, or the first time "
+                + "a property is keyed, from its value at 0 (so a color change at 5s fades in over 5s; key it again "
+                + "just before to make it quicker). Position and size are in canvas points; ease is the curve from "
+                + "this key to the next.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "id": prop("string", "Element id"),
+                "t": prop("number", "Second of the key"),
+                "x": prop("number", "Left"), "y": prop("number", "Top"),
+                "width": prop("number", "Width"), "height": prop("number", "Height"),
+                "rotation": prop("number", "Degrees clockwise"),
+                "fill": prop("string", "Fill color, hex"), "stroke": prop("string", "Stroke color, hex"),
+                "stroke_width": prop("number", "Stroke width"),
+                "opacity": prop("number", "0 transparent to 1 opaque"),
+                "visible": prop("boolean", "Show or hide from this key on (a lone true key is where it appears)"),
+                "reveal": prop("number", "0-1: how much of the outline is drawn (draw-on)"),
+                "ease": prop("string", "Curve to the next key", enum: easeValues),
+             ], required: ["path", "id", "t"])),
+        Tool(name: "send_packet",
+             description: "Send a dot along a connector, like a request or message on its way; with a label it is a pill "
+                + "carrying that text (\"POST /orders\"). every repeats it forever, so traffic keeps flowing.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "connector_id": prop("string", "The connector to travel along"),
+                "t": prop("number", "Second it sets off"),
+                "duration": prop("number", "Seconds the trip takes (default 0.6)"),
+                "color": prop("string", "Hex color (default orange-red)"),
+                "label": prop("string", "Text to carry, short"),
+                "every": prop("number", "Send it again every this many seconds, forever"),
+             ], required: ["path", "connector_id", "t"])),
+        Tool(name: "set_camera",
+             description: "Point the exported view (GIF, MP4, HTML) at part of the page from time t, easing from the previous "
+                + "camera key: frame elements by id (with padding) or give a rectangle. Pans and zooms around a big "
+                + "diagram. clear removes the camera, so exports show everything again.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "t": prop("number", "Second of the camera key"),
+                "ids": .object(["type": "array", "items": .object(["type": "string"]), "description": "Elements to frame"]),
+                "padding": prop("number", "Space around framed elements, default 40"),
+                "x": prop("number", "Left of the view, instead of ids"), "y": prop("number", "Top of the view"),
+                "width": prop("number", "Width of the view"), "height": prop("number", "Height of the view"),
+                "ease": prop("string", "Curve to the next camera key (default easeInOut)", enum: easeValues),
+                "clear": prop("boolean", "Remove the camera instead"),
+             ], required: ["path"])),
+        Tool(name: "add_scene",
+             description: "Name a moment of the animation as a scene. The HTML export becomes a click-through presentation: it "
+                + "plays to each scene and stops, and next/back step between them. Pair with set_camera.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "t": prop("number", "Second of the scene"),
+                "name": prop("string", "What the scene shows; default Scene n"),
+             ], required: ["path", "t"])),
+        Tool(name: "clear_animation",
+             description: "Remove the animation from the given elements (their keys, paths and repeats), or with no ids remove "
+                + "the page's whole timeline. The drawing itself is unchanged.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "ids": .object(["type": "array", "items": .object(["type": "string"]), "description": "Elements to clear; omit for all"]),
+             ], required: ["path"])),
         Tool(name: "export_animation",
-             description: "Export the page's animation (made with run_script's dottie.timeline/key/transition/follow/"
-                + "packet/animateBuild) as a looping GIF, an MP4 movie, or a self-contained HTML player with "
-                + "play/pause and a scrubber. The format comes from out_path's extension. Returns a PNG of the "
-                + "frame at `preview` seconds (default the poster frame) so you can check it.",
+             description: "Export the page's animation (made with the animation tools, or run_script's dottie.timeline/key/"
+                + "transition/packet/camera/scene) as a looping GIF, an MP4 movie, or a self-contained HTML player with "
+                + "play/pause and a scrubber (a click-through presentation when it has scenes). The format comes from "
+                + "out_path's extension. Returns a PNG of the frame at `preview` seconds (default the poster frame) so "
+                + "you can check it.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "out_path": prop("string", "Absolute path ending in .gif, .mp4 or .html"),
@@ -698,6 +816,10 @@ actor DottieTools {
             try svg.write(to: out, atomically: true, encoding: .utf8)
             return text("Exported \(doc.elements.count) elements to \(out.path)")
 
+        case "set_timeline", "animate_build", "add_transition", "add_keyframe", "send_packet", "set_camera", "add_scene",
+             "clear_animation":
+            return try animation(name, a)
+
         case "export_animation":
             let file = try load(try fileURL(a))
             var doc = file.pages[try pageIndex(file, a)]
@@ -730,5 +852,164 @@ actor DottieTools {
         default:
             throw ToolFailure(message: "Unknown tool '\(name)'")
         }
+    }
+}
+
+// MARK: Animation tools
+
+extension DottieTools {
+    /// The animation tools: each edits one page's timeline and saves, like the other edit tools.
+    fileprivate func animation(_ name: String, _ a: Args) throws -> CallTool.Result {
+        let url = try fileURL(a)
+        var file = try load(url)
+        let p = try pageIndex(file, a, element: (try? a.uuids("ids"))??.first ?? (try? a.uuid("id")) ?? (try? a.uuid("connector_id")))
+        var doc = file.pages[p]
+        func elementOnPage(_ id: UUID) throws -> Element {
+            guard let e = doc.elements.first(where: { $0.id == id }) else {
+                throw ToolFailure(message: "No element \(id.uuidString) on page \"\(doc.name)\"")
+            }
+            return e
+        }
+        func ensure() { if doc.timeline == nil { doc.startAnimation(duration: 0) } }
+        let reply: String
+        do {
+            switch name {
+            case "set_timeline":
+                let changes = ["fps", "duration", "boil", "settle", "poster"].contains { a.raw[$0] != nil }
+                if changes {
+                    ensure()
+                    if let v = a.double("fps") { doc.timeline!.fps = v }
+                    if let v = a.double("duration") { doc.timeline!.duration = v }
+                    if let v = a.double("boil") { doc.timeline!.boil = Int(max(0, min(v, 10_000))) }
+                    if let v = a.bool("settle") { doc.timeline!.settle = v ? true : nil }
+                    if let v = a.double("poster") { doc.timeline!.poster = v }
+                }
+                guard let tl = doc.timeline else { return text("Page \"\(doc.name)\" has no animation yet.") }
+                if !changes { return text(Self.describe(tl, in: doc)) }
+                reply = "Timeline: \(Self.secs(tl.duration)) at \(tl.fps) fps, boil \(tl.boil.map(String.init) ?? "off")"
+            case "animate_build":
+                ensure()
+                let tr = try a.string("transition").map { s -> Transition in
+                    guard let t = Transition(rawValue: s) else { throw ToolFailure(message: "Unknown transition '\(s)'") }
+                    return t
+                } ?? .popIn
+                try doc.addBuild(tr, at: a.double("start") ?? 0, stagger: a.double("stagger") ?? 0.4,
+                                 packets: a.bool("packets") ?? false, drawArrows: a.bool("draw_arrows") ?? false,
+                                 travel: a.double("travel") ?? 0.6)
+                reply = "The page now builds itself over \(Self.secs(doc.timeline!.duration))"
+            case "add_transition":
+                guard let ids = try a.uuids("ids"), !ids.isEmpty else { throw ToolFailure(message: "'ids' must list element ids") }
+                for id in ids { _ = try elementOnPage(id) }
+                guard let tr = Transition(rawValue: try a.require("name")) else {
+                    throw ToolFailure(message: "'name' must be one of \(transitionValues.joined(separator: ", "))")
+                }
+                let t = try a.time("t")
+                ensure()
+                let stagger = (a.double("stagger") ?? 0.15).isFinite ? min(max(a.double("stagger") ?? 0.15, 0), 60) : 0.15
+                let repeats = a.double("repeat").flatMap { r -> Int?? in
+                    guard r.isFinite, r == 0 || r >= 2 else { return nil }
+                    return .some(r == 0 ? nil : Int(min(r, 10_000)))   // nil inside: forever
+                }
+                // Element by element, so each repeat covers exactly the transition it was given.
+                var n = 0
+                for id in ids where (try? elementOnPage(id))?.kind != .connector || tr.appliesToConnectors {
+                    let span = try doc.addTransition(tr, to: id, at: t + Double(n) * stagger, duration: a.double("duration"))
+                    if let count = repeats { doc.timeline!.addRepeat(for: id, from: span.start, to: span.end, count: count) }
+                    n += 1
+                }
+                reply = n == ids.count ? "Added \(tr.rawValue) to \(n) element\(n == 1 ? "" : "s")"
+                    : "Added \(tr.rawValue) to \(n) of \(ids.count) elements (connectors only take drawIn, fadeIn, fadeOut)"
+            case "add_keyframe":
+                let id = try a.uuid("id")
+                _ = try elementOnPage(id)
+                let t = try a.time("t")
+                let ease = try a.string("ease").map { s -> Ease in
+                    guard let e = Ease(rawValue: s) else { throw ToolFailure(message: "'ease' must be one of \(easeValues.joined(separator: ", "))") }
+                    return e
+                }
+                let k = Keyframe(t: t, x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
+                                 rotation: a.double("rotation").map { $0 * .pi / 180 }, strokeWidth: a.double("stroke_width"),
+                                 stroke: try a.color("stroke"), fill: try a.color("fill"), visible: a.bool("visible"),
+                                 reveal: a.double("reveal").map { min(max($0, 0), 1) },
+                                 opacity: a.double("opacity").map { min(max($0, 0), 1) }, ease: ease)
+                guard k != Keyframe(t: t, ease: ease) || ease != nil else { throw ToolFailure(message: "Give at least one property to key") }
+                doc.addKey(k, for: id)
+                reply = "Keyed at \(Self.secs(t))"
+            case "send_packet":
+                let c = try a.uuid("connector_id")
+                let t = try a.time("t")
+                ensure()
+                let dot = try doc.addPacket(along: c, at: t, duration: a.double("duration") ?? 0.6,
+                                            color: try a.color("color") ?? RGBA(r: 0.95, g: 0.36, b: 0.33), label: a.string("label"))
+                if let every = a.double("every"), every.isFinite, every > 0.1 {
+                    doc.timeline!.addRepeat(for: dot.id, from: t, to: t + every)
+                }
+                reply = "id: \(dot.id.uuidString)"
+            case "set_camera":
+                ensure()
+                if a.bool("clear") == true {
+                    doc.timeline!.camera = nil
+                    reply = "Camera removed; exports show the whole animation"
+                    break
+                }
+                let t = try a.time("t")
+                var view: CGRect
+                if let ids = try a.uuids("ids"), !ids.isEmpty {
+                    let index = doc.elementIndex
+                    view = try ids.map { id -> CGRect in
+                        let e = try elementOnPage(id)
+                        return e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.rotatedBounds
+                    }.reduce(CGRect.null) { $0.union($1) }
+                    let pad = a.double("padding") ?? 40
+                    view = view.insetBy(dx: -pad, dy: -pad)
+                } else if let x = a.double("x"), let y = a.double("y"), let w = a.double("width"), let h = a.double("height"), w > 1, h > 1 {
+                    view = CGRect(x: x, y: y, width: w, height: h)
+                } else {
+                    throw ToolFailure(message: "Give ids to frame, or x, y, width and height, or clear")
+                }
+                let ease = try a.string("ease").map { s -> Ease in
+                    guard let e = Ease(rawValue: s) else { throw ToolFailure(message: "'ease' must be one of \(easeValues.joined(separator: ", "))") }
+                    return e
+                }
+                doc.timeline!.setCamera(CameraKey(t: t, rect: view, ease: ease))
+                reply = "Camera at \(Self.secs(t)): x \(Int(view.minX)), y \(Int(view.minY)), \(Int(view.width))x\(Int(view.height))"
+            case "add_scene":
+                let t = try a.time("t")
+                ensure()
+                let label = a.string("name").flatMap { $0.isEmpty ? nil : $0 } ?? "Scene \((doc.timeline!.markers?.count ?? 0) + 1)"
+                doc.timeline!.addMarker(at: t, name: label)
+                reply = "Scene \"\(label)\" at \(Self.secs(t))"
+            default:  // clear_animation
+                if let ids = try a.uuids("ids"), !ids.isEmpty {
+                    doc.clearAnimation(of: Set(ids))
+                    reply = "Cleared the animation of \(ids.count) element\(ids.count == 1 ? "" : "s")"
+                } else {
+                    doc.timeline = nil
+                    reply = "Removed the page's animation"
+                }
+            }
+        } catch let e as OpsError { throw ToolFailure(message: e.description) }
+        file.pages[p] = doc
+        try save(file, to: url)
+        return text(reply + on(file, p))
+    }
+
+    /// Seconds for a reply: hundredths, no float noise.
+    static func secs(_ t: Double) -> String { "\((t * 100).rounded() / 100)s" }
+
+    /// A readable summary of a timeline, for set_timeline with no changes.
+    static func describe(_ tl: Timeline, in doc: DottieDocument) -> String {
+        var lines = ["\(secs(tl.duration)) at \(tl.fps) fps, boil \(tl.boil.map(String.init) ?? "off")\(tl.settle == true ? ", settles" : "")"
+                     + (tl.poster.map { ", poster \(secs($0))" } ?? "")]
+        let rows = TimelineRows(doc)
+        for group in rows.groups {
+            for row in group.rows {
+                let keys = row.keys.map { k in "\((k.t * 100).rounded() / 100)s " + k.sets.map(\.rawValue).sorted().joined(separator: "+") }
+                lines.append("- \(row.label) (\(row.element.uuidString)): " + (keys.isEmpty ? "path or repeat only" : keys.joined(separator: ", ")))
+            }
+        }
+        if let cam = tl.camera, !cam.isEmpty { lines.append("camera keys at " + cam.map { secs($0.t) }.joined(separator: ", ")) }
+        if let m = tl.markers, !m.isEmpty { lines.append("scenes: " + m.map { "\(secs($0.t)) \"\($0.name)\"" }.joined(separator: ", ")) }
+        return lines.joined(separator: "\n")
     }
 }
