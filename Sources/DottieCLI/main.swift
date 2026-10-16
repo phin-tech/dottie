@@ -105,7 +105,9 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--transparent": o.transparent = true
         case "--at":
             let v = try value(a)
-            guard let n = Double(v), n >= 0 else { throw CLIError(message: "--at must be a time in seconds", code: 2) }
+            guard let n = Double(v), n.isFinite, n >= 0, n <= Timeline.maxDuration else {
+                throw CLIError(message: "--at must be a time in seconds, 0 to \(Int(Timeline.maxDuration))", code: 2)
+            }
             o.at = n
         case "-":
             o.inputs.append(a)
@@ -132,6 +134,9 @@ func absolute(_ path: String) -> URL {
 func render(_ doc: DottieDocument, as format: Format, title: String, _ o: RenderOptions) throws -> Data {
     let plays = format == .gif || format == .mp4 || (format == .html && doc.timeline != nil && o.at == nil)
     var doc = plays ? doc : o.at.map(doc.resolved) ?? doc.still
+    if plays, Exporter.animationTooLong(doc) {
+        throw CLIError(message: "the animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
+    }
     if let r = o.roughness { doc = doc.withRoughness(r) }
     guard !doc.elements.isEmpty else { throw CLIError(message: "the drawing is empty; nothing to render") }
     let white = RGBA(r: 1, g: 1, b: 1)
@@ -146,7 +151,10 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
     case .svg:
         return Data(Exporter.svg(doc, background: o.transparent ? nil : white).utf8)
     case .html:
-        if plays { return Data(Exporter.player(doc, title: title).utf8) }
+        if plays {
+            guard let page = Exporter.player(doc, title: title) else { throw CLIError(message: "rendering failed") }
+            return Data(page.utf8)
+        }
         return Data(Exporter.html(doc, title: title, background: o.transparent ? nil : white).utf8)
     case .mermaid:
         return Data(Exporter.mermaid(doc).utf8)

@@ -389,13 +389,13 @@ public enum Renderer {
     /// without visiting the rest. `zoom` enables level of detail; `ink` resolves automatic ink per drawn
     /// element instead of copying the whole document.
     public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil, clip: CGRect? = nil,
-                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil) {
+                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil, skipping: Set<UUID> = []) {
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         let lod = zoom.map(DetailLevel.init)
         let index = spatial?.byID ?? doc.elementIndex
 
         func paint(_ e: Element) {
-            guard visible.contains(e.layerID) else { return }
+            guard visible.contains(e.layerID), !skipping.contains(e.id) else { return }
             if let lod, e.kind != .connector, !lod.isVisible(e.rotatedBounds) { return }
             draw(ink.map { e.resolvingInk(to: $0) } ?? e, in: ctx, document: doc, background: background, index: index, lod: lod)
         }

@@ -710,10 +710,13 @@ actor DottieTools {
             guard ["gif", "mp4", "html"].contains(ext) else { throw ToolFailure(message: "'out_path' must end in .gif, .mp4 or .html") }
             let out = try fileURL(a, key: "out_path", ext: ext)
             let scale = min(max(a.double("scale") ?? 1.5, 0.25), 4)
+            guard !Exporter.animationTooLong(doc) else {
+                throw ToolFailure(message: "The animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
+            }
             let data: Data? = switch ext {
             case "gif": Exporter.gif(doc, scale: scale)
             case "mp4": Exporter.mp4(doc, scale: scale)
-            default: Data(Exporter.player(doc, title: doc.name).utf8)
+            default: Exporter.player(doc, title: doc.name).map { Data($0.utf8) }
             }
             guard let data else { throw ToolFailure(message: "Rendering failed") }
             try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)

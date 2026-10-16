@@ -58,7 +58,8 @@ extension DottieDocument {
         guard e.kind != .connector || transition.appliesToConnectors else {
             throw OpsError.invalid("Connectors follow their shapes; only drawIn, fadeIn and fadeOut apply to them")
         }
-        let d = max(0.05, duration ?? transition.defaultDuration)
+        let t = Timeline.clampTime(t)
+        let d = min(max(0.05, duration ?? transition.defaultDuration), Timeline.maxDuration - t + 0.05)
         var tl = timeline ?? Timeline(duration: t + d)
         tl.duration = max(tl.duration, t + d)
         let restT = transition.isEntrance ? t + d : t

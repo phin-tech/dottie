@@ -27,16 +27,17 @@ public enum Exporter {
 
     /// The page's timeline as a looping animated GIF, every frame framed to the whole animation.
     /// A page without a timeline is a one-frame GIF.
+    /// nil when the animation is too long to export (see `maxAnimationFrames`).
     public static func gif(_ doc: DottieDocument, scale: Double = 1) -> Data? {
-        let (timeline, frames, b) = animation(doc)
+        guard let (_, times, durations, b) = animation(doc) else { return nil }
         let data = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, frames.count, nil)
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, times.count, nil)
         else { return nil }
         let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
         CGImageDestinationSetProperties(dest, loop as CFDictionary)
-        let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1 / timeline.fps]]
-        for f in frames {
-            guard let img = bitmap(f, bounds: b, scale: scale, background: CGColor(gray: 1, alpha: 1)) else { return nil }
+        for (t, shown) in zip(times, durations) {
+            guard let img = bitmap(doc.resolved(at: t), bounds: b, scale: scale, background: CGColor(gray: 1, alpha: 1)) else { return nil }
+            let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: shown]]
             CGImageDestinationAddImage(dest, img, delay as CFDictionary)
         }
         return CGImageDestinationFinalize(dest) ? data as Data : nil

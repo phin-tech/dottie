@@ -21,7 +21,7 @@ final class AnimationExportTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         let asset = AVURLAsset(url: url)
         let duration = try await asset.load(.duration)
-        XCTAssertEqual(duration.seconds, 1, accuracy: 0.05)
+        XCTAssertEqual(duration.seconds, 1.1, accuracy: 0.05, "ten frames, then the end pose for one more")
         let track = try await XCTUnwrapAsync(await asset.loadTracks(withMediaType: .video).first)
         let size = try await track.load(.naturalSize)
         XCTAssertEqual(Int(size.width) % 2, 0)
@@ -30,8 +30,8 @@ final class AnimationExportTests: XCTestCase {
     }
 
     func testPlayerHasEveryFrameOnOneViewBox() throws {
-        let html = Exporter.player(try animated(), title: "<demo>")
-        XCTAssertEqual(html.components(separatedBy: "<div class=\"f").count - 1, 10)
+        let html = try XCTUnwrap(Exporter.player(try animated(), title: "<demo>"))
+        XCTAssertEqual(html.components(separatedBy: "<div class=\"f").count - 1, 11)
         let boxes = Set(html.components(separatedBy: "viewBox=\"").dropFirst().map { $0.prefix { $0 != "\"" } })
         XCTAssertEqual(boxes.count, 1)
         XCTAssertTrue(html.contains("&lt;demo&gt;"))

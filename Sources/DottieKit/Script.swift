@@ -459,7 +459,9 @@ public enum DottieScript {
             case "key":
                 let id = try a.uuid("id")
                 _ = try element(id)
-                guard let t = a.double("t"), t >= 0 else { throw OpsError.invalid("'t' (seconds, 0 or more) is required") }
+                guard let t = a.double("t"), t.isFinite, t >= 0, t <= Timeline.maxDuration else {
+                    throw OpsError.invalid("'t' (seconds, 0 to \(Int(Timeline.maxDuration))) is required")
+                }
                 let k = Keyframe(t: t, x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                  rotation: a.double("rotation").map { $0 * .pi / 180 }, strokeWidth: a.double("strokeWidth"),
                                  stroke: try a.color("stroke"), fill: try a.color("fill"), visible: a.bool("visible"),

@@ -3,18 +3,35 @@ import CoreGraphics
 import AVFoundation
 
 extension Exporter {
-    /// Every frame of `doc`'s timeline, and the bounds that hold all of them. A page without a timeline is
-    /// one frame.
-    static func animation(_ doc: DottieDocument) -> (Timeline, [DottieDocument], CGRect) {
+    /// The most frames an animation export draws (about 11 minutes at 15 fps).
+    public static let maxAnimationFrames = 10_000
+
+    /// True when `doc`'s animation has more frames than an export will draw.
+    public static func animationTooLong(_ doc: DottieDocument) -> Bool {
+        (doc.timeline?.frameCount ?? 1) + 1 > maxAnimationFrames
+    }
+
+    /// The times of `doc`'s frames, how long each shows, and the bounds that hold all of them; nil when there
+    /// are too many to export. Frames are resolved again when drawn rather than kept, so memory stays flat.
+    /// Empty frames (before anything has entered) don't count towards the bounds.
+    static func animation(_ doc: DottieDocument) -> (timeline: Timeline, times: [Double], durations: [Double], bounds: CGRect)? {
+        guard !animationTooLong(doc) else { return nil }
         let timeline = doc.timeline ?? Timeline(duration: 0)
-        let frames = (0..<timeline.frameCount).map { doc.resolved(at: timeline.time(ofFrame: $0)) }
-        let b = frames.map { bounds(of: $0) }.reduce(CGRect.null) { $0.union($1) }
-        return (timeline, frames, b)
+        let times = timeline.frameTimes
+        let step = 1 / timeline.fps
+        let durations = times.indices.map { i in i + 1 < times.count ? times[i + 1] - times[i] : step }
+        var b = CGRect.null
+        for t in times {
+            let frame = doc.resolved(at: t)
+            if !frame.elements.isEmpty { b = b.union(bounds(of: frame)) }
+        }
+        if b.isNull { b = bounds(of: doc.resolved(at: times[0])) }
+        return (timeline, times, durations, b)
     }
 
     /// The page's timeline as an H.264 movie on the page color.
     public static func mp4(_ doc: DottieDocument, scale: Double = 2) -> Data? {
-        let (timeline, frames, area) = animation(doc)
+        guard let (_, times, durations, area) = animation(doc) else { return nil }
         // H.264 wants even dimensions: grow the area to the next even pixel size.
         let w = Int((area.width * scale).rounded(.up)) + Int((area.width * scale).rounded(.up)) % 2
         let h = Int((area.height * scale).rounded(.up)) + Int((area.height * scale).rounded(.up)) % 2
@@ -36,8 +53,8 @@ extension Exporter {
         guard writer.startWriting() else { return nil }
         writer.startSession(atSourceTime: .zero)
 
-        for (i, frame) in frames.enumerated() {
-            guard let image = bitmap(frame, bounds: b, scale: scale, background: CGColor(gray: 1, alpha: 1)),
+        for t in times {
+            guard let image = bitmap(doc.resolved(at: t), bounds: b, scale: scale, background: CGColor(gray: 1, alpha: 1)),
                   let pool = adaptor.pixelBufferPool else { writer.cancelWriting(); return nil }
             var buffer: CVPixelBuffer?
             CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
@@ -49,12 +66,12 @@ extension Exporter {
             ctx?.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
             CVPixelBufferUnlockBaseAddress(buffer, [])
             while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.002) }
-            let time = CMTime(value: CMTimeValue((Double(i) * 600 / timeline.fps).rounded()), timescale: 600)
+            let time = CMTime(value: CMTimeValue((t * 600).rounded()), timescale: 600)
             guard adaptor.append(buffer, withPresentationTime: time) else { writer.cancelWriting(); return nil }
         }
         input.markAsFinished()
         // Hold the last frame for its full length rather than a single tick.
-        writer.endSession(atSourceTime: CMTime(value: CMTimeValue((Double(frames.count) * 600 / timeline.fps).rounded()), timescale: 600))
+        writer.endSession(atSourceTime: CMTime(value: CMTimeValue(((times.last ?? 0) + (durations.last ?? 0)) * 600), timescale: 600))
         let done = DispatchSemaphore(value: 0)
         writer.finishWriting { done.signal() }
         done.wait()
@@ -64,8 +81,12 @@ extension Exporter {
 
     /// A self-contained web page that plays the page's timeline: every frame as inline SVG, with play/pause,
     /// a scrubber, and the space and arrow keys. It loops, and stays sharp at any size.
-    public static func player(_ doc: DottieDocument, title: String = "Dottie animation") -> String {
-        let (timeline, frames, b) = animation(doc)
+    /// nil when the animation is too long to export (see `maxAnimationFrames`).
+    public static func player(_ doc: DottieDocument, title: String = "Dottie animation") -> String? {
+        guard let (timeline, times, _, b) = animation(doc) else { return nil }
+        // With reduced motion the player rests on the frame a still would show.
+        let poster = timeline.poster ?? timeline.duration
+        let posterIndex = times.indices.min { abs(times[$0] - poster) < abs(times[$1] - poster) } ?? 0
         let page = doc.resolvedTheme?.background ?? RGBA(r: 1, g: 1, b: 1)
         let ink = doc.resolvedTheme?.ink ?? .black
         func hex(_ c: RGBA) -> String {
@@ -75,8 +96,8 @@ extension Exporter {
         let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
         var body = ""
-        for (i, f) in frames.enumerated() {
-            body += "<div class=\"f\(i == 0 ? " on" : "")\">\(svg(f, background: nil, bounds: b))</div>\n"
+        for (i, t) in times.enumerated() {
+            body += "<div class=\"f\(i == 0 ? " on" : "")\">\(svg(doc.resolved(at: t), background: nil, bounds: b))</div>\n"
         }
         return """
         <!doctype html>
@@ -106,7 +127,7 @@ extension Exporter {
         \(body)</div>
         <div class="bar">
         <button id="play" aria-label="Pause">❚❚</button>
-        <input id="scrub" type="range" min="0" max="\(frames.count - 1)" value="0" aria-label="Frame">
+        <input id="scrub" type="range" min="0" max="\(times.count - 1)" value="0" aria-label="Frame">
         <output id="time">0.0s</output>
         </div>
         <script>
@@ -138,7 +159,7 @@ extension Exporter {
             else if (e.key === "ArrowRight") { setPlaying(false); show(i + 1); }
             else if (e.key === "ArrowLeft") { setPlaying(false); show(i - 1); }
           });
-          if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setPlaying(false); show(n - 1); }
+          if (matchMedia("(prefers-reduced-motion: reduce)").matches) { setPlaying(false); show(\(posterIndex)); }
           setPlaying(playing);
           requestAnimationFrame(tick);
         })();
