@@ -72,13 +72,13 @@ tag set its options, like `data-clean` or `data-no-loop`. Dottie's command-line 
 
 Here is one. Everything below comes from a single script tag,
 `<script src="labels.js" data-class="player"></script>`, and the file is all there is
-([labels.js](../compiled/labels.js), 80 KB):
+([labels.js](compiled/labels.js), 80 KB):
 
 <script src="../compiled/labels.js" data-class="player" data-label="Labelled requests, from one compiled script"></script>
 
-Every demo on this site is compiled too: [build.js](../compiled/build.js), [zoom.js](../compiled/zoom.js),
-[tour.js](../compiled/tour.js), [labels.js](../compiled/labels.js), [live.js](../compiled/live.js) and
-[stagger.js](../compiled/stagger.js).
+Every demo on this site is compiled too: [build.js](compiled/build.js), [zoom.js](compiled/zoom.js),
+[tour.js](compiled/tour.js), [labels.js](compiled/labels.js), [live.js](compiled/live.js) and
+[stagger.js](compiled/stagger.js).
 
 ## Render SVG in code
 
