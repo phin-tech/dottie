@@ -172,10 +172,12 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     }
 
     /// Copy with automatic ink replaced by `ink`; a light ink is not used on a light, mostly opaque fill.
+    /// Hatching leaves the page showing between its lines, so it never counts as a light fill.
     public func resolvingInk(to ink: RGBA) -> Element {
         guard style.stroke.isAutomaticInk else { return self }
         var copy = self
-        let onLightFill = style.fill.a >= 0.5 && style.fill.luminance > 0.5
+        let covers = style.fillStyle == .solid || style.fillStyle == .grid
+        let onLightFill = covers && style.fill.a >= 0.5 && style.fill.luminance > 0.5
         copy.style.stroke = (ink.luminance > 0.5 && onLightFill) ? .black : ink
         return copy
     }
