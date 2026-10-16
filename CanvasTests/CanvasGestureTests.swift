@@ -740,6 +740,46 @@ final class CanvasGestureTests: XCTestCase {
         view.onShowPage?(other)
         XCTAssertTrue(view.selection.isEmpty)
     }
+
+    // MARK: Animation preview
+
+    private func redBox() -> Element {
+        var st = Style(); st.roughness = 0; st.fill = RGBA(r: 1, g: 0, b: 0)
+        let e = Element(kind: .rectangle, frame: CGRect(x: 100, y: 100, width: 100, height: 100), style: st, layerID: layer)
+        view.model.elements.append(e)
+        var tl = Timeline(duration: 1)
+        tl.setKey(Keyframe(t: 0, x: 100), for: e.id)
+        tl.setKey(Keyframe(t: 1, x: 500), for: e.id)
+        view.model.timeline = tl
+        return e
+    }
+
+    private func isRed(at p: CGPoint) -> Bool {
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+        let c = rep.colorAt(x: Int(p.x * scale), y: Int(p.y * scale))!.usingColorSpace(.sRGB)!
+        return c.redComponent > 0.8 && c.greenComponent < 0.5 && c.blueComponent < 0.5 // color-managed red
+    }
+
+    func testPreviewDrawsTheFrameAtThePlayhead() {
+        _ = redBox()
+        XCTAssertTrue(isRed(at: CGPoint(x: 150, y: 150)), "editing shows the base pose")
+        view.playhead = 1
+        XCTAssertTrue(isRed(at: CGPoint(x: 550, y: 150)))
+        XCTAssertFalse(isRed(at: CGPoint(x: 150, y: 150)))
+        view.playhead = nil
+        XCTAssertTrue(isRed(at: CGPoint(x: 150, y: 150)))
+    }
+
+    func testPreviewTakesNoEdits() {
+        let e = redBox()
+        view.playhead = 0.5
+        drag(CGPoint(x: 150, y: 150), CGPoint(x: 400, y: 400))
+        XCTAssertTrue(commits.isEmpty)
+        XCTAssertEqual(element(e.id).frame, e.frame)
+        XCTAssertNil(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 150))))
+    }
 }
 
 /// Undo and redo in a multi-page document land on the page they change.
@@ -790,4 +830,5 @@ final class PageUndoTests: XCTestCase {
         undo.undo()
         XCTAssertEqual(doc.currentPageID, doomed)
     }
+
 }

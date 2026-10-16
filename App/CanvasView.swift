@@ -141,6 +141,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return s
     }
     var showRulers = false { didSet { needsDisplay = true } }
+    /// Seconds into the page's animation while previewing it; nil while editing. A preview draws that frame and
+    /// takes no edits, since shapes are not where the frame shows them.
+    var playhead: Double? {
+        didSet {
+            guard playhead != oldValue else { return }
+            if oldValue == nil { endEditing(); gesture = nil; marqueeRect = nil }
+            needsDisplay = true
+        }
+    }
     private let rulerSize: CGFloat = 20
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
@@ -228,6 +237,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         // Only what the dirty rectangle shows, in model units, found through the spatial index.
         let visible = CGRect(x: (dirtyRect.minX - pan.x) / zoom, y: (dirtyRect.minY - pan.y) / zoom,
                              width: dirtyRect.width / zoom, height: dirtyRect.height / zoom)
+        if let t = playhead, model.timeline != nil {
+            Renderer.draw(model.resolved(at: t), in: ctx, background: canvasBackground.cgColor, clip: visible,
+                          zoom: Double(zoom), ink: canvasInk)
+            ctx.restoreGState()
+            return
+        }
         // The label being edited is drawn by the editor instead, so the old text does not show through.
         var drawn = model
         if let id = editingID, let i = drawn.elements.firstIndex(where: { $0.id == id }) { drawn.elements[i].text = nil }
@@ -1116,6 +1131,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        if playhead != nil { return false }
         if let dragged = draggedStencil(sender) {
             let raw = convert(sender.draggingLocation, from: nil)
             let at = CGPoint(x: (raw.x - pan.x) / zoom, y: (raw.y - pan.y) / zoom)
@@ -1158,6 +1174,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// Right-clicking a shape selects it (with its group) unless it is already selected; empty canvas clears the selection.
     override func menu(for event: NSEvent) -> NSMenu? {
+        if playhead != nil { return nil }
         endEditing()
         linkSources = nil
         if let hit = spatial.element(at: point(event), in: model) {
@@ -1329,6 +1346,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             window?.invalidateCursorRects(for: self)
             return
         }
+        if playhead != nil { return }
         if linkSources != nil { finishLink(at: point(event)); return }
         if showRulers {
             let raw = convert(event.locationInWindow, from: nil)
@@ -1445,6 +1463,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             pan = CGPoint(x: panAnchor.pan.x + raw.x - panAnchor.raw.x, y: panAnchor.pan.y + raw.y - panAnchor.raw.y)
             return
         }
+        if playhead != nil { return }
         if case .erasing? = gesture { eraseStep(at: point(event)); return }
         if case .guide(let vertical, let index)? = gesture {
             let q = point(event)
@@ -1586,6 +1605,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if playhead != nil, gesture == nil { return }
         defer {
             gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; pressedLink = nil; guides = []; spacingGuides = []; strokePoints = []; needsDisplay = true
             if spaceDown { window?.invalidateCursorRects(for: self) }
@@ -1663,6 +1683,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func keyDown(with event: NSEvent) {
         let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        if playhead != nil, !(event.keyCode == 49 && plain) { return super.keyDown(with: event) } // previewing: only space-panning
         if event.keyCode == 49, plain { // space: hold to pan
             if !event.isARepeat { spaceDown = true }
             return
@@ -1822,6 +1843,7 @@ struct CanvasView: NSViewRepresentable {
     @Binding var placeRequest: PlaceRequest?
     var showRulers = false
     @Binding var jumpRequest: JumpRequest?
+    var playhead: Double?
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
@@ -1855,6 +1877,7 @@ struct CanvasView: NSViewRepresentable {
         v.routing = routing
         v.activeLayerID = activeLayerID
         v.showRulers = showRulers
+        if v.playhead != playhead { v.playhead = playhead }
         if v.selection != selection { v.selection = selection }
         if let req = placeRequest, v.handledPlace != req.id {
             v.handledPlace = req.id
