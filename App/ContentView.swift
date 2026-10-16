@@ -285,12 +285,13 @@ struct Inspector: View {
             }
             if !selected.isEmpty {
                 Section("Link") {
+                    let targets = linkTargets   // every titled shape in the file: worked out once per update
                     Picker("Jumps to", selection: linkBinding) {
                         Text("None").tag(UUID?.none)
-                        if let id = selectedLink, !linkTargets.contains(where: { $0.id == id }) {
+                        if let id = selectedLink, !targets.contains(where: { $0.id == id }) {
                             Text(linkTitle(id) ?? "Missing element").tag(UUID?.some(id))
                         }
-                        ForEach(linkTargets) { t in Text(t.title).tag(UUID?.some(t.id)) }
+                        ForEach(targets) { t in Text(t.title).tag(UUID?.some(t.id)) }
                     }
                     .help("Click the badge beside the shape, or ⌘-click the shape, to go there")
                     if let id = selectedLink {
@@ -336,8 +337,9 @@ struct Inspector: View {
             let prefix = page.id == here ? "" : page.name + " › "
             out += page.elements
                 .filter { $0.kind != .connector && !selection.contains($0.id) && !(($0.anchor ?? $0.text) ?? "").isEmpty }
-                .sorted { $0.displayTitle.localizedCaseInsensitiveCompare($1.displayTitle) == .orderedAscending }
-                .map { LinkTarget(id: $0.id, title: prefix + $0.displayTitle) }
+                .map { LinkTarget(id: $0.id, title: $0.displayTitle) }
+                .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+                .map { LinkTarget(id: $0.id, title: prefix + $0.title) }
             if out.count >= Self.linkTargetLimit { break }
         }
         return Array(out.prefix(Self.linkTargetLimit))
