@@ -1,11 +1,11 @@
 # Publishes website/ (Material for MkDocs) to GitHub Pages. The demo drawings are made on a Mac by `just demos`
-# and committed (website/docs/drawings); the site plays them with <dottie-player>, built here from web/.
+# and committed (website/docs/drawings); the site plays them with <dottie-player>, the published dottie.js.
 name: Pages
 
 on:
   push:
     branches: [main]
-    paths: [website/**, web/**, .github/workflows/pages.yml]
+    paths: [website/**, .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:
@@ -22,17 +22,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Build dottie.js
-        working-directory: web
-        run: |
-          npm ci
-          npm run build
-          cp dist/dottie-player.min.js ../website/docs/assets/
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

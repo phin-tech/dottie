@@ -34,9 +34,10 @@ nav:
 extra_css:
   - assets/site.css
 
-# Built from web/ by the Pages workflow (or `just site` locally); not committed.
+# <dottie-player>, the published dottie.js (web/) from npm via jsDelivr. 0.1 takes 0.1.x releases; bump it after
+# publishing a new minor version.
 extra_javascript:
-  - assets/dottie-player.min.js
+  - https://cdn.jsdelivr.net/npm/@phin-tech/dottie@0.1/dist/dottie-player.min.js
 
 markdown_extensions:
   - admonition

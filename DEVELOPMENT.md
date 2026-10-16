@@ -22,10 +22,15 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 `Dottie.xcodeproj` is generated from `project.yml` and gitignored, so change settings there, not in Xcode.
 
 **Website.** `website/` is the GitHub Pages site (Material for MkDocs), published by
-`.github/workflows/pages.yml` on pushes to `main` that touch it or `web/`. Its demos are the drawings in
+`.github/workflows/pages.yml` on pushes to `main` that touch it. Its demos are the drawings in
 `website/docs/drawings`, made by `just demos` (and `just readme-animation`) on a Mac and committed, and played
-live by `<dottie-player>`, which the workflow builds from `web/`. Preview it with
+live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.1` via jsDelivr, set in
+`website/mkdocs.yml`), so a change to `web/` reaches the site once it is published. Preview it with
 `pip install -r website/requirements.txt && just site`.
+
+**Publishing dottie.js.** Bump `version` in `web/package.json` (and `VERSION` in `web/src/index.ts`), then
+`cd web && npm publish` (it runs the tests and builds first; the `@phin-tech` npm organization owns it). After a
+new minor version, update the version in `website/mkdocs.yml`.
 
 **Looking at the running app.** `just debug-app file.dottie` launches a Debug build in the background on its own
 live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and

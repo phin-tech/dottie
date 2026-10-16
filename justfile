@@ -42,10 +42,8 @@ goldens-check:
 web-test:
     cd web && npm ci --silent && npm test
 
-# Preview the Pages site locally, with dottie.js built from web/ (needs: pip install -r website/requirements.txt)
+# Preview the Pages site locally (needs: pip install -r website/requirements.txt)
 site:
-    cd web && npm ci --silent && npm run build
-    cp web/dist/dottie-player.min.js website/docs/assets/
     mkdocs serve -f website/mkdocs.yml
 
 # Launch a Debug build on its own live socket, for scripts/dottie-debug.py to drive (snapshots, playhead, actions)
