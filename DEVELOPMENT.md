@@ -24,7 +24,7 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 **Website.** `website/` is the GitHub Pages site (Material for MkDocs), published by
 `.github/workflows/pages.yml` on pushes to `main` that touch it. Its demos are the drawings in
 `website/docs/drawings`, made by `just demos` (and `just readme-animation`) on a Mac and committed, and played
-live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.1` via jsDelivr, set in
+live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.2` via jsDelivr, set in
 `website/mkdocs.yml`), so a change to `web/` reaches the site once it is published. Preview it with
 `pip install -r website/requirements.txt && just site`.
 
