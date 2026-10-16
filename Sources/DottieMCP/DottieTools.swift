@@ -522,7 +522,7 @@ actor DottieTools {
             var content: [Tool.Content] = [.plain(report)]
             if a.bool("render") == true, !doc.elements.isEmpty {
                 let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
-                if let png = Exporter.png(doc, scale: scale) {
+                if let png = Exporter.png(doc.still, scale: scale) {
                     content.insert(.png(png), at: 0)
                 }
             }
@@ -643,7 +643,7 @@ actor DottieTools {
 
         case "export_png":
             let file = try load(try fileURL(a))
-            var doc = file.pages[try pageIndex(file, a)]
+            var doc = file.pages[try pageIndex(file, a)].still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to render") }
             let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
@@ -672,7 +672,7 @@ actor DottieTools {
 
         case "export_svg":
             let file = try load(try fileURL(a))
-            var doc = file.pages[try pageIndex(file, a)]
+            var doc = file.pages[try pageIndex(file, a)].still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
             let svg = Exporter.svg(doc, background: a.bool("transparent") == true ? nil : RGBA(r: 1, g: 1, b: 1))

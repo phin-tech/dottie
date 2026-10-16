@@ -70,6 +70,8 @@ public struct Timeline: Codable, Equatable, Sendable {
     /// Boil a shape only while its keys are changing it, so its lines settle once it holds still. Shapes
     /// without keys stay steady; a connector boils while either shape it attaches to does.
     public var settle: Bool?
+    /// The moment a still picture of the page shows (exports, previews, thumbnails); nil is the end.
+    public var poster: Double?
     public var tracks: [Track]
 
     public init(fps: Double = 12, duration: Double, boil: Int? = nil, settle: Bool? = nil,
@@ -183,6 +185,7 @@ extension DottieDocument {
     public func resolved(at t: Double) -> DottieDocument {
         guard let timeline else { return self }
         var copy = self
+        copy.timeline = nil   // a frame is a still; resolving it again changes nothing
         let tracks = Dictionary(timeline.tracks.map { ($0.element, $0) }, uniquingKeysWith: { a, _ in a })
         let reseed: UInt32? = timeline.boil.map { n in
             UInt32(truncatingIfNeeded: Int((t * timeline.fps + 1e-9).rounded(.down)) / max(1, n))
@@ -225,6 +228,13 @@ extension DottieDocument {
         }
         copy.elements.removeAll { gone.contains($0.id) }
         return copy
+    }
+
+    /// The page as a still picture: its poster frame when it is animated, the end unless set otherwise.
+    /// The editor works on the page itself; exports, previews and thumbnails show this.
+    public var still: DottieDocument {
+        guard let timeline else { return self }
+        return resolved(at: timeline.poster ?? timeline.duration)
     }
 
     /// A different but repeatable seed for each boil step, never 0.

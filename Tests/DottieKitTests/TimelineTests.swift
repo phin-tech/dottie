@@ -136,6 +136,22 @@ final class TimelineTests: XCTestCase {
         XCTAssertNotEqual(doc.resolved(at: 0.55).elements[1].seed, calm.seed, "nil follows the timeline")
     }
 
+    func testStillShowsThePosterFrameAndFramesAreStills() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc), b = try box(&doc, x: 300)
+        let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        let dot = try doc.addPacket(along: c.id, at: 0.5)
+        try doc.addTransition(.popIn, to: b.id, at: 1)
+        XCTAssertNil(doc.resolved(at: 0.5).timeline)
+        XCTAssertEqual(doc.resolved(at: 0.7).resolved(at: 0), doc.resolved(at: 0.7))
+        let end = doc.still.elements.map(\.id)
+        XCTAssertFalse(end.contains(dot.id), "the packet has arrived")
+        XCTAssertTrue(end.contains(b.id))
+        doc.timeline!.poster = 0.2
+        XCTAssertEqual(doc.still.elements.map(\.id), [a.id], "before b and the arrow appear")
+        XCTAssertEqual(Exporter.bounds(of: doc.still).width, Exporter.bounds(of: doc.resolved(at: 0.2)).width)
+    }
+
     func testRoundTripsAndOldPagesStillDecode() throws {
         var doc = DottieDocument()
         let a = try box(&doc)

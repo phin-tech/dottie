@@ -28,6 +28,8 @@ RENDER
       --clean           Render precisely instead of sketchy.
       --sketchy         Render sketchy even if the drawing is clean.
       --transparent     No page background (png, svg, html).
+      --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
+                        unless set). gif ignores it.
 
 LIBRARY
   list      Shows the libraries installed for the Dottie app.
@@ -70,6 +72,7 @@ struct RenderOptions {
     var scale = 2.0
     var roughness: Double?
     var transparent = false
+    var at: Double?
 }
 
 func parseRender(_ args: [String]) throws -> RenderOptions {
@@ -99,6 +102,10 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--clean": o.roughness = 0
         case "--sketchy": o.roughness = 1
         case "--transparent": o.transparent = true
+        case "--at":
+            let v = try value(a)
+            guard let n = Double(v), n >= 0 else { throw CLIError(message: "--at must be a time in seconds", code: 2) }
+            o.at = n
         case "-":
             o.inputs.append(a)
         default:
@@ -122,7 +129,7 @@ func absolute(_ path: String) -> URL {
 }
 
 func render(_ doc: DottieDocument, as format: Format, title: String, _ o: RenderOptions) throws -> Data {
-    var doc = doc
+    var doc = format == .gif ? doc : o.at.map(doc.resolved) ?? doc.still
     if let r = o.roughness { doc = doc.withRoughness(r) }
     guard !doc.elements.isEmpty else { throw CLIError(message: "the drawing is empty; nothing to render") }
     let white = RGBA(r: 1, g: 1, b: 1)
