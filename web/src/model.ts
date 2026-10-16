@@ -9,7 +9,7 @@ export type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connec
 export type Port = "top" | "right" | "bottom" | "left";
 export type Routing = "straight" | "curved" | "elbow";
 export type Arrowhead = "none" | "arrow" | "triangle" | "dot" | "bar";
-export type Ease = "linear" | "easeIn" | "easeOut" | "easeInOut" | "hold";
+export type Ease = "linear" | "easeIn" | "easeOut" | "easeInOut" | "hold" | "spring" | "bounce" | "elastic";
 
 export interface Style {
   stroke: RGBA;
@@ -127,7 +127,7 @@ export interface DottieFile {
 /** The newest file version this library was written for. Newer files still load, with a warning. */
 export const SUPPORTED_VERSION = 2;
 export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image"];
-const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold"];
+const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"];
 
 /** The fields dottie.js reads, per object; the schema test checks they're exactly the schema's. Anything else
  * in a file is newer than this version and is reported in `warnings`. */

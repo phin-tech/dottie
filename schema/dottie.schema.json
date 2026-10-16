@@ -164,7 +164,7 @@
       }
     },
     "arrowhead": { "enum": ["none", "arrow", "triangle", "dot", "bar"] },
-    "ease": { "enum": ["linear", "easeIn", "easeOut", "easeInOut", "hold"] },
+    "ease": { "enum": ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"] },
     "timeline": {
       "type": "object",
       "additionalProperties": false,

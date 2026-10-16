@@ -44,7 +44,7 @@ final class DebugDriver {
     keys <text>                  list the keys of the element whose text contains <text>
     keysel <text> <t>            select that element's key at <t> in the timeline (none: clear)
     keymove <text> <from> <to> [copy]   retime (or copy) a key, as dragging a diamond does
-    keyease <text> <t> <ease>    set a key's ease: linear, easeIn, easeOut, easeInOut, hold
+    keyease <text> <t> <ease>    set a key's ease: linear, easeIn, easeOut, easeInOut, hold, spring, bounce, elastic
     keydel <text> <t>            delete a key
     menu [Top/Sub/...]           list the menu bar (or a menu); items read as disabled while the app is in
                                  the background, since commands follow the focused window

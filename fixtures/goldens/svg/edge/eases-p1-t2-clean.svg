@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="295" height="388" viewBox="376 16 295 388">
+<rect x="376" y="16" width="295" height="388" fill="#ffffff"/>
+<path d="M400 40 L460 40 L460 90 L400 90 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="430" y="71.48">spring</tspan></text>
+<path d="M400 120 L460 120 L460 170 L400 170 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="430" y="151.48">bounce</tspan></text>
+<path d="M400 200 L460 200 L460 250 L400 250 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="430" y="231.48">elastic</tspan></text>
+<path d="M400 280 L460 280 L460 330 L400 330 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="430" y="311.48">wobble</tspan></text>
+<path d="M580 70 C580 86.57 566.57 100 550 100 C533.43 100 520 86.57 520 70 C520 53.43 533.43 40 550 40 C566.57 40 580 53.43 580 70 Z" fill="#f21a80" stroke="none"/>
+<path d="M580 70 C580 86.57 566.57 100 550 100 C533.43 100 520 86.57 520 70 C520 53.43 533.43 40 550 40 C566.57 40 580 53.43 580 70 Z" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M520 160 L522 160 L522 162 L520 162 Z" fill="none" stroke="#1f1f21" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M640 320 C640 353.14 613.14 380 580 380 C546.86 380 520 353.14 520 320 C520 286.86 546.86 260 580 260 C613.14 260 640 286.86 640 320 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M647 320 C647 323.87 643.87 327 640 327 C636.13 327 633 323.87 633 320 C633 316.13 636.13 313 640 313 C643.87 313 647 316.13 647 320 Z" fill="#333333" stroke="none"/>
+<path d="M647 320 C647 323.87 643.87 327 640 327 C636.13 327 633 323.87 633 320 C633 316.13 636.13 313 640 313 C643.87 313 647 316.13 647 320 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -711,7 +711,7 @@ public enum DottieScript {
     poster: the second exports and previews show (default the end; the editor shows the page unanimated)
       dottie.key(id, t, {x?, y?, width?, height?, rotation?, strokeWidth?, stroke?, fill?, visible?, reveal?, opacity?, ease?})  \
     a keyframe at t seconds; each property tweens between the keys that set it. ease (towards the next key): \
-    linear | easeIn | easeOut | easeInOut | hold. visible switches at the key: a lone visible:true key is where the \
+    linear | easeIn | easeOut | easeInOut | hold | spring | bounce | elastic (the last three overshoot and settle). visible switches at the key: a lone visible:true key is where the \
     element appears. reveal 0-1 draws the stroke on (fill and text follow once it is complete); opacity 0-1 fades. \
     Connectors follow their shapes and hide with them; key only their visible, reveal and opacity.
       dottie.transition(id | [ids], name, t, {duration?, stagger?})  given a list, starts each stagger seconds \

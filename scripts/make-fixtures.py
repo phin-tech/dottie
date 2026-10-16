@@ -432,8 +432,7 @@ def transitions():
             "popIn": [scaled(t, 0.2, "easeOut", True), scaled(t + 0.6 * d, 1.15, "easeInOut"), scaled(t + d, 1)],
             "growIn": [scaled(t, 0.02, "easeOut", True), scaled(t + d, 1)],
             "wipeIn": [wiped(t, 0, "easeOut", True), wiped(t + d, 1)],
-            "dropIn": [{"t": t, "y": fy - 140, "ease": "easeIn", "visible": True}, {"t": t + 0.65 * d, "y": fy, "ease": "easeOut"},
-                       {"t": t + 0.82 * d, "y": fy - 140 * 0.12, "ease": "easeIn"}, {"t": t + d, "y": fy}],
+            "dropIn": [{"t": t, "y": fy - 140, "ease": "bounce", "visible": True}, {"t": t + d, "y": fy}],
             "slideIn": [{"t": t, "x": fx - 120, "ease": "easeOut", "visible": True}, {"t": t + d, "x": fx}],
             "drawIn": [{"t": t, "visible": True, "reveal": 0, "ease": "easeInOut"}, {"t": t + d, "reveal": 1}],
             "fadeIn": [{"t": t, "visible": True, "opacity": 0, "ease": "easeOut"}, {"t": t + d, "opacity": 1}],
@@ -447,6 +446,25 @@ def transitions():
         }[n]
         p.track(e, keys)
     write(EDGE / "transitions.dottie", [p])
+
+
+def eases():
+    """The springy eases, which overshoot: colors, sizes and line widths are clamped, follows stop at the end."""
+    p = Page()
+    p.animate(2, fps=20)
+    for i, ease in enumerate(["spring", "bounce", "elastic", "wobble"]):   # wobble: a name from the future, played linear
+        e = p.add("rectangle", 40, 40 + i * 80, 60, 50, text=ease)
+        p.track(e, [{"t": 0, "x": 40, "ease": ease}, {"t": 1.5, "x": 400}])
+    tint = p.add("ellipse", 520, 40, 60, 60, style=style(fill=rgba(0.05, 0.9, 0.5)))
+    p.track(tint, [{"t": 0, "fill": rgba(0.05, 0.9, 0.5), "stroke": rgba(0, 0, 0), "ease": "elastic"},
+                   {"t": 1, "fill": rgba(0.95, 0.1, 0.5, 1), "stroke": rgba(1, 1, 1)}])
+    shrink = p.add("rectangle", 520, 160, 80, 60)
+    p.track(shrink, [{"t": 0, "width": 80, "height": 60, "strokeWidth": 4, "ease": "elastic"},
+                     {"t": 1, "width": 2, "height": 2, "strokeWidth": 0.5}])
+    ring = p.add("ellipse", 520, 260, 120, 120)
+    dot = p.add("ellipse", 0, 0, 14, 14, style=style(fill=rgba(0.2, 0.2, 0.2)))
+    p.track(dot, [], follow=[{"path": ring, "start": 0, "end": 1.5, "ease": "elastic"}])
+    write(EDGE / "eases.dottie", [p])
 
 
 def notes():
@@ -504,6 +522,7 @@ def main():
     transitions()
     notes()
     js_only()
+    eases()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

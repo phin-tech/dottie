@@ -86,7 +86,8 @@ extension Track {
         guard let pathElement = doc.elements.first(where: { $0.id == f.path }), pathElement.id != e.id else { return e }
         let line = Polyline(tracing: pathElement, in: doc)
         let span = f.end - f.start
-        var u = (f.ease ?? .easeInOut).apply(span > 0 ? min(1, (t - f.start) / span) : 1) * (f.laps ?? 1)
+        // An overshooting ease stops at the end of the path rather than wrapping round to its start.
+        var u = min(max((f.ease ?? .easeInOut).apply(span > 0 ? min(1, (t - f.start) / span) : 1), 0), 1) * (f.laps ?? 1)
         if u > 1 { u = u.truncatingRemainder(dividingBy: 1) == 0 ? 1 : u.truncatingRemainder(dividingBy: 1) }
         if f.reverse == true { u = 1 - u }
         let p = line.point(at: u)

@@ -143,6 +143,9 @@ struct TimelinePanel: View {
         case .easeOut: "Ease Out"
         case .easeInOut: "Ease In and Out"
         case .hold: "Hold"
+        case .spring: "Spring"
+        case .bounce: "Bounce"
+        case .elastic: "Elastic"
         }
     }
 

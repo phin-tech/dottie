@@ -1,10 +1,23 @@
 import Foundation
 
-/// The curve from one keyframe to the next.
+/// The curve from one keyframe to the next. Each is a pure function of the fraction of the way between the
+/// keys, 0 at the first and exactly 1 at the second; spring and elastic pass 1 on the way, overshooting the
+/// next key's value and settling back onto it.
 public enum Ease: String, Codable, Sendable, CaseIterable {
     case linear, easeIn, easeOut, easeInOut
     /// Keep this key's value until the next key, then jump (a Flash "keyframe without a tween").
     case hold
+    /// Starts gently, overshoots and settles, like a weight on a spring.
+    case spring
+    /// Lands and bounces a few times, each lower, like a dropped ball.
+    case bounce
+    /// Snaps there and wobbles about it, like a plucked rubber band.
+    case elastic
+
+    /// A name this version doesn't know (written by a newer Dottie) plays linear rather than failing the file.
+    public init(from decoder: Decoder) throws {
+        self = Ease(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .linear
+    }
 
     func apply(_ u: Double) -> Double {
         switch self {
@@ -13,7 +26,37 @@ public enum Ease: String, Codable, Sendable, CaseIterable {
         case .easeOut: 1 - pow(1 - u, 3)
         case .easeInOut: u < 0.5 ? 4 * u * u * u : 1 - pow(-2 * u + 2, 3) / 2
         case .hold: 0
+        case .spring: Self.spring(u)
+        case .bounce: Self.bounce(u)
+        case .elastic: Self.elastic(u)
         }
+    }
+
+    /// A damped spring released from rest, nudged so it is exactly 1 at the end.
+    static func spring(_ u: Double) -> Double {
+        if u <= 0 { return 0 }
+        if u >= 1 { return 1 }
+        func s(_ u: Double) -> Double { 1 - exp(-6 * u) * (cos(3 * .pi * u) + 6 / (3 * .pi) * sin(3 * .pi * u)) }
+        return s(u) + u * (1 - s(1))
+    }
+
+    /// Robert Penner's ease-out bounce: four arcs, each landing on 1.
+    static func bounce(_ u: Double) -> Double {
+        if u <= 0 { return 0 }
+        if u >= 1 { return 1 }
+        let n = 7.5625, d = 2.75
+        if u < 1 / d { return n * u * u }
+        if u < 2 / d { let v = u - 1.5 / d; return n * v * v + 0.75 }
+        if u < 2.5 / d { let v = u - 2.25 / d; return n * v * v + 0.9375 }
+        let v = u - 2.625 / d
+        return n * v * v + 0.984375
+    }
+
+    /// Robert Penner's ease-out elastic.
+    static func elastic(_ u: Double) -> Double {
+        if u <= 0 { return 0 }
+        if u >= 1 { return 1 }
+        return pow(2, -10 * u) * sin((u * 10 - 0.75) * (2 * .pi / 3)) + 1
     }
 }
 
@@ -388,8 +431,10 @@ extension Track {
             value(at: t, p, base: base) { a, b, u in a + (b - a) * u }
         }
         func color(_ p: (Keyframe) -> RGBA?, _ base: RGBA) -> RGBA {
+            // Springy eases overshoot: a color can't go past white or black.
             value(at: t, p, base: base) { a, b, u in
-                RGBA(r: a.r + (b.r - a.r) * u, g: a.g + (b.g - a.g) * u, b: a.b + (b.b - a.b) * u, a: a.a + (b.a - a.a) * u)
+                func mix(_ p: Double, _ q: Double) -> Double { min(max(p + (q - p) * u, 0), 1) }
+                return RGBA(r: mix(a.r, b.r), g: mix(a.g, b.g), b: mix(a.b, b.b), a: mix(a.a, b.a))
             }
         }
         var e = e
@@ -404,9 +449,10 @@ extension Track {
         // A connector's geometry comes from its shapes; only its drawing-on and opacity are keyed.
         if e.kind == .connector { return e }
         e.x = num(\.x, e.x); e.y = num(\.y, e.y)
-        e.width = num(\.width, e.width); e.height = num(\.height, e.height)
+        // Nor can a size or a line width go below nothing.
+        e.width = max(0, num(\.width, e.width)); e.height = max(0, num(\.height, e.height))
         if keys.contains(where: { $0.rotation != nil }) { e.rotation = num(\.rotation, e.angle) }
-        e.style.strokeWidth = num(\.strokeWidth, e.style.strokeWidth)
+        e.style.strokeWidth = max(0, num(\.strokeWidth, e.style.strokeWidth))
         e.style.stroke = color(\.stroke, e.style.stroke)
         e.style.fill = color(\.fill, e.style.fill)
         return e
