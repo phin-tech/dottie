@@ -129,6 +129,30 @@ export const SUPPORTED_VERSION = 2;
 export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image"];
 const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold"];
 
+/** The fields dottie.js reads, per object; the schema test checks they're exactly the schema's. Anything else
+ * in a file is newer than this version and is reported in `warnings`. */
+export const KNOWN_FIELDS: Record<string, readonly string[]> = {
+  file: ["version", "pages", "images"],
+  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline"],
+  layer: ["id", "name", "visible", "locked"],
+  rgba: ["r", "g", "b", "a"],
+  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity"],
+  element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
+    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "image", "reveal"],
+  strokePoint: ["x", "y"],
+  subpath: ["closed", "coords"],
+  inlineImage: ["data", "format"],
+  endpoint: ["elementID", "port", "x", "y"],
+  connector: ["start", "end", "routing", "startHead", "endHead"],
+  timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
+  track: ["element", "keys", "boil", "follow", "repeats"],
+  keyframe: ["t", "x", "y", "width", "height", "rotation", "strokeWidth", "stroke", "fill", "visible", "reveal", "opacity", "ease"],
+  follow: ["path", "start", "end", "ease", "reverse", "orient", "laps"],
+  repeat: ["start", "end", "count"],
+  cameraKey: ["t", "x", "y", "width", "height", "ease"],
+  marker: ["t", "name"],
+};
+
 export const MAX_DURATION = 3600;
 export const BOIL_DRAWINGS = 3;
 
@@ -169,8 +193,15 @@ class Reader {
     if (!this.seen.has(message)) { this.seen.add(message); this.warnings.push(message); }
   }
 
+  /** Reports fields this version doesn't read (they're ignored, as Dottie ignores them). */
+  fields(v: Obj, kind: string): void {
+    const known = KNOWN_FIELDS[kind];
+    for (const k of Object.keys(v)) if (!known.includes(k)) this.warn(`Unknown field "${k}" on ${kind}, ignored`);
+  }
+
   style(v: unknown): Style {
     const s = isObj(v) ? v : {};
+    this.fields(s, "style");
     const fillStyle = str(s.fillStyle) ?? "solid";
     const dash = str(s.dash) ?? "solid";
     if (!["solid", "hachure", "crossHatch", "grid"].includes(fillStyle)) this.warn(`Unknown fill style "${fillStyle}", drawn solid`);
@@ -202,6 +233,7 @@ class Reader {
 
   connector(v: unknown): ConnectorData | null {
     if (!isObj(v)) return null;
+    this.fields(v, "connector");
     const head = (h: unknown, d: Arrowhead): Arrowhead => {
       const s = str(h);
       return s && ["none", "arrow", "triangle", "dot", "bar"].includes(s) ? (s as Arrowhead) : d;
@@ -226,6 +258,7 @@ class Reader {
 
   element(v: unknown, images: Record<string, EmbeddedImage>): Element | null {
     if (!isObj(v)) return null;
+    this.fields(v, "element");
     const id = uuid(v.id), kind = str(v.kind), layerID = uuid(v.layerID);
     if (!id || !kind || !layerID) { this.warn("Skipped an element without an id, kind or layer"); return null; }
     if (!KINDS.includes(kind)) this.warn(`Unknown element kind "${kind}", drawn as a placeholder`);
@@ -261,6 +294,7 @@ class Reader {
 
   keyframe(v: unknown): Keyframe | null {
     if (!isObj(v)) return null;
+    this.fields(v, "keyframe");
     const t = num(v.t);
     if (t === undefined) return null;
     const k: Keyframe = { t };
@@ -278,6 +312,7 @@ class Reader {
 
   track(v: unknown): Track | null {
     if (!isObj(v)) return null;
+    this.fields(v, "track");
     const element = uuid(v.element);
     if (!element) return null;
     const keys = (Array.isArray(v.keys) ? v.keys : []).map((k) => this.keyframe(k))
@@ -304,6 +339,7 @@ class Reader {
 
   timeline(v: unknown): Timeline | null {
     if (!isObj(v)) return null;
+    this.fields(v, "timeline");
     const boil = num(v.boil);
     const camera = Array.isArray(v.camera)
       ? v.camera.filter(isObj).flatMap((c): CameraKey[] => {
@@ -336,6 +372,7 @@ class Reader {
 
   page(v: unknown, images: Record<string, EmbeddedImage>, n: number): Page {
     if (!isObj(v)) throw new DottieFormatError(`Page ${n} is not an object`);
+    this.fields(v, "page");
     const layers = (Array.isArray(v.layers) ? v.layers : []).filter(isObj).flatMap((l): Layer[] => {
       const id = uuid(l.id);
       return id ? [{ id, name: str(l.name) ?? "", visible: bool(l.visible) ?? true, locked: bool(l.locked) ?? false }] : [];
@@ -375,6 +412,7 @@ export function parseDottie(source: string | unknown): DottieFile {
   if (version === undefined) throw new DottieFormatError("Not a Dottie drawing (no version)");
   if (!Array.isArray(json.pages) || json.pages.length === 0) throw new DottieFormatError("A drawing needs at least one page");
   const reader = new Reader();
+  reader.fields(json, "file");
   if (version > SUPPORTED_VERSION) reader.warn(`File version ${version} is newer than this player knows (${SUPPORTED_VERSION}); some things may not show`);
   const images: Record<string, EmbeddedImage> = {};
   if (isObj(json.images)) {
