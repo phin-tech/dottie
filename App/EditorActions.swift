@@ -46,6 +46,11 @@ struct EditorActions {
     var toggleBoil: () -> Void
     var toggleSettle: () -> Void
     var clearKeys: () -> Void
+    var hasCamera: Bool
+    var addScene: () -> Void
+    var frameCamera: () -> Void
+    var removeCamera: () -> Void
+    var repeatSelection: () -> Void
 }
 
 /// The ways Animate ▸ Build Diagram reveals a page.
@@ -139,7 +144,35 @@ extension ContentView {
             } },
             toggleBoil: { edit("Boil Lines") { $0.startAnimation(); $0.timeline!.boil = $0.timeline!.boil == nil ? 2 : nil } },
             toggleSettle: { edit("Settle When Still") { $0.startAnimation(); $0.timeline!.settle = $0.timeline!.settle == true ? nil : true } },
-            clearKeys: { edit("Clear Keys") { $0.clearAnimation(of: ids) } })
+            clearKeys: { edit("Clear Keys") { $0.clearAnimation(of: ids) } },
+            hasCamera: !(document.model.timeline?.camera ?? []).isEmpty,
+            addScene: { edit("Add Scene") { doc in
+                doc.startAnimation()
+                let n = (doc.timeline!.markers?.count ?? 0) + 1
+                doc.timeline!.addMarker(at: playhead ?? 0, name: "Scene \(n)")
+            } },
+            frameCamera: { animate("Frame Camera") { doc in
+                let index = doc.elementIndex
+                let boxes = doc.resolved(at: playhead ?? 0).elements.filter { ids.contains($0.id) }
+                    .map { $0.kind == .connector ? Connector.bounds(of: $0, in: doc, index: index) : $0.rotatedBounds }
+                guard !boxes.isEmpty else { return false }
+                doc.startAnimation()
+                let view = boxes.reduce(CGRect.null) { $0.union($1) }.insetBy(dx: -40, dy: -40)
+                doc.timeline!.setCamera(CameraKey(t: playhead ?? 0, rect: view))
+                return true
+            } },
+            removeCamera: { edit("Remove Camera") { $0.timeline?.camera = nil } },
+            repeatSelection: { animate("Repeat Animation") { doc in
+                guard var tl = doc.timeline else { return false }
+                var any = false
+                for id in ids {
+                    guard let keys = tl.track(for: id)?.keys, let first = keys.first?.t, let last = keys.last?.t, last > first else { continue }
+                    tl.addRepeat(for: id, from: first, to: last)
+                    any = true
+                }
+                doc.timeline = tl
+                return any
+            } })
     }
 
     /// An animation edit that can fail or do nothing: beeps instead of committing in either case.

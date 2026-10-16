@@ -52,8 +52,9 @@ extension DottieDocument {
     /// Adds `transition` to element `id`, starting at `t` seconds, creating the timeline if there is none
     /// and lengthening it to fit. The motion is worked out from the element's pose when the transition
     /// rests: at its end for an entrance, at its start otherwise.
+    @discardableResult
     public mutating func addTransition(_ transition: Transition, to id: UUID, at t: Double,
-                                       duration: Double? = nil) throws {
+                                       duration: Double? = nil) throws -> (start: Double, end: Double) {
         guard let e = elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
         guard e.kind != .connector || transition.appliesToConnectors else {
             throw OpsError.invalid("Connectors follow their shapes; only drawIn, fadeIn and fadeOut apply to them")
@@ -115,5 +116,6 @@ extension DottieDocument {
         }
         for k in keys { tl.setKey(k, for: id) }
         timeline = tl
+        return (t, t + d)
     }
 }

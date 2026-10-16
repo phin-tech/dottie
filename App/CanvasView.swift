@@ -423,6 +423,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ctx.restoreGState()
 
         if showRulers { drawRulers(ctx) }
+        // The camera's view (what exports show) while previewing or posing.
+        if let tl = (poseSource ?? model).timeline, let t = poseTime ?? playhead, let view = tl.cameraView(at: t) {
+            ctx.saveGState()
+            ctx.translateBy(x: pan.x, y: pan.y); ctx.scaleBy(x: zoom, y: zoom)
+            ctx.setStrokeColor(NSColor.systemTeal.cgColor)
+            ctx.setLineWidth(2 / zoom)
+            ctx.setLineDash(phase: 0, lengths: [8 / zoom, 5 / zoom])
+            ctx.stroke(view)
+            ctx.restoreGState()
+        }
         if linkSources != nil { drawHint("Click the shape to link to (on any page)   ·   Esc to cancel") }
         else if let t = poseTime {
             drawHint("Posing at \(t.formatted(.number.precision(.fractionLength(1))))s   ·   changes become keyframes")

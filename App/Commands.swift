@@ -138,6 +138,19 @@ struct DottieCommands: Commands {
                 .disabled(editor == nil)
             Toggle("Settle When Still", isOn: Binding(get: { editor?.settles ?? false }, set: { _ in editor?.toggleSettle() }))
                 .disabled(editor?.hasAnimation != true)
+            Button("Repeat Selection's Animation") { editor?.repeatSelection() }
+                .disabled(n == 0 || editor?.hasAnimation != true)
+                .help("Play the selected shapes' keys over and over")
+            Divider()
+            Button("Add Scene Marker") { editor?.addScene() }
+                .disabled(editor == nil)
+                .help("A stop at the playhead for click-through presentations (in the HTML export)")
+            Button("Frame Camera on Selection") { editor?.frameCamera() }
+                .disabled(n == 0)
+                .help("Exports look at the selection from the playhead on, easing from the last camera key")
+            Button("Remove Camera") { editor?.removeCamera() }
+                .disabled(editor?.hasCamera != true)
+            Divider()
             Toggle("Onion Skin", isOn: $onionSkin)
                 .help("While posing, show the frames just before and after faintly")
             Divider()
