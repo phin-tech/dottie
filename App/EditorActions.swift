@@ -43,6 +43,9 @@ struct EditorActions {
     var addTransition: (DottieKit.Transition) -> Void
     var sendPacket: () -> Void
     var buildDiagram: (BuildStyle) -> Void
+    var hasNextPage: Bool
+    var magicMove: () -> Void
+    var marchSelection: () -> Void
     var toggleBoil: () -> Void
     var toggleSettle: () -> Void
     var clearKeys: () -> Void
@@ -139,6 +142,27 @@ extension ContentView {
                 case .popIn: try doc.addBuild(.popIn, at: playhead ?? 0)
                 case .drawIn: try doc.addBuild(.drawIn, at: playhead ?? 0, drawArrows: true)
                 case .packets: try doc.addBuild(.popIn, at: playhead ?? 0, packets: true)
+                }
+                return true
+            } },
+            hasNextPage: document.file.pages.last?.id != document.currentPageID,
+            magicMove: { animate("Magic Move") { doc in
+                let pages = document.file.pages
+                guard let i = pages.firstIndex(where: { $0.id == doc.id }), i + 1 < pages.count else { return false }
+                try doc.magicMove(to: pages[i + 1])
+                return true
+            } },
+            marchSelection: { animate("March") { doc in
+                // Selected lines march, or stop if they all already do.
+                let lines = doc.elements.filter { ids.contains($0.id) && ($0.kind == .connector || $0.kind == .freehand) }.map(\.id)
+                guard !lines.isEmpty else { return false }
+                doc.startAnimation()
+                let stop = lines.allSatisfy { doc.timeline!.track(for: $0)?.march != nil }
+                for id in lines {
+                    doc.timeline!.setMarch(stop ? nil : 40, for: id)
+                    if !stop, let i = doc.elements.firstIndex(where: { $0.id == id }), doc.elements[i].style.dash == .solid {
+                        doc.elements[i].style.dash = .dashed
+                    }
                 }
                 return true
             } },

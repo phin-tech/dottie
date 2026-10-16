@@ -566,6 +566,17 @@ public enum DottieScript {
                 doc.timeline = tl
                 return nil
 
+            case "magicMove":
+                guard let file else { throw OpsError.invalid("magicMove needs the drawing's other pages") }
+                let spec = (a.raw["page"] as? NSNumber).map { String($0.intValue) } ?? (a.raw["page"] as? String) ?? ""
+                let target = UUID(uuidString: spec).flatMap(file.page) ?? file.pageIndex(matching: spec).map { file.pages[$0] }
+                guard let target, target.id != doc.id else {
+                    throw OpsError.invalid("magicMove: no other page '\(spec)' (give a page's name, number or id)")
+                }
+                let s = try doc.magicMove(to: target, at: a.double("t"), duration: a.double("duration") ?? 1,
+                                          ease: try a.enumValue("ease", as: Ease.self) ?? .easeInOut)
+                return ["moved": s.moved, "entering": s.entering, "leaving": s.leaving]
+
             case "march":
                 let id = try a.uuid("id")
                 let e = try element(id)
@@ -625,6 +636,10 @@ public enum DottieScript {
           call("transition", merge(o, { id: idOf(id), name: name, t: t }));
         },
         boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
+        magicMove: function (page, o) {
+          var p = page && typeof page === "object" ? page.id : page;
+          return call("magicMove", merge(o, { page: p }));
+        },
         march: function (id, o) {
           var speed = o === null ? null : typeof o === "number" ? o : (o && o.speed !== undefined ? o.speed : 40);
           call("march", { id: idOf(id), speed: speed });
@@ -737,6 +752,11 @@ public enum DottieScript {
     fades). Canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
     (enter), popOut, shrinkOut, wipeOut, fadeOut (exit), pulse, wiggle (emphasis); arrows take drawIn, fadeIn, fadeOut
       dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
+      dottie.magicMove(page, {t?, duration?, ease?})  Keynote-style Magic Move: tweens this page into another \
+    page (its name, number or id) from t (default the end of the timeline) over duration (default 1 s, easeInOut). \
+    Shapes match by anchor, else seed (a duplicated page keeps them), else identical text; matched shapes tween \
+    frame, rotation, line width, colors and opacity (kind, text and other style stay this page's). Shapes only \
+    this page has fade out; the other page's extras are copied in and fade in. Returns {moved, entering, leaving}
       dottie.march(id, {speed?} | speed | null)  marching ants: the line's dashes travel from its start to its end \
     at speed points per second (default 40; negative runs backwards) for the whole timeline, evened out to loop \
     seamlessly; a solid line becomes dashed. null stops it. For a live stream or flow direction on an arrow
