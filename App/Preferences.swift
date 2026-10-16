@@ -10,6 +10,8 @@ enum Pref {
     static let snapToGrid = "snapToGrid"
     static let gridSize = "gridSize"
     static let singleKeyShortcuts = "singleKeyToolShortcuts"
+    /// After drawing a shape, connector, text or note, go back to the Select tool (as Excalidraw does).
+    static let returnToSelect = "returnToSelectAfterDrawing"
     static let mcpBinaryPath = "mcpBinaryPath"
     static let settingsTab = "settingsTab"
     static let appearance = "appearance"
@@ -89,6 +91,7 @@ private struct GeneralSettings: View {
     @AppStorage(Pref.snapToGrid) private var snapToGrid = false
     @AppStorage(Pref.gridSize) private var gridSize = Pref.gridSizeDefault
     @AppStorage(Pref.singleKeyShortcuts) private var singleKeyShortcuts = true
+    @AppStorage(Pref.returnToSelect) private var returnToSelect = false
     @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
     @AppStorage(Pref.checkForUpdates) private var checkForUpdates = true
@@ -113,6 +116,14 @@ private struct GeneralSettings: View {
                 Text("Snapping")
             } footer: {
                 Text("Hold ⌘ while dragging to bypass snapping.").foregroundStyle(.secondary)
+            }
+            Section {
+                Toggle("Return to the Select tool after drawing", isOn: $returnToSelect)
+            } header: {
+                Text("Tools")
+            } footer: {
+                Text("Draw a shape, arrow, text or note, then move it straight away. The pencil and eraser stay on.")
+                    .foregroundStyle(.secondary)
             }
             Section("Keyboard") {
                 Toggle("Single-key tool shortcuts (V, R, O, D, T, C, P)", isOn: $singleKeyShortcuts)

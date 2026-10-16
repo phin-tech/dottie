@@ -1473,6 +1473,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             onPreview?(model)
             gesture = nil
             beginEditing(e.id, isNew: true)
+            returnToSelectIfWanted()
             return
         }
 
@@ -1722,12 +1723,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 }
                 onPreview?(model)
                 beginEditing(e.id, isNew: true)
+                returnToSelectIfWanted()
                 return
             }
             if e.width < 3 && e.height < 3 { // accidental click
                 model = base; selection = []; onPreview?(base); return
             }
             commit(base, "Add Shape")
+            returnToSelectIfWanted()
         case .connecting(let id):
             if let e = model.elements.first(where: { $0.id == id }), let c = e.connector,
                c.start.elementID == nil, c.end.elementID == nil,
@@ -1735,6 +1738,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 model = base; selection = []; onPreview?(base); return
             }
             commit(base, "Add Connector")
+            returnToSelectIfWanted()
         case .drawing(let id):
             if strokePoints.count < 2 { model = base; selection = []; onPreview?(base); return }
             if let i = model.elements.firstIndex(where: { $0.id == id }) { model.elements[i].fitStroke() }
@@ -1774,6 +1778,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         selection = selection.filter { id in next.elements.contains { $0.id == id } }
         model = next
         onPreview?(next)
+    }
+
+    /// With the preference on, a finished shape, arrow, text or note hands back to the Select tool, as in
+    /// Excalidraw, so it can be moved straight away. The pencil and eraser keep going.
+    private func returnToSelectIfWanted() {
+        if tool != .select, Pref.bool(Pref.returnToSelect, default: false) { switchTool(.select) }
     }
 
     private func switchTool(_ t: Tool) {

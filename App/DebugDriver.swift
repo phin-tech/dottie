@@ -28,7 +28,7 @@ final class DebugDriver {
     var front: DebugHooks?
 
     static let help = """
-    state                        what the front window shows
+    state                        what the front window shows (page, tool, selection, timeline)
     open <file.dottie>           open a document (give it a moment, then `state`)
     size <width> <height>        resize the front window's content
     snapshot <out.png> [canvas]  render the window (or just the canvas) to a PNG
@@ -155,6 +155,7 @@ final class DebugDriver {
             "window \(Int(w.frame.width))x\(Int(w.frame.height)) \"\(w.title)\"",
             "page \"\(doc.name)\" (\(h.document.file.pages.count) pages), \(doc.elements.count) elements, \(h.selection().count) selected",
         ]
+        if let c = try? canvas() { lines.append("tool \(c.tool.rawValue)") }
         if let tl = doc.timeline {
             lines.append("timeline \(tl.duration)s at \(tl.fps) fps, \(tl.tracks.count) tracks, boil \(tl.boil.map(String.init) ?? "off"), settle \(tl.settle == true)")
         } else {
