@@ -49,6 +49,12 @@ final class LiveRegistry {
                   let new = request.file else { return LiveResponse(open: false) }
             doc.commitFile(new, actionName: request.actionName ?? "Agent Edit", undoManager: entry.undoManager)
             return LiveResponse(open: true)
+        case .debug:
+            #if DEBUG
+            return DebugDriver.shared.handle(request.args ?? [])
+            #else
+            return LiveResponse(open: false, error: "Debug commands need a Debug build of Dottie")
+            #endif
         }
     }
 }
@@ -94,6 +100,7 @@ final class LiveServer: @unchecked Sendable {
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         guard let line = LiveSocket.readLine(fd: fd),
               let request = try? JSONDecoder().decode(LiveRequest.self, from: line) else { return }
+        if let wait = request.wait, wait > 0 { Thread.sleep(forTimeInterval: min(wait, 30)) }
         let response = DispatchQueue.main.sync {
             MainActor.assumeIsolated { LiveRegistry.shared.handle(request) }
         }

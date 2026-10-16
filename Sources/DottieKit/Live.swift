@@ -7,14 +7,22 @@ import Darwin
 /// that are open in the app (undoable, no file-change conflicts). Newline-delimited JSON, one
 /// request and one response per connection.
 public struct LiveRequest: Codable, Sendable {
-    public enum Op: String, Codable, Sendable { case ping, get, put }
+    /// `debug` drives a Debug build of the app for visual checks (see `scripts/dottie-debug.py`); release
+    /// builds refuse it.
+    public enum Op: String, Codable, Sendable { case ping, get, put, debug }
     public var op: Op
     public var path: String?
     /// The whole file, every page, for `put`.
     public var file: DottieFile?
     public var actionName: String?
-    public init(op: Op, path: String? = nil, file: DottieFile? = nil, actionName: String? = nil) {
+    /// For `debug`: the command and its arguments, e.g. `["playhead", "1.5"]` or `["snapshot", "/tmp/a.png"]`.
+    public var args: [String]?
+    /// For `debug`: seconds to wait before handling it, so animations and layout settle.
+    public var wait: Double?
+    public init(op: Op, path: String? = nil, file: DottieFile? = nil, actionName: String? = nil,
+                args: [String]? = nil, wait: Double? = nil) {
         self.op = op; self.path = path; self.file = file; self.actionName = actionName
+        self.args = args; self.wait = wait
     }
 }
 
@@ -23,14 +31,18 @@ public struct LiveResponse: Codable, Sendable {
     public var open: Bool
     public var file: DottieFile?
     public var error: String?
-    public init(open: Bool, file: DottieFile? = nil, error: String? = nil) {
-        self.open = open; self.file = file; self.error = error
+    /// For `debug`: what the command found or did, as readable text.
+    public var text: String?
+    public init(open: Bool, file: DottieFile? = nil, error: String? = nil, text: String? = nil) {
+        self.open = open; self.file = file; self.error = error; self.text = text
     }
 }
 
 public enum LiveSocket {
-    /// Short enough for sockaddr_un (104 bytes on Darwin).
+    /// Short enough for sockaddr_un (104 bytes on Darwin). `DOTTIE_LIVE_SOCKET` overrides it, so a second
+    /// copy of the app (a Debug build being driven by an agent) doesn't take over the user's socket.
     public static var path: String {
+        if let custom = ProcessInfo.processInfo.environment["DOTTIE_LIVE_SOCKET"], !custom.isEmpty { return custom }
         let dir = (NSHomeDirectory() as NSString).appendingPathComponent("Library/Application Support/Dottie")
         return (dir as NSString).appendingPathComponent("live.sock")
     }

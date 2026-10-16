@@ -103,6 +103,7 @@ struct TimelinePanel: View {
                             .onChange(of: g.size.width) { _, w in trackWidth = w }
                     })
             }
+            .frame(height: 18)   // a vertical Divider takes all the height it is offered
             Divider()
             ScrollView(.vertical) {
                 LazyVStack(spacing: 0) {

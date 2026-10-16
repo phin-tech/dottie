@@ -118,9 +118,12 @@ struct DottieCommands: Commands {
             Button("New Animation") { editor?.newAnimation() }
                 .disabled(editor == nil || editor?.hasAnimation == true)
             Menu("Add Transition") {
-                Section("Enter") { ForEach(DottieKit.Transition.entrances, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } } }
-                Section("Exit") { ForEach(DottieKit.Transition.exits, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } } }
-                Section("Emphasis") { ForEach(DottieKit.Transition.emphasis, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } } }
+                // Entrances, exits, then emphasis; a Section would add separators of its own on top of these.
+                ForEach(DottieKit.Transition.entrances, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } }
+                Divider()
+                ForEach(DottieKit.Transition.exits, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } }
+                Divider()
+                ForEach(DottieKit.Transition.emphasis, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } }
             }
             .disabled(n == 0)
             Button("Send Packet Along Arrow") { editor?.sendPacket() }

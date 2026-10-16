@@ -15,6 +15,16 @@ canvas-test: gen
 gen:
     xcodegen generate
 
+# Launch a Debug build on its own live socket, for scripts/dottie-debug.py to drive (snapshots, playhead, actions)
+# (in the background, so it doesn't take focus; files open through the debug socket once it's up)
+debug-app *files: build
+    open -n -g --env DOTTIE_LIVE_SOCKET="$HOME/Library/Application Support/Dottie/debug.sock" "$(xcodebuild -project Dottie.xcodeproj -scheme Dottie -showBuildSettings 2>/dev/null | awk '/ BUILT_PRODUCTS_DIR /{print $3}')/Dottie.app"
+    for f in {{files}}; do scripts/dottie-debug.py --wait 3 open "$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"; done
+
+# Send a command to the Debug build started by debug-app (try: just debug help)
+debug *args:
+    scripts/dottie-debug.py {{args}}
+
 # Build the macOS app
 build: gen
     xcodebuild -project Dottie.xcodeproj -scheme Dottie build
