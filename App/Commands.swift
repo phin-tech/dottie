@@ -113,6 +113,33 @@ struct DottieCommands: Commands {
             }
             .disabled(n < 3)
         }
+        CommandMenu("Animate") {
+            let n = editor?.selectionCount ?? 0
+            Button("New Animation") { editor?.newAnimation() }
+                .disabled(editor == nil || editor?.hasAnimation == true)
+            Menu("Add Transition") {
+                Section("Enter") { ForEach(DottieKit.Transition.entrances, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } } }
+                Section("Exit") { ForEach(DottieKit.Transition.exits, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } } }
+                Section("Emphasis") { ForEach(DottieKit.Transition.emphasis, id: \.self) { t in Button(t.title) { editor?.addTransition(t) } } }
+            }
+            .disabled(n == 0)
+            Button("Send Packet Along Arrow") { editor?.sendPacket() }
+                .disabled((editor?.connectorsSelected ?? 0) == 0)
+            Menu("Build Diagram") {
+                ForEach(BuildStyle.allCases, id: \.self) { s in Button(s.title) { editor?.buildDiagram(s) } }
+            }
+            .disabled(editor == nil)
+            Divider()
+            Toggle("Boil Lines", isOn: Binding(get: { editor?.boils ?? false }, set: { _ in editor?.toggleBoil() }))
+                .disabled(editor == nil)
+            Toggle("Settle When Still", isOn: Binding(get: { editor?.settles ?? false }, set: { _ in editor?.toggleSettle() }))
+                .disabled(editor?.hasAnimation != true)
+            Divider()
+            Button("Clear Keys from Selection") { editor?.clearKeys() }
+                .disabled(n == 0 || editor?.hasAnimation != true)
+            Button("Remove Animation") { editor?.removeAnimation() }
+                .disabled(editor?.hasAnimation != true)
+        }
         CommandMenu("Script") {
             Button("Script Console…") { editor?.openScriptConsole() }
                 .keyboardShortcut("j", modifiers: [.command, .option])

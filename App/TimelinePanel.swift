@@ -3,13 +3,14 @@ import DottieKit
 
 /// The timeline under an animated page's canvas, Flash-style: a row per animated element, grouped by layer,
 /// with its keyframes (diamonds) and what happens between them (bars), under a ruler and a playhead.
-/// Dragging anywhere on the ruler or rows scrubs; the canvas previews the frame at `playhead` and takes no
-/// edits until Done (or Esc). Clicking a row's name selects that element for editing.
+/// Dragging anywhere on the ruler or rows scrubs. While playing, the canvas shows the frame at `playhead`
+/// and takes no edits; paused there, edits on the canvas pose that frame (they become keyframes). Done (or
+/// Esc) goes back to editing the page itself. Clicking a row's name selects that element.
 struct TimelinePanel: View {
     let page: DottieDocument
     @Binding var playhead: Double?
+    @Binding var playing: Bool
     var onSelect: (UUID) -> Void
-    @State private var playing = false
     @AppStorage("timelineCollapsed") private var collapsed = false
     @State private var collapsedLayers: Set<UUID> = []
 
@@ -71,7 +72,7 @@ struct TimelinePanel: View {
             if playhead != nil {
                 Button("Done") { stop() }
                     .controlSize(.small)
-                    .help("Back to editing (Esc)")
+                    .help("Stop posing and edit the page itself (Esc)")
             }
         }
         .font(.callout)
@@ -163,7 +164,7 @@ struct TimelinePanel: View {
 
     private func rowView(_ row: TimelineRows.Row) -> some View {
         HStack(spacing: 0) {
-            Button { stop(); onSelect(row.element) } label: {
+            Button { onSelect(row.element) } label: {
                 HStack(spacing: 6) {
                     Image(systemName: Self.symbol(row)).frame(width: 14).foregroundStyle(.secondary)
                     Text(row.label).lineLimit(1).truncationMode(.tail)

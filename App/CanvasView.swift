@@ -165,6 +165,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var onSelectionChange: ((Set<UUID>) -> Void)?
     /// Leaves an animation preview (Esc).
     var onExitPreview: (() -> Void)?
+    /// While posing, the time of the frame being edited (its edits become keyframes) and the page it was
+    /// resolved from; a new frame is only loaded when either changes, never in the middle of a gesture.
+    var poseTime: Double? { didSet { if poseTime != oldValue { needsDisplay = true } } }
+    var poseSource: DottieDocument?
     /// Shows another page; `model` is that page when it returns.
     var onShowPage: ((UUID) -> Void)?
     /// The page holding a followable shape (on a visible layer), searching the whole file.
@@ -397,6 +401,9 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
         if showRulers { drawRulers(ctx) }
         if linkSources != nil { drawHint("Click the shape to link to (on any page)   ·   Esc to cancel") }
+        else if let t = poseTime {
+            drawHint("Posing at \(t.formatted(.number.precision(.fractionLength(1))))s   ·   changes become keyframes")
+        }
 
         if zoom != 1 {
             let label = "\(Int((zoom * 100).rounded()))%" as NSString
@@ -1848,12 +1855,13 @@ struct CanvasView: NSViewRepresentable {
     var showRulers = false
     @Binding var jumpRequest: JumpRequest?
     var playhead: Double?
+    /// Seconds into the animation to pose, while paused on the timeline; nil edits the page itself.
+    var pose: Double?
     var onExitPreview: () -> Void = {}
     @Environment(\.undoManager) private var undoManager
 
     func makeNSView(context: Context) -> CanvasNSView {
         let v = CanvasNSView()
-        v.onPreview = { [document] in document.preview($0) }
         v.onToolChange = { t in DispatchQueue.main.async { tool = t } }
         v.onSelectionChange = { sel in DispatchQueue.main.async { selection = sel } }
         v.onShowPage = { [document, weak v] page in
@@ -1867,7 +1875,16 @@ struct CanvasView: NSViewRepresentable {
     }
 
     func updateNSView(_ v: CanvasNSView, context: Context) {
-        v.onCommit = { [document, undoManager] new, name in document.commit(new, actionName: name, undoManager: undoManager) }
+        if let t = pose {
+            // Posing: the canvas edits the frame at `t`; only the finished edit reaches the page, as keys.
+            v.onPreview = { _ in }
+            v.onCommit = { [document, undoManager] new, name in
+                document.commit(document.model.applyingPose(new, at: t), actionName: name, undoManager: undoManager)
+            }
+        } else {
+            v.onPreview = { [document] in document.preview($0) }
+            v.onCommit = { [document, undoManager] new, name in document.commit(new, actionName: name, undoManager: undoManager) }
+        }
         v.onLinkOtherPage = { [document, undoManager] sources, page, target in
             var next = document.file
             guard let i = next.index(of: page),
@@ -1875,7 +1892,17 @@ struct CanvasView: NSViewRepresentable {
             document.commitFile(next, actionName: "Link", undoManager: undoManager)
             return true
         }
-        if v.model != document.model { v.model = document.model }
+        if let t = pose {
+            if v.poseSource != document.model || v.poseTime != t {
+                v.poseSource = document.model
+                v.poseTime = t
+                let frame = document.model.resolved(at: t)
+                if v.model != frame { v.model = frame }
+            }
+        } else {
+            if v.poseTime != nil { v.poseTime = nil; v.poseSource = nil }
+            if v.model != document.model { v.model = document.model }
+        }
         if v.fileRevision != document.revision { v.fileRevision = document.revision; v.linksElsewhereChanged() }
         v.tool = tool
         v.style = style

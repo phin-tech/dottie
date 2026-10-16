@@ -781,6 +781,24 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertNil(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 150))))
     }
 
+    func testPosingADragBecomesKeysInOneCommit() {
+        let e = redBox()   // x keyed 100 -> 500 over 1s
+        let base = view.model
+        // What CanvasView does while paused at 0.5s: show that frame, and turn the finished edit into keys.
+        view.model = base.resolved(at: 0.5)
+        view.poseTime = 0.5
+        var posed: DottieDocument?
+        view.onPreview = { _ in }
+        view.onCommit = { [unowned self] new, name in commits.append((new, name)); posed = base.applyingPose(new, at: 0.5) }
+        drag(CGPoint(x: 350, y: 150), CGPoint(x: 350, y: 300))
+        XCTAssertEqual(commits.count, 1)
+        let result = try! XCTUnwrap(posed)
+        XCTAssertEqual(result.elements[0].frame, e.frame, "the page's own geometry is untouched")
+        XCTAssertEqual(result.resolved(at: 0.5).elements[0].y, 250, accuracy: 1)
+        XCTAssertEqual(result.resolved(at: 0).elements[0].y, 100, accuracy: 1, "pinned where it was at the start")
+        XCTAssertEqual(result.resolved(at: 1).elements[0].x, 500, accuracy: 1, "the x tween is kept")
+    }
+
     func testPreviewClearsSelectionAndEscLeavesIt() {
         let e = redBox()
         view.selection = [e.id]
