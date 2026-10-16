@@ -91,7 +91,7 @@ private struct GeneralSettings: View {
     @AppStorage(Pref.snapToGrid) private var snapToGrid = false
     @AppStorage(Pref.gridSize) private var gridSize = Pref.gridSizeDefault
     @AppStorage(Pref.singleKeyShortcuts) private var singleKeyShortcuts = true
-    @AppStorage(Pref.returnToSelect) private var returnToSelect = false
+    @AppStorage(Pref.returnToSelect) private var returnToSelect = true
     @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
     @AppStorage(Pref.checkForUpdates) private var checkForUpdates = true

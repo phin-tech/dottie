@@ -1787,7 +1787,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// With the preference on, a finished shape, arrow, text or note hands back to the Select tool, as in
     /// Excalidraw, so it can be moved straight away. The pencil and eraser keep going.
     private func returnToSelectIfWanted() {
-        if tool != .select, Pref.bool(Pref.returnToSelect, default: false) { switchTool(.select) }
+        if tool != .select, Pref.bool(Pref.returnToSelect, default: true) { switchTool(.select) }
     }
 
     private func switchTool(_ t: Tool) {
