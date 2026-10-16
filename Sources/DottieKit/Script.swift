@@ -566,6 +566,20 @@ public enum DottieScript {
                 doc.timeline = tl
                 return nil
 
+            case "march":
+                let id = try a.uuid("id")
+                let e = try element(id)
+                let speed = a.double("speed")
+                var tl = doc.timeline ?? Timeline(duration: 0)
+                tl.setMarch(speed, for: id)
+                doc.timeline = tl
+                // Marching needs dashes to show: a solid line becomes dashed.
+                if tl.track(for: id)?.march != nil, e.style.dash == .solid,
+                   let i = doc.elements.firstIndex(where: { $0.id == id }) {
+                    doc.elements[i].style.dash = .dashed
+                }
+                return nil
+
             default:
                 throw OpsError.invalid("Unknown dottie call '\(name)'")
             }
@@ -611,6 +625,10 @@ public enum DottieScript {
           call("transition", merge(o, { id: idOf(id), name: name, t: t }));
         },
         boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
+        march: function (id, o) {
+          var speed = o === null ? null : typeof o === "number" ? o : (o && o.speed !== undefined ? o.speed : 40);
+          call("march", { id: idOf(id), speed: speed });
+        },
         repeat: function (id, start, end, count) { call("repeat", { id: idOf(id), start: start, end: end, count: count }); },
         camera: function (t, view, o) {
           if (t === null) return call("camera", { clear: true });
@@ -719,6 +737,9 @@ public enum DottieScript {
     fades). Canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
     (enter), popOut, shrinkOut, wipeOut, fadeOut (exit), pulse, wiggle (emphasis); arrows take drawIn, fadeIn, fadeOut
       dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
+      dottie.march(id, {speed?} | speed | null)  marching ants: the line's dashes travel from its start to its end \
+    at speed points per second (default 40; negative runs backwards) for the whole timeline, evened out to loop \
+    seamlessly; a solid line becomes dashed. null stops it. For a live stream or flow direction on an arrow
       transition option repeat: true plays it forever, a number that many times (e.g. a pulse that never stops)
       dottie.repeat(id, start, end, count?)  play the element's keys from start to end again, count times in all \
     (default forever)

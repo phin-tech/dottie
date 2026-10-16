@@ -467,6 +467,26 @@ def eases():
     write(EDGE / "eases.dottie", [p])
 
 
+def march():
+    """Marching ants: dashes travel along lines, evened out to loop; a solid line shows nothing."""
+    p = Page()
+    p.animate(1.5, fps=10, boil=2)
+    a = p.add("rectangle", 40, 40, 100, 60, text="a")
+    b = p.add("rectangle", 360, 40, 100, 60, text="b")
+    flow = p.connect(a, b, st=style(dash="dashed"))
+    back = p.connect(a, b, routing="curved", start_port="bottom", end_port="bottom", st=style(dash="dotted", strokeWidth=3))
+    solid = p.connect(b, a, routing="elbow", start_port="top", end_port="top")
+    ring = p.add("ellipse", 520, 40, 100, 100, style=style(dash="dashed", roughness=0))
+    widen = p.add("rectangle", 520, 180, 100, 60, style=style(dash="dashed"))
+    p.track(flow, [], march=40)
+    p.track(back, [], march=-25)
+    p.track(solid, [], march=40)
+    p.track(ring, [], march=1e9)                       # clamped
+    p.track(widen, [{"t": 0, "strokeWidth": 2}, {"t": 1.5, "strokeWidth": 5}], march=30)
+    p.add("rectangle", 40, 180, 100, 60, style=style(dash="dashed", dashOffset=7))   # a still offset
+    write(EDGE / "march.dottie", [p])
+
+
 def notes():
     """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
     p = Page()
@@ -523,6 +543,7 @@ def main():
     notes()
     js_only()
     eases()
+    march()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

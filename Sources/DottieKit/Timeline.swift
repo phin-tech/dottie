@@ -100,15 +100,28 @@ public struct Track: Codable, Equatable, Sendable {
     public var follow: [Follow]?
     /// Spans of the keys that play again (a pulse that never stops, a wiggle three times).
     public var repeats: [Repeat]?
-    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil, repeats: [Repeat]? = nil) {
+    /// Marching ants: the element's dashes travel along its line at this many points per second, from its
+    /// start towards its end (backwards when negative), for the whole timeline. Only a dashed or dotted line
+    /// shows it. The speed is evened out so the dashes come round to where they started as the timeline loops.
+    public var march: Double?
+    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil, repeats: [Repeat]? = nil,
+                march: Double? = nil) {
         self.element = element
         self.keys = keys.sorted { $0.t < $1.t }
         self.boil = boil
         self.follow = follow
         self.repeats = repeats
+        self.march = march.flatMap(Self.clampMarch)
     }
 
-    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow, repeats }
+    /// The fastest march, points per second.
+    public static let maxMarch = 10_000.0
+    static func clampMarch(_ v: Double) -> Double? {
+        guard v.isFinite, v != 0 else { return nil }
+        return min(max(v, -maxMarch), maxMarch)
+    }
+
+    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow, repeats, march }
 
     /// Hand- or agent-written files may list keys out of order or with impossible times: keep the usable
     /// keys, in time order, so interpolation (which walks them in order) stays right.
@@ -122,6 +135,7 @@ public struct Track: Codable, Equatable, Sendable {
         follow = try c.decodeIfPresent([Follow].self, forKey: .follow)?
             .filter { $0.start.isFinite && $0.end.isFinite && $0.start >= 0 && $0.end <= Timeline.maxDuration }
         repeats = try c.decodeIfPresent([Repeat].self, forKey: .repeats)?.filter(\.isValid)
+        march = try c.decodeIfPresent(Double.self, forKey: .march).flatMap(Self.clampMarch)
     }
 
     /// The time inside the element's own keys that `t` plays: within a repeat, the same moment of the
@@ -308,6 +322,34 @@ public struct Timeline: Codable, Equatable, Sendable {
         else { tracks.append(Track(element: id, keys: [], boil: boil)) }
     }
 
+    /// Sets how fast the element's dashes march (see `Track.march`; nil or 0 stops them), creating an empty
+    /// track if needed.
+    public mutating func setMarch(_ speed: Double?, for id: UUID) {
+        let speed = speed.flatMap(Track.clampMarch)
+        if let ti = tracks.firstIndex(where: { $0.element == id }) {
+            tracks[ti].march = speed
+            let t = tracks[ti]
+            if speed == nil, t.keys.isEmpty, (t.follow ?? []).isEmpty, (t.repeats ?? []).isEmpty, t.boil == nil { tracks.remove(at: ti) }
+        } else if speed != nil {
+            tracks.append(Track(element: id, keys: [], march: speed))
+        }
+    }
+
+    /// Where the dashes of a line marching at `speed` stand at `t`: the dash phase, within one pattern
+    /// `period`. The speed is rounded to a whole number of patterns over the timeline, so a loop is seamless.
+    func marchOffset(speed: Double, period: Double, at t: Double) -> Double {
+        guard period > 0 else { return 0 }
+        var speed = speed
+        let d = Self.clampTime(duration)
+        if d > 0 {
+            let laps = (speed * d / period).rounded()
+            if laps != 0 { speed = laps * period / d }
+        }
+        let r = (speed * t).truncatingRemainder(dividingBy: period)
+        // Positive phase pulls the pattern back towards the start, so going forward is a falling phase.
+        return r < 0 ? -r : r == 0 ? 0 : period - r
+    }
+
     /// The element's keyframes, or nil if it isn't animated.
     public func track(for id: UUID) -> Track? { tracks.first { $0.element == id } }
 
@@ -361,7 +403,9 @@ public struct Timeline: Codable, Equatable, Sendable {
     public mutating func removeKey(of id: UUID, at t: Double) {
         guard let (ti, ki) = keyIndex(of: id, at: t) else { return }
         tracks[ti].keys.remove(at: ki)
-        if tracks[ti].keys.isEmpty, (tracks[ti].follow ?? []).isEmpty, tracks[ti].boil == nil { tracks.remove(at: ti) }
+        if tracks[ti].keys.isEmpty, (tracks[ti].follow ?? []).isEmpty, tracks[ti].boil == nil, tracks[ti].march == nil {
+            tracks.remove(at: ti)
+        }
     }
 
     /// Sets the curve from the element's key at `t` to the next one.
@@ -485,6 +529,9 @@ extension DottieDocument {
             let e = copy.elements[i]
             if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
+            if let speed = tracks[e.id]?.march, let pattern = Renderer.dashPattern(copy.elements[i].style.dash, width: copy.elements[i].style.strokeWidth) {
+                copy.elements[i].style.dashOffset = timeline.marchOffset(speed: speed, period: pattern.reduce(0, +), at: t)
+            }
         }
         // A hidden shape waits at its resting place, not at the start of the entrance it is about to make,
         // so arrows and paths leading to it already end where it will appear.

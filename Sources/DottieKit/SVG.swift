@@ -62,6 +62,7 @@ extension Exporter {
         var strokeAttrs = "stroke=\"\(stroke)\" stroke-width=\"\(num(e.style.strokeWidth))\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
         if let d = Renderer.dashPattern(e.style.dash, width: e.style.strokeWidth) {
             strokeAttrs += " stroke-dasharray=\"\(d.map { num($0) }.joined(separator: " "))\""
+            if let o = e.style.dashOffset, num(o) != "0" { strokeAttrs += " stroke-dashoffset=\"\(num(o))\"" }
         }
         var e = e
         if let r = e.revealProgress { // drawing on: a partial stroke, as Renderer.draw does

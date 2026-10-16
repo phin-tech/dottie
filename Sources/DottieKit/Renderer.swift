@@ -446,7 +446,7 @@ public enum Renderer {
             ctx.setLineWidth(e.style.strokeWidth)
             ctx.setLineCap(.round); ctx.setLineJoin(.round)
             if lod?.dashes ?? true, let d = dashPattern(e.style.dash, width: e.style.strokeWidth) {
-                ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) })
+                ctx.setLineDash(phase: e.style.dashOffset ?? 0, lengths: d.map { CGFloat($0) })
             }
         }
         if let r = e.revealProgress, e.kind == .text { e.text = e.typed(e.text ?? "", r) }
@@ -564,7 +564,9 @@ public enum Renderer {
         ctx.setStrokeColor(e.style.stroke.cgColor)
         ctx.setLineWidth(e.style.strokeWidth)
         ctx.setLineCap(.round); ctx.setLineJoin(.round)
-        if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) { ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) }) }
+        if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) {
+            ctx.setLineDash(phase: e.style.dashOffset ?? 0, lengths: d.map { CGFloat($0) })
+        }
         ctx.strokePath()
     }
 

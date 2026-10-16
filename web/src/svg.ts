@@ -128,6 +128,7 @@ function svgElement(e: Element, index: Index, labelBackground: RGBA | null): str
   let strokeAttrs = `stroke="${stroke}" stroke-width="${fmt(e.style.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"`;
   const dash = dashPattern(e.style.dash, e.style.strokeWidth);
   if (dash) strokeAttrs += ` stroke-dasharray="${dash.map(fmt).join(" ")}"`;
+  if (dash && e.style.dashOffset !== null && fmt(e.style.dashOffset) !== "0") strokeAttrs += ` stroke-dashoffset="${fmt(e.style.dashOffset)}"`;
   let text = e.text;
   const r = revealProgress(e);
   if (r !== null) {

@@ -7,9 +7,9 @@ import {
   BOIL_DRAWINGS, type CameraKey, type Ease, type Element, type Follow, type Keyframe, type Page, type RGBA, type Timeline,
   type Track, clampFPS, clampTime, cloneElement, repeatIsValid, sameColor,
 } from "./model.ts";
-import { Polyline, type Point, type Rect } from "./path.ts";
+import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
-import { outline } from "./shapes.ts";
+import { dashPattern, outline } from "./shapes.ts";
 
 export function applyEase(ease: Ease, u: number): number {
   switch (ease) {
@@ -189,6 +189,20 @@ export function following(track: Track, e: Element, t: number, page: Page): Elem
   return moved;
 }
 
+/** Where the dashes of a line marching at `speed` stand at `t`, within one pattern `period` (Timeline.marchOffset):
+ * the speed is rounded to a whole number of patterns over the timeline, so a loop is seamless. */
+export function marchOffset(tl: Timeline, speed: number, period: number, t: number): number {
+  if (!(period > 0)) return 0;
+  const d = clampTime(tl.duration);
+  if (d > 0) {
+    const laps = roundHalfAway((speed * d) / period);
+    if (laps !== 0) speed = (laps * period) / d;
+  }
+  const r = rem(speed * t, period);
+  // Positive phase pulls the pattern back towards the start, so going forward is a falling phase.
+  return r < 0 ? -r : r === 0 ? 0 : period - r;
+}
+
 /** Tracks by element; when two name the same element the first wins. */
 function trackMap(tl: Timeline): Map<string, Track> {
   const m = new Map<string, Track>();
@@ -224,6 +238,11 @@ export function resolved(page: Page, t: number): Page {
     if (reseed !== null && reseed > 0 && boils(e)) {
       if (out === e) out = cloneElement(e);
       out.seed = boiled(e.seed, reseed);
+    }
+    const pattern = track?.march != null ? dashPattern(out.style.dash, out.style.strokeWidth) : null;
+    if (track?.march != null && pattern) {
+      if (out === e) out = cloneElement(e);
+      out.style.dashOffset = marchOffset(timeline, track.march, pattern.reduce((a, b) => a + b, 0), t);
     }
     return out;
   });

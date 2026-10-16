@@ -29,6 +29,7 @@ fixture, so the gap is visible rather than silent.
 | Transitions | Supported | [edge/transitions](../fixtures/edge/transitions.dottie) | They are ordinary keys in the file |
 | Follow paths (connectors, outlines, orient, reverse, laps) | Supported | [edge/follow](../fixtures/edge/follow.dottie) | |
 | Packets, labelled packets | Supported | [design/labels](../fixtures/design/labels.dottie) | |
+| Marching ants (dashes travelling along a line) | Supported | [edge/march](../fixtures/edge/march.dottie) | `stroke-dashoffset` per frame, evened out to loop |
 | Repeats (counted and forever) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
 | Boil (three drawings) and settle | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | Boiled seeds match bit for bit |
 | Camera views | Supported | [edge/camera](../fixtures/edge/camera.dottie), [design/zoom](../fixtures/design/zoom.dottie) | |

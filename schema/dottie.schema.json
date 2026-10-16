@@ -74,7 +74,8 @@
         "bowing": { "type": "number" },
         "fontSize": { "type": "number" },
         "gridSize": { "type": "number" },
-        "opacity": { "type": "number" }
+        "opacity": { "type": "number" },
+        "dashOffset": { "type": "number" }
       }
     },
     "element": {
@@ -188,7 +189,8 @@
         "keys": { "type": "array", "items": { "$ref": "#/$defs/keyframe" } },
         "boil": { "type": "boolean" },
         "follow": { "type": "array", "items": { "$ref": "#/$defs/follow" } },
-        "repeats": { "type": "array", "items": { "$ref": "#/$defs/repeat" } }
+        "repeats": { "type": "array", "items": { "$ref": "#/$defs/repeat" } },
+        "march": { "type": "number" }
       }
     },
     "keyframe": {

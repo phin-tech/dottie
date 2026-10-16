@@ -54,6 +54,7 @@ public enum Inspector {
             if let r = e.rotation { d["rotation"] = num(r) }
             if let o = e.style.opacity { d["opacity"] = num(o) }
             if let r = e.reveal { d["reveal"] = num(r) }
+            if let o = e.style.dashOffset { d["dashOffset"] = num(o) }
             d["strokeWidth"] = num(e.style.strokeWidth)
             d["stroke"] = color(e.style.stroke)
             d["fill"] = color(e.style.fill)

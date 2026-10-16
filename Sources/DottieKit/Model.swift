@@ -39,6 +39,9 @@ public struct Style: Codable, Equatable, Sendable {
     public var gridSize: Double?
     /// How opaque the whole element is, 0...1; nil is fully opaque. Keyable, so elements can fade.
     public var opacity: Double?
+    /// How far into its dash pattern a dashed or dotted line starts, in points; nil is 0. Marching ants
+    /// (`Track.march`) set it on every frame.
+    public var dashOffset: Double?
     public init() {}
 
     public static let defaultGridSize = 50.0
@@ -61,6 +64,7 @@ public struct Style: Codable, Equatable, Sendable {
         fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 18
         gridSize = try c.decodeIfPresent(Double.self, forKey: .gridSize)
         opacity = try c.decodeIfPresent(Double.self, forKey: .opacity)
+        dashOffset = try c.decodeIfPresent(Double.self, forKey: .dashOffset).flatMap { $0.isFinite ? $0 : nil }
     }
 }
 
