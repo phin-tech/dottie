@@ -15,6 +15,12 @@ canvas-test: gen
 gen:
     xcodegen generate --use-cache
 
+# Regenerate the README's animation (Design/animation.gif, .mp4, .dottie) from scripts/readme-animation.js
+readme-animation:
+    swift build --product dottie-mcp
+    swift build --product dottie
+    scripts/make-readme-animation.py
+
 # Launch a Debug build on its own live socket, for scripts/dottie-debug.py to drive (snapshots, playhead, actions)
 # (in the background, so it doesn't take focus; files open through the debug socket once it's up)
 debug-app *files: build
