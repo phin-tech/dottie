@@ -474,6 +474,25 @@ public enum DottieScript {
                 try doc.addTransition(tr, to: try a.uuid("id"), at: max(0, a.double("t") ?? 0), duration: a.double("duration"))
                 return nil
 
+            case "follow":
+                try doc.addFollow(try a.uuid("id"), along: try a.uuid("path"), at: max(0, a.double("t") ?? 0),
+                                  duration: a.double("duration") ?? 1, ease: try a.enumValue("ease", as: Ease.self),
+                                  reverse: a.bool("reverse") ?? false, orient: a.bool("orient") ?? false, laps: a.double("laps"))
+                return nil
+
+            case "packet":
+                let dot = try doc.addPacket(along: try a.uuid("id"), at: max(0, a.double("t") ?? 0),
+                                            duration: a.double("duration") ?? 0.6,
+                                            color: try a.color("color") ?? RGBA(r: 0.95, g: 0.36, b: 0.33),
+                                            size: min(max(a.double("size") ?? 14, 2), 200))
+                return describe(dot)
+
+            case "animateBuild":
+                try doc.addBuild(try a.enumValue("transition", as: Transition.self) ?? .popIn, at: max(0, a.double("start") ?? 0),
+                                 stagger: a.double("stagger") ?? 0.4, packets: a.bool("packets") ?? false,
+                                 packetDuration: a.double("packetDuration") ?? 0.6)
+                return nil
+
             case "boil":
                 let id = try a.uuid("id")
                 _ = try element(id)
@@ -524,6 +543,9 @@ public enum DottieScript {
         key: function (id, t, props) { call("key", merge(props, { id: idOf(id), t: t })); },
         transition: function (id, name, t, o) { call("transition", merge(o, { id: idOf(id), name: name, t: t })); },
         boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
+        follow: function (id, path, t, o) { call("follow", merge(o, { id: idOf(id), path: idOf(path), t: t })); },
+        packet: function (connector, t, o) { return call("packet", merge(o, { id: idOf(connector), t: t })); },
+        animateBuild: function (o) { call("animateBuild", o); },
         selection: call("selection"),
       };
       var fmt = function (v) {
@@ -612,6 +634,9 @@ public enum DottieScript {
       dottie.key(id, t, {x?, y?, width?, height?, rotation?, strokeWidth?, stroke?, fill?, visible?, ease?})      a keyframe at t seconds; each property tweens between the keys that set it. ease (towards the next key):     linear | easeIn | easeOut | easeInOut | hold. visible switches at the key: a lone visible:true key is where the     element appears. Connectors follow their shapes and hide with them; they are not keyed.
       dottie.transition(id, name, t, {duration?})  canned keys: popIn, growIn, wipeIn, dropIn, slideIn (enter),     popOut, shrinkOut, wipeOut (exit), pulse, wiggle (emphasis)
       dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
+      dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along     path (a connector's route or any shape's outline) from t; it stays at the end afterwards. orient turns it to face     along the path; laps > 1 goes round a closed outline more than once
+      dottie.packet(connector, t, {duration?, color?, size?})  a dot that runs along the connector, shown only while     it travels; returns the dot
+      dottie.animateBuild({transition?, start?, stagger?, packets?, packetDuration?})  reveals every shape in     connector order with an entrance (default popIn); with packets, a dot runs down each arrow and the shape it     points to enters as it arrives
 
     Libraries
       require("name")                  loads name.js (or name/index.js) CommonJS/UMD modules from the modules \

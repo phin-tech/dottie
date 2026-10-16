@@ -49,10 +49,13 @@ public struct Track: Codable, Equatable, Sendable {
     /// Overrides the timeline's boil for this element: true keeps it boiling even while still (a "live"
     /// light), false never boils it, nil follows `Timeline.settle`. A track may exist only to carry this.
     public var boil: Bool?
-    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil) {
+    /// Spans of time when the element travels along a path instead of following its x and y keys.
+    public var follow: [Follow]?
+    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil) {
         self.element = element
         self.keys = keys.sorted { $0.t < $1.t }
         self.boil = boil
+        self.follow = follow
     }
 }
 
@@ -100,7 +103,7 @@ public struct Timeline: Codable, Equatable, Sendable {
         } else {
             keys.append(key)
         }
-        tracks[ti] = Track(element: id, keys: keys, boil: tracks[ti].boil)
+        tracks[ti].keys = keys.sorted { $0.t < $1.t }
     }
 }
 
@@ -198,10 +201,16 @@ extension DottieDocument {
             if e.kind != .connector, let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
         }
-        // A connector goes with either shape it is attached to.
+        // Paths are traced where their shapes are posed at `t`, so follows go after every key is applied.
+        let posed = copy
+        for i in copy.elements.indices {
+            if let track = tracks[copy.elements[i].id] { copy.elements[i] = track.following(copy.elements[i], at: t, in: posed) }
+        }
+        // A connector goes with either shape it is attached to, unless it has visible keys of its own.
         copy.elements.removeAll { e in
-            hidden.contains(e.id) || [e.connector?.start.elementID, e.connector?.end.elementID]
-                .contains { $0.map(hidden.contains) ?? false }
+            if hidden.contains(e.id) { return true }
+            guard let c = e.connector, tracks[e.id]?.keys.contains(where: { $0.visible != nil }) != true else { return false }
+            return [c.start.elementID, c.end.elementID].contains { $0.map(hidden.contains) ?? false }
         }
         return copy
     }
