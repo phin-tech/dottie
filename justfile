@@ -13,7 +13,7 @@ canvas-test: gen
 
 # Regenerate Dottie.xcodeproj from project.yml
 gen:
-    xcodegen generate
+    xcodegen generate --use-cache
 
 # Launch a Debug build on its own live socket, for scripts/dottie-debug.py to drive (snapshots, playhead, actions)
 # (in the background, so it doesn't take focus; files open through the debug socket once it's up)
