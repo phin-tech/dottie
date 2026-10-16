@@ -201,17 +201,29 @@ extension DottieDocument {
             if e.kind != .connector, let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
         }
+        // A hidden shape waits at its resting place, not at the start of the entrance it is about to make,
+        // so arrows and paths leading to it already end where it will appear.
+        for i in copy.elements.indices where hidden.contains(copy.elements[i].id) { copy.elements[i] = elements[i] }
         // Paths are traced where their shapes are posed at `t`, so follows go after every key is applied.
         let posed = copy
         for i in copy.elements.indices {
             if let track = tracks[copy.elements[i].id] { copy.elements[i] = track.following(copy.elements[i], at: t, in: posed) }
         }
-        // A connector goes with either shape it is attached to, unless it has visible keys of its own.
-        copy.elements.removeAll { e in
-            if hidden.contains(e.id) { return true }
-            guard let c = e.connector, tracks[e.id]?.keys.contains(where: { $0.visible != nil }) != true else { return false }
-            return [c.start.elementID, c.end.elementID].contains { $0.map(hidden.contains) ?? false }
+        // A connector goes with either shape it is attached to, unless it has visible keys of its own. Then
+        // both its ends are pinned where they are now, so it draws the same route without the hidden shape.
+        let index = copy.elementIndex
+        var gone = hidden
+        for i in copy.elements.indices {
+            guard let c = copy.elements[i].connector,
+                  [c.start.elementID, c.end.elementID].contains(where: { $0.map(hidden.contains) ?? false }) else { continue }
+            guard tracks[copy.elements[i].id]?.keys.contains(where: { $0.visible != nil }) == true else {
+                gone.insert(copy.elements[i].id); continue
+            }
+            let (a, b) = Connector.endpoints(of: copy.elements[i], in: copy, index: index)
+            copy.elements[i].connector!.start = Endpoint(elementID: nil, port: c.start.port, x: a.x, y: a.y)
+            copy.elements[i].connector!.end = Endpoint(elementID: nil, port: c.end.port, x: b.x, y: b.y)
         }
+        copy.elements.removeAll { gone.contains($0.id) }
         return copy
     }
 

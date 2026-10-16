@@ -89,6 +89,10 @@ final class MotionTests: XCTestCase {
         XCTAssertTrue(during.contains(c.id))
         XCTAssertFalse(during.contains(b.id))
         XCTAssertEqual(doc.resolved(at: 0.9).elements.count, 3, "a, the arrow and the packet")
+        let early = doc.resolved(at: 0.9), late = doc.resolved(at: 3)
+        let shown = try XCTUnwrap(early.elements.first { $0.id == c.id })
+        XCTAssertEqual(Connector.endpoints(of: shown, in: early).1.x,
+                       Connector.endpoints(of: c, in: late).1.x, accuracy: 0.5, "points where its hidden target will be")
         XCTAssertTrue(doc.resolved(at: 1.5).elements.map(\.id).contains(b.id))
     }
 
