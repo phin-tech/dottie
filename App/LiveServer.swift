@@ -14,6 +14,8 @@ final class LiveRegistry {
     private var entries: [String: Entry] = [:]
     /// The document whose window was most recently key; reachable as path "current", even unsaved.
     private var frontmost: Entry?
+    /// Handles `debug` requests; only Debug builds of the app set it (see `DebugDriver`).
+    var debugHandler: (([String]) -> LiveResponse)?
 
     func markFront(_ document: DrawingDocument, undoManager: UndoManager?) {
         frontmost = Entry(document: document, undoManager: undoManager)
@@ -50,11 +52,8 @@ final class LiveRegistry {
             doc.commitFile(new, actionName: request.actionName ?? "Agent Edit", undoManager: entry.undoManager)
             return LiveResponse(open: true)
         case .debug:
-            #if DEBUG
-            return DebugDriver.shared.handle(request.args ?? [])
-            #else
-            return LiveResponse(open: false, error: "Debug commands need a Debug build of Dottie")
-            #endif
+            return debugHandler?(request.args ?? [])
+                ?? LiveResponse(open: false, error: "Debug commands need a Debug build of Dottie")
         }
     }
 }

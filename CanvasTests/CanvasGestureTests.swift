@@ -799,6 +799,22 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(result.resolved(at: 1).elements[0].x, 500, accuracy: 1, "the x tween is kept")
     }
 
+    func testPacketsAreHiddenWhileEditingUnlessSelected() {
+        var st = Style(); st.roughness = 0; st.fill = RGBA(r: 1, g: 0, b: 0)
+        let dot = Element(kind: .ellipse, frame: CGRect(x: 100, y: 100, width: 100, height: 100), style: st, layerID: layer)
+        view.model.elements.append(dot)
+        var tl = Timeline(duration: 2)
+        tl.setKey(Keyframe(t: 0.5, visible: true), for: dot.id)
+        tl.setKey(Keyframe(t: 1, visible: false), for: dot.id)
+        view.model.timeline = tl
+        XCTAssertFalse(isRed(at: CGPoint(x: 150, y: 150)), "a packet's base pose is not drawn")
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 150, y: 150)))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 150, y: 150)))
+        XCTAssertTrue(view.selection.isEmpty, "nor clickable")
+        view.selection = [dot.id]
+        XCTAssertTrue(isRed(at: CGPoint(x: 150, y: 150)), "picked from the timeline, it shows")
+    }
+
     func testPreviewClearsSelectionAndEscLeavesIt() {
         let e = redBox()
         view.selection = [e.id]

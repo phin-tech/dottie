@@ -126,6 +126,7 @@ extension ContentView {
     @MainActor
     func registerDebugHooks() {
         #if DEBUG
+        LiveRegistry.shared.debugHandler = { DebugDriver.shared.handle($0) }
         DebugDriver.shared.front = DebugHooks(
             document: document, undoManager: undoManager, editor: { editorActions },
             playhead: { playhead }, setPlayhead: { playhead = $0 },

@@ -105,4 +105,20 @@ final class MotionTests: XCTestCase {
         try doc.addBuild(packets: true)
         XCTAssertEqual(doc.resolved(at: 20).elements.filter { $0.kind == .rectangle }.count, 2)
     }
+
+    func testPacketsAreTransientButBuiltShapesAreNot() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc, x: 0), b = try box(&doc, x: 400)
+        let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        try doc.addBuild(.popIn, packets: true)
+        let dots = doc.elements.filter { $0.kind == .ellipse }.map(\.id)
+        XCTAssertEqual(doc.transientElements, Set(dots), "hidden at the start and in the still")
+        XCTAssertFalse(doc.transientElements.contains(b.id), "appears later, so the editor keeps it")
+        XCTAssertFalse(doc.transientElements.contains(c.id))
+        XCTAssertEqual(DottieDocument().transientElements, [])
+        let index = SpatialIndex(doc)
+        let start = Connector.endpoints(of: c, in: doc).0
+        XCTAssertEqual(index.element(at: start, in: doc)?.id, dots.first)
+        XCTAssertNotEqual(index.element(at: start, in: doc, skipping: Set(dots))?.id, dots.first, "clicks pass through")
+    }
 }

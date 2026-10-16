@@ -123,8 +123,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         didSet {
             needsDisplay = true; spatialStale = true; badgeCache = nil
             if model.id != oldValue.id { enterPage() }
+            transient = model.transientElements
         }
     }
+    /// Elements that only exist in motion (packets): not drawn or clickable while editing, unless selected
+    /// (from the timeline). A posed frame has no timeline, so none are hidden while posing.
+    private var transient: Set<UUID> = []
+    private var hiddenInEditor: Set<UUID> { transient.subtracting(selection) }
     /// Built lazily for the current `model`. Panning and zooming reuse it; an edit marks it stale and
     /// the next use folds the changed elements in (or rebuilds when the structure changed).
     private var spatialCache: SpatialIndex?
@@ -253,8 +258,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         // The label being edited is drawn by the editor instead, so the old text does not show through.
         var drawn = model
         if let id = editingID, let i = drawn.elements.firstIndex(where: { $0.id == id }) { drawn.elements[i].text = nil }
+        let hidden = hiddenInEditor
+        if !hidden.isEmpty { drawn.elements.removeAll { hidden.contains($0.id) } }
         Renderer.draw(drawn, in: ctx, background: canvasBackground.cgColor, clip: visible,
-                      zoom: Double(zoom), ink: canvasInk, spatial: spatial)
+                      zoom: Double(zoom), ink: canvasInk, spatial: hidden.isEmpty ? spatial : nil)
 
         // Ruler guides sit over the drawing and under the selection.
         if showRulers {
@@ -576,7 +583,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// The target of the link badge under `p`, front-most first.
     /// Ticks or unticks the task checkbox in a note under `p`, as one undo step. False if there is none.
     private func toggleCheckbox(at p: CGPoint) -> Bool {
-        guard let hit = spatial.element(at: p, in: model), hit.kind == .note,
+        guard let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor), hit.kind == .note,
               let line = Note.checkboxLine(at: hit.unrotated(p), in: hit),
               let i = model.elements.firstIndex(where: { $0.id == hit.id }) else { return false }
         var next = model
@@ -1187,7 +1194,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if playhead != nil { return nil }
         endEditing()
         linkSources = nil
-        if let hit = spatial.element(at: point(event), in: model) {
+        if let hit = spatial.element(at: point(event), in: model, skipping: hiddenInEditor) {
             if !selection.contains(hit.id) { selection = model.expandingGroups([hit.id]) }
         } else {
             selection = []
@@ -1242,7 +1249,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// a connector or one of the sources beeps and keeps waiting.
     private func finishLink(at p: CGPoint) {
         guard let sources = linkSources else { return }
-        guard let hit = spatial.element(at: p, in: model) else { linkSources = nil; return }
+        guard let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) else { linkSources = nil; return }
         guard hit.kind != .connector, !sources.contains(hit.id) else { NSSound.beep(); return }
         let sourcePage = linkSourcePage
         linkSources = nil
@@ -1380,14 +1387,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         if tool == .select, event.clickCount == 1, toggleCheckbox(at: p) { return }
         baseline = model
-        if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model) == nil {
+        if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model, skipping: hiddenInEditor) == nil {
             gesture = .guide(vertical: hit.vertical, index: hit.index)
             return
         }
         let usable = model.layers.filter { !$0.locked && $0.visible }
         guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return }
 
-        if event.clickCount == 2, tool == .select, let hit = spatial.element(at: p, in: model) {
+        if event.clickCount == 2, tool == .select, let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) {
             selection = [hit.id]
             beginEditing(hit.id)
             gesture = nil
@@ -1452,7 +1459,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             gesture = .rotating(id: id)
         } else if let (id, h, frame) = handle(at: p) {
             gesture = .resizing(id: id, handle: h, original: frame)
-        } else if let hit = spatial.element(at: p, in: model) {
+        } else if let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) {
             let hitSet = model.expandingGroups([hit.id])
             if event.modifierFlags.contains(.shift) {
                 selection = selection.isSuperset(of: hitSet) ? selection.subtracting(hitSet) : selection.union(hitSet)
