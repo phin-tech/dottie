@@ -51,8 +51,7 @@
     "typescript": "^5.9.3"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "keywords": [
     "dottie",
