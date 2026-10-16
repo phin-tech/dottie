@@ -46,9 +46,13 @@ public struct Keyframe: Codable, Equatable, Sendable {
 public struct Track: Codable, Equatable, Sendable {
     public var element: UUID
     public var keys: [Keyframe]
-    public init(element: UUID, keys: [Keyframe]) {
+    /// Overrides the timeline's boil for this element: true keeps it boiling even while still (a "live"
+    /// light), false never boils it, nil follows `Timeline.settle`. A track may exist only to carry this.
+    public var boil: Bool?
+    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil) {
         self.element = element
         self.keys = keys.sorted { $0.t < $1.t }
+        self.boil = boil
     }
 }
 
@@ -75,6 +79,12 @@ public struct Timeline: Codable, Equatable, Sendable {
     /// The time of frame `i`, for export and playback.
     public func time(ofFrame i: Int) -> Double { Double(i) / fps }
 
+    /// Sets the element's boil override (see `Track.boil`), creating an empty track if needed.
+    public mutating func setBoil(_ boil: Bool?, for id: UUID) {
+        if let ti = tracks.firstIndex(where: { $0.element == id }) { tracks[ti].boil = boil }
+        else { tracks.append(Track(element: id, keys: [], boil: boil)) }
+    }
+
     /// The element's keyframes, or nil if it isn't animated.
     public func track(for id: UUID) -> Track? { tracks.first { $0.element == id } }
 
@@ -90,7 +100,7 @@ public struct Timeline: Codable, Equatable, Sendable {
         } else {
             keys.append(key)
         }
-        tracks[ti] = Track(element: id, keys: keys)
+        tracks[ti] = Track(element: id, keys: keys, boil: tracks[ti].boil)
     }
 }
 
@@ -178,6 +188,7 @@ extension DottieDocument {
         let moving: Set<UUID>? = timeline.settle == true
             ? Set(tracks.values.filter { $0.isChanging(at: t) }.map(\.element)) : nil
         func boils(_ e: Element) -> Bool {
+            if let override = tracks[e.id]?.boil { return override }
             guard let moving else { return true }
             if let c = e.connector { return [c.start.elementID, c.end.elementID].contains { $0.map(moving.contains) ?? false } }
             return moving.contains(e.id)

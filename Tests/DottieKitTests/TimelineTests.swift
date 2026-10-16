@@ -118,6 +118,24 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(seeds(at: 2.55), base, "held: settled")
     }
 
+    func testTrackBoilOverridesTheTimeline() throws {
+        var doc = DottieDocument()
+        let live = try box(&doc, roughness: 1), calm = try box(&doc, x: 300, roughness: 1)
+        var tl = Timeline(fps: 10, duration: 1, boil: 1, settle: true)
+        tl.setBoil(true, for: live.id)
+        tl.setKey(Keyframe(t: 0, x: 300), for: calm.id)
+        tl.setKey(Keyframe(t: 1, x: 400), for: calm.id)
+        tl.setBoil(false, for: calm.id)
+        doc.timeline = tl
+        let seeds = doc.resolved(at: 0.55).elements.map(\.seed)
+        XCTAssertNotEqual(seeds[0], live.seed, "boils while still")
+        XCTAssertEqual(seeds[1], calm.seed, "never boils, even moving")
+        XCTAssertEqual(doc.timeline!.track(for: calm.id)?.boil, false, "setKey keeps the override")
+        doc.timeline!.settle = nil
+        doc.timeline!.setBoil(nil, for: calm.id)
+        XCTAssertNotEqual(doc.resolved(at: 0.55).elements[1].seed, calm.seed, "nil follows the timeline")
+    }
+
     func testRoundTripsAndOldPagesStillDecode() throws {
         var doc = DottieDocument()
         let a = try box(&doc)
