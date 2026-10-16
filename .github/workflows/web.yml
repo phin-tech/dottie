@@ -20,6 +20,7 @@ on:
       - web/**
       - scripts/make-fixtures.py
       - scripts/make-goldens.py
+      - scripts/update-player-script.py
       - .github/workflows/web.yml
   pull_request:
     paths:
@@ -33,6 +34,7 @@ on:
       - web/**
       - scripts/make-fixtures.py
       - scripts/make-goldens.py
+      - scripts/update-player-script.py
       - .github/workflows/web.yml
   workflow_dispatch:
 
@@ -70,6 +72,8 @@ jobs:
       - run: npm ci
       - name: Types, unit, contract and SVG tests
         run: npm test
+      - name: The player embedded in DottieKit is this one
+        run: npm run build && python3 ../scripts/update-player-script.py --check
       - run: npx playwright install --with-deps chromium
       - name: Visual comparison with Dottie's renders
         run: npm run visual

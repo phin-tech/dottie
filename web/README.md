@@ -36,6 +36,25 @@ The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `currentTime`
 Without modules, `dist/dottie-player.min.js` is a classic script that registers the element and sets
 `window.Dottie`.
 
+## Compile a drawing into one script
+
+```sh
+npx -p @phin-tech/dottie dottie-compile tour.dottie        # writes tour.js
+```
+
+`tour.js` holds the player and the drawing (about 75 KB plus the drawing; around 25 KB gzipped), so one file
+shows it anywhere you can put a script tag:
+
+```html
+<script src="tour.js"></script>                            <!-- a player right here -->
+<script src="tour.js" data-target="#demo"></script>        <!-- a player inside #demo -->
+<script src="tour.js" data-clean data-no-loop></script>    <!-- data-* set the player's attributes -->
+```
+
+`dottie-compile` takes `--page`, `--at`, `--clean`, `--no-controls`, `--no-autoplay`, `--no-loop` and `--label`;
+only the chosen page (and its pictures) goes in. The Dottie Mac app's command-line tool writes the same file:
+`dottie render tour.dottie -f js`. From code: `import { compile } from "@phin-tech/dottie/compile"`.
+
 ## Use the library
 
 ```js

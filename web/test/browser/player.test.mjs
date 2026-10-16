@@ -141,3 +141,39 @@ test("strings from a hostile file never become markup or script", async () => {
   assert.deepEqual(found, { pwned: false, handlers: [], tags: [] });
   await close();
 });
+
+test("a compiled drawing shows itself where its script is, in a target, or from the head", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { compile } = await import("../../dist/compile.js");
+  const runtime = readFileSync(new URL("../../dist/dottie-player.min.js", import.meta.url), "utf8");
+  const tour = readFileSync(new URL("../../../fixtures/design/tour.dottie", import.meta.url), "utf8");
+  const themes = readFileSync(new URL("../../../fixtures/edge/themes.dottie", import.meta.url), "utf8");
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await serve(page, {
+    "/tour.js": compile(tour, runtime),
+    "/still.js": compile(themes, runtime, { page: "midnight", label: "Midnight" }),
+    "/c.html": `<!doctype html><head><script src="/still.js" data-no-controls></script></head><body>
+      <p id="before">before</p><script src="/tour.js"></script><p id="after">after</p>
+      <div id="box"></div><script src="/tour.js" data-target="#box" data-at="3.2" data-clean></script></body>`,
+  });
+  await page.goto("http://dottie.test/c.html");
+  await page.waitForFunction(() => document.querySelectorAll("dottie-player").length === 3
+    && [...document.querySelectorAll("dottie-player")].every((p) => p.playback));
+  const got = await page.evaluate(() => {
+    const ps = [...document.querySelectorAll("dottie-player")];
+    const inline = document.querySelector("#before").nextElementSibling;
+    const boxed = document.querySelector("#box dottie-player");
+    const still = ps.find((p) => p.getAttribute("label") === "Midnight");
+    return {
+      inline: inline.tagName.toLowerCase(), inlineFrames: inline.playback.frameCount,
+      boxed: !!boxed && boxed.hasAttribute("clean") && boxed.getAttribute("at") === "3.2", boxedRoughness: boxed.playback.page.elements.every((e) => e.style.roughness === 0),
+      stillParent: still.parentElement.tagName.toLowerCase(), stillName: still.playback.page.name, stillControls: !still.shadowRoot.querySelector(".bar").hidden,
+    };
+  });
+  assert.deepEqual(got, { inline: "dottie-player", inlineFrames: 277, boxed: true, boxedRoughness: true, stillParent: "body", stillName: "midnight", stillControls: false });
+  assert.deepEqual(errors, []);
+  await context.close();
+});

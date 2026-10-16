@@ -38,6 +38,11 @@ goldens-check:
     swift build --product dottie
     scripts/make-goldens.py --check
 
+# Rebuild dottie.js and embed its player in DottieKit (Sources/DottieKit/PlayerScript.swift), for dottie render -f js
+player-script:
+    cd web && npm ci --silent && npm run build
+    scripts/update-player-script.py
+
 # Build dottie.js (web/) and run its unit and contract tests
 web-test:
     cd web && npm ci --silent && npm test

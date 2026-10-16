@@ -53,6 +53,23 @@ The same drawing, still and clean, three seconds in:
 From script, the element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `currentTime`, `duration` and
 `paused`, and fires `load`, `frame` and `error` events.
 
+## Or compile it into one file
+
+`dottie-compile` turns a drawing into a single script that holds both the player and the drawing, so there is
+one file to host:
+
+```sh
+npx -p @phin-tech/dottie dottie-compile tour.dottie     # writes tour.js
+```
+
+```html
+<script src="tour.js"></script>
+```
+
+The player appears where the script tag is (or inside `data-target="#some-id"`), and `data-*` attributes on the
+tag set its options, like `data-clean` or `data-no-loop`. Dottie's command-line tool makes the same file with
+`dottie render tour.dottie -f js`.
+
 ## Render SVG in code
 
 The library also runs in Node, to make SVG on a server or at build time:

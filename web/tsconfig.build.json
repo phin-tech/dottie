@@ -8,5 +8,10 @@
     "declarationDir": "dist/types",
     "types": []
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "src/cli.ts"
+  ]
 }

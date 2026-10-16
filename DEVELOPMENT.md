@@ -95,6 +95,11 @@ things guard against it:
    routing or the SVG export therefore has to update the goldens, which makes the dottie.js tests fail until the
    port catches up, in the same PR.
 
+**Compiled drawings.** `dottie render -f js` and dottie.js's `dottie-compile` write the same thing: the player
+runtime (`web/dist/dottie-player.min.js`) followed by the loader in `web/src/compile.ts` with the page as JSON.
+DottieKit embeds both in the generated `Sources/DottieKit/PlayerScript.swift`; after changing `web/`, run
+`just player-script` and commit it (the Linux CI job fails if it is stale).
+
 [`web/PARITY.md`](web/PARITY.md) lists each feature as supported, partial or missing with its fixture; a new app
 feature lands there as a missing row.
 
@@ -195,6 +200,7 @@ dottie library list
 dottie library install shapes.dottielib
 ```
 
+`dottie render diagram.dottie -f js` writes the page and dottie.js's player as one script (see dottie.js below).
 `dottie inspect diagram.dottie --at 1.5` prints the page's resolved geometry as JSON (see dottie.js above).
 `--clean` / `--sketchy` override the look and `--transparent` drops the background. It reads the file on disk,
 not unsaved edits in the app.

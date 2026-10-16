@@ -1,7 +1,7 @@
 {
   "name": "@phin-tech/dottie",
-  "version": "0.1.0",
-  "description": "Render and play Dottie (.dottie) drawings and animations in the browser",
+  "version": "0.2.0",
+  "description": "Render, play and compile Dottie (.dottie) drawings and animations in the browser",
   "type": "module",
   "license": "Apache-2.0",
   "repository": {
@@ -21,6 +21,10 @@
     "./player": {
       "types": "./dist/types/player-entry.d.ts",
       "default": "./dist/dottie-player.js"
+    },
+    "./compile": {
+      "types": "./dist/types/compile.d.ts",
+      "default": "./dist/compile.js"
     }
   },
   "files": [
@@ -64,5 +68,8 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "bin": {
+    "dottie-compile": "dist/dottie-compile.mjs"
   }
 }
