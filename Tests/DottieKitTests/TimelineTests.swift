@@ -98,6 +98,9 @@ final class TimelineTests: XCTestCase {
         XCTAssertEqual(seeds[0], a.seed)
         XCTAssertEqual(seeds[0], seeds[1]); XCTAssertEqual(seeds[2], seeds[3]); XCTAssertEqual(seeds[4], seeds[5])
         XCTAssertEqual(Set([seeds[0], seeds[2], seeds[4]]).count, 3)
+        let cycle = (0..<14).map { doc.resolved(at: doc.timeline!.time(ofFrame: $0)).elements[0].seed }
+        XCTAssertEqual(cycle[6], cycle[0], "a boil loops three drawings")
+        XCTAssertEqual(Set(cycle).count, 3)
     }
 
     func testSettledShapesStopBoilingWhenStill() throws {

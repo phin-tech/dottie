@@ -136,12 +136,16 @@ public struct Timeline: Codable, Equatable, Sendable {
     /// from a file or a script can't turn into billions of frames.
     public static let maxDuration = 3600.0
     public static let fpsRange = 1.0...60.0
+    /// How many drawings a boil cycles through. Three, as hand-drawn animation usually does; repeating them
+    /// also lets the HTML player and the movie encoders share what comes round again.
+    public static let boilDrawings = 3
 
     /// Frames per second, kept within `fpsRange`.
     public var fps: Double { didSet { fps = Self.clampFPS(fps) } }
     /// Seconds, kept within 0...`maxDuration`.
     public var duration: Double { didSet { duration = Self.clampTime(duration) } }
-    /// Reseed sketchy strokes every `boil` frames, so lines jitter like hand-drawn animation. nil holds them steady.
+    /// Reseed sketchy strokes every `boil` frames, so lines jitter like hand-drawn animation, cycling through
+    /// `boilDrawings` versions of each line as a hand-drawn boil loops a few drawings. nil holds them steady.
     public var boil: Int? { didSet { boil = boil.flatMap { $0 > 0 ? min($0, 10_000) : nil } } }
     /// Boil a shape only while its keys are changing it, so its lines settle once it holds still. Shapes
     /// without keys stay steady; a connector boils while either shape it attaches to does.
@@ -420,7 +424,7 @@ extension DottieDocument {
         let tracks = Dictionary(timeline.tracks.map { ($0.element, $0) }, uniquingKeysWith: { a, _ in a })
         let reseed: UInt32? = timeline.boil.map { n in
             // t and fps are both clamped, so this frame number is always a small finite integer.
-            UInt32(truncatingIfNeeded: Int((t * Timeline.clampFPS(timeline.fps) + 1e-9).rounded(.down)) / max(1, n))
+            UInt32(truncatingIfNeeded: (Int((t * Timeline.clampFPS(timeline.fps) + 1e-9).rounded(.down)) / max(1, n)) % Timeline.boilDrawings)
         }
         let hidden = Set(tracks.values.filter { !$0.isVisible(at: t) }.map(\.element))
         let moving: Set<UUID>? = timeline.settle == true

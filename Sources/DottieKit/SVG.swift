@@ -11,24 +11,40 @@ extension Exporter {
 
     /// `bounds` fixes the viewBox, so every frame of an animation lines up.
     static func svg(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> String {
-        let theme = doc.resolvedTheme
-        let background = background.map { plain in theme?.background ?? plain }
-        let d = doc.resolvingInk(to: theme?.ink ?? .black)
-        let b = fixed ?? bounds(of: d)
-        let visible = Set(d.layers.filter(\.visible).map(\.id))
+        let (b, parts) = svgParts(doc, background: background, bounds: fixed)
+        return svgOpen(b, background: doc.resolvedTheme?.background ?? background.map { $0 }, paint: background != nil)
+            + parts.map(\.markup).joined() + "</svg>\n"
+    }
+
+    /// The opening `<svg>` tag for `b`, with the page color behind everything when `paint`.
+    static func svgOpen(_ b: CGRect, background: RGBA?, paint: Bool) -> String {
         var out = """
         <svg xmlns="http://www.w3.org/2000/svg" width="\(num(b.width))" height="\(num(b.height))" \
         viewBox="\(num(b.minX)) \(num(b.minY)) \(num(b.width)) \(num(b.height))">
 
         """
-        if let background {
+        if paint, let background {
             out += "<rect x=\"\(num(b.minX))\" y=\"\(num(b.minY))\" width=\"\(num(b.width))\" height=\"\(num(b.height))\" fill=\"\(color(background))\"/>\n"
         }
+        return out
+    }
+
+    /// The SVG for each thing drawn, back to front, keyed by element id (dungeon rock hatching as "rock"),
+    /// and the bounds they were drawn for. Joined, they are the body of `svg(_:background:bounds:)`; kept
+    /// apart, an animation export can store what doesn't change between frames once.
+    static func svgParts(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> (CGRect, [(key: String, markup: String)]) {
+        let theme = doc.resolvedTheme
+        let background = background.map { plain in theme?.background ?? plain }
+        let d = doc.resolvingInk(to: theme?.ink ?? .black)
+        let b = fixed ?? bounds(of: d)
+        let visible = Set(d.layers.filter(\.visible).map(\.id))
+        var parts: [(key: String, markup: String)] = []
         let index = d.elementIndex
         let floors = d.orderedElements.filter { visible.contains($0.layerID) && DungeonGrid.isFloor($0) }
-        for rock in DungeonGrid.rock(for: floors) {
-            out += "<path d=\"\(pathData(rock.path))\" fill=\"none\" stroke=\"\(color(rock.ink))\"\(opacity(rock.ink, attr: "stroke-opacity")) stroke-width=\"\(num(rock.width))\" stroke-linecap=\"round\"/>\n"
-        }
+        let rock = DungeonGrid.rock(for: floors).map { rock in
+            "<path d=\"\(pathData(rock.path))\" fill=\"none\" stroke=\"\(color(rock.ink))\"\(opacity(rock.ink, attr: "stroke-opacity")) stroke-width=\"\(num(rock.width))\" stroke-linecap=\"round\"/>\n"
+        }.joined()
+        if !rock.isEmpty { parts.append(("rock", rock)) }
         for e in d.orderedElements where visible.contains(e.layerID) {
             let alpha = min(max(e.style.opacity ?? 1, 0), 1)
             if alpha <= 0 { continue }
@@ -36,9 +52,9 @@ extension Exporter {
             if e.angle != 0, e.kind != .connector {
                 body = "<g transform=\"rotate(\(num(e.angle * 180 / .pi)) \(num(e.frame.midX)) \(num(e.frame.midY)))\">\n\(body)</g>\n"
             }
-            out += alpha < 1 ? "<g opacity=\"\(num(alpha))\">\n\(body)</g>\n" : body
+            parts.append((e.id.uuidString, alpha < 1 ? "<g opacity=\"\(num(alpha))\">\n\(body)</g>\n" : body))
         }
-        return out + "</svg>\n"
+        return (b, parts)
     }
 
     private static func svgElement(_ e: Element, in doc: DottieDocument, index: [UUID: Element], labelBackground: RGBA?) -> String {

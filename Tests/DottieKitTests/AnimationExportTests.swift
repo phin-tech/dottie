@@ -41,6 +41,58 @@ final class AnimationExportTests: XCTestCase {
     }
 }
 
+extension AnimationExportTests {
+    /// Each player frame with its `<use>` references expanded, beside the frame drawn whole the old way.
+    private func expandedFrames(_ doc: DottieDocument) throws -> [(slim: String, whole: String)] {
+        let plan = try XCTUnwrap(Exporter.animation(doc))
+        let (holder, frames) = Exporter.playerFrames(doc, plan: plan)
+        var defs: [String: String] = [:]
+        let pattern = try NSRegularExpression(pattern: #"<g id="(d[sp]\d+)">\n(.*?)</g>\n(?=<g id="d[sp]\d+">|</defs>)"#,
+                                              options: [.dotMatchesLineSeparators])
+        for m in pattern.matches(in: holder, range: NSRange(holder.startIndex..., in: holder)) {
+            defs[String(holder[Range(m.range(at: 1), in: holder)!])] = String(holder[Range(m.range(at: 2), in: holder)!])
+        }
+        return zip(frames, plan.times.indices).map { frame, i in
+            var slim = frame
+            for (id, markup) in defs { slim = slim.replacingOccurrences(of: "<use href=\"#\(id)\"/>\n", with: markup) }
+            return (slim, Exporter.svg(doc.resolved(at: plan.times[i]), background: nil, bounds: plan.rects[i]))
+        }
+    }
+
+    func testThePlayerSharesWhatRepeatsAndStaysExact() throws {
+        // Interleaved on purpose: a still shape above a moving one, a boiling one, and one that appears later.
+        var doc = DottieDocument()
+        let below = try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 80, height: 40), at: .zero,
+                                            text: "below", fill: nil, stroke: nil, roughness: 1)
+        let mover = try DiagramOps.addShape(&doc, kind: .ellipse, frame: CGRect(x: 0, y: 60, width: 40, height: 40), at: .zero,
+                                            text: nil, fill: RGBA(r: 1, g: 0, b: 0), stroke: nil, roughness: 1)
+        _ = try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 20, y: 50, width: 80, height: 60), at: .zero,
+                                    text: "above", fill: RGBA(r: 0.8, g: 0.9, b: 1), stroke: nil, roughness: 1)
+        let late = try DiagramOps.addShape(&doc, kind: .diamond, frame: CGRect(x: 200, y: 0, width: 60, height: 60), at: .zero,
+                                           text: nil, fill: nil, stroke: nil, roughness: 1)
+        _ = try DiagramOps.addConnector(&doc, from: below.id, to: late.id)
+        var tl = Timeline(fps: 8, duration: 2, boil: 2, settle: true)
+        tl.setKey(Keyframe(t: 0, x: 0), for: mover.id)
+        tl.setKey(Keyframe(t: 1, x: 150), for: mover.id)
+        doc.timeline = tl
+        try doc.addTransition(.popIn, to: late.id, at: 0.5)
+        for (slim, whole) in try expandedFrames(doc) { XCTAssertEqual(slim, whole) }
+
+        let plan = try XCTUnwrap(Exporter.animation(doc))
+        let (holder, frames) = Exporter.playerFrames(doc, plan: plan)
+        let wholeSize = plan.times.indices.map { Exporter.svg(doc.resolved(at: plan.times[$0]), background: nil, bounds: plan.rects[$0]).utf8.count }.reduce(0, +)
+        XCTAssertLessThan(holder.utf8.count + frames.map(\.utf8.count).reduce(0, +), wholeSize / 2, "shared, it's much smaller")
+    }
+
+    func testTheTourDemoStaysExact() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Design/demos/tour.dottie")
+        let doc = try DottieFile.decode(Data(contentsOf: url)).pages[0]
+        let frames = try expandedFrames(doc)
+        XCTAssertGreaterThan(frames.count, 100)
+        for (slim, whole) in frames { XCTAssertEqual(slim, whole) }
+    }
+}
+
 private func XCTUnwrapAsync<T>(_ value: @autoclosure () async throws -> T?) async throws -> T {
     let v = try await value()
     return try XCTUnwrap(v)

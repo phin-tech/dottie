@@ -49,6 +49,53 @@ extension Exporter {
                     rects: Array(repeating: b, count: times.count), size: b.size)
     }
 
+    /// Every frame's SVG for the player, sharing what repeats. Anything whose markup is the same in every
+    /// frame is drawn once, consecutive runs of it as one group; any other piece that turns up in more than
+    /// one frame (lines boiling every few frames, a shape that has settled) is also stored once. Frames refer
+    /// to those with `<use>`, in place, so the stacking order and the pixels are exactly what drawing each
+    /// frame whole gives (`defs` goes once, before the frames). Size then grows with what changes, not with
+    /// the size of the drawing.
+    static func playerFrames(_ doc: DottieDocument, plan: Plan) -> (defs: String, frames: [String]) {
+        let drawn = plan.times.indices.map { i in svgParts(doc.resolved(at: plan.times[i]), background: nil, bounds: plan.rects[i]) }
+        // Back to front: the order every frame draws in (a frame only ever leaves things out).
+        let order = ["rock"] + doc.orderedElements.map(\.id.uuidString)
+        let byKey = drawn.map { Dictionary($0.1.map { ($0.key, $0.markup) }, uniquingKeysWith: { a, _ in a }) }
+        let unchanging = Set(order.filter { key in
+            guard let first = byKey.first?[key] else { return false }
+            return byKey.allSatisfy { $0[key] == first }
+        })
+        var defs = "", runOf: [String: Int] = [:], runCount = 0
+        var i = 0
+        while i < order.count {
+            guard unchanging.contains(order[i]) else { i += 1; continue }
+            var markup = ""
+            let start = i
+            while i < order.count, unchanging.contains(order[i]) { markup += byKey[0][order[i]]!; runOf[order[i]] = runCount; i += 1 }
+            if start < i { defs += "<g id=\"ds\(runCount)\">\n\(markup)</g>\n"; runCount += 1 }
+        }
+        // The other pieces worth sharing: markup that more than one frame uses.
+        var uses: [String: Int] = [:]
+        for frame in byKey { for (key, markup) in frame where !unchanging.contains(key) { uses[markup, default: 0] += 1 } }
+        var shared: [String: Int] = [:]
+        for (markup, n) in uses where n > 1 { shared[markup] = shared.count }
+        for (markup, id) in shared.sorted(by: { $0.value < $1.value }) { defs += "<g id=\"dp\(id)\">\n\(markup)</g>\n" }
+
+        let frames = drawn.enumerated().map { (f, part) -> String in
+            var out = svgOpen(part.0, background: nil, paint: false)
+            var lastRun = -1
+            for key in order {
+                if let run = runOf[key] {
+                    if run != lastRun { out += "<use href=\"#ds\(run)\"/>\n"; lastRun = run }
+                } else if let markup = byKey[f][key] {
+                    out += shared[markup].map { "<use href=\"#dp\($0)\"/>\n" } ?? markup
+                }
+            }
+            return out + "</svg>\n"
+        }
+        let holder = defs.isEmpty ? "" : "<svg width=\"0\" height=\"0\" style=\"position:absolute;overflow:hidden\" aria-hidden=\"true\"><defs>\n\(defs)</defs></svg>\n"
+        return (holder, frames)
+    }
+
     /// `r` widened (never cropped) about its center to the width-to-height ratio `aspect`.
     static func fit(_ r: CGRect, aspect: Double) -> CGRect {
         guard r.width > 0, r.height > 0, aspect > 0 else { return r }
@@ -136,9 +183,10 @@ extension Exporter {
         }
         let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        let (defs, frames) = playerFrames(doc, plan: plan)
         var body = ""
-        for (i, t) in times.enumerated() {
-            body += "<div class=\"f\(i == 0 ? " on" : "")\">\(svg(doc.resolved(at: t), background: nil, bounds: plan.rects[i]))</div>\n"
+        for (i, frame) in frames.enumerated() {
+            body += "<div class=\"f\(i == 0 ? " on" : "")\">\(frame)</div>\n"
         }
         let sceneControls = scenes.isEmpty ? "" : """
         <button id="prev" aria-label="Previous scene">⏮</button>
@@ -170,7 +218,7 @@ extension Exporter {
         </style>
         </head>
         <body>
-        <div class="stage">
+        \(defs)<div class="stage">
         \(body)</div>
         <div class="bar">
         <button id="play" aria-label="Pause">❚❚</button>
