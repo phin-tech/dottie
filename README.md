@@ -126,6 +126,12 @@ before and after, faintly.
 Assistants can animate too: ask for *"a version of this diagram that builds itself, with a request moving
 through it"*, then *"export it as a GIF"*.
 
+More examples, each made by a short script in [scripts/demos](scripts/demos): a sprint board whose notes
+[pop in one after another](Design/demos/stagger.gif), a service map with
+[requests that never stop flowing](Design/demos/live.gif), and a [camera tour](Design/demos/tour.gif) of the
+diagram above that is also a [click-through presentation](Design/demos/tour.html) (download it and open it in
+a browser).
+
 ## Extras for power users
 
 - **Scripting.** Script ▸ Script Console… (⌥⌘J) runs JavaScript to draw or change many things at once, such as
