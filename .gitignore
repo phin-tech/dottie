@@ -4,3 +4,4 @@
 DerivedData/
 .DS_Store
 Signing.local.xcconfig
+.kata.local.toml
