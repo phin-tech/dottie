@@ -261,7 +261,6 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         var drawn = model
         if let id = editingID, let i = drawn.elements.firstIndex(where: { $0.id == id }) { drawn.elements[i].text = nil }
         let hidden = hiddenInEditor
-        if !hidden.isEmpty { drawn.elements.removeAll { hidden.contains($0.id) } }
         if onionSkin, let t = poseTime, let base = poseSource, let tl = base.timeline {
             // Two frames apart, fading with distance; skipped past either end of the timeline.
             let step = 2 / max(tl.fps, 1)
@@ -278,7 +277,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             }
         }
         Renderer.draw(drawn, in: ctx, background: canvasBackground.cgColor, clip: visible,
-                      zoom: Double(zoom), ink: canvasInk, spatial: hidden.isEmpty ? spatial : nil)
+                      zoom: Double(zoom), ink: canvasInk, spatial: spatial, skipping: hidden)
 
         // Ruler guides sit over the drawing and under the selection.
         if showRulers {

@@ -57,6 +57,10 @@ struct ContentView: View {
                 playhead = nil
                 selectedKey = nil
             }
+            .onChange(of: document.model.timeline == nil) { _, gone in
+                // Undo (or Remove Animation) took the timeline away: stop playing and posing.
+                if gone { playing = false; playhead = nil; selectedKey = nil }
+            }
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
                     Picker("Sidebar", selection: $sidebarTab) {
@@ -184,8 +188,15 @@ struct Inspector: View {
                 })
     }
 
+    /// The posed frame, kept between renders: every control's binding reads it, so resolving it each time
+    /// would cost a full resolve per control.
+    @State private var frameCache = FrameCache()
+
     /// The page as the canvas shows it: the posed frame while posing, else the page itself.
-    private var shown: DottieDocument { pose.map { document.model.resolved(at: $0) } ?? document.model }
+    private var shown: DottieDocument {
+        guard let t = pose else { return document.model }
+        return frameCache.frame(of: document.model, at: t)
+    }
     private var selected: [Element] { shown.elements.filter { selection.contains($0.id) } }
 
     /// Edits the shown page as one undo step; while posing, animatable changes become keys (see `applyingPose`).
@@ -648,5 +659,19 @@ extension Style {
     var opacityLevel: Double {
         get { opacity ?? 1 }
         set { opacity = newValue >= 0.999 ? nil : max(0, newValue) }
+    }
+}
+
+/// The last resolved frame and what it was resolved from.
+final class FrameCache {
+    private var page: DottieDocument?
+    private var time = 0.0
+    private var frame: DottieDocument?
+
+    func frame(of page: DottieDocument, at t: Double) -> DottieDocument {
+        if let frame, t == time, page == self.page { return frame }
+        let f = page.resolved(at: t)
+        self.page = page; time = t; frame = f
+        return f
     }
 }
