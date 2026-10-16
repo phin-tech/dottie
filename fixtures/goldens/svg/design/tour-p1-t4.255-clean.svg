@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="829.52" height="218" viewBox="16 16 829.52 218">
+<rect x="16" y="16" width="829.52" height="218" fill="#ffffff"/>
+<path d="M40 95 L160 95 L160 155 L40 155 Z" fill="#ffd966" stroke="none"/>
+<path d="M40 95 L160 95 L160 155 L40 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="131.48">Browser</tspan></text>
+<path d="M250 95 L400.88 95 L400.88 155 L250 155 Z" fill="#8cbfff" stroke="none"/>
+<path d="M250 95 L400.88 95 L400.88 155 L250 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="325.44" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="325.44" y="131.48">API gateway</tspan></text>
+<path d="M490.88 40 L610.88 40 L610.88 100 L490.88 100 Z" fill="#c9a7ff" stroke="none"/>
+<path d="M490.88 40 L610.88 40 L610.88 100 L490.88 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="550.88" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="550.88" y="76.48">Auth</tspan></text>
+<path d="M490.88 150 L610.88 150 L610.88 210 L490.88 210 Z" fill="#8cbfff" stroke="none"/>
+<path d="M490.88 150 L610.88 150 L610.88 210 L490.88 210 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="550.88" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="550.88" y="186.48">Orders</tspan></text>
+<path d="M700.88 40 L821.52 40 L821.52 100 L713.34 100" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M701.2 150 L821.2 150 L821.2 210 L713.4 210" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M160 125 L205 125 M205 125 L205 125 M205 125 L250 125 M240.99 120.66 L250 125 M240.99 129.34 L250 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M400.88 125 L445.88 125 M445.88 125 L445.88 70 M445.88 70 L490.88 70 M481.87 65.66 L490.88 70 M481.87 74.34 L490.88 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M400.88 125 L445.88 125 M445.88 125 L445.88 180 M445.88 180 L490.88 180 M481.87 175.66 L490.88 180 M481.87 184.34 L490.88 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M610.88 180 L655.88 180 M655.88 180 L655.88 70 M655.88 70 L700.88 70 M691.87 65.66 L700.88 70 M691.87 74.34 L700.88 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M610.88 180 L656.04 180 M656.04 180 L656.04 180 M656.04 180 L701.2 180 M692.19 175.66 L701.2 180 M692.19 184.34 L701.2 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

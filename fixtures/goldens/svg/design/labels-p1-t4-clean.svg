@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="921.52" height="218" viewBox="16 16 921.52 218">
+<rect x="16" y="16" width="921.52" height="218" fill="#ffffff"/>
+<path d="M40 95 L211.04 95 L211.04 155 L40 155 Z" fill="#ffd966" stroke="none"/>
+<path d="M40 95 L211.04 95 L211.04 155 L40 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="125.52" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="125.52" y="131.48">Checkout page</tspan></text>
+<path d="M301.04 95 L441.84 95 L441.84 155 L301.04 155 Z" fill="#8cbfff" stroke="none"/>
+<path d="M301.04 95 L441.84 95 L441.84 155 L301.04 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="371.44" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="371.44" y="131.48">Orders API</tspan></text>
+<path d="M536.88 40 L657.52 40 L657.52 100 L536.88 100 Z" fill="#ff99b3" stroke="none"/>
+<path d="M536.88 40 L657.52 40 L657.52 100 L536.88 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="597.2" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="597.2" y="76.48">Postgres</tspan></text>
+<path d="M531.84 150 L662.56 150 L662.56 210 L531.84 210 Z" fill="#c9a7ff" stroke="none"/>
+<path d="M531.84 150 L662.56 150 L662.56 210 L531.84 210 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="597.2" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="597.2" y="186.48">Event bus</tspan></text>
+<path d="M752.56 95 L913.52 95 L913.52 155 L752.56 155 Z" fill="#7fd98c" stroke="none"/>
+<path d="M752.56 95 L913.52 95 L913.52 155 L752.56 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="833.04" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="833.04" y="131.48">Email worker</tspan></text>
+<path d="M211.04 125 L256.04 125 M256.04 125 L256.04 125 M256.04 125 L301.04 125 M292.03 120.66 L301.04 125 M292.03 129.34 L301.04 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M441.84 125 L489.36 125 M489.36 125 L489.36 70 M489.36 70 L536.88 70 M527.87 65.66 L536.88 70 M527.87 74.34 L536.88 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M441.84 125 L486.84 125 M486.84 125 L486.84 180 M486.84 180 L531.84 180 M522.83 175.66 L531.84 180 M522.83 184.34 L531.84 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M662.56 180 L707.56 180 M707.56 180 L707.56 125 M707.56 125 L752.56 125 M743.55 120.66 L752.56 125 M743.55 129.34 L752.56 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M260.04 125 C260.04 132.73 238.1 139 211.04 139 C183.98 139 162.04 132.73 162.04 125 C162.04 117.27 183.98 111 211.04 111 C238.1 111 260.04 117.27 260.04 125 Z" fill="#e8590c" stroke="none"/>
+<path d="M260.04 125 C260.04 132.73 238.1 139 211.04 139 C183.98 139 162.04 132.73 162.04 125 C162.04 117.27 183.98 111 211.04 111 C238.1 111 260.04 117.27 260.04 125 Z" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="211.04" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="12" fill="#ffffff" text-anchor="middle"><tspan x="211.04" y="129.32">POST /orders</tspan></text>
+</svg>

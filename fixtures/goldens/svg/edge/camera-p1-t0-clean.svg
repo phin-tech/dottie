@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="848" height="268" viewBox="16 16 848 268">
+<rect x="16" y="16" width="848" height="268" fill="#ffffff"/>
+<path d="M40 40 L180 40 L180 120 L40 120 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="86.48">Scene 1</tspan></text>
+<path d="M260 180 L400 180 L400 260 L260 260 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="330" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="330" y="226.48">Scene 2</tspan></text>
+<path d="M480 40 L620 40 L620 120 L480 120 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="550" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="550" y="86.48">Scene 3</tspan></text>
+<path d="M700 180 L840 180 L840 260 L700 260 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="770" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="770" y="226.48">Scene 4</tspan></text>
+</svg>

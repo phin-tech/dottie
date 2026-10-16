@@ -1,0 +1,111 @@
+{
+  "pages": [
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "000000CE-0000-4000-8000-0000000000CE",
+          "kind": "rectangle",
+          "layerID": "000000CD-0000-4000-8000-0000000000CD",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "known",
+          "width": 120,
+          "x": 40,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000000CF-0000-4000-8000-0000000000CF",
+          "kind": "hexagon",
+          "layerID": "000000CD-0000-4000-8000-0000000000CD",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "unknown kind",
+          "width": 120,
+          "x": 200,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000000D0-0000-4000-8000-0000000000D0",
+          "kind": "rectangle",
+          "layerID": "000000CD-0000-4000-8000-0000000000CD",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "wavy",
+            "fill": {
+              "a": 1,
+              "b": 0.4,
+              "g": 0.85,
+              "r": 1
+            },
+            "fillStyle": "zigzag",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 360,
+          "y": 40
+        }
+      ],
+      "id": "000000CC-0000-4000-8000-0000000000CC",
+      "layers": [
+        {
+          "id": "000000CD-0000-4000-8000-0000000000CD",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Page 1"
+    }
+  ],
+  "version": 99
+}

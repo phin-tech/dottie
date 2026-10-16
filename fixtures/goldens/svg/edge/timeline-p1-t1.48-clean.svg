@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="588" height="416.1" viewBox="16 -12.1 588 416.1">
+<rect x="16" y="-12.1" width="588" height="416.1" fill="#ffffff"/>
+<g transform="rotate(63.92 154.84 70)">
+<path d="M104.84 40 L204.84 40 L204.84 100 L104.84 100 Z" fill="#bed55e" fill-opacity="0.84" stroke="none"/>
+<path d="M104.84 40 L204.84 40 L204.84 100 L104.84 100 Z" fill="none" stroke="#561d1f" stroke-width="3.28" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="154.84" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#561d1f" text-anchor="middle"><tspan x="154.84" y="76.48">box</tspan></text>
+</g>
+<g opacity="0.21">
+<path d="M458.93 60.27 C458.93 71.46 423.35 80.53 379.47 80.53 C335.58 80.53 300 71.46 300 60.27 C300 49.07 335.58 40 379.47 40 C423.35 40 458.93 49.07 458.93 60.27 Z" fill="#99d9ff" stroke="none"/>
+<path d="M458.93 60.27 C458.93 71.46 423.35 80.53 379.47 80.53 C335.58 80.53 300 71.46 300 60.27 C300 49.07 335.58 40 379.47 40 C423.35 40 458.93 49.07 458.93 60.27 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+<path d="M40 220 L140 220 L140 261.56" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M192.89 107.04 L260.17 107.04 M260.17 107.04 L260.17 238.04 M260.17 238.04 L327.45 238.04 M318.44 233.7 L327.45 238.04 M318.44 242.38 L322.3 240.52" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M140.68 109.31 C140.68 164.66 100.81 164.66 100.81 220 M105.42 211.13 L100.81 220 M96.74 210.86 L100.81 220" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="40" y="357.28">Typing out a </tspan></text>
+<path d="M500 40 L580 40 L580 100 L500 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M560 190 C560 206.57 546.57 220 530 220 C513.43 220 500 206.57 500 190 C500 173.43 513.43 160 530 160 C546.57 160 560 173.43 560 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

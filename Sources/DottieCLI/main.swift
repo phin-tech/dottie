@@ -9,6 +9,7 @@ dottie \(version): render and manage Dottie drawings from the command line.
 
 USAGE
   dottie render <file.dottie | file.mmd>... [-o <out>] [options]
+  dottie inspect <file.dottie> [-p <page>] [--at <seconds>]...
   dottie library list
   dottie library install <file.dottielib>...
   dottie --help | --version
@@ -31,6 +32,15 @@ RENDER
       --transparent     No page background (png, svg, html).
       --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
                         unless set). An html export becomes a still; gif and mp4 ignore it.
+
+INSPECT
+  Prints, as JSON, what each page resolves to with no drawing: every element's frame, rotation,
+  opacity, reveal, seed and stacking order, each connector's route, and the camera's view and the
+  scene, at the given times (default a spread across the animation, its scenes and both ends).
+  dottie.js is tested against this (see web/ and `just goldens`).
+
+  -p, --page <page>     Only this page, by name or 1-based number (default every page).
+      --at <seconds>    A time to inspect; repeat for several.
 
 LIBRARY
   list      Shows the libraries installed for the Dottie app.
@@ -235,6 +245,45 @@ func runRender(_ args: [String]) -> Int32 {
     return failures == 0 ? 0 : 1
 }
 
+func runInspect(_ args: [String]) -> Int32 {
+    var input: String?, page: String?, times: [Double] = []
+    var i = 0
+    while i < args.count {
+        let a = args[i]
+        func value() -> String {
+            i += 1
+            guard i < args.count else { fail("\(a) needs a value", code: 2) }
+            return args[i]
+        }
+        switch a {
+        case "-p", "--page": page = value()
+        case "--at":
+            let v = value()
+            guard let n = Double(v), n.isFinite, n >= 0 else { fail("--at must be a time in seconds", code: 2) }
+            times.append(n)
+        case "--json": break   // the only output there is
+        default:
+            if a.hasPrefix("-") || input != nil { fail("unknown option \(a)", code: 2) }
+            input = a
+        }
+        i += 1
+    }
+    guard let input else { fail("inspect needs a .dottie file", code: 2) }
+    guard let data = try? Data(contentsOf: absolute(input)) else { fail("\(input): cannot read file") }
+    let file: DottieFile
+    do { file = try DottieFile.decode(data) } catch { fail("\(input): not a Dottie drawing (\(error.localizedDescription))") }
+    var pages: [Int]?
+    if let page {
+        guard let p = file.pageIndex(matching: page) else { fail("\(input): no page '\(page)'") }
+        pages = [p]
+    }
+    do {
+        FileHandle.standardOutput.write(try Inspector.json(Inspector.file(file, pages: pages, times: times.isEmpty ? nil : times)))
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    } catch { fail("\(error)") }
+    return 0
+}
+
 func runLibrary(_ args: [String]) -> Int32 {
     guard let sub = args.first else { fail("library needs a subcommand: list or install", code: 2) }
     switch sub {
@@ -275,6 +324,8 @@ case "-v", "--version", "version":
     print("dottie \(version)")
 case "render":
     exit(runRender(Array(argv.dropFirst())))
+case "inspect":
+    exit(runInspect(Array(argv.dropFirst())))
 case "library", "lib":
     exit(runLibrary(Array(argv.dropFirst())))
 default:

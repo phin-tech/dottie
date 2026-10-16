@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1567.61" height="218" viewBox="16 16 1567.61 218">
+<rect x="16" y="16" width="1567.61" height="218" fill="#ffffff"/>
+<path d="M284.12 125 C284.12 144.33 229.47 160 162.06 160 C94.65 160 40 144.33 40 125 C40 105.67 94.65 90 162.06 90 C229.47 90 284.12 105.67 284.12 125 Z" fill="#d6f5d6" stroke="none"/>
+<path d="M284.12 125 C284.12 144.33 229.47 160 162.06 160 C94.65 160 40 144.33 40 125 C40 105.67 94.65 90 162.06 90 C229.47 90 284.12 105.67 284.12 125 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="162.06" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="162.06" y="131.48">Visitor arrives</tspan></text>
+<path d="M374.12 95 L605.64 95 L605.64 155 L374.12 155 Z" fill="#fff3c4" stroke="none"/>
+<path d="M374.12 95 L605.64 95 L605.64 155 L374.12 155 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="489.88" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="489.88" y="131.48">Fill in signup form</tspan></text>
+<path d="M818.46 80 L941.27 125 L818.46 170 L695.64 125 Z" fill="#ffe0cc" stroke="none"/>
+<path d="M818.46 80 L941.27 125 L818.46 170 L695.64 125 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="818.46" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="818.46" y="131.48">Email valid?</tspan></text>
+<path d="M1071.59 40 L1212.39 40 L1212.39 100 L1071.59 100 Z" fill="#ffd6d6" stroke="none"/>
+<path d="M1071.59 40 L1212.39 40 L1212.39 100 L1071.59 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1141.99" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1141.99" y="76.48">Show error</tspan></text>
+<path d="M1031.27 150 L1252.71 150 L1252.71 210 L1031.27 210 Z" fill="#dbe8ff" stroke="none"/>
+<path d="M1031.27 150 L1252.71 150 L1252.71 210 L1031.27 210 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1141.99" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1141.99" y="186.48">Send welcome email</tspan></text>
+<path d="M1559.61 125 C1559.61 144.33 1511.06 160 1451.16 160 C1391.26 160 1342.71 144.33 1342.71 125 C1342.71 105.67 1391.26 90 1451.16 90 C1511.06 90 1559.61 105.67 1559.61 125 Z" fill="#d6f5d6" stroke="none"/>
+<path d="M1559.61 125 C1559.61 144.33 1511.06 160 1451.16 160 C1391.26 160 1342.71 144.33 1342.71 125 C1342.71 105.67 1391.26 90 1451.16 90 C1511.06 90 1559.61 105.67 1559.61 125 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1451.16" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1451.16" y="131.48">Account ready</tspan></text>
+<path d="M284.12 125 L329.12 125 M329.12 125 L329.12 125 M329.12 125 L374.12 125 M365.11 120.66 L374.12 125 M365.11 129.34 L374.12 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M605.64 125 L650.64 125 M650.64 125 L650.64 125 M650.64 125 L695.64 125 M686.63 120.66 L695.64 125 M686.63 129.34 L695.64 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M941.27 125 L986.27 125 M986.27 125 L986.27 180 M986.27 180 L1031.27 180 M1022.26 175.66 L1031.27 180 M1022.26 184.34 L1031.27 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="964.27" y="139" width="44" height="27" fill="#ffffff"/>
+<text x="986.27" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="986.27" y="158.98">yes</tspan></text>
+<path d="M941.27 125 L1006.43 125 M1006.43 125 L1006.43 70 M1006.43 70 L1071.59 70 M1062.58 65.66 L1071.59 70 M1062.58 74.34 L1071.59 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="984.43" y="84" width="44" height="27" fill="#ffffff"/>
+<text x="1006.43" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="1006.43" y="103.98">no</tspan></text>
+<path d="M1252.71 180 L1297.71 180 M1297.71 180 L1297.71 125 M1297.71 125 L1342.71 125 M1333.7 120.66 L1342.71 125 M1333.7 129.34 L1342.71 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
