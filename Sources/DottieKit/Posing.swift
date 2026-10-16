@@ -111,6 +111,34 @@ extension DottieDocument {
         return next
     }
 
+    /// Adds `key` to element `id` as posing does: any property no key has set yet is also keyed at 0 with
+    /// its value then, so the element tweens from how it was instead of taking the new value for the whole
+    /// animation. Creates the timeline if needed and lengthens it to fit.
+    public mutating func addKey(_ key: Keyframe, for id: UUID) {
+        var tl = timeline ?? Timeline(duration: 0)
+        let t = Timeline.clampTime(key.t)
+        if t > 0, let base = elements.first(where: { $0.id == id }) {
+            let s = resolved(at: 0).elements.first { $0.id == id } ?? base
+            let track = tl.track(for: id)
+            func unset<V>(_ p: (Keyframe) -> V?) -> Bool { !(track?.keys.contains { p($0) != nil } ?? false) }
+            var pin = Keyframe(t: 0)
+            if key.x != nil, unset(\.x) { pin.x = s.x }
+            if key.y != nil, unset(\.y) { pin.y = s.y }
+            if key.width != nil, unset(\.width) { pin.width = s.width }
+            if key.height != nil, unset(\.height) { pin.height = s.height }
+            if key.rotation != nil, unset(\.rotation) { pin.rotation = s.angle }
+            if key.fill != nil, unset(\.fill) { pin.fill = s.style.fill }
+            if key.stroke != nil, unset(\.stroke) { pin.stroke = s.style.stroke }
+            if key.strokeWidth != nil, unset(\.strokeWidth) { pin.strokeWidth = s.style.strokeWidth }
+            if key.opacity != nil, unset(\.opacity) { pin.opacity = s.style.opacity ?? 1 }
+            if key.reveal != nil, unset(\.reveal) { pin.reveal = 1 }
+            if pin != Keyframe(t: 0) { tl.setKey(pin, for: id) }
+        }
+        tl.duration = max(tl.duration, t)
+        tl.setKey(key, for: id)
+        timeline = tl
+    }
+
     // MARK: Menu-sized operations
 
     /// Gives a still page an empty timeline to add keys to.

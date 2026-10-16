@@ -114,6 +114,9 @@ private enum Gesture {
     case rotatingGroup(center: CGPoint, start: Double)
     /// Dragging a ruler guide; `vertical` guides live in `guidesX`.
     case guide(vertical: Bool, index: Int)
+    /// Dragging the camera's view while posing: by its edge (`corner` nil) to move it, or by a corner (0 top
+    /// left, then clockwise) to resize it, keeping its shape.
+    case camera(corner: Int?, original: CGRect, start: CGPoint)
 }
 
 /// Core Graphics canvas. Model coordinates are top-left origin, so the view is flipped.
@@ -176,6 +179,27 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var poseSource: DottieDocument?
     /// While posing, faintly draw the frames just before and after, to see the motion around the pose.
     var onionSkin = false { didSet { if onionSkin != oldValue { needsDisplay = true } } }
+    /// Called with the camera view dragged into place while posing; the window keys it at the pose time.
+    var onCameraEdit: ((CGRect) -> Void)?
+    /// The camera view mid-drag, drawn in place of the keyed one.
+    private var cameraDraft: CGRect?
+
+    /// The camera's view at the pose being edited, if the page has a camera.
+    private var posedCameraView: CGRect? {
+        guard let t = poseTime, let tl = poseSource?.timeline else { return nil }
+        return tl.cameraView(at: t)
+    }
+
+    /// Which part of the camera view is under `p`: a corner (0 top left, clockwise), its edge (nil inside
+    /// .some), or nothing. Inside the frame is left for the drawing.
+    private func cameraHit(_ p: CGPoint, _ view: CGRect) -> Int?? {
+        let corners = [CGPoint(x: view.minX, y: view.minY), CGPoint(x: view.maxX, y: view.minY),
+                       CGPoint(x: view.maxX, y: view.maxY), CGPoint(x: view.minX, y: view.maxY)]
+        if let i = corners.firstIndex(where: { hypot($0.x - p.x, $0.y - p.y) <= 8 / zoom }) { return .some(i) }
+        let band = 5 / zoom
+        if view.insetBy(dx: -band, dy: -band).contains(p), !view.insetBy(dx: band, dy: band).contains(p) { return .some(nil) }
+        return nil
+    }
     /// Shows another page; `model` is that page when it returns.
     var onShowPage: ((UUID) -> Void)?
     /// The page holding a followable shape (on a visible layer), searching the whole file.
@@ -424,13 +448,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
         if showRulers { drawRulers(ctx) }
         // The camera's view (what exports show) while previewing or posing.
-        if let tl = (poseSource ?? model).timeline, let t = poseTime ?? playhead, let view = tl.cameraView(at: t) {
+        if let tl = (poseSource ?? model).timeline, let t = poseTime ?? playhead,
+           let view = cameraDraft ?? tl.cameraView(at: t) {
             ctx.saveGState()
             ctx.translateBy(x: pan.x, y: pan.y); ctx.scaleBy(x: zoom, y: zoom)
             ctx.setStrokeColor(NSColor.systemTeal.cgColor)
             ctx.setLineWidth(2 / zoom)
             ctx.setLineDash(phase: 0, lengths: [8 / zoom, 5 / zoom])
             ctx.stroke(view)
+            if poseTime != nil {   // posing: corner handles to resize it, its edge to move it
+                ctx.setLineDash(phase: 0, lengths: [])
+                ctx.setFillColor(NSColor.systemTeal.cgColor)
+                for c in [CGPoint(x: view.minX, y: view.minY), CGPoint(x: view.maxX, y: view.minY),
+                          CGPoint(x: view.maxX, y: view.maxY), CGPoint(x: view.minX, y: view.maxY)] {
+                    ctx.fill(CGRect(x: c.x - 4 / zoom, y: c.y - 4 / zoom, width: 8 / zoom, height: 8 / zoom))
+                }
+            }
             ctx.restoreGState()
         }
         if linkSources != nil { drawHint("Click the shape to link to (on any page)   ·   Esc to cancel") }
@@ -1390,6 +1423,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         if playhead != nil { return }
+        if tool == .select, let view = posedCameraView, let hit = cameraHit(point(event), view) {
+            gesture = .camera(corner: hit, original: view, start: point(event))
+            cameraDraft = view
+            return
+        }
         if linkSources != nil { finishLink(at: point(event)); return }
         if showRulers {
             let raw = convert(event.locationInWindow, from: nil)
@@ -1507,6 +1545,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         if playhead != nil { return }
+        if case .camera(let corner, let original, let start)? = gesture {
+            let q = point(event)
+            if let corner {
+                // The opposite corner stays put; the view keeps its shape, sized by the larger pull.
+                let fixed = [CGPoint(x: original.maxX, y: original.maxY), CGPoint(x: original.minX, y: original.maxY),
+                             CGPoint(x: original.minX, y: original.minY), CGPoint(x: original.maxX, y: original.minY)][corner]
+                let aspect = original.width / max(original.height, 1)
+                let w = max(40, max(abs(q.x - fixed.x), abs(q.y - fixed.y) * aspect))
+                let h = w / aspect
+                cameraDraft = CGRect(x: q.x < fixed.x ? fixed.x - w : fixed.x, y: q.y < fixed.y ? fixed.y - h : fixed.y, width: w, height: h)
+            } else {
+                cameraDraft = original.offsetBy(dx: q.x - start.x, dy: q.y - start.y)
+            }
+            needsDisplay = true
+            return
+        }
         if case .erasing? = gesture { eraseStep(at: point(event)); return }
         if case .guide(let vertical, let index)? = gesture {
             let q = point(event)
@@ -1599,7 +1653,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 }
                 next.elements[i].frame = f
             }
-        case .panning, .erasing, .guide:
+        case .panning, .erasing, .guide, .camera:
             return
         case .rotating(let id):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
@@ -1649,6 +1703,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func mouseUp(with event: NSEvent) {
         if playhead != nil, gesture == nil { return }
+        if case .camera(_, let original, _)? = gesture {
+            if let draft = cameraDraft, draft != original { onCameraEdit?(draft) }
+            gesture = nil; cameraDraft = nil; needsDisplay = true
+            return
+        }
         defer {
             gesture = nil; baseline = nil; marqueeRect = nil; hoverShapeID = nil; pressedLink = nil; guides = []; spacingGuides = []; strokePoints = []; needsDisplay = true
             if spaceDown { window?.invalidateCursorRects(for: self) }
@@ -1944,6 +2003,17 @@ struct CanvasView: NSViewRepresentable {
         v.activeLayerID = activeLayerID
         v.showRulers = showRulers
         v.onExitPreview = onExitPreview
+        v.onCameraEdit = pose.map { t in
+            { [document, undoManager] view in
+                var next = document.model
+                guard var tl = next.timeline else { return }
+                // Keep the ease of a key already at this moment.
+                let ease = tl.camera?.first { abs($0.t - t) < 1e-6 }?.ease
+                tl.setCamera(CameraKey(t: t, rect: view, ease: ease))
+                next.timeline = tl
+                document.commit(next, actionName: "Move Camera", undoManager: undoManager)
+            }
+        }
         v.onionSkin = onionSkin
         if v.playhead != playhead { v.playhead = playhead }
         if v.selection != selection { v.selection = selection }

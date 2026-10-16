@@ -45,7 +45,7 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
     var isEntrance: Bool { [.popIn, .growIn, .wipeIn, .dropIn, .slideIn, .drawIn, .fadeIn].contains(self) }
     var isExit: Bool { [.popOut, .shrinkOut, .wipeOut, .fadeOut].contains(self) }
     /// Transitions that don't move or resize anything, so they work on connectors too.
-    var appliesToConnectors: Bool { [.drawIn, .fadeIn, .fadeOut].contains(self) }
+    public var appliesToConnectors: Bool { [.drawIn, .fadeIn, .fadeOut].contains(self) }
 }
 
 extension DottieDocument {

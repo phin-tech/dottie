@@ -121,4 +121,16 @@ final class MotionTests: XCTestCase {
         XCTAssertEqual(index.element(at: start, in: doc)?.id, dots.first)
         XCTAssertNotEqual(index.element(at: start, in: doc, skipping: Set(dots))?.id, dots.first, "clicks pass through")
     }
+
+    func testALabelledPacketIsAPillCarryingItsText() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc, x: 0), b = try box(&doc, x: 400)
+        let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        let pill = try doc.addPacket(along: c.id, at: 0.5, label: "POST /orders")
+        XCTAssertEqual(pill.text, "POST /orders")
+        XCTAssertGreaterThan(pill.width, 60, "wide enough for its text")
+        XCTAssertEqual(pill.style.stroke, RGBA(r: 1, g: 1, b: 1))
+        XCTAssertTrue(doc.transientElements.contains(pill.id), "still only exists in motion")
+        XCTAssertNil(try doc.addPacket(along: c.id, at: 0, label: "").text, "an empty label is a plain dot")
+    }
 }

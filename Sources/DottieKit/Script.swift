@@ -549,7 +549,7 @@ public enum DottieScript {
                 let dot = try doc.addPacket(along: try a.uuid("id"), at: max(0, a.double("t") ?? 0),
                                             duration: a.double("duration") ?? 0.6,
                                             color: try a.color("color") ?? RGBA(r: 0.95, g: 0.36, b: 0.33),
-                                            size: min(max(a.double("size") ?? 14, 2), 200))
+                                            size: min(max(a.double("size") ?? 14, 2), 200), label: a.string("label"))
                 return describe(dot)
 
             case "animateBuild":
@@ -729,8 +729,8 @@ public enum DottieScript {
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
     path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
     face along the path; laps > 1 goes round a closed outline more than once
-      dottie.packet(connector, t, {duration?, color?, size?})  a dot that runs along the connector, shown only while \
-    it travels; returns the dot
+      dottie.packet(connector, t, {duration?, color?, size?, label?})  a dot (or with a label, a pill carrying that \
+    text, like "POST /orders") that runs along the connector, shown only while it travels; returns it
       dottie.animateBuild({transition?, start?, stagger?, packets?, drawArrows?, travel?})  reveals every shape in \
     connector order with an entrance (default popIn). With packets a dot runs down each arrow, with drawArrows each \
     arrow draws itself on, and the shape it points to enters when it arrives (travel seconds later, default 0.6)

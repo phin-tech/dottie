@@ -815,6 +815,27 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertTrue(isRed(at: CGPoint(x: 150, y: 150)), "picked from the timeline, it shows")
     }
 
+    func testDraggingTheCameraFrameWhilePosingSetsAView() {
+        _ = redBox()
+        view.model.timeline!.setCamera(CameraKey(t: 0, rect: CGRect(x: 300, y: 300, width: 200, height: 100)))
+        let base = view.model
+        view.model = base.resolved(at: 0.5)
+        view.poseSource = base
+        view.poseTime = 0.5
+        var edits: [CGRect] = []
+        view.onCameraEdit = { edits.append($0) }
+        view.onCommit = { [unowned self] d, n in commits.append((d, n)) }
+        drag(CGPoint(x: 400, y: 300), CGPoint(x: 450, y: 340))   // the top edge: move
+        XCTAssertEqual(edits.last, CGRect(x: 350, y: 340, width: 200, height: 100))
+        drag(CGPoint(x: 500, y: 400), CGPoint(x: 700, y: 450))   // the bottom-right corner: resize, same shape
+        XCTAssertEqual(edits.last?.width ?? 0, 400, accuracy: 1e-6)
+        XCTAssertEqual(edits.last?.height ?? 0, 200, accuracy: 1e-6)
+        XCTAssertEqual(edits.last?.origin, CGPoint(x: 300, y: 300), "the opposite corner stays")
+        edits = []
+        drag(CGPoint(x: 400, y: 350), CGPoint(x: 420, y: 360))   // inside: the drawing, not the camera
+        XCTAssertTrue(edits.isEmpty)
+    }
+
     func testPreviewClearsSelectionAndEscLeavesIt() {
         let e = redBox()
         view.selection = [e.id]
