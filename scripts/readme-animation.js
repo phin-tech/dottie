@@ -1,5 +1,5 @@
 // The README's animation (Design/animation.*): an architecture diagram that builds itself, then one request
-// running through it. Regenerate with `just readme-animation`, which runs this through dottie-mcp.
+// running through it. Regenerate with `just readme-animation` (scripts/make-demos.py runs it through dottie-mcp).
 const k = dottie.build({direction: "LR", sketchy: true,
   nodes: [
     {key: "b", text: "Browser", fill: "#ffd966"},

@@ -36,7 +36,8 @@ final class DebugDriver {
     play | pause | done          play, pause, or stop previewing
     select all|none|<text>       select shapes whose text contains <text>
     action <name> [arg]          newAnimation, removeAnimation, transition <popIn|...>, packet,
-                                 build <popIn|drawIn|packets>, boil, settle, clearKeys, undo, redo
+                                 build <popIn|drawIn|packets>, boil, settle, clearKeys, scene, camera
+                                 (frame the selection), removeCamera, repeat, undo, redo
     drag <x1> <y1> <x2> <y2>     drag on the canvas, in canvas points (top-left origin)
     click <x> <y>                click on the canvas
     key <esc|delete|text>        send a key to the canvas
@@ -206,6 +207,10 @@ final class DebugDriver {
         case "boil": e.toggleBoil()
         case "settle": e.toggleSettle()
         case "clearKeys": e.clearKeys()
+        case "scene": e.addScene()
+        case "camera": e.frameCamera()
+        case "removeCamera": e.removeCamera()
+        case "repeat": e.repeatSelection()
         case "undo": h.undoManager?.undo()
         case "redo": h.undoManager?.redo()
         default: throw DebugError("unknown action '\(name)'")

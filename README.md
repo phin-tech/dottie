@@ -112,6 +112,10 @@ play button. The Animate menu does the common things in one go:
 - **Send Packet Along Arrow** runs a dot down the selected arrows, like a request on its way.
 - **Boil Lines** makes the sketchy lines jitter like hand-drawn animation; **Settle When Still** calms them
   once a shape stops moving.
+- **Repeat Selection's Animation** plays a shape's animation over and over, like a light that keeps pulsing.
+- **Frame Camera on Selection** points the export's view at the selected shapes from that moment on, so a big
+  diagram can pan and zoom from one part to the next. **Add Scene Marker** names a stop: the web page export
+  then pauses at each scene and steps through them with its next and back buttons, like slides.
 
 The timeline under the canvas shows every animated shape with its keyframes. Press play to watch, or drag
 along it to scrub. Stop on any moment and change the drawing there, moving, resizing or recoloring a
@@ -121,6 +125,12 @@ before and after, faintly.
 
 Assistants can animate too: ask for *"a version of this diagram that builds itself, with a request moving
 through it"*, then *"export it as a GIF"*.
+
+More examples, each made by a short script in [scripts/demos](scripts/demos): a sprint board whose notes
+[pop in one after another](Design/demos/stagger.gif), a service map with
+[requests that never stop flowing](Design/demos/live.gif), and a [camera tour](Design/demos/tour.gif) of the
+diagram above that is also a [click-through presentation](Design/demos/tour.html) (download it and open it in
+a browser).
 
 ## Extras for power users
 

@@ -478,7 +478,65 @@ public enum DottieScript {
                 guard let tr = try a.enumValue("name", as: Transition.self) else {
                     throw OpsError.invalid("'name' must be one of \(Transition.allCases.map(\.rawValue).joined(separator: ", "))")
                 }
-                try doc.addTransition(tr, to: try a.uuid("id"), at: max(0, a.double("t") ?? 0), duration: a.double("duration"))
+                let t = Timeline.clampTime(a.double("t") ?? 0)
+                if let list = a.raw["ids"] as? [Any] {
+                    let ids = try list.map { v -> UUID in
+                        guard let s = v as? String, let u = UUID(uuidString: s) else { throw OpsError.invalid("'ids' must be element ids") }
+                        return u
+                    }
+                    let stagger = a.double("stagger").map { $0.isFinite ? min(max($0, 0), 60) : 0.15 } ?? 0.15
+                    return try doc.addTransition(tr, to: ids, at: t, stagger: stagger, duration: a.double("duration"))
+                }
+                let id = try a.uuid("id")
+                let span = try doc.addTransition(tr, to: id, at: t, duration: a.double("duration"))
+                // repeat: true plays it forever, a number plays it that many times in all.
+                if a.bool("repeat") == true { doc.timeline!.addRepeat(for: id, from: span.start, to: span.end) }
+                else if let n = a.double("repeat"), n.isFinite, n >= 2 {
+                    doc.timeline!.addRepeat(for: id, from: span.start, to: span.end, count: Int(min(n, 10_000)))
+                }
+                return nil
+
+            case "repeat":
+                let id = try a.uuid("id")
+                _ = try element(id)
+                guard let start = a.double("start"), let end = a.double("end"), end > start else {
+                    throw OpsError.invalid("'start' and 'end' (seconds, end after start) are required")
+                }
+                var tl = doc.timeline ?? Timeline(duration: end)
+                tl.duration = max(tl.duration, end)
+                tl.addRepeat(for: id, from: start, to: end, count: a.double("count").map { Int(min(max($0, 1), 10_000)) })
+                doc.timeline = tl
+                return nil
+
+            case "camera":
+                var tl = doc.timeline ?? Timeline(duration: 0)
+                if a.has("clear") { tl.camera = nil; doc.timeline = tl; return nil }
+                guard let t = a.double("t"), t.isFinite, t >= 0 else { throw OpsError.invalid("'t' (seconds) is required") }
+                var rect: CGRect
+                if let list = a.raw["ids"] as? [Any] {
+                    let ids = Set(list.compactMap { ($0 as? String).flatMap(UUID.init(uuidString:)) })
+                    let shapes = doc.elements.filter { ids.contains($0.id) }
+                    guard !shapes.isEmpty else { throw OpsError.invalid("'ids' names no elements on this page") }
+                    let index = doc.elementIndex
+                    rect = shapes.map { $0.kind == .connector ? Connector.bounds(of: $0, in: doc, index: index) : $0.rotatedBounds }
+                        .reduce(CGRect.null) { $0.union($1) }
+                    let pad = a.double("padding") ?? 40
+                    rect = rect.insetBy(dx: -pad, dy: -pad)
+                } else {
+                    guard let x = a.double("x"), let y = a.double("y"), let w = a.double("width"), let h = a.double("height"), w > 1, h > 1 else {
+                        throw OpsError.invalid("give {x, y, width, height} or elements to frame")
+                    }
+                    rect = CGRect(x: x, y: y, width: w, height: h)
+                }
+                tl.setCamera(CameraKey(t: t, rect: rect, ease: try a.enumValue("ease", as: Ease.self)))
+                doc.timeline = tl
+                return ["x": round1(rect.minX), "y": round1(rect.minY), "width": round1(rect.width), "height": round1(rect.height)]
+
+            case "scene":
+                guard let t = a.double("t"), t.isFinite, t >= 0 else { throw OpsError.invalid("'t' (seconds) is required") }
+                var tl = doc.timeline ?? Timeline(duration: t)
+                tl.addMarker(at: t, name: a.string("name") ?? "Scene \((tl.markers?.count ?? 0) + 1)")
+                doc.timeline = tl
                 return nil
 
             case "follow":
@@ -548,8 +606,19 @@ public enum DottieScript {
         pages: function () { return call("pages"); },
         timeline: function (o) { return call("timeline", o); },
         key: function (id, t, props) { call("key", merge(props, { id: idOf(id), t: t })); },
-        transition: function (id, name, t, o) { call("transition", merge(o, { id: idOf(id), name: name, t: t })); },
+        transition: function (id, name, t, o) {
+          if (Array.isArray(id)) return call("transition", merge(o, { ids: id.map(idOf), name: name, t: t }));
+          call("transition", merge(o, { id: idOf(id), name: name, t: t }));
+        },
         boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
+        repeat: function (id, start, end, count) { call("repeat", { id: idOf(id), start: start, end: end, count: count }); },
+        camera: function (t, view, o) {
+          if (t === null) return call("camera", { clear: true });
+          var target = Array.isArray(view) ? { ids: view.map(idOf) }
+            : (view && view.x === undefined && (typeof view === "string" || view.id)) ? { ids: [idOf(view)] } : view;
+          return call("camera", merge(merge(o, target), { t: t }));
+        },
+        scene: function (t, name) { call("scene", { t: t, name: name }); },
         follow: function (id, path, t, o) { call("follow", merge(o, { id: idOf(id), path: idOf(path), t: t })); },
         packet: function (connector, t, o) { return call("packet", merge(o, { id: idOf(connector), t: t })); },
         animateBuild: function (o) { call("animateBuild", o); },
@@ -645,9 +714,18 @@ public enum DottieScript {
     linear | easeIn | easeOut | easeInOut | hold. visible switches at the key: a lone visible:true key is where the \
     element appears. reveal 0-1 draws the stroke on (fill and text follow once it is complete); opacity 0-1 fades. \
     Connectors follow their shapes and hide with them; key only their visible, reveal and opacity.
-      dottie.transition(id, name, t, {duration?})  canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
+      dottie.transition(id | [ids], name, t, {duration?, stagger?})  given a list, starts each stagger seconds \
+    (default 0.15) after the last, in list order, and returns how many it animated (arrows only take drawIn and \
+    fades). Canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
     (enter), popOut, shrinkOut, wipeOut, fadeOut (exit), pulse, wiggle (emphasis); arrows take drawIn, fadeIn, fadeOut
       dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
+      transition option repeat: true plays it forever, a number that many times (e.g. a pulse that never stops)
+      dottie.repeat(id, start, end, count?)  play the element's keys from start to end again, count times in all \
+    (default forever)
+      dottie.camera(t, view, {ease?, padding?})  where exports look from t on: view is {x, y, width, height}, an \
+    element, or a list of elements to frame (padding default 40). Views ease between keys; the first key's shape \
+    sets the export's. dottie.camera(null) removes the camera
+      dottie.scene(t, name?)  a scene marker: the HTML player stops at each, and next/back step through them
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
     path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
     face along the path; laps > 1 goes round a closed outline more than once

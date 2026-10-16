@@ -42,24 +42,32 @@ public struct TimelineRows: Equatable, Sendable {
             case follow(path: UUID)
             /// The element is not shown.
             case hidden
+            /// The keys in this span play again: `count` times in all, nil forever.
+            case repeating(count: Int?)
         }
     }
 
     public var duration: Double
     public var fps: Double
     public var groups: [Group]
+    /// Times of the camera's keys, for a Camera row.
+    public var camera: [Double]
+    /// Scene markers, for the ruler.
+    public var markers: [Marker]
 
     public init(_ doc: DottieDocument) {
         let timeline = doc.timeline ?? Timeline(duration: 0)
         duration = timeline.duration
         fps = timeline.fps
+        camera = (timeline.camera ?? []).map(\.t)
+        markers = timeline.markers ?? []
         let tracks = Dictionary(timeline.tracks.map { ($0.element, $0) }, uniquingKeysWith: { a, _ in a })
         let index = doc.elementIndex
         groups = doc.layers.compactMap { layer in
             let rows = doc.orderedElements.reversed()   // front to back, as layer lists read
                 .filter { $0.layerID == layer.id }
                 .compactMap { e -> Row? in
-                    guard let track = tracks[e.id], !track.keys.isEmpty || !(track.follow ?? []).isEmpty else { return nil }
+                    guard let track = tracks[e.id], !track.keys.isEmpty || !(track.follow ?? []).isEmpty || !(track.repeats ?? []).isEmpty else { return nil }
                     return Row(element: e.id, label: Self.label(e, track: track, index: index), kind: e.kind,
                                keys: track.keys.map(Self.mark), spans: Self.spans(track, duration: timeline.duration))
                 }
@@ -100,6 +108,10 @@ public struct TimelineRows: Equatable, Sendable {
             else if track.keys.contains(where: { $0.t == a && $0.ease == .hold }) { out.append(Span(start: a, end: b, kind: .hold)) }
         }
         for f in track.follow ?? [] { out.append(Span(start: f.start, end: f.end, kind: .follow(path: f.path))) }
+        for r in track.repeats ?? [] where r.isValid {
+            out.append(Span(start: r.start, end: r.count.map { min(duration, r.start + (r.end - r.start) * Double($0)) } ?? duration,
+                            kind: .repeating(count: r.count)))
+        }
         return out
     }
 

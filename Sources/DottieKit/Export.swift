@@ -29,26 +29,31 @@ public enum Exporter {
     /// A page without a timeline is a one-frame GIF.
     /// nil when the animation is too long to export (see `maxAnimationFrames`).
     public static func gif(_ doc: DottieDocument, scale: Double = 1) -> Data? {
-        guard let (_, times, durations, b) = animation(doc) else { return nil }
+        guard let plan = animation(doc) else { return nil }
+        let size = (width: max(1, Int((plan.size.width * scale).rounded())), height: max(1, Int((plan.size.height * scale).rounded())))
         let data = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, times.count, nil)
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, plan.times.count, nil)
         else { return nil }
         let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
         CGImageDestinationSetProperties(dest, loop as CFDictionary)
-        for (t, shown) in zip(times, durations) {
-            guard let img = bitmap(doc.resolved(at: t), bounds: b, scale: scale, background: CGColor(gray: 1, alpha: 1)) else { return nil }
-            let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: shown]]
+        for (i, t) in plan.times.enumerated() {
+            guard let img = bitmap(doc.resolved(at: t), bounds: plan.rects[i], scale: scale,
+                                   background: CGColor(gray: 1, alpha: 1), pixels: size) else { return nil }
+            let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: plan.durations[i]]]
             CGImageDestinationAddImage(dest, img, delay as CFDictionary)
         }
         return CGImageDestinationFinalize(dest) ? data as Data : nil
     }
 
     /// `doc` drawn into a bitmap covering `b`.
-    static func bitmap(_ doc: DottieDocument, bounds b: CGRect, scale: Double, background: CGColor?) -> CGImage? {
+    /// `pixels` fixes the bitmap's size (an animation's frames must all match), scaling `b` to fill it.
+    static func bitmap(_ doc: DottieDocument, bounds b: CGRect, scale: Double, background: CGColor?,
+                       pixels: (width: Int, height: Int)? = nil) -> CGImage? {
         // A themed drawing exports on its own page color, unless the caller asked for transparency.
         let background = background.map { plain in doc.resolvedTheme?.background.cgColor ?? plain }
         let ink = doc.resolvedTheme?.ink ?? .black
-        let w = Int(b.width * scale), h = Int(b.height * scale)
+        let w = pixels?.width ?? Int(b.width * scale), h = pixels?.height ?? Int(b.height * scale)
+        let scale = pixels.map { Double($0.width) / max(b.width, 1) } ?? scale
         guard let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
                                   space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }

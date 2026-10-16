@@ -19,7 +19,13 @@ gen:
 readme-animation:
     swift build --product dottie-mcp
     swift build --product dottie
-    scripts/make-readme-animation.py
+    scripts/make-demos.py readme
+
+# Regenerate the feature demos in Design/demos from scripts/demos/*.js (or just the ones named)
+demos *names:
+    swift build --product dottie-mcp
+    swift build --product dottie
+    scripts/make-demos.py {{ if names == "" { "demos" } else { names } }}
 
 # Launch a Debug build on its own live socket, for scripts/dottie-debug.py to drive (snapshots, playhead, actions)
 # (in the background, so it doesn't take focus; files open through the debug socket once it's up)

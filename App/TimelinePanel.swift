@@ -78,6 +78,9 @@ struct TimelinePanel: View {
             } else {
                 Spacer()
             }
+            if let markers = timeline.markers, !markers.isEmpty {
+                sceneControls(markers)
+            }
             if let k = selectedKey, let key = timeline.key(of: k.element, at: k.t) {
                 keyControls(k, key)
             }
@@ -90,6 +93,21 @@ struct TimelinePanel: View {
         .font(.callout)
         .padding(.horizontal, 10)
         .frame(height: 30)
+    }
+
+    /// Back and next between scenes, with the current scene's name.
+    @ViewBuilder
+    private func sceneControls(_ markers: [Marker]) -> some View {
+        let t = playhead ?? 0
+        let current = markers.last { $0.t <= t + 1e-6 }
+        Divider().frame(height: 16)
+        Button { scrub(to: markers.last { $0.t < t - 1e-6 }?.t ?? 0) } label: { Image(systemName: "backward.end.fill") }
+            .buttonStyle(.borderless)
+            .help("Previous Scene")
+        Text(current?.name ?? "Start").lineLimit(1).frame(maxWidth: 140)
+        Button { if let next = markers.first(where: { $0.t > t + 1e-6 }) { scrub(to: next.t) } } label: { Image(systemName: "forward.end.fill") }
+            .buttonStyle(.borderless)
+            .help("Next Scene")
     }
 
     /// The selected key's ease and a delete button.
@@ -155,6 +173,7 @@ struct TimelinePanel: View {
             Divider()
             ScrollView(.vertical) {
                 LazyVStack(spacing: 0) {
+                    if !rows.camera.isEmpty { cameraRow }
                     ForEach(groups) { group in
                         layerHeader(group)
                         if !collapsedLayers.contains(group.layer) {
@@ -164,8 +183,39 @@ struct TimelinePanel: View {
                 }
             }
             .scrollIndicators(.never)   // keeps every row exactly as wide as the ruler they scrub against
-            .frame(height: min(CGFloat(count) * rowHeight, 200))
+            .frame(height: min(CGFloat(count + (rows.camera.isEmpty ? 0 : 1)) * rowHeight, 200))
         }
+    }
+
+    /// The camera's keys, with bars where it moves between them.
+    private var cameraRow: some View {
+        HStack(spacing: 0) {
+            HStack(spacing: 6) {
+                Image(systemName: "camera").frame(width: 14).foregroundStyle(.secondary)
+                Text("Camera").lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 8)
+            .font(.caption.weight(.semibold))
+            .frame(width: labelWidth, height: rowHeight)
+            Divider()
+            Canvas { ctx, size in
+                let mid = size.height / 2, keys = rows.camera
+                for (a, b) in zip(keys, keys.dropFirst()) {
+                    ctx.fill(Path(roundedRect: CGRect(x: x(a, size.width), y: mid - 3, width: x(b, size.width) - x(a, size.width), height: 6),
+                                  cornerRadius: 3), with: .color(.teal.opacity(0.5)))
+                }
+                for t in keys {
+                    let c = CGPoint(x: x(t, size.width), y: mid)
+                    ctx.fill(Path(ellipseIn: CGRect(x: c.x - 4.5, y: c.y - 4.5, width: 9, height: 9)), with: .color(.teal))
+                }
+                if let p = playhead { drawPlayhead(&ctx, size: size, at: p, head: false) }
+            }
+            .contentShape(Rectangle())
+            .gesture(scrubGesture)
+        }
+        .frame(height: rowHeight)
+        .background(Color.primary.opacity(0.04))
     }
 
     private var ruler: some View {
@@ -184,6 +234,14 @@ struct TimelinePanel: View {
                              at: CGPoint(x: x + 2, y: 1), anchor: .topLeading)
                 }
                 t += step
+            }
+            // Scene markers: a small flag at each, under the ticks' labels.
+            for m in rows.markers {
+                let mx = x(m.t, size.width)
+                var flag = Path()
+                flag.move(to: CGPoint(x: mx, y: size.height)); flag.addLine(to: CGPoint(x: mx, y: 3))
+                flag.addLine(to: CGPoint(x: mx + 7, y: 6)); flag.addLine(to: CGPoint(x: mx, y: 9))
+                ctx.stroke(flag, with: .color(.orange), lineWidth: 1.2)
             }
             if let p = playhead { drawPlayhead(&ctx, size: size, at: p, head: true) }
         }
@@ -269,6 +327,14 @@ struct TimelinePanel: View {
                 var p = Path()
                 p.move(to: CGPoint(x: a, y: mid)); p.addLine(to: CGPoint(x: b, y: mid))
                 ctx.stroke(p, with: .color(.orange), style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [4, 3]))
+            case .repeating(let count):
+                // A bracket under the row, labelled with how many times (∞ for forever).
+                var p = Path()
+                p.move(to: CGPoint(x: a, y: size.height - 6)); p.addLine(to: CGPoint(x: a, y: size.height - 2))
+                p.addLine(to: CGPoint(x: b, y: size.height - 2)); p.addLine(to: CGPoint(x: b, y: size.height - 6))
+                ctx.stroke(p, with: .color(.accentColor.opacity(0.7)), style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                ctx.draw(Text(count.map { "↻ \($0)×" } ?? "↻ ∞").font(.system(size: 8)).foregroundStyle(Color.accentColor),
+                         at: CGPoint(x: b - 2, y: 1), anchor: .topTrailing)
             }
         }
         let dragging = keyDrag.flatMap { $0.element == row.element ? $0 : nil }

@@ -55,14 +55,17 @@ public struct Track: Codable, Equatable, Sendable {
     public var boil: Bool?
     /// Spans of time when the element travels along a path instead of following its x and y keys.
     public var follow: [Follow]?
-    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil) {
+    /// Spans of the keys that play again (a pulse that never stops, a wiggle three times).
+    public var repeats: [Repeat]?
+    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil, repeats: [Repeat]? = nil) {
         self.element = element
         self.keys = keys.sorted { $0.t < $1.t }
         self.boil = boil
         self.follow = follow
+        self.repeats = repeats
     }
 
-    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow }
+    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow, repeats }
 
     /// Hand- or agent-written files may list keys out of order or with impossible times: keep the usable
     /// keys, in time order, so interpolation (which walks them in order) stays right.
@@ -75,7 +78,55 @@ public struct Track: Codable, Equatable, Sendable {
         boil = try c.decodeIfPresent(Bool.self, forKey: .boil)
         follow = try c.decodeIfPresent([Follow].self, forKey: .follow)?
             .filter { $0.start.isFinite && $0.end.isFinite && $0.start >= 0 && $0.end <= Timeline.maxDuration }
+        repeats = try c.decodeIfPresent([Repeat].self, forKey: .repeats)?.filter(\.isValid)
     }
+
+    /// The time inside the element's own keys that `t` plays: within a repeat, the same moment of the
+    /// repeated span; after a counted repeat ends, the time shifted back by the repeats it played.
+    func localTime(_ t: Double) -> Double {
+        guard let reps = repeats?.filter(\.isValid).sorted(by: { $0.start < $1.start }), !reps.isEmpty else { return t }
+        var t = t
+        for r in reps where t >= r.end {
+            let length = r.end - r.start
+            guard let count = r.count else { return r.start + (t - r.start).truncatingRemainder(dividingBy: length) }
+            let played = length * Double(count)
+            if t < r.start + played { return r.start + (t - r.start).truncatingRemainder(dividingBy: length) }
+            t -= played - length
+        }
+        return t
+    }
+}
+
+/// A span of a track's keys that plays again: `count` times in all (nil forever, until the timeline ends).
+public struct Repeat: Codable, Equatable, Sendable {
+    public var start, end: Double
+    public var count: Int?
+    public init(start: Double, end: Double, count: Int? = nil) {
+        self.start = start; self.end = end; self.count = count
+    }
+    var isValid: Bool {
+        start.isFinite && end.isFinite && start >= 0 && end - start > 1e-3 && end <= Timeline.maxDuration
+            && (count.map { $0 >= 1 && $0 <= 10_000 } ?? true)
+    }
+}
+
+/// The view an export shows at time `t`: a rectangle of the page, eased from this key to the next.
+public struct CameraKey: Codable, Equatable, Sendable {
+    public var t: Double
+    public var x, y, width, height: Double
+    public var ease: Ease?
+    public init(t: Double, rect: CGRect, ease: Ease? = nil) {
+        self.t = t; x = rect.minX; y = rect.minY; width = rect.width; height = rect.height; self.ease = ease
+    }
+    public var rect: CGRect { CGRect(x: x, y: y, width: width, height: height) }
+    var isValid: Bool { [t, x, y, width, height].allSatisfy(\.isFinite) && width > 1 && height > 1 && t >= 0 }
+}
+
+/// A named moment: where a click-through presentation stops.
+public struct Marker: Codable, Equatable, Sendable {
+    public var t: Double
+    public var name: String
+    public init(t: Double, name: String) { self.t = t; self.name = name }
 }
 
 /// A page's animation. The page's elements are the base pose; tracks override their properties over time.
@@ -98,6 +149,10 @@ public struct Timeline: Codable, Equatable, Sendable {
     /// The moment a still picture of the page shows (exports, previews, thumbnails); nil is the end.
     public var poster: Double? { didSet { poster = poster.map(Self.clampTime) } }
     public var tracks: [Track]
+    /// Where exports look over time; nil frames the whole animation.
+    public var camera: [CameraKey]?
+    /// Named scenes; the HTML player stops at each, for click-through presentations.
+    public var markers: [Marker]?
 
     public init(fps: Double = 12, duration: Double, boil: Int? = nil, settle: Bool? = nil,
                 tracks: [Track] = []) {
@@ -116,7 +171,7 @@ public struct Timeline: Codable, Equatable, Sendable {
         f.isFinite ? min(max(f, fpsRange.lowerBound), fpsRange.upperBound) : 12
     }
 
-    private enum CodingKeys: String, CodingKey { case fps, duration, boil, settle, poster, tracks }
+    private enum CodingKeys: String, CodingKey { case fps, duration, boil, settle, poster, tracks, camera, markers }
 
     /// Every field is optional on disk, and out-of-range numbers are clamped rather than rejected, so a
     /// hand-written or damaged timeline still opens.
@@ -128,6 +183,63 @@ public struct Timeline: Codable, Equatable, Sendable {
                   settle: try c.decodeIfPresent(Bool.self, forKey: .settle),
                   tracks: try c.decodeIfPresent([Track].self, forKey: .tracks) ?? [])
         poster = try c.decodeIfPresent(Double.self, forKey: .poster).map(Self.clampTime)
+        camera = try c.decodeIfPresent([CameraKey].self, forKey: .camera)?.filter(\.isValid).sorted { $0.t < $1.t }
+        markers = try c.decodeIfPresent([Marker].self, forKey: .markers)?
+            .filter { $0.t.isFinite && $0.t >= 0 }.sorted { $0.t < $1.t }
+    }
+
+    /// The camera's view at `t`, or nil when there's no camera.
+    public func cameraRect(at t: Double) -> CGRect? {
+        guard let keys = camera?.filter(\.isValid), let first = keys.first else { return nil }
+        let before = keys.last { $0.t <= t }, after = keys.first { $0.t > t }
+        guard let b = before else { return first.rect }
+        guard let a = after else { return b.rect }
+        let u = (b.ease ?? .easeInOut).apply((t - b.t) / max(a.t - b.t, 1e-9))
+        func mix(_ p: Double, _ q: Double) -> Double { p + (q - p) * u }
+        return CGRect(x: mix(b.x, a.x), y: mix(b.y, a.y), width: mix(b.width, a.width), height: mix(b.height, a.height))
+    }
+
+    /// What exports show at `t`: the camera's view widened (never cropped) to the first key's shape, so
+    /// the output keeps one size as the camera moves. nil when there's no camera.
+    public func cameraView(at t: Double) -> CGRect? {
+        guard let first = camera?.first(where: \.isValid), let r = cameraRect(at: t), r.width > 0, r.height > 0 else { return nil }
+        let aspect = first.width / first.height
+        var out = r
+        if r.width / r.height < aspect { out.size.width = r.height * aspect } else { out.size.height = r.width / aspect }
+        out.origin = CGPoint(x: r.midX - out.width / 2, y: r.midY - out.height / 2)
+        return out
+    }
+
+    /// Adds or replaces the camera key at `t` (to a microsecond), growing the timeline to fit.
+    public mutating func setCamera(_ key: CameraKey) {
+        var key = key
+        key.t = Self.clampTime(key.t)
+        guard key.isValid else { return }
+        var keys = (camera ?? []).filter { abs($0.t - key.t) >= 1e-6 }
+        keys.append(key)
+        camera = keys.sorted { $0.t < $1.t }
+        duration = max(duration, key.t)
+    }
+
+    /// Adds a scene marker (replacing one at the same time), growing the timeline to fit.
+    public mutating func addMarker(at t: Double, name: String) {
+        let t = Self.clampTime(t)
+        var list = (markers ?? []).filter { abs($0.t - t) >= 1e-6 }
+        list.append(Marker(t: t, name: name))
+        markers = list.sorted { $0.t < $1.t }
+        duration = max(duration, t)
+    }
+
+    /// Makes the element's keys from `start` to `end` play again, `count` times in all (nil forever).
+    public mutating func addRepeat(for id: UUID, from start: Double, to end: Double, count: Int? = nil) {
+        let r = Repeat(start: Self.clampTime(start), end: Self.clampTime(end), count: count.map { min(max($0, 1), 10_000) })
+        guard r.isValid else { return }
+        if let ti = tracks.firstIndex(where: { $0.element == id }) {
+            tracks[ti].repeats = (tracks[ti].repeats ?? []).filter { $0.start != r.start } + [r]
+        } else {
+            tracks.append(Track(element: id, keys: [], repeats: [r]))
+        }
+        if let n = r.count { duration = max(duration, Self.clampTime(r.start + (r.end - r.start) * Double(n))) }
     }
 
     public var frameCount: Int { max(1, Int((Self.clampTime(duration) * Self.clampFPS(fps)).rounded(.up))) }
@@ -229,6 +341,7 @@ extension Track {
     /// The value of one property at time `t`: the base value with no key setting it, held flat before the
     /// first such key and after the last, and eased between the two keys around `t`.
     func value<V>(at t: Double, _ prop: (Keyframe) -> V?, base: V, lerp: (V, V, Double) -> V) -> V {
+        let t = localTime(t)
         var before: Keyframe?, after: Keyframe?
         for k in keys where prop(k) != nil {
             if k.t <= t { before = k } else { after = k; break }
@@ -246,6 +359,7 @@ extension Track {
     /// Whether some property is tweening at time `t`: between two keys that set it to different values,
     /// and not held.
     func isChanging(at t: Double) -> Bool {
+        let t = localTime(t)
         func changing<V: Equatable>(_ prop: (Keyframe) -> V?) -> Bool {
             guard let b = keys.last(where: { $0.t <= t && prop($0) != nil }),
                   let a = keys.first(where: { $0.t > t && prop($0) != nil }) else { return false }
@@ -258,6 +372,7 @@ extension Track {
 
     /// Whether the element is shown at time `t`.
     func isVisible(at t: Double) -> Bool {
+        let t = localTime(t)
         let keyed = keys.filter { $0.visible != nil }
         guard let first = keyed.first else { return true }
         return keyed.last { $0.t <= t }?.visible ?? !first.visible!
