@@ -4,8 +4,8 @@
 <dottie-player> (web/). Each script runs on a new page through dottie-mcp, and the dottie tool renders the
 result. Run through `just readme-animation` or `just demos`, which build both tools first.
 
-    scripts/make-demos.py readme        the README animation: .dottie, .gif, .mp4, and drawings/build.dottie
-    scripts/make-demos.py demos         every scripts/demos/*.js: .dottie, .gif and drawings/<name>.dottie
+    scripts/make-demos.py readme        the README animation: .dottie, .gif, .mp4, drawings/build.dottie, compiled/build.js
+    scripts/make-demos.py demos         every scripts/demos/*.js: .dottie, .gif, drawings/<name>.dottie, compiled/<name>.js
     scripts/make-demos.py live tour     just those demos
 """
 import json, pathlib, shutil, subprocess, sys
@@ -13,6 +13,7 @@ import json, pathlib, shutil, subprocess, sys
 root = pathlib.Path(__file__).resolve().parent.parent
 bin_dir = root / ".build" / "debug"
 drawings = root / "website" / "docs" / "drawings"
+compiled = root / "website" / "docs" / "compiled"
 
 
 def run_script(script: pathlib.Path, page: pathlib.Path) -> None:
@@ -61,9 +62,11 @@ def render(page: pathlib.Path, out: pathlib.Path, scale: str) -> None:
 
 
 def publish(page: pathlib.Path, name: str) -> None:
-    """Puts a copy of the drawing on the Pages site, which plays it live."""
+    """Puts a copy of the drawing on the Pages site, which plays it live, and the drawing compiled into one
+    script (`dottie render -f js`) for the dottie.js page."""
     drawings.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(page, drawings / f"{name}.dottie")
+    render(page, compiled / f"{name}.js", "1")
 
 
 def readme() -> None:
