@@ -73,6 +73,7 @@ extension Track {
     /// The path span placing the element at time `t`: the latest one started, unless an x or y key after it
     /// has taken the element back.
     func followSpan(at t: Double) -> Follow? {
+        let t = localTime(t)   // a repeated span repeats its travel too
         guard let f = follow?.filter({ $0.start <= t }).max(by: { $0.start < $1.start }) else { return nil }
         if keys.contains(where: { $0.t >= f.end && $0.t <= t && ($0.x != nil || $0.y != nil) }) { return nil }
         return f
@@ -81,6 +82,7 @@ extension Track {
     /// `e` moved onto the path it is following at time `t`, if any. `doc` is the page with keys applied.
     func following(_ e: Element, at t: Double, in doc: DottieDocument) -> Element {
         guard let f = followSpan(at: t) else { return e }
+        let t = localTime(t)
         guard let pathElement = doc.elements.first(where: { $0.id == f.path }), pathElement.id != e.id else { return e }
         let line = Polyline(tracing: pathElement, in: doc)
         let span = f.end - f.start

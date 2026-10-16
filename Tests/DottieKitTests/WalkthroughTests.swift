@@ -42,6 +42,21 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertEqual(TimelineRows(doc).groups[0].rows[0].spans.filter { if case .repeating = $0.kind { true } else { false } }.count, 1)
     }
 
+    func testARepeatedPacketKeepsFlowing() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc), b = try box(&doc, x: 400)
+        let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        let dot = try doc.addPacket(along: c.id, at: 0, duration: 1)
+        doc.timeline!.duration = 10
+        doc.timeline!.addRepeat(for: dot.id, from: 0, to: 1.5)
+        func dotX(_ t: Double) -> Double? {
+            guard let e = doc.resolved(at: t).elements.first(where: { $0.id == dot.id }) else { return nil }
+            return Double(e.frame.midX)
+        }
+        XCTAssertEqual(dotX(7.5 + 0.5) ?? 0, dotX(0.5) ?? 1, accuracy: 1e-6, "sixth trip, same place")
+        XCTAssertNil(dotX(7.5 + 1.2), "and gone between trips")
+    }
+
     // MARK: Camera
 
     func testCameraEasesBetweenViews() {
