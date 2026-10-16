@@ -7,6 +7,9 @@ result. Run through `just readme-animation` or `just demos`, which build both to
     scripts/make-demos.py readme        the README animation: .dottie, .gif, .mp4, drawings/build.dottie, compiled/build.js
     scripts/make-demos.py demos         every scripts/demos/*.js: .dottie, .gif, drawings/<name>.dottie, compiled/<name>.js
     scripts/make-demos.py live tour     just those demos
+
+A demo can have a second page: scripts/demos/<name>.after.js draws a page called "After" first, for the demo's
+script (on page 1) to animate into, as Magic Move does.
 """
 import json, pathlib, shutil, subprocess, sys
 
@@ -16,8 +19,9 @@ drawings = root / "website" / "docs" / "drawings"
 compiled = root / "website" / "docs" / "compiled"
 
 
-def run_script(script: pathlib.Path, page: pathlib.Path) -> None:
-    """Runs `script` on a new page saved at `page`, through dottie-mcp over stdio."""
+def run_script(script: pathlib.Path, page: pathlib.Path, after=None) -> None:
+    """Runs `script` on a new page saved at `page`, through dottie-mcp over stdio; with `after`, that script
+    first draws a second page, "After"."""
     mcp = subprocess.Popen([str(bin_dir / "dottie-mcp")], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     next_id = 0
 
@@ -38,11 +42,11 @@ def run_script(script: pathlib.Path, page: pathlib.Path) -> None:
             if reply.get("id") == next_id:
                 return reply
 
-    def tool(name, **arguments):
-        result = call("tools/call", {"name": name, "arguments": arguments})["result"]
+    def tool(tool_name, **arguments):
+        result = call("tools/call", {"name": tool_name, "arguments": arguments})["result"]
         text = "\n".join(c.get("text", "") for c in result.get("content", []) if c.get("type") == "text")
         if result.get("isError"):
-            sys.exit(f"{script.name}: {name} failed: {text}")
+            sys.exit(f"{script.name}: {tool_name} failed: {text}")
         return text
 
     try:
@@ -51,6 +55,9 @@ def run_script(script: pathlib.Path, page: pathlib.Path) -> None:
         call("notifications/initialized", notify=True)
         page.parent.mkdir(parents=True, exist_ok=True)
         tool("create_diagram", path=str(page), overwrite=True)
+        if after is not None:
+            tool("add_page", path=str(page), name="After")
+            tool("run_script", path=str(page), page="After", code=after.read_text())
         print(f"{script.name}: {tool('run_script', path=str(page), code=script.read_text()).splitlines()[-1]}")
     finally:
         mcp.terminate()
@@ -75,6 +82,8 @@ def readme() -> None:
     render(page, page.with_suffix(".gif"), "1")
     render(page, page.with_suffix(".mp4"), "2")
     publish(page, "build")
+    # And as Lottie, which the dottie.js page plays with lottie-web.
+    render(page, root / "website" / "docs" / "lottie" / "build.json", "1")
 
 
 def demo(name: str) -> None:
@@ -82,7 +91,8 @@ def demo(name: str) -> None:
     if not script.exists():
         sys.exit(f"no demo called {name} (scripts/demos/{name}.js)")
     page = root / "Design" / "demos" / f"{name}.dottie"
-    run_script(script, page)
+    after = script.with_name(f"{name}.after.js")
+    run_script(script, page, after if after.exists() else None)
     render(page, page.with_suffix(".gif"), "1")
     publish(page, name)
 
@@ -93,6 +103,7 @@ for target in targets:
         readme()
     elif target == "demos":
         for script in sorted((root / "scripts" / "demos").glob("*.js")):
-            demo(script.stem)
+            if not script.stem.endswith(".after"):
+                demo(script.stem)
     else:
         demo(target)
