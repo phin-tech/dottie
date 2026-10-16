@@ -28,9 +28,7 @@ public enum Exporter {
     /// The page's timeline as a looping animated GIF, every frame framed to the whole animation.
     /// A page without a timeline is a one-frame GIF.
     public static func gif(_ doc: DottieDocument, scale: Double = 1) -> Data? {
-        let timeline = doc.timeline ?? Timeline(duration: 0)
-        let frames = (0..<timeline.frameCount).map { doc.resolved(at: timeline.time(ofFrame: $0)) }
-        let b = frames.map { bounds(of: $0) }.reduce(CGRect.null) { $0.union($1) }
+        let (timeline, frames, b) = animation(doc)
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, frames.count, nil)
         else { return nil }
