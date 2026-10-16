@@ -176,8 +176,15 @@ struct Inspector: View {
                         Text("Solid").tag(FillStyle.solid)
                         Text("Hachure").tag(FillStyle.hachure)
                         Text("Cross").tag(FillStyle.crossHatch)
+                        Text("Grid").tag(FillStyle.grid)
                     }
                     .pickerStyle(.segmented)
+                    if binding(\.fillStyle, "").wrappedValue == .grid {
+                        let cell = binding(\.cellSize, "Change Grid Size")
+                        Stepper(value: cell, in: 10...200, step: 5) {
+                            LabeledContent("Grid cell", value: "\(Int(cell.wrappedValue)) pt")
+                        }
+                    }
                 }
                 Picker("Line", selection: binding(\.dash, "Change Line Style")) {
                     Text("Solid").tag(DashStyle.solid)

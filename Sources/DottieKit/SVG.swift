@@ -20,6 +20,10 @@ extension Exporter {
             out += "<rect x=\"\(num(b.minX))\" y=\"\(num(b.minY))\" width=\"\(num(b.width))\" height=\"\(num(b.height))\" fill=\"\(color(background))\"/>\n"
         }
         let index = d.elementIndex
+        let floors = d.orderedElements.filter { visible.contains($0.layerID) && DungeonGrid.isFloor($0) }
+        for rock in DungeonGrid.rock(for: floors) {
+            out += "<path d=\"\(pathData(rock.path))\" fill=\"none\" stroke=\"\(color(rock.ink))\"\(opacity(rock.ink, attr: "stroke-opacity")) stroke-width=\"\(num(rock.width))\" stroke-linecap=\"round\"/>\n"
+        }
         for e in d.orderedElements where visible.contains(e.layerID) {
             let body = svgElement(e, in: d, index: index, labelBackground: background)
             if e.angle != 0, e.kind != .connector {
@@ -75,6 +79,10 @@ extension Exporter {
             if e.style.fill.a > 0 {
                 if e.style.fillStyle == .solid {
                     s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity"))\(e.evenOdd == true ? " fill-rule=\"evenodd\"" : "") stroke=\"none\"/>\n"
+                } else if e.style.fillStyle == .grid {
+                    let line = DungeonGrid.lineColor(for: e.style.fill)
+                    s += "<path d=\"\(pathData(Renderer.fillPath(for: e)))\" fill=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "fill-opacity"))\(e.evenOdd == true ? " fill-rule=\"evenodd\"" : "") stroke=\"none\"/>\n"
+                    s += "<path d=\"\(pathData(Renderer.hachurePath(for: e)))\" fill=\"none\" stroke=\"\(color(line))\"\(opacity(line, attr: "stroke-opacity")) stroke-width=\"1\" stroke-linecap=\"round\"/>\n"
                 } else {
                     s += "<path d=\"\(pathData(Renderer.hachurePath(for: e)))\" fill=\"none\" stroke=\"\(color(e.style.fill))\"\(opacity(e.style.fill, attr: "stroke-opacity")) stroke-width=\"\(num(max(1, e.style.strokeWidth / 2)))\" stroke-linecap=\"round\"/>\n"
                 }

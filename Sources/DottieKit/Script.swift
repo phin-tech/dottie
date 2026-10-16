@@ -242,7 +242,8 @@ public enum DottieScript {
                                 dash: try enumValue("dash", as: DashStyle.self),
                                 strokeWidth: double("strokeWidth"), bowing: double("bowing"),
                                 startHead: try enumValue("startHead", as: Arrowhead.self),
-                                endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"))
+                                endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"),
+                                gridSize: double("gridSize"))
             }
             /// `sketchy: true|false` as a roughness override.
             var roughness: Double? { bool("sketchy").map { $0 ? 1 : 0 } }
@@ -286,6 +287,7 @@ public enum DottieScript {
             if let t = e.text { d["text"] = t }
             if e.style.fill.a > 0 { d["fill"] = hex(e.style.fill) }
             if e.style.fillStyle != .solid { d["fillStyle"] = e.style.fillStyle.rawValue }
+            if e.style.fillStyle == .grid { d["gridSize"] = e.style.cellSize }
             if e.style.dash != .solid { d["dash"] = e.style.dash.rawValue }
             if let r = e.rotation { d["rotation"] = round1(r * 180 / .pi) }
             if let g = e.groupID { d["group"] = g.uuidString }
@@ -567,7 +569,8 @@ public enum DottieScript {
       folder, or from the `modules` argument of run_script; ./ and ../ resolve relative to the requiring module. \
       Bundled: lodash, d3-array, d3-color, d3-hierarchy, dagre (graph layout: dagre.graphlib.Graph, dagre.layout), dayjs. Other single-file bundles work (the Scripting settings tab installs more); timers never fire, so step d3-force by hand with simulation.stop().tick(n); there is no npm, import syntax or Node built-ins.
 
-    Look fields (any shape or connector): fillStyle solid|hachure|crossHatch, dash solid|dashed|dotted, \
+    Look fields (any shape or connector): fillStyle solid|hachure|crossHatch|grid, dash solid|dashed|dotted, \
+    gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors).
 
     Example

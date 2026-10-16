@@ -23,6 +23,18 @@ final class ScriptTests: XCTestCase {
         XCTAssertEqual(r.value, ##"{"n":3,"fill":"#ffeeaa"}"##)
     }
 
+    func testCreatesAGridFloorWithItsCellSize() {
+        var doc = DottieDocument()
+        let r = run("""
+            const room = dottie.rect({x: 0, y: 0, width: 100, height: 100, fill: "#eeeeee", fillStyle: "grid", gridSize: 30});
+            return room.gridSize;
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(doc.elements[0].style.fillStyle, .grid)
+        XCTAssertEqual(doc.elements[0].style.cellSize, 30)
+        XCTAssertEqual(r.value, "30")
+    }
+
     func testLastExpressionIsTheValue() {
         var doc = DottieDocument()
         XCTAssertEqual(run("1 + 2", &doc).value, "3")

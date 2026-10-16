@@ -20,13 +20,15 @@ private let pageProp = prop("string", "Page (tab) to work on, by name or 1-based
     + "Tools given an element id find its page themselves.")
 private let kindValues = ["rectangle", "ellipse", "diamond", "text", "note"]
 private let routingValues = ["straight", "curved", "elbow"]
-private let fillStyleValues = ["solid", "hachure", "crossHatch"]
+private let fillStyleValues = ["solid", "hachure", "crossHatch", "grid"]
 private let dashValues = ["solid", "dashed", "dotted"]
 private let headValues = ["none", "arrow", "triangle", "dot", "bar"]
 
 /// Look options shared by add_shape, add_connector and update_element.
 private let lookProps: [String: Value] = [
-    "fill_style": prop("string", "How the fill is painted: solid, or pen-shaded hachure / crossHatch", enum: fillStyleValues),
+    "fill_style": prop("string", "How the fill is painted: solid, pen-shaded hachure / crossHatch, or grid (a dungeon floor: "
+        + "the fill ruled into square cells on a page-wide lattice, with Dyson hatching in the rock around it)", enum: fillStyleValues),
+    "grid_size": prop("number", "Cell size of a grid fill in points, 8 to 400 (default 50)"),
     "dash": prop("string", "Line style", enum: dashValues),
     "stroke_width": prop("number", "Line width, 0.5 to 24 (default 2)"),
     "bowing": prop("number", "How much sketchy lines bow sideways, 0 to 3 (default 1)"),
@@ -88,7 +90,7 @@ private struct Args {
         DiagramOps.Look(fillStyle: try enumValue("fill_style", fillStyleValues), dash: try enumValue("dash", dashValues),
                         strokeWidth: double("stroke_width"), bowing: double("bowing"),
                         startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
-                        rotation: double("rotation"))
+                        rotation: double("rotation"), gridSize: double("grid_size"))
     }
 }
 
