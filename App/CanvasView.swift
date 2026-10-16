@@ -217,6 +217,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var spaceDown = false { didSet { window?.invalidateCursorRects(for: self) } }
     private var panAnchor: (raw: CGPoint, pan: CGPoint) = (.zero, .zero)
     private var gesture: Gesture?
+    /// Where the press began, in view points, and whether it has since moved far enough to be a drag: a click
+    /// whose finger slides a little moves nothing and draws no marquee.
+    private var pressPoint: CGPoint = .zero
+    private var dragging = false
+    private static let dragThreshold: CGFloat = 3
     private var dragStart: CGPoint = .zero
     private var baseline: DottieDocument?
     private var marqueeRect: CGRect?
@@ -1417,6 +1422,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
+        pressPoint = convert(event.locationInWindow, from: nil)
+        dragging = false
         endEditing()
         stopJumpAnimation()
         window?.makeFirstResponder(self)
@@ -1567,6 +1574,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         if case .erasing? = gesture { eraseStep(at: point(event)); return }
+        if !dragging {
+            let raw = convert(event.locationInWindow, from: nil)
+            if hypot(raw.x - pressPoint.x, raw.y - pressPoint.y) < Self.dragThreshold {
+                switch gesture {
+                case .moving?, .marquee?, .resizing?, .rotating?, .rotatingGroup?, .endpoint?, .editingPoint?: return
+                default: break
+                }
+            }
+            dragging = true
+        }
         if case .guide(let vertical, let index)? = gesture {
             let q = point(event)
             var pos = vertical ? q.x : q.y
@@ -1768,6 +1785,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .rotating where model != base: commit(base, "Rotate")
         case .rotatingGroup where model != base: commit(base, "Rotate")
         case .endpoint where model != base: commit(base, "Move Connector End")
+        case .marquee where !dragging:
+            // A click that just missed a shape still picks it, if it is within a few screen points.
+            if let hit = spatial.element(at: point(event), in: model, skipping: hiddenInEditor, tolerance: 8 / zoom) {
+                let hitSet = model.expandingGroups([hit.id])
+                selection = event.modifierFlags.contains(.shift) ? selection.symmetricDifference(hitSet) : hitSet
+            }
         case .moving where model != base: commit(base, "Move")
         case .moving: if let target = pressedLink { jump(to: target) } // ⌘-click on a linked shape
         case .resizing where model != base: commit(base, "Resize")
