@@ -33,6 +33,10 @@ nav:
 extra_css:
   - assets/site.css
 
+# Built from web/ by the Pages workflow (or `just site` locally); not committed.
+extra_javascript:
+  - assets/dottie-player.min.js
+
 markdown_extensions:
   - admonition
   - attr_list

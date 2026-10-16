@@ -5,9 +5,11 @@
 Sketch a flowchart, a system diagram or a whiteboard idea in seconds. Switch to a clean, precise look when it
 needs to go in a document. Or just ask Claude to draw it, and watch the shapes appear. Then make it move.
 
-<iframe class="player" src="players/build.html" height="420" title="A diagram building itself" loading="lazy"></iframe>
+<dottie-player class="player" src="drawings/build.dottie" label="A diagram building itself"></dottie-player>
 
-That animation is a live Dottie export: press play, drag the slider, or step with the arrow keys.
+That animation is the Dottie drawing itself, played in your browser by
+[dottie.js](https://github.com/phin-tech/dottie/tree/main/web): press play, drag the slider, or step with the
+arrow keys.
 
 [Get Dottie on GitHub](https://github.com/phin-tech/dottie#get-dottie){ .md-button .md-button--primary }
 [See the animation demos](demos.md){ .md-button }

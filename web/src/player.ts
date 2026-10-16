@@ -8,7 +8,7 @@
 // moment as a still), clean (draw without the sketchy look), no-controls, no-autoplay, no-loop, label (the
 // accessible name). The file can also be inline: <dottie-player><script type="application/json">{…}</script>.
 
-import { type DottieFile, type Page, type RGBA, parseDottie } from "./model.ts";
+import { type DottieFile, type Page, type RGBA, luminance, parseDottie } from "./model.ts";
 import { fmt } from "./path.ts";
 import { type Plan, plan, svgParts } from "./svg.ts";
 import { color } from "./svg-util.ts";
@@ -256,6 +256,8 @@ export class DottiePlayer extends ElementBase {
     this.playback = p;
     this.style.setProperty("--dottie-page", color(p.background));
     this.style.setProperty("--dottie-ink", color(p.ink));
+    // Controls follow the drawing's page color, not the surrounding site's light or dark scheme.
+    this.style.colorScheme = luminance(p.background) < 0.5 ? "dark" : "light";
     this.stage.setAttribute("aria-label", this.getAttribute("label") ?? page.name);
     const at = this.getAttribute("at");
     const animated = page.timeline !== null && p.frameCount > 1 && at === null;
