@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Bumps the release version: MARKETING_VERSION in project.yml (the app) and DottieVersion (the dottie tool
-# and the MCP server), and adds one to the build number. Then regenerates the Xcode project.
+# Bumps the release version: MARKETING_VERSION in project.yml (the app), DottieVersion (the dottie tool and
+# the MCP server) and dottie.js (web/, published to npm at the same version), and adds one to the build number.
+# Then rebuilds the player embedded in DottieKit and regenerates the Xcode project.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,6 +24,11 @@ build=$((build + 1))
 sed -i '' "s/^\( *MARKETING_VERSION: \)\".*\"$/\1\"$next\"/" project.yml
 sed -i '' "s/^\( *CURRENT_PROJECT_VERSION: \)\".*\"$/\1\"$build\"/" project.yml
 sed -i '' "s/\(static let current = \)\".*\"/\1\"$next\"/" Sources/DottieKit/Version.swift
+# dottie.js goes out at the app's version, so its VERSION and the player embedded for `dottie render -f js` follow.
+(cd web && npm version "$next" --no-git-tag-version --allow-same-version >/dev/null)
+sed -i '' "s/\(export const VERSION = \)\".*\";/\1\"$next\";/" web/src/index.ts
+(cd web && npm ci --silent && npm run build --silent >/dev/null) && scripts/update-player-script.py
 
 if command -v xcodegen >/dev/null; then xcodegen generate --quiet; fi
-echo "$current -> $next (build $build). Commit and push, then archive in Xcode and run just release."
+echo "$current -> $next (build $build). Commit and push, publish dottie.js (cd web && npm publish), then archive"
+echo "in Xcode and run just release."

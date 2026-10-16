@@ -28,9 +28,10 @@ live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.2
 `website/mkdocs.yml`), so a change to `web/` reaches the site once it is published. Preview it with
 `pip install -r website/requirements.txt && just site`.
 
-**Publishing dottie.js.** Bump `version` in `web/package.json` (and `VERSION` in `web/src/index.ts`), then
-`cd web && npm publish` (it runs the tests and builds first; the `@phin-tech` npm organization owns it). After a
-new minor version, update the version in `website/mkdocs.yml`.
+**Publishing dottie.js.** dottie.js goes out at Dottie's own version: `just bump` sets `web/package.json` and
+`VERSION` in `web/src/index.ts` along with the app's, and a test fails if they ever differ. Publish it with each
+release: `cd web && npm publish` (it runs the tests and builds first; the `@phin-tech` npm organization owns it).
+Once a new minor version is on npm, point `website/mkdocs.yml` at it.
 
 **Looking at the running app.** `just debug-app file.dottie` launches a Debug build in the background on its own
 live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and
@@ -110,9 +111,10 @@ just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm r
 
 ## Releasing
 
-1. `just bump patch` (or `minor`, `major`): sets `MARKETING_VERSION` in `project.yml` and `DottieVersion`
-   (the version the tool and the MCP server report), and adds one to the build number.
-2. Commit and push.
+1. `just bump patch` (or `minor`, `major`): sets `MARKETING_VERSION` in `project.yml`, `DottieVersion` (the
+   version the tool and the MCP server report) and dottie.js's version, rebuilds the player embedded for
+   `dottie render -f js`, and adds one to the build number.
+2. Commit and push, then publish dottie.js: `cd web && npm publish`.
 3. In Xcode: Product ▸ Archive, then Distribute App ▸ Direct Distribution, and wait for "Ready to distribute".
    This needs a Developer ID Application certificate.
 4. `just release`: finds the newest notarized `Dottie.app` Xcode kept in the archive's `Submissions` folder,
