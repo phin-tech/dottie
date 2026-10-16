@@ -207,6 +207,8 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var guidesY: [Double]?
     /// Locked guides still snap, but cannot be dragged or created from the rulers.
     public var guidesLocked: Bool?
+    /// Keyframe animation over this page's elements (see `resolved(at:)`); nil is a still page.
+    public var timeline: Timeline?
 
     public init(id: UUID = UUID(), name: String = "Page 1", layers: [Layer]? = nil, elements: [Element] = []) {
         self.id = id
@@ -240,6 +242,7 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
             elements[i].connector = c
         }
         elements.removeAll { ids.contains($0.id) }
+        timeline?.tracks.removeAll { ids.contains($0.element) }
         // Drop connectors that lost both ends to deleted shapes? Keep them: they're free-floating arrows now.
     }
 

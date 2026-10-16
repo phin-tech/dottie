@@ -1,0 +1,120 @@
+import XCTest
+@testable import DottieKit
+
+final class TimelineTests: XCTestCase {
+    private func box(_ doc: inout DottieDocument, x: Double = 0, roughness: Double = 0) throws -> Element {
+        try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: x, y: 0, width: 80, height: 40), at: .zero,
+                                text: nil, fill: nil, stroke: nil, roughness: roughness)
+    }
+
+    func testPageWithoutTimelineIsUnchanged() throws {
+        var doc = DottieDocument()
+        _ = try box(&doc)
+        XCTAssertEqual(doc.resolved(at: 1), doc)
+    }
+
+    func testTweensBetweenKeysAndHoldsOutside() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        var tl = Timeline(duration: 2)
+        tl.setKey(Keyframe(t: 0.5, x: 0), for: a.id)
+        tl.setKey(Keyframe(t: 1.5, x: 100), for: a.id)
+        doc.timeline = tl
+        XCTAssertEqual(doc.resolved(at: 0).elements[0].x, 0)
+        XCTAssertEqual(doc.resolved(at: 1).elements[0].x, 50, accuracy: 1e-9)
+        XCTAssertEqual(doc.resolved(at: 2).elements[0].x, 100)
+        XCTAssertEqual(doc.resolved(at: 1).elements[0].y, 0, "unkeyed properties keep the base value")
+    }
+
+    func testPropertiesTweenBetweenTheKeysThatSetThem() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        var tl = Timeline(duration: 2)
+        tl.setKey(Keyframe(t: 0, x: 0), for: a.id)
+        tl.setKey(Keyframe(t: 1, fill: RGBA(r: 1, g: 0, b: 0)), for: a.id)
+        tl.setKey(Keyframe(t: 2, x: 200), for: a.id)
+        doc.timeline = tl
+        XCTAssertEqual(doc.resolved(at: 1).elements[0].x, 100, accuracy: 1e-9, "the fill key doesn't pin x")
+    }
+
+    func testEaseAndHold() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        var tl = Timeline(duration: 1)
+        tl.setKey(Keyframe(t: 0, x: 0, ease: .easeIn), for: a.id)
+        tl.setKey(Keyframe(t: 1, x: 100), for: a.id)
+        doc.timeline = tl
+        XCTAssertEqual(doc.resolved(at: 0.5).elements[0].x, 12.5, accuracy: 1e-9)
+        doc.timeline!.setKey(Keyframe(t: 0, ease: .hold), for: a.id)
+        XCTAssertEqual(doc.resolved(at: 0.99).elements[0].x, 0)
+        XCTAssertEqual(doc.resolved(at: 1).elements[0].x, 100)
+    }
+
+    func testSetKeyMergesKeysAtTheSameFrame() throws {
+        var tl = Timeline(fps: 10, duration: 1)
+        let id = UUID()
+        tl.setKey(Keyframe(t: 0.5, x: 1), for: id)
+        tl.setKey(Keyframe(t: 0.52, y: 2), for: id)
+        XCTAssertEqual(tl.tracks[0].keys, [Keyframe(t: 0.5, x: 1, y: 2)])
+    }
+
+    func testConnectorFollowsAnimatedShape() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc), b = try box(&doc, x: 300)
+        let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        var tl = Timeline(duration: 1)
+        tl.setKey(Keyframe(t: 0, y: 0), for: b.id)
+        tl.setKey(Keyframe(t: 1, y: 200), for: b.id)
+        doc.timeline = tl
+        let still = doc.resolved(at: 0), moved = doc.resolved(at: 1)
+        let end0 = Connector.endpoints(of: still.elements.first { $0.id == c.id }!, in: still).1
+        let end1 = Connector.endpoints(of: moved.elements.first { $0.id == c.id }!, in: moved).1
+        XCTAssertGreaterThan(end1.y - end0.y, 150)
+    }
+
+    func testElementAppearsAtItsVisibleKeyWithItsConnectors() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc), b = try box(&doc, x: 300)
+        let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
+        var tl = Timeline(duration: 2)
+        tl.setKey(Keyframe(t: 1, visible: true), for: b.id)
+        doc.timeline = tl
+        XCTAssertEqual(doc.resolved(at: 0.5).elements.map(\.id), [a.id])
+        XCTAssertEqual(doc.resolved(at: 1).elements.map(\.id), [a.id, b.id, c.id])
+        doc.timeline!.setKey(Keyframe(t: 1.5, visible: false), for: b.id)
+        XCTAssertEqual(doc.resolved(at: 1.75).elements.map(\.id), [a.id])
+    }
+
+    func testBoilReseedsEveryNFramesAndSteadyDoesNot() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc, roughness: 1)
+        doc.timeline = Timeline(fps: 12, duration: 1)
+        XCTAssertEqual(doc.resolved(at: 0.5).elements[0].seed, a.seed)
+        doc.timeline!.boil = 2
+        let seeds = (0..<6).map { doc.resolved(at: doc.timeline!.time(ofFrame: $0)).elements[0].seed }
+        XCTAssertEqual(seeds[0], a.seed)
+        XCTAssertEqual(seeds[0], seeds[1]); XCTAssertEqual(seeds[2], seeds[3]); XCTAssertEqual(seeds[4], seeds[5])
+        XCTAssertEqual(Set([seeds[0], seeds[2], seeds[4]]).count, 3)
+    }
+
+    func testRoundTripsAndOldPagesStillDecode() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        var tl = Timeline(duration: 1, boil: 3)
+        tl.setKey(Keyframe(t: 0.25, x: 10, visible: true, ease: .easeOut), for: a.id)
+        doc.timeline = tl
+        XCTAssertEqual(try DottieDocument.decode(doc.encoded()).timeline, tl)
+        doc.timeline = nil
+        XCTAssertFalse(String(decoding: try doc.encoded(), as: UTF8.self).contains("timeline"))
+    }
+
+    func testDeletingAnElementDropsItsTrack() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        var tl = Timeline(duration: 1)
+        tl.setKey(Keyframe(t: 0, x: 5), for: a.id)
+        doc.timeline = tl
+        doc.remove([a.id])
+        XCTAssertEqual(doc.timeline?.tracks, [])
+    }
+}
