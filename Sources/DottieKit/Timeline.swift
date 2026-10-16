@@ -257,7 +257,8 @@ public struct Timeline: Codable, Equatable, Sendable {
         guard let a = after else { return b.rect }
         let u = (b.ease ?? .easeInOut).apply((t - b.t) / max(a.t - b.t, 1e-9))
         func mix(_ p: Double, _ q: Double) -> Double { p + (q - p) * u }
-        return CGRect(x: mix(b.x, a.x), y: mix(b.y, a.y), width: mix(b.width, a.width), height: mix(b.height, a.height))
+        // A springy ease can overshoot a zoom past nothing.
+        return CGRect(x: mix(b.x, a.x), y: mix(b.y, a.y), width: max(1, mix(b.width, a.width)), height: max(1, mix(b.height, a.height)))
     }
 
     /// What exports show at `t`: the camera's view widened (never cropped) to the first key's shape, so

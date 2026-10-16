@@ -294,7 +294,8 @@ export function cameraRect(tl: Timeline, t: number): Rect | null {
   if (!after) return rectOf(before);
   const u = applyEase(before.ease ?? "easeInOut", (t - before.t) / Math.max(after.t - before.t, 1e-9));
   const mix = (p: number, q: number) => p + (q - p) * u;
-  return { x: mix(before.x, after.x), y: mix(before.y, after.y), width: mix(before.width, after.width), height: mix(before.height, after.height) };
+  // A springy ease can overshoot a zoom past nothing.
+  return { x: mix(before.x, after.x), y: mix(before.y, after.y), width: Math.max(1, mix(before.width, after.width)), height: Math.max(1, mix(before.height, after.height)) };
 }
 
 const rectOf = (k: CameraKey): Rect => ({ x: k.x, y: k.y, width: k.width, height: k.height });

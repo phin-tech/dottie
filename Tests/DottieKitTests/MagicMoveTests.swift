@@ -29,6 +29,8 @@ final class MagicMoveTests: XCTestCase {
             XCTAssertEqual(start.elements.first { $0.id == mine.id }?.frame, mine.frame, "\(n) starts where it was")
             XCTAssertEqual(end.elements.first { $0.id == mine.id }?.frame, theirs.frame, "\(n) ends where the second page has it")
         }
+        XCTAssertEqual(a.timeline?.poster, 0, "the still still shows this page")
+        XCTAssertEqual(a.still.elements.map(\.frame), a.elements.map(\.frame))
         let mid = a.resolved(at: 0.75).elements.first { $0.anchor == "two" }!
         XCTAssertNotEqual(mid.frame, a.elements.first { $0.anchor == "two" }!.frame, "and moves in between")
     }
@@ -47,6 +49,7 @@ final class MagicMoveTests: XCTestCase {
         XCTAssertEqual(s, MagicMoveSummary(moved: 3, entering: 2, leaving: 2))
 
         let before = a.resolved(at: 0.4), after = a.resolved(at: 1.5)
+        XCTAssertEqual(Exporter.bounds(of: a.still), Exporter.bounds(of: before), "copies waiting at nothing take no room in the still")
         XCTAssertTrue(before.elements.contains { $0.id == gone.id })
         XCTAssertFalse(before.elements.contains { $0.text == "only there" }, "the copy waits, hidden")
         XCTAssertFalse(after.elements.contains { $0.id == gone.id })

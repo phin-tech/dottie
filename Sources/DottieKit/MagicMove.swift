@@ -31,6 +31,8 @@ extension DottieDocument {
         let d = min(max(0.05, duration.isFinite ? duration : 1), Timeline.maxDuration - t + 0.05)
         var tl = timeline ?? Timeline(duration: t + d)
         tl.duration = max(tl.duration, t + d)
+        // The page's still keeps showing this page as drawn, not the next one it turns into.
+        if tl.poster == nil { tl.poster = t }
         timeline = tl
 
         // Both ends as posed: this page at `t`, the target where it starts.

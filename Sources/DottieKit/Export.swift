@@ -12,8 +12,11 @@ public enum Exporter {
             let reach = DungeonGrid.isFloor(e) ? (DungeonGrid.band + 0.25) * e.style.cellSize : 0
             return e.rotatedBounds.insetBy(dx: -reach, dy: -reach)
         }
-        guard var r = doc.elements.first.map(frame) else { return CGRect(x: 0, y: 0, width: 200, height: 200) }
-        for e in doc.elements { r = r.union(frame(e)) }
+        // Fully transparent elements (an entrance about to fade up) take no room, unless nothing else is there.
+        let shown = doc.elements.filter { ($0.style.opacity ?? 1) > 0 }
+        let counted = shown.isEmpty ? doc.elements : shown
+        guard var r = counted.first.map(frame) else { return CGRect(x: 0, y: 0, width: 200, height: 200) }
+        for e in counted { r = r.union(frame(e)) }
         return r.insetBy(dx: -padding, dy: -padding)
     }
 
