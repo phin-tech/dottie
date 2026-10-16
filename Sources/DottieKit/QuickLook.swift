@@ -9,7 +9,7 @@ extension Exporter {
         let data = NSMutableData()
         guard let consumer = CGDataConsumer(data: data),
               let ctx = CGContext(consumer: consumer, mediaBox: nil, nil) else { return nil }
-        for doc in file.pages {
+        for doc in file.pages.map(\.still) {
             let b = bounds(of: doc)
             var box = CGRect(origin: .zero, size: b.size)
             let info = [kCGPDFContextMediaBox as String: Data(bytes: &box, count: MemoryLayout<CGRect>.size)]
@@ -24,7 +24,7 @@ extension Exporter {
     /// The size of `doc`'s drawing scaled to fit inside `maxSize`, keeping its aspect ratio. Never upscales
     /// past 1:1 unless `allowUpscale`, so a tiny drawing doesn't turn into a blurry blown-up thumbnail.
     public static func fittedSize(of doc: DottieDocument, in maxSize: CGSize, allowUpscale: Bool = true) -> CGSize {
-        let b = bounds(of: doc)
+        let b = bounds(of: doc.still)
         guard b.width > 0, b.height > 0, maxSize.width > 0, maxSize.height > 0 else { return .zero }
         var s = min(maxSize.width / b.width, maxSize.height / b.height)
         if !allowUpscale { s = min(s, 1) }
@@ -34,6 +34,7 @@ extension Exporter {
     /// Draws `doc` on its theme's page color (white without a theme), scaled to fill `size`, into a y-up
     /// context whose origin is the bottom-left corner of that area (a PDF page, a Quick Look thumbnail).
     public static func draw(_ doc: DottieDocument, in ctx: CGContext, size: CGSize) {
+        let doc = doc.still
         let b = bounds(of: doc)
         guard b.width > 0, b.height > 0 else { return }
         let background = doc.resolvedTheme?.background.cgColor ?? CGColor(gray: 1, alpha: 1)

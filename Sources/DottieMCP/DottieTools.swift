@@ -268,6 +268,7 @@ actor DottieTools {
                 "scale": prop("number", "Pixel scale, default 2"),
                 "sketchy": prop("boolean", "Override the look for this render only"),
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
+                "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
              ], required: ["path"])),
         Tool(name: "export_mermaid",
              description: "Export the diagram as Mermaid flowchart text: shapes become nodes and attached connectors links "
@@ -285,7 +286,20 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Override the look for this export only"),
                 "transparent": prop("boolean", "Omit the white page background"),
                 "out_path": prop("string", "Optional absolute path ending in .svg to write the file to"),
+                "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
              ], required: ["path"])),
+        Tool(name: "export_animation",
+             description: "Export the page's animation (made with run_script's dottie.timeline/key/transition/follow/"
+                + "packet/animateBuild) as a looping GIF, an MP4 movie, or a self-contained HTML player with "
+                + "play/pause and a scrubber. The format comes from out_path's extension. Returns a PNG of the "
+                + "frame at `preview` seconds (default the poster frame) so you can check it.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "out_path": prop("string", "Absolute path ending in .gif, .mp4 or .html"),
+                "scale": prop("number", "Pixel scale for gif and mp4, 0.25 to 4 (default 1.5)"),
+                "sketchy": prop("boolean", "Override the look for this export only"),
+                "preview": prop("number", "Second of the animation to return as a PNG preview"),
+             ], required: ["path", "out_path"])),
     ]
 
     func call(name: String, arguments: [String: Value]) -> CallTool.Result {
@@ -522,7 +536,7 @@ actor DottieTools {
             var content: [Tool.Content] = [.plain(report)]
             if a.bool("render") == true, !doc.elements.isEmpty {
                 let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
-                if let png = Exporter.png(doc, scale: scale) {
+                if let png = Exporter.png(doc.still, scale: scale) {
                     content.insert(.png(png), at: 0)
                 }
             }
@@ -643,7 +657,8 @@ actor DottieTools {
 
         case "export_png":
             let file = try load(try fileURL(a))
-            var doc = file.pages[try pageIndex(file, a)]
+            let page = file.pages[try pageIndex(file, a)]
+            var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to render") }
             let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
@@ -672,7 +687,8 @@ actor DottieTools {
 
         case "export_svg":
             let file = try load(try fileURL(a))
-            var doc = file.pages[try pageIndex(file, a)]
+            let page = file.pages[try pageIndex(file, a)]
+            var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
             let svg = Exporter.svg(doc, background: a.bool("transparent") == true ? nil : RGBA(r: 1, g: 1, b: 1))
@@ -681,6 +697,32 @@ actor DottieTools {
             try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
             try svg.write(to: out, atomically: true, encoding: .utf8)
             return text("Exported \(doc.elements.count) elements to \(out.path)")
+
+        case "export_animation":
+            let file = try load(try fileURL(a))
+            var doc = file.pages[try pageIndex(file, a)]
+            if let r = a.roughness { doc = doc.withRoughness(r) }
+            guard let timeline = doc.timeline else {
+                throw ToolFailure(message: "This page has no animation; add one with run_script (dottie.timeline, dottie.key, ...)")
+            }
+            let raw = try a.require("out_path")
+            let ext = URL(fileURLWithPath: raw).pathExtension.lowercased()
+            guard ["gif", "mp4", "html"].contains(ext) else { throw ToolFailure(message: "'out_path' must end in .gif, .mp4 or .html") }
+            let out = try fileURL(a, key: "out_path", ext: ext)
+            let scale = min(max(a.double("scale") ?? 1.5, 0.25), 4)
+            let data: Data? = switch ext {
+            case "gif": Exporter.gif(doc, scale: scale)
+            case "mp4": Exporter.mp4(doc, scale: scale)
+            default: Data(Exporter.player(doc, title: doc.name).utf8)
+            }
+            guard let data else { throw ToolFailure(message: "Rendering failed") }
+            try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: out, options: .atomic)
+            let frame = a.double("preview").map(doc.resolved) ?? doc.still
+            var content: [Tool.Content] = [.plain("Exported \(timeline.frameCount) frames (\(timeline.duration)s at \(timeline.fps) fps) "
+                                                  + "to \(out.path)")]
+            if !frame.elements.isEmpty, let png = Exporter.png(frame, scale: 1) { content.insert(.png(png), at: 0) }
+            return .init(content: content)
 
         default:
             throw ToolFailure(message: "Unknown tool '\(name)'")

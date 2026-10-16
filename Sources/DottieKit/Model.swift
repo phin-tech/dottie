@@ -129,6 +129,9 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var anchor: String?
     /// Only set for `.image`: the picture's bytes.
     public var image: EmbeddedImage?
+    /// How much of the stroke is drawn, 0...1, in an animation frame (see `Keyframe.reveal`). Fill and label
+    /// wait for the whole stroke; text types out. nil is fully drawn.
+    public var reveal: Double?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,
@@ -207,6 +210,8 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var guidesY: [Double]?
     /// Locked guides still snap, but cannot be dragged or created from the rulers.
     public var guidesLocked: Bool?
+    /// Keyframe animation over this page's elements (see `resolved(at:)`); nil is a still page.
+    public var timeline: Timeline?
 
     public init(id: UUID = UUID(), name: String = "Page 1", layers: [Layer]? = nil, elements: [Element] = []) {
         self.id = id
@@ -240,6 +245,7 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
             elements[i].connector = c
         }
         elements.removeAll { ids.contains($0.id) }
+        timeline?.tracks.removeAll { ids.contains($0.element) }
         // Drop connectors that lost both ends to deleted shapes? Keep them: they're free-floating arrows now.
     }
 

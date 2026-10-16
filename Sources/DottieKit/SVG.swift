@@ -6,10 +6,15 @@ extension Exporter {
     /// SVG built from the same paths the renderer draws, so the sketchy look is identical.
     /// Automatic ink is exported as black. Pass `background: nil` for a transparent page.
     public static func svg(_ doc: DottieDocument, background: RGBA? = RGBA(r: 1, g: 1, b: 1)) -> String {
+        svg(doc, background: background, bounds: nil)
+    }
+
+    /// `bounds` fixes the viewBox, so every frame of an animation lines up.
+    static func svg(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> String {
         let theme = doc.resolvedTheme
         let background = background.map { plain in theme?.background ?? plain }
         let d = doc.resolvingInk(to: theme?.ink ?? .black)
-        let b = bounds(of: d)
+        let b = fixed ?? bounds(of: d)
         let visible = Set(d.layers.filter(\.visible).map(\.id))
         var out = """
         <svg xmlns="http://www.w3.org/2000/svg" width="\(num(b.width))" height="\(num(b.height))" \
@@ -40,6 +45,17 @@ extension Exporter {
         var strokeAttrs = "stroke=\"\(stroke)\" stroke-width=\"\(num(e.style.strokeWidth))\" stroke-linecap=\"round\" stroke-linejoin=\"round\""
         if let d = Renderer.dashPattern(e.style.dash, width: e.style.strokeWidth) {
             strokeAttrs += " stroke-dasharray=\"\(d.map { num($0) }.joined(separator: " "))\""
+        }
+        var e = e
+        if let r = e.revealProgress { // drawing on: a partial stroke, as Renderer.draw does
+            switch e.kind {
+            case .text: e.text = e.typed(e.text ?? "", r)
+            case .connector:
+                let line = Renderer.connectorParts(for: e, in: doc, index: index).line.trimmed(to: r)
+                return "<path d=\"\(pathData(line))\" fill=\"none\" \(strokeAttrs)/>\n"
+            default:
+                return "<path d=\"\(pathData(Renderer.outline(for: e).trimmed(to: r)))\" fill=\"none\" \(strokeAttrs)/>\n"
+            }
         }
         switch e.kind {
         case .connector:

@@ -443,6 +443,67 @@ public enum DottieScript {
                 return ["ids": doc.elements.map(\.id).filter(placed.ids.contains).map(\.uuidString),
                         "width": round1(placed.size.width), "height": round1(placed.size.height)] as [String: Any]
 
+            case "timeline":
+                var tl = doc.timeline ?? Timeline(duration: 0)
+                if let v = a.double("fps") { tl.fps = min(max(v, 1), 60) }
+                if let v = a.double("duration") { tl.duration = max(0, v) }
+                if a.has("boil") { tl.boil = a.double("boil").map { max(0, Int($0)) }.flatMap { $0 == 0 ? nil : $0 } }
+                if let v = a.bool("settle") { tl.settle = v }
+                if a.has("poster") { tl.poster = a.double("poster").map { max(0, $0) } }
+                if doc.timeline != nil || !a.raw.isEmpty { doc.timeline = tl }
+                var info: [String: Any] = ["fps": tl.fps, "duration": tl.duration, "boil": tl.boil ?? 0,
+                                           "settle": tl.settle ?? false, "frames": tl.frameCount]
+                if let p = tl.poster { info["poster"] = p }
+                return info
+
+            case "key":
+                let id = try a.uuid("id")
+                _ = try element(id)
+                guard let t = a.double("t"), t >= 0 else { throw OpsError.invalid("'t' (seconds, 0 or more) is required") }
+                let k = Keyframe(t: t, x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
+                                 rotation: a.double("rotation").map { $0 * .pi / 180 }, strokeWidth: a.double("strokeWidth"),
+                                 stroke: try a.color("stroke"), fill: try a.color("fill"), visible: a.bool("visible"),
+                                 ease: try a.enumValue("ease", as: Ease.self))
+                var tl = doc.timeline ?? Timeline(duration: t)
+                tl.duration = max(tl.duration, t)
+                tl.setKey(k, for: id)
+                doc.timeline = tl
+                return nil
+
+            case "transition":
+                guard let tr = try a.enumValue("name", as: Transition.self) else {
+                    throw OpsError.invalid("'name' must be one of \(Transition.allCases.map(\.rawValue).joined(separator: ", "))")
+                }
+                try doc.addTransition(tr, to: try a.uuid("id"), at: max(0, a.double("t") ?? 0), duration: a.double("duration"))
+                return nil
+
+            case "follow":
+                try doc.addFollow(try a.uuid("id"), along: try a.uuid("path"), at: max(0, a.double("t") ?? 0),
+                                  duration: a.double("duration") ?? 1, ease: try a.enumValue("ease", as: Ease.self),
+                                  reverse: a.bool("reverse") ?? false, orient: a.bool("orient") ?? false, laps: a.double("laps"))
+                return nil
+
+            case "packet":
+                let dot = try doc.addPacket(along: try a.uuid("id"), at: max(0, a.double("t") ?? 0),
+                                            duration: a.double("duration") ?? 0.6,
+                                            color: try a.color("color") ?? RGBA(r: 0.95, g: 0.36, b: 0.33),
+                                            size: min(max(a.double("size") ?? 14, 2), 200))
+                return describe(dot)
+
+            case "animateBuild":
+                try doc.addBuild(try a.enumValue("transition", as: Transition.self) ?? .popIn, at: max(0, a.double("start") ?? 0),
+                                 stagger: a.double("stagger") ?? 0.4, packets: a.bool("packets") ?? false,
+                                 drawArrows: a.bool("drawArrows") ?? false, travel: a.double("travel") ?? 0.6)
+                return nil
+
+            case "boil":
+                let id = try a.uuid("id")
+                _ = try element(id)
+                var tl = doc.timeline ?? Timeline(duration: 0)
+                tl.setBoil(a.bool("boil"), for: id)
+                doc.timeline = tl
+                return nil
+
             default:
                 throw OpsError.invalid("Unknown dottie call '\(name)'")
             }
@@ -481,6 +542,13 @@ public enum DottieScript {
         stencils: function (o) { return call("stencils", o); },
         stencil: function (o) { return call("stencil", o); },
         pages: function () { return call("pages"); },
+        timeline: function (o) { return call("timeline", o); },
+        key: function (id, t, props) { call("key", merge(props, { id: idOf(id), t: t })); },
+        transition: function (id, name, t, o) { call("transition", merge(o, { id: idOf(id), name: name, t: t })); },
+        boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
+        follow: function (id, path, t, o) { call("follow", merge(o, { id: idOf(id), path: idOf(path), t: t })); },
+        packet: function (connector, t, o) { return call("packet", merge(o, { id: idOf(connector), t: t })); },
+        animateBuild: function (o) { call("animateBuild", o); },
         selection: call("selection"),
       };
       var fmt = function (v) {
@@ -563,6 +631,27 @@ public enum DottieScript {
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
       dottie.layout({direction?})      re-arranges all shapes into ranks along their connectors
+
+    Animation (the current page's timeline; export it with `dottie render page.dottie -o out.gif`)
+      dottie.timeline({fps?, duration?, boil?, settle?, poster?})  sets and returns {fps, duration, boil, settle, \
+    frames, poster?}. boil: reseed sketchy lines every n frames (0 off). settle: boil a shape only while it moves. \
+    poster: the second exports and previews show (default the end; the editor shows the page unanimated)
+      dottie.key(id, t, {x?, y?, width?, height?, rotation?, strokeWidth?, stroke?, fill?, visible?, reveal?, ease?})  \
+    a keyframe at t seconds; each property tweens between the keys that set it. ease (towards the next key): \
+    linear | easeIn | easeOut | easeInOut | hold. visible switches at the key: a lone visible:true key is where the \
+    element appears. reveal 0-1 draws the stroke on (fill and text follow once it is complete). Connectors follow \
+    their shapes and hide with them; key only their visible and reveal.
+      dottie.transition(id, name, t, {duration?})  canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn (enter), \
+    popOut, shrinkOut, wipeOut (exit), pulse, wiggle (emphasis)
+      dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
+      dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
+    path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
+    face along the path; laps > 1 goes round a closed outline more than once
+      dottie.packet(connector, t, {duration?, color?, size?})  a dot that runs along the connector, shown only while \
+    it travels; returns the dot
+      dottie.animateBuild({transition?, start?, stagger?, packets?, drawArrows?, travel?})  reveals every shape in \
+    connector order with an entrance (default popIn). With packets a dot runs down each arrow, with drawArrows each \
+    arrow draws itself on, and the shape it points to enters when it arrives (travel seconds later, default 0.6)
 
     Libraries
       require("name")                  loads name.js (or name/index.js) CommonJS/UMD modules from the modules \

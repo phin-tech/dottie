@@ -75,7 +75,8 @@ extension ContentView {
 
     @MainActor
     private func exportDocument(_ format: ExportFormat) {
-        let model = document.model
+        // An animated page exports its poster frame.
+        let model = document.model.still
         guard !model.elements.isEmpty else { NSSound.beep(); return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [format.contentType]

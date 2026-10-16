@@ -444,9 +444,16 @@ public enum Renderer {
                 ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) })
             }
         }
+        if let r = e.revealProgress, e.kind == .text { e.text = e.typed(e.text ?? "", r) }
         if e.kind == .connector {
             guard let document else { return }
             let (line, filled) = connectorParts(for: e, in: document, index: index)
+            if let r = e.revealProgress { // drawing on: the line, then its arrowheads; the label waits
+                ctx.addPath(line.trimmed(to: r))
+                applyStroke()
+                ctx.strokePath()
+                return
+            }
             ctx.addPath(line); ctx.addPath(filled)
             applyStroke()
             ctx.strokePath()
@@ -467,6 +474,12 @@ public enum Renderer {
             ctx.translateBy(x: e.frame.midX, y: e.frame.midY)
             ctx.rotate(by: e.angle)
             ctx.translateBy(x: -e.frame.midX, y: -e.frame.midY)
+        }
+        if let r = e.revealProgress, e.kind != .text { // drawing on: the outline only, fill and label once it closes
+            ctx.addPath(outline(for: e).trimmed(to: r))
+            applyStroke()
+            ctx.strokePath()
+            return
         }
         if e.kind == .text {
             if lod?.showsText(fontSize: e.style.fontSize) ?? true {

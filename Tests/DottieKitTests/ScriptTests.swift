@@ -262,4 +262,32 @@ final class ScriptTests: XCTestCase {
         XCTAssertNil(r.error)
         XCTAssertEqual(r.value, "[true,\"Intro\",true]")
     }
+
+    func testAnimatesWithKeysTransitionsAndBoil() throws {
+        var doc = DottieDocument()
+        let r = run("""
+            const a = dottie.rect({x: 0, y: 0, text: "A"});
+            const b = dottie.rect({x: 300, y: 0, text: "B"});
+            dottie.timeline({fps: 10, boil: 2, settle: true});
+            dottie.key(a, 0, {x: 0, ease: "easeInOut"});
+            dottie.key(a, 1, {x: 100, rotation: 90, fill: "#00ff00"});
+            dottie.transition(b, "popIn", 1.5);
+            dottie.boil(b, true);
+            const t = dottie.timeline();
+            return [t.fps, t.duration, t.boil, t.settle, t.frames].join(" ");
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(r.value, ##""10 1.9 2 true 19""##)
+        let tl = try XCTUnwrap(doc.timeline)
+        XCTAssertEqual(tl.track(for: doc.elements[0].id)?.keys.last?.rotation ?? 0, .pi / 2, accuracy: 1e-9)
+        XCTAssertEqual(tl.track(for: doc.elements[1].id)?.boil, true)
+        XCTAssertEqual(doc.resolved(at: 1).elements.count, 1, "B pops in later")
+    }
+
+    func testTimelineRejectsUnknownTransitionAndReadsWithoutCreating() {
+        var doc = DottieDocument()
+        let r = run(#"dottie.timeline(); const a = dottie.rect({x: 0, y: 0}); dottie.transition(a, "explode", 0)"#, &doc)
+        XCTAssertNotNil(r.error)
+        XCTAssertNil(doc.timeline)
+    }
 }

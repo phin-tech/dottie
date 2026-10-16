@@ -22,11 +22,18 @@ struct ContentView: View {
     @State var scriptOutput = ""
     @State var scriptRunning = false
     @AppStorage(Pref.scriptSource) var scriptSource = ""
+    /// Seconds into the page's animation while previewing it (see `TimelineBar`); nil while editing.
+    @State private var playhead: Double?
 
     var body: some View {
         VStack(spacing: 0) {
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
-                       activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest)
+                       activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
+                       playhead: document.model.timeline == nil ? nil : playhead)
+            if let timeline = document.model.timeline {
+                Divider()
+                TimelineBar(timeline: timeline, playhead: $playhead)
+            }
             Divider()
             PageBar(document: document, undoManager: undoManager)
         }
@@ -35,6 +42,7 @@ struct ContentView: View {
                 // Keep only what is on the new page: a link picked on another page brings its sources back selected.
                 selection = selection.intersection(document.model.elements.map(\.id))
                 activeLayer = nil
+                playhead = nil
             }
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {

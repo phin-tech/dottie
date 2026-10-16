@@ -14,19 +14,23 @@ USAGE
   dottie --help | --version
 
 RENDER
-  Writes png, svg, pdf, html or mermaid (.mmd, a flowchart of the shapes and connectors).
+  Writes png, svg, pdf, html, mermaid (.mmd, a flowchart of the shapes and connectors), gif or mp4.
+  An animated page renders as a still of its poster frame, except to gif and mp4, and to html, which
+  becomes a player.
   The format comes from the extension of -o, or --format.
   With no -o the result is written next to the input (drawing.dottie -> drawing.png).
   A Mermaid flowchart (.mmd, .mermaid, or flowchart text on stdin) is laid out and rendered too.
 
   -o, --output <path>   Output file, or "-" for stdout. Needs a single input.
   -d, --out-dir <dir>   Directory for the results of one or more inputs.
-  -f, --format <fmt>    png (default), svg, pdf, html or mermaid.
+  -f, --format <fmt>    png (default), svg, pdf, html, mermaid, gif or mp4.
   -p, --page <page>     Page (tab) to render, by name or 1-based number (default the first).
-  -s, --scale <n>       PNG pixel scale, 0.25 to 8 (default 2).
+  -s, --scale <n>       PNG, GIF and MP4 pixel scale, 0.25 to 8 (default 2).
       --clean           Render precisely instead of sketchy.
       --sketchy         Render sketchy even if the drawing is clean.
       --transparent     No page background (png, svg, html).
+      --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
+                        unless set). An html export becomes a still; gif and mp4 ignore it.
 
 LIBRARY
   list      Shows the libraries installed for the Dottie app.
@@ -49,7 +53,7 @@ func warn(_ message: String) {
 }
 
 enum Format: String, CaseIterable {
-    case png, svg, pdf, html, mermaid
+    case png, svg, pdf, html, mermaid, gif, mp4
     init?(extension ext: String) {
         switch ext.lowercased() {
         case "htm": self = .html
@@ -69,6 +73,7 @@ struct RenderOptions {
     var scale = 2.0
     var roughness: Double?
     var transparent = false
+    var at: Double?
 }
 
 func parseRender(_ args: [String]) throws -> RenderOptions {
@@ -87,7 +92,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "-f", "--format":
             let v = try value(a)
             guard let f = Format(extension: v) else {
-                throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html, mermaid)", code: 2)
+                throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html, mermaid, gif, mp4)", code: 2)
             }
             o.format = f
         case "-p", "--page": o.page = try value(a)
@@ -98,6 +103,10 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--clean": o.roughness = 0
         case "--sketchy": o.roughness = 1
         case "--transparent": o.transparent = true
+        case "--at":
+            let v = try value(a)
+            guard let n = Double(v), n >= 0 else { throw CLIError(message: "--at must be a time in seconds", code: 2) }
+            o.at = n
         case "-":
             o.inputs.append(a)
         default:
@@ -121,7 +130,8 @@ func absolute(_ path: String) -> URL {
 }
 
 func render(_ doc: DottieDocument, as format: Format, title: String, _ o: RenderOptions) throws -> Data {
-    var doc = doc
+    let plays = format == .gif || format == .mp4 || (format == .html && doc.timeline != nil && o.at == nil)
+    var doc = plays ? doc : o.at.map(doc.resolved) ?? doc.still
     if let r = o.roughness { doc = doc.withRoughness(r) }
     guard !doc.elements.isEmpty else { throw CLIError(message: "the drawing is empty; nothing to render") }
     let white = RGBA(r: 1, g: 1, b: 1)
@@ -136,9 +146,16 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
     case .svg:
         return Data(Exporter.svg(doc, background: o.transparent ? nil : white).utf8)
     case .html:
+        if plays { return Data(Exporter.player(doc, title: title).utf8) }
         return Data(Exporter.html(doc, title: title, background: o.transparent ? nil : white).utf8)
     case .mermaid:
         return Data(Exporter.mermaid(doc).utf8)
+    case .gif:
+        guard let d = Exporter.gif(doc, scale: o.scale) else { throw CLIError(message: "rendering failed") }
+        return d
+    case .mp4:
+        guard let d = Exporter.mp4(doc, scale: o.scale) else { throw CLIError(message: "rendering failed") }
+        return d
     }
 }
 
@@ -149,9 +166,9 @@ func runRender(_ args: [String]) -> Int32 {
     var format = o.format
     if format == nil, let out = o.output, out != "-" { format = Format(extension: URL(fileURLWithPath: out).pathExtension) }
     guard let format = format ?? (o.output == nil || o.output == "-" ? .png : nil) else {
-        fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html, .mmd or --format", code: 2)
+        fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html, .mmd, .gif, .mp4 or --format", code: 2)
     }
-    if o.output == "-", format == .png || format == .pdf, isatty(STDOUT_FILENO) != 0 {
+    if o.output == "-", format == .png || format == .pdf || format == .gif || format == .mp4, isatty(STDOUT_FILENO) != 0 {
         fail("refusing to write binary \(format.rawValue) to a terminal; redirect it or use -o <file>", code: 2)
     }
 

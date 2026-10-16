@@ -18,7 +18,32 @@ public enum Exporter {
     }
 
     public static func png(_ doc: DottieDocument, scale: Double = 2, background: CGColor? = CGColor(gray: 1, alpha: 1)) -> Data? {
-        let b = bounds(of: doc)
+        guard let img = bitmap(doc, bounds: bounds(of: doc), scale: scale, background: background) else { return nil }
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, img, nil)
+        return CGImageDestinationFinalize(dest) ? data as Data : nil
+    }
+
+    /// The page's timeline as a looping animated GIF, every frame framed to the whole animation.
+    /// A page without a timeline is a one-frame GIF.
+    public static func gif(_ doc: DottieDocument, scale: Double = 1) -> Data? {
+        let (timeline, frames, b) = animation(doc)
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, frames.count, nil)
+        else { return nil }
+        let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
+        CGImageDestinationSetProperties(dest, loop as CFDictionary)
+        let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1 / timeline.fps]]
+        for f in frames {
+            guard let img = bitmap(f, bounds: b, scale: scale, background: CGColor(gray: 1, alpha: 1)) else { return nil }
+            CGImageDestinationAddImage(dest, img, delay as CFDictionary)
+        }
+        return CGImageDestinationFinalize(dest) ? data as Data : nil
+    }
+
+    /// `doc` drawn into a bitmap covering `b`.
+    static func bitmap(_ doc: DottieDocument, bounds b: CGRect, scale: Double, background: CGColor?) -> CGImage? {
         // A themed drawing exports on its own page color, unless the caller asked for transparency.
         let background = background.map { plain in doc.resolvedTheme?.background.cgColor ?? plain }
         let ink = doc.resolvedTheme?.ink ?? .black
@@ -31,11 +56,7 @@ public enum Exporter {
         ctx.translateBy(x: 0, y: CGFloat(h)); ctx.scaleBy(x: scale, y: -scale)
         ctx.translateBy(x: -b.minX, y: -b.minY)
         Renderer.draw(doc.resolvingInk(to: ink), in: ctx, background: background)
-        guard let img = ctx.makeImage() else { return nil }
-        let data = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else { return nil }
-        CGImageDestinationAddImage(dest, img, nil)
-        return CGImageDestinationFinalize(dest) ? data as Data : nil
+        return ctx.makeImage()
     }
 
     public static func pdf(_ doc: DottieDocument) -> Data? {
