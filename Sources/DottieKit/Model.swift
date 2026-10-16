@@ -16,7 +16,12 @@ public struct RGBA: Codable, Equatable, Sendable {
     public var cgColor: CGColor { CGColor(srgbRed: r, green: g, blue: b, alpha: a) }
 }
 
-public enum FillStyle: String, Codable, Sendable, CaseIterable { case solid, hachure, crossHatch }
+public enum FillStyle: String, Codable, Sendable, CaseIterable {
+    case solid, hachure, crossHatch
+    /// A dungeon floor: a solid fill ruled into square cells on a page-wide lattice, with Dyson-style
+    /// hatching in the rock around it (see `DungeonGrid`).
+    case grid
+}
 public enum DashStyle: String, Codable, Sendable, CaseIterable { case solid, dashed, dotted }
 
 public struct Style: Codable, Equatable, Sendable {
@@ -30,7 +35,16 @@ public struct Style: Codable, Equatable, Sendable {
     /// Sideways bow of sketchy lines, independent of roughness. 0 is straight but shaky.
     public var bowing: Double = 1
     public var fontSize: Double = 18
+    /// Cell size of a `.grid` fill in points; nil is `Style.defaultGridSize`.
+    public var gridSize: Double?
     public init() {}
+
+    public static let defaultGridSize = 50.0
+    /// The `.grid` cell size actually drawn, never so small that the lines become a solid tint.
+    public var cellSize: Double {
+        get { max(8, gridSize ?? Style.defaultGridSize) }
+        set { gridSize = newValue }
+    }
 
     // Every field is optional on disk so hand- or agent-written files stay valid as the style grows.
     public init(from decoder: Decoder) throws {
@@ -43,6 +57,7 @@ public struct Style: Codable, Equatable, Sendable {
         roughness = try c.decodeIfPresent(Double.self, forKey: .roughness) ?? 1
         bowing = try c.decodeIfPresent(Double.self, forKey: .bowing) ?? 1
         fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 18
+        gridSize = try c.decodeIfPresent(Double.self, forKey: .gridSize)
     }
 }
 

@@ -39,6 +39,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Mermaid flowchart import: File ▸ Import Mermaid…, ⌘V of flowchart text, `.mmd` drop, `import_mermaid` over MCP, `dottie render flow.mmd`
 - [x] Mermaid flowchart export: File ▸ Export As ▸ Mermaid, `dottie render -f mermaid`, `export_mermaid` over MCP; round-trips with import
 - [x] Sticky notes (`note` kind, N): GitHub Flavored Markdown (swift-markdown) laid out with CoreText, tables included; click-to-tick task boxes, color swatches, identical in PNG, PDF and SVG; `note` over MCP and scripts
+- [x] Grid fill (`fillStyle: grid`, `gridSize`): dungeon floor ruled on a page-wide lattice, with Dyson rock hatching drawn once per page around every grid-filled shape (ported from Guildhall's map renderer)
 - [x] Quick Look: Space in Finder previews a drawing (every page, as a PDF) or a stencil library; Finder thumbnails show the first page on its theme's color
 
 ## Next

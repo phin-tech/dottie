@@ -77,6 +77,9 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 
 - **Sketchy or clean.** The inspector on the right switches the look, and sets colors, fill patterns,
   dashed lines and arrowheads. Themes like Blueprint and Chalkboard change the whole page.
+- **Dungeon maps.** The Grid fill pattern turns a shape into a dungeon room: the floor is ruled into squares
+  (set the cell size in the inspector) and the rock around it gets Dyson-style hatching. Rooms on the same
+  grid line up cell for cell, and rooms that touch don't hatch over each other.
 - **Pages.** Big diagram? Split it into pages, shown as tabs along the bottom. Click **+** to add one,
   double-click a tab to rename it, drag tabs to reorder them.
 - **Links.** Make a shape jump to another one, even on another page: select it and choose a target under

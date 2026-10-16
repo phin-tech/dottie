@@ -90,10 +90,12 @@ public enum DiagramOps {
         public var endHead: Arrowhead?
         /// Degrees, clockwise.
         public var rotation: Double?
+        /// Cell size of a grid fill, in points.
+        public var gridSize: Double?
         public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
-                    startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil) {
+                    startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil) {
             self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
-            self.startHead = startHead; self.endHead = endHead; self.rotation = rotation
+            self.startHead = startHead; self.endHead = endHead; self.rotation = rotation; self.gridSize = gridSize
         }
 
         func apply(to e: inout Element) {
@@ -101,6 +103,7 @@ public enum DiagramOps {
             if let dash { e.style.dash = dash }
             if let strokeWidth { e.style.strokeWidth = min(max(strokeWidth, 0.5), 24) }
             if let bowing { e.style.bowing = max(0, bowing) }
+            if let gridSize { e.style.gridSize = min(max(gridSize, 8), 400) }
             if e.kind == .connector {
                 if let startHead { e.connector?.startHead = startHead }
                 if let endHead { e.connector?.endHead = endHead }

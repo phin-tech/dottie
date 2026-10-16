@@ -15,6 +15,7 @@ public enum Renderer {
         var seed: UInt32
         var roughness, bowing, strokeWidth: Double
         var fillStyle: FillStyle
+        var cell: Double
         var pathHash: Int
     }
 
@@ -71,7 +72,7 @@ public enum Renderer {
     private static func shapeKey(_ e: Element, tag: UInt8) -> ShapeKey {
         ShapeKey(tag: tag, kind: e.kind, x: e.x, y: e.y, w: e.width, h: e.height, seed: e.seed,
                  roughness: e.style.roughness, bowing: e.style.bowing, strokeWidth: e.style.strokeWidth,
-                 fillStyle: e.style.fillStyle, pathHash: e.path?.hashValue ?? e.subpaths?.hashValue ?? 0)
+                 fillStyle: e.style.fillStyle, cell: e.style.fillStyle == .grid ? e.style.cellSize : 0, pathHash: e.path?.hashValue ?? e.subpaths?.hashValue ?? 0)
     }
 
     /// Outline path for an element. roughness == 0 gives exact geometry.
@@ -310,7 +311,7 @@ public enum Renderer {
         }
     }
 
-    /// Pen-shaded fill for `fillStyle` hachure / crossHatch; empty for solid fills.
+    /// Pen-shaded fill for `fillStyle` hachure / crossHatch, or the cell lines of a grid fill; empty for solid fills.
     public static func hachurePath(for e: Element) -> CGPath {
         guard e.style.fillStyle != .solid, e.kind != .freehand, e.kind != .connector, e.kind != .text, e.kind != .image else {
             return CGMutablePath()
@@ -321,6 +322,15 @@ public enum Renderer {
     private static func computeHachure(for e: Element) -> CGPath {
         let path = CGMutablePath()
         let polys = fillPolygons(for: e)
+        if e.style.fillStyle == .grid {
+            let path = CGMutablePath()
+            var rng = SeededRNG(seed: e.seed ^ 0x5bd1e995)
+            for (a, b) in DungeonGrid.lines(in: polys, cell: e.style.cellSize) {
+                if e.style.roughness <= 0 { path.move(to: a); path.addLine(to: b) }
+                else { Rough.line(a, b, rng: &rng, roughness: e.style.roughness * 0.3, bowing: 0.3, into: path) }
+            }
+            return path
+        }
         let gap = max(4, e.style.strokeWidth * 4)
         var angles = [Hachure.angle]
         if e.style.fillStyle == .crossHatch { angles.append(Hachure.angle + .pi / 2) }
@@ -390,6 +400,8 @@ public enum Renderer {
             draw(ink.map { e.resolvingInk(to: $0) } ?? e, in: ctx, document: doc, background: background, index: index, lod: lod)
         }
 
+        if lod?.hatch ?? true { drawRock(doc, visible: visible, ink: ink, in: ctx) }
+
         if let spatial, let clip {
             for pos in spatial.candidates(in: clip) { paint(spatial.ordered[pos]) }
             return
@@ -401,6 +413,21 @@ public enum Renderer {
                 if !box.insetBy(dx: -(e.style.strokeWidth + 60), dy: -(e.style.strokeWidth + 60)).intersects(clip) { continue }
             }
             paint(e)
+        }
+    }
+
+    /// Dyson hatching in the rock around every grid-filled floor, drawn under all elements so each floor
+    /// covers the strokes that run beneath its edge.
+    static func drawRock(_ doc: DottieDocument, visible: Set<UUID>, ink: RGBA?, in ctx: CGContext) {
+        let floors = doc.orderedElements.filter { visible.contains($0.layerID) && DungeonGrid.isFloor($0) }
+        guard !floors.isEmpty else { return }
+        ctx.saveGState(); defer { ctx.restoreGState() }
+        ctx.setLineCap(.round)
+        for rock in DungeonGrid.rock(for: floors.map { e in ink.map { e.resolvingInk(to: $0) } ?? e }) {
+            ctx.addPath(rock.path)
+            ctx.setStrokeColor(rock.ink.cgColor)
+            ctx.setLineWidth(rock.width)
+            ctx.strokePath()
         }
     }
 
@@ -460,14 +487,20 @@ public enum Renderer {
             if e.style.fillStyle == .solid || !(lod?.hatch ?? true) {
                 ctx.addPath(fillPath(for: e))
                 var tint = e.style.fill
-                if e.style.fillStyle != .solid { tint.a *= 0.55 } // hatching read from afar is a lighter wash
+                if e.style.fillStyle == .hachure || e.style.fillStyle == .crossHatch { tint.a *= 0.55 } // hatching read from afar is a lighter wash
                 ctx.setFillColor(tint.cgColor)
                 ctx.fillPath(using: e.evenOdd == true ? .evenOdd : .winding)
             } else {
+                let grid = e.style.fillStyle == .grid
+                if grid {
+                    ctx.addPath(fillPath(for: e))
+                    ctx.setFillColor(e.style.fill.cgColor)
+                    ctx.fillPath(using: e.evenOdd == true ? .evenOdd : .winding)
+                }
                 ctx.saveGState()
                 ctx.addPath(hachurePath(for: e))
-                ctx.setStrokeColor(e.style.fill.cgColor)
-                ctx.setLineWidth(max(1, e.style.strokeWidth / 2))
+                ctx.setStrokeColor(grid ? DungeonGrid.lineColor(for: e.style.fill).cgColor : e.style.fill.cgColor)
+                ctx.setLineWidth(grid ? 1 : max(1, e.style.strokeWidth / 2))
                 ctx.setLineCap(.round)
                 ctx.strokePath()
                 ctx.restoreGState()
