@@ -1,0 +1,9 @@
+/* Demo players are whole pages of their own, embedded at a fixed height with room for their controls. */
+.player {
+  width: 100%;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 8px;
+  background: #fff;
+  display: block;
+  margin: 0.5rem 0 1.5rem;
+}

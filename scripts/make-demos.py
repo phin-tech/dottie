@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Regenerates the animations made by script: the README's (Design/animation.*) and the feature demos
-(Design/demos/*). Each script runs on a new page through dottie-mcp, and the dottie tool renders the result.
-Run through `just readme-animation` or `just demos`, which build both tools first.
+(Design/demos/*), with a web player for each in website/docs/players for the GitHub Pages site. Each script
+runs on a new page through dottie-mcp, and the dottie tool renders the result. Run through
+`just readme-animation` or `just demos`, which build both tools first.
 
-    scripts/make-demos.py readme        the README animation: .dottie, .gif and .mp4
-    scripts/make-demos.py demos         every scripts/demos/*.js: .dottie and .gif (and .html for tour)
+    scripts/make-demos.py readme        the README animation: .dottie, .gif, .mp4, and players/build.html
+    scripts/make-demos.py demos         every scripts/demos/*.js: .dottie, .gif and players/<name>.html
     scripts/make-demos.py live tour     just those demos
 """
 import json, pathlib, subprocess, sys
 
 root = pathlib.Path(__file__).resolve().parent.parent
 bin_dir = root / ".build" / "debug"
+players = root / "website" / "docs" / "players"
 
 
 def run_script(script: pathlib.Path, page: pathlib.Path) -> None:
@@ -54,6 +56,7 @@ def run_script(script: pathlib.Path, page: pathlib.Path) -> None:
 
 
 def render(page: pathlib.Path, out: pathlib.Path, scale: str) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run([str(bin_dir / "dottie"), "render", str(page), "-o", str(out), "-s", scale], check=True)
 
 
@@ -62,6 +65,7 @@ def readme() -> None:
     run_script(root / "scripts" / "readme-animation.js", page)
     render(page, page.with_suffix(".gif"), "1")
     render(page, page.with_suffix(".mp4"), "2")
+    render(page, players / "build.html", "1")
 
 
 def demo(name: str) -> None:
@@ -71,8 +75,7 @@ def demo(name: str) -> None:
     page = root / "Design" / "demos" / f"{name}.dottie"
     run_script(script, page)
     render(page, page.with_suffix(".gif"), "1")
-    if name == "tour":  # the click-through presentation
-        render(page, page.with_suffix(".html"), "1")
+    render(page, players / f"{name}.html", "1")
 
 
 targets = sys.argv[1:] or ["readme", "demos"]

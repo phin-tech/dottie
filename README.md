@@ -128,12 +128,12 @@ Assistants can animate too: ask for *"a version of this diagram that builds itse
 through it"*, *"send a POST /orders packet from the client every second"*, or *"zoom in on each service in turn,
 as scenes"*, then *"export it as a GIF"*.
 
-More examples, each made by a short script in [scripts/demos](scripts/demos): a sprint board whose notes
-[pop in one after another](Design/demos/stagger.gif), a service map with
-[requests that never stop flowing](Design/demos/live.gif), a checkout flow with
-[labelled requests and events](Design/demos/labels.gif) (`POST /orders`, `order.created`), and a
-[camera tour](Design/demos/tour.gif) of the diagram above that is also a
-[click-through presentation](Design/demos/tour.html) (download it and open it in a browser).
+**[Play the demos in your browser](https://phin-tech.github.io/dottie/demos/)**: a camera that
+[zooms through a checkout flow](Design/demos/zoom.gif), a [click-through tour](Design/demos/tour.gif) of the
+diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /orders`, `order.created`),
+[traffic that never stops](Design/demos/live.gif), and a sprint board whose notes
+[pop in one after another](Design/demos/stagger.gif). Each is made by a short script in
+[scripts/demos](scripts/demos).
 
 ## Extras for power users
 

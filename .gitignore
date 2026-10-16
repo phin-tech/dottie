@@ -5,3 +5,7 @@ DerivedData/
 .DS_Store
 Signing.local.xcconfig
 .kata.local.toml
+
+# mkdocs output
+website/site/
+_site/

@@ -21,6 +21,11 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 
 `Dottie.xcodeproj` is generated from `project.yml` and gitignored, so change settings there, not in Xcode.
 
+**Website.** `website/` is the GitHub Pages site (Material for MkDocs), published by
+`.github/workflows/pages.yml` on pushes to `main` that touch it. Its demo players in `website/docs/players` are
+made by `just demos` (and `just readme-animation`) on a Mac and committed. Preview it with
+`pip install -r website/requirements.txt && mkdocs serve -f website/mkdocs.yml`.
+
 **Looking at the running app.** `just debug-app file.dottie` launches a Debug build in the background on its own
 live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and
 `just debug <command>` drives it through `scripts/dottie-debug.py`: `snapshot out.png [canvas]` has the window
