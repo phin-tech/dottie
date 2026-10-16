@@ -23,6 +23,9 @@ targets:
     type: application
     platform: macOS
     sources: [App]
+    # A shared scheme, generated every time: without one, Xcode can remember a scheme that a regenerate
+    # removed and then show no way to build or archive the app.
+    scheme: {}
     configFiles:
       Debug: Signing.xcconfig
       Release: Signing.xcconfig
@@ -205,6 +208,8 @@ targets:
   CanvasTests:
     type: bundle.unit-test
     platform: macOS
+    scheme:
+      testTargets: [CanvasTests]
     sources:
       - CanvasTests
       - App/CanvasView.swift
