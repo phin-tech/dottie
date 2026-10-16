@@ -3,7 +3,7 @@ import Foundation
 /// Editing an animation by posing it, as Flash's auto-key does: the editor shows the frame at a time `t`, and
 /// what is changed there becomes keyframes at `t` instead of changes to the page.
 extension DottieDocument {
-    /// The page after `edited` (an edited copy of `resolved(at: t)`) is posed at time `t`.
+    /// The page after `edited` (an edited copy of `posed(at: t)`) is posed at time `t`.
     ///
     /// - A change to an element's frame, rotation, colors, stroke width or opacity becomes a key at `t` (or
     ///   on the key nearest `t`, within half a frame, so posing on a key's frame edits that key). If no key
@@ -17,8 +17,8 @@ extension DottieDocument {
     public func applyingPose(_ edited: DottieDocument, at t: Double) -> DottieDocument {
         let t = Timeline.clampTime(t)
         func byID(_ d: DottieDocument) -> [UUID: Element] { Dictionary(d.elements.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }) }
-        let before = byID(resolved(at: t))
-        let atStart = byID(resolved(at: 0))
+        let before = byID(posed(at: t))
+        let atStart = byID(posed(at: 0))
         let baseByID = byID(self)
         var tl = timeline ?? Timeline(duration: max(t, 1))
         tl.duration = max(tl.duration, t)
@@ -118,7 +118,7 @@ extension DottieDocument {
         var tl = timeline ?? Timeline(duration: 0)
         let t = Timeline.clampTime(key.t)
         if t > 0, let base = elements.first(where: { $0.id == id }) {
-            let s = resolved(at: 0).elements.first { $0.id == id } ?? base
+            let s = posed(at: 0).elements.first { $0.id == id } ?? base
             let track = tl.track(for: id)
             func unset<V>(_ p: (Keyframe) -> V?) -> Bool { !(track?.keys.contains { p($0) != nil } ?? false) }
             var pin = Keyframe(t: 0)

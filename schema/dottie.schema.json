@@ -36,6 +36,21 @@
         "guidesX": { "type": "array", "items": { "type": "number" } },
         "guidesY": { "type": "array", "items": { "type": "number" } },
         "guidesLocked": { "type": "boolean" },
+        "timeline": { "$ref": "#/$defs/timeline" },
+        "symbols": { "type": "array", "description": "Drawings placed by symbol elements, each with its own animation.", "items": { "$ref": "#/$defs/symbol" } }
+      }
+    },
+    "symbol": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "name": { "type": "string" },
+        "width": { "type": "number", "description": "The box its elements are drawn in, from the origin; instances scale it into their frame." },
+        "height": { "type": "number" },
+        "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" } },
+        "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
         "timeline": { "$ref": "#/$defs/timeline" }
       }
     },
@@ -84,7 +99,7 @@
       "additionalProperties": false,
       "properties": {
         "id": { "$ref": "#/$defs/uuid" },
-        "kind": { "enum": ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image"] },
+        "kind": { "enum": ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image", "symbol"] },
         "x": { "type": "number" },
         "y": { "type": "number" },
         "width": { "type": "number" },
@@ -104,6 +119,9 @@
         "anchor": { "type": "string" },
         "click": { "$ref": "#/$defs/click" },
         "hover": { "$ref": "#/$defs/hover" },
+        "symbol": { "$ref": "#/$defs/uuid", "description": "For a symbol element: the page's symbol it shows." },
+        "playback": { "enum": ["loop", "once", "still"], "description": "How a symbol element plays its symbol's timeline; loop by default." },
+        "offset": { "type": "number", "description": "Seconds into its symbol's timeline a symbol element is when the page's starts." },
         "image": { "$ref": "#/$defs/image" },
         "reveal": { "type": "number" }
       }

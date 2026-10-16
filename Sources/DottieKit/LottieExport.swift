@@ -80,7 +80,8 @@ final class LottieWriter {
         }
         end = (times.last ?? 0) + 1 / fps
         let theme = doc.resolvedTheme
-        base = doc.resolvingInk(to: theme?.ink ?? .black)
+        // Every element a frame can have, in drawing order: symbols' elements included, even ones hidden at first.
+        base = doc.expandingSymbols(at: 0, posing: false).resolvingInk(to: theme?.ink ?? .black)
         frames = times.map { source.resolved(at: $0).resolvingInk(to: theme?.ink ?? .black) }
         indexes = frames.map(\.elementIndex)
         background = transparent ? nil : theme?.background ?? RGBA(r: 1, g: 1, b: 1)

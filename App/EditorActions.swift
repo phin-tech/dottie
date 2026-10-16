@@ -236,7 +236,7 @@ extension ContentView {
             } },
             frameCamera: { animate("Frame Camera") { doc in
                 let index = doc.elementIndex
-                let boxes = doc.resolved(at: playhead ?? 0).elements.filter { ids.contains($0.id) }
+                let boxes = doc.posed(at: playhead ?? 0).elements.filter { ids.contains($0.id) }
                     .map { $0.kind == .connector ? Connector.bounds(of: $0, in: doc, index: index) : $0.rotatedBounds }
                 guard !boxes.isEmpty else { return false }
                 doc.startAnimation()

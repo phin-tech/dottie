@@ -667,7 +667,7 @@ extension Style {
     }
 }
 
-/// The last resolved frame and what it was resolved from.
+/// The last posed frame and what it was posed from.
 final class FrameCache {
     private var page: DottieDocument?
     private var time = 0.0
@@ -675,7 +675,7 @@ final class FrameCache {
 
     func frame(of page: DottieDocument, at t: Double) -> DottieDocument {
         if let frame, t == time, page == self.page { return frame }
-        let f = page.resolved(at: t)
+        let f = page.posed(at: t)
         self.page = page; time = t; frame = f
         return f
     }

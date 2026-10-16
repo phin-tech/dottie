@@ -306,7 +306,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             }
         }
         Renderer.draw(drawn, in: ctx, background: canvasBackground.cgColor, clip: visible,
-                      zoom: Double(zoom), ink: canvasInk, spatial: spatial, skipping: hidden)
+                      zoom: Double(zoom), ink: canvasInk, spatial: spatial, skipping: hidden, symbolTime: poseTime ?? 0)
 
         // Ruler guides sit over the drawing and under the selection.
         if showRulers {
@@ -2026,7 +2026,7 @@ struct CanvasView: NSViewRepresentable {
             if v.poseSource != document.model || v.poseTime != t {
                 v.poseSource = document.model
                 v.poseTime = t
-                let frame = document.model.resolved(at: t)
+                let frame = document.model.posed(at: t)
                 if v.model != frame { v.model = frame }
             }
         } else {

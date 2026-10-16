@@ -33,6 +33,7 @@ extension Exporter {
     /// and the bounds they were drawn for. Joined, they are the body of `svg(_:background:bounds:)`; kept
     /// apart, an animation export can store what doesn't change between frames once.
     static func svgParts(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> (CGRect, [(key: String, markup: String)]) {
+        if doc.hasInstances { return svgParts(doc.expandingSymbols(at: 0), background: background, bounds: fixed) }
         let theme = doc.resolvedTheme
         let background = background.map { plain in theme?.background ?? plain }
         let d = doc.resolvingInk(to: theme?.ink ?? .black)
@@ -76,6 +77,8 @@ extension Exporter {
             }
         }
         switch e.kind {
+        case .symbol:   // svgParts expands instances first
+            return ""
         case .connector:
             let (line, filled) = Renderer.connectorParts(for: e, in: doc, index: index)
             var s = "<path d=\"\(pathData(line))\" fill=\"none\" \(strokeAttrs)/>\n"

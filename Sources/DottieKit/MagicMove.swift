@@ -38,7 +38,7 @@ extension DottieDocument {
         // Both ends as posed: this page at `t`, the target where it starts.
         func posed(_ e: Element) -> Element { tl.track(for: e.id)?.apply(to: e, at: t) ?? e }
         let here = elements.filter { tl.track(for: $0.id)?.isVisible(at: t) ?? true }.map(posed)
-        let there = target.timeline == nil ? target.elements : target.resolved(at: 0).elements
+        let there = target.timeline == nil ? target.elements : target.posed(at: 0).elements
         let originals = target.elementIndex
 
         // Shapes first, pass by pass, each pass among those still unmatched.
