@@ -47,6 +47,7 @@ final class DebugDriver {
     keydel <text> <t>            delete a key
     menu [Top/Sub/...]           list the menu bar (or a menu); items read as disabled while the app is in
                                  the background, since commands follow the focused window
+    onion on|off                 onion skinning while posing (the Animate menu's toggle)
     quit                         quit this copy of the app (unsaved changes are discarded)
     """
 
@@ -97,6 +98,9 @@ final class DebugDriver {
             case "key": return ok(try key(rest.joined(separator: " ")))
             case "menu": return ok(try menu(rest.first))
             case "keys", "keysel", "keymove", "keyease", "keydel": return ok(try keyCommand(command, rest))
+            case "onion":
+                UserDefaults.standard.set(rest.first == "on", forKey: "onionSkin")
+                return ok("onion skin \(rest.first == "on" ? "on" : "off")")
             case "quit":
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { exit(0) }
                 return ok("quitting")

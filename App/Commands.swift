@@ -17,6 +17,7 @@ struct DottieCommands: Commands {
     @FocusedBinding(\.tool) private var tool
     @FocusedValue(\.editor) private var editor
     @AppStorage(Pref.showRulers) private var showRulers = false
+    @AppStorage("onionSkin") private var onionSkin = false
 
     private func send(_ action: Selector) { NSApp.sendAction(action, to: nil, from: nil) }
 
@@ -137,6 +138,8 @@ struct DottieCommands: Commands {
                 .disabled(editor == nil)
             Toggle("Settle When Still", isOn: Binding(get: { editor?.settles ?? false }, set: { _ in editor?.toggleSettle() }))
                 .disabled(editor?.hasAnimation != true)
+            Toggle("Onion Skin", isOn: $onionSkin)
+                .help("While posing, show the frames just before and after faintly")
             Divider()
             Button("Clear Keys from Selection") { editor?.clearKeys() }
                 .disabled(n == 0 || editor?.hasAnimation != true)

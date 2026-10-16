@@ -174,6 +174,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// resolved from; a new frame is only loaded when either changes, never in the middle of a gesture.
     var poseTime: Double? { didSet { if poseTime != oldValue { needsDisplay = true } } }
     var poseSource: DottieDocument?
+    /// While posing, faintly draw the frames just before and after, to see the motion around the pose.
+    var onionSkin = false { didSet { if onionSkin != oldValue { needsDisplay = true } } }
     /// Shows another page; `model` is that page when it returns.
     var onShowPage: ((UUID) -> Void)?
     /// The page holding a followable shape (on a visible layer), searching the whole file.
@@ -260,6 +262,21 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if let id = editingID, let i = drawn.elements.firstIndex(where: { $0.id == id }) { drawn.elements[i].text = nil }
         let hidden = hiddenInEditor
         if !hidden.isEmpty { drawn.elements.removeAll { hidden.contains($0.id) } }
+        if onionSkin, let t = poseTime, let base = poseSource, let tl = base.timeline {
+            // Two frames apart, fading with distance; skipped past either end of the timeline.
+            let step = 2 / max(tl.fps, 1)
+            for (offset, alpha) in [(-2.0, 0.1), (2.0, 0.1), (-1.0, 0.22), (1.0, 0.22)] {
+                let at = t + offset * step
+                guard at >= 0, at <= tl.duration else { continue }
+                ctx.saveGState()
+                ctx.setAlpha(alpha)
+                ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+                Renderer.draw(base.resolved(at: at), in: ctx, background: canvasBackground.cgColor, clip: visible,
+                              zoom: Double(zoom), ink: canvasInk)
+                ctx.endTransparencyLayer()
+                ctx.restoreGState()
+            }
+        }
         Renderer.draw(drawn, in: ctx, background: canvasBackground.cgColor, clip: visible,
                       zoom: Double(zoom), ink: canvasInk, spatial: hidden.isEmpty ? spatial : nil)
 
@@ -1866,6 +1883,7 @@ struct CanvasView: NSViewRepresentable {
     var pose: Double?
     var onExitPreview: () -> Void = {}
     @Environment(\.undoManager) private var undoManager
+    @AppStorage("onionSkin") private var onionSkin = false
 
     func makeNSView(context: Context) -> CanvasNSView {
         let v = CanvasNSView()
@@ -1917,6 +1935,7 @@ struct CanvasView: NSViewRepresentable {
         v.activeLayerID = activeLayerID
         v.showRulers = showRulers
         v.onExitPreview = onExitPreview
+        v.onionSkin = onionSkin
         if v.playhead != playhead { v.playhead = playhead }
         if v.selection != selection { v.selection = selection }
         if let req = placeRequest, v.handledPlace != req.id {
