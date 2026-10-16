@@ -23,6 +23,28 @@ final class ScriptTests: XCTestCase {
         XCTAssertEqual(r.value, ##"{"n":3,"fill":"#ffeeaa"}"##)
     }
 
+    /// An error from a dottie call gives the script line that made it (not the prelude's), the one the type check
+    /// reports too, including when a top-level return has the script run wrapped in a function.
+    func testErrorsGiveTheScriptsLineNumber() {
+        var doc = DottieDocument()
+        let returning = run("""
+            const a = dottie.rect({x: 0, y: 0});
+            dottie.connect(a, a, {routing: "elbo"});
+            return 1;
+            """, &doc)
+        XCTAssertTrue(returning.error?.hasSuffix("(line 2)") == true, returning.error ?? "no error")
+        let nested = run("""
+            const a = dottie.rect({x: 0, y: 0});
+            function link(x) {
+              return dottie.connect(x, x, {routing: "elbo"});
+            }
+            link(a);
+            """, &doc)
+        XCTAssertTrue(nested.error?.hasSuffix("(line 3)") == true, nested.error ?? "no error")
+        let thrown = run("const a = 1;\n\nnull.x;", &doc)
+        XCTAssertTrue(thrown.error?.hasSuffix("(line 3)") == true, thrown.error ?? "no error")
+    }
+
     func testCreatesAGridFloorWithItsCellSize() {
         var doc = DottieDocument()
         let r = run("""

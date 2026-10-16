@@ -85,11 +85,12 @@ public enum DottieScript {
 
         var failure: String?
         var json: String?
-        var result = context.evaluateScript(source)
-        // A top-level `return` is a syntax error for a plain script; nothing ran, so wrap and retry.
+        var result = context.evaluateScript(source, withSourceURL: scriptURL)
+        // A top-level `return` is a syntax error for a plain script; nothing ran, so wrap and retry. The source
+        // starts on the wrapper's first line, so errors keep its line numbers.
         if let e = context.exception, isReturnSyntaxError(e) {
             context.exception = nil
-            result = context.evaluateScript("(function () {\n" + source + "\n})()")
+            result = context.evaluateScript("(function () {" + source + "\n})()", withSourceURL: scriptURL)
         }
         if let e = context.exception {
             failure = describe(e)
@@ -105,9 +106,16 @@ public enum DottieScript {
         e.forProperty("name")?.toString() == "SyntaxError" && (e.forProperty("message")?.toString() ?? "").lowercased().contains("return")
     }
 
+    /// The script's source URL, so its frames can be told from the prelude's and modules' in a stack.
+    private static let scriptURL = URL(string: "script.js")
+
     private static func describe(_ e: JSValue) -> String {
         var s = e.forProperty("message")?.isString == true ? (e.forProperty("name")?.toString() ?? "Error") + ": " + e.forProperty("message")!.toString() : e.toString() ?? "Error"
-        if let line = e.forProperty("line"), line.isNumber { s += " (line \(line.toInt32()))" }
+        // An error from a dottie call is made in the prelude, so its `line` is the prelude's; the innermost
+        // frame in the script is the line that made the call.
+        let stack = e.forProperty("stack")?.isString == true ? e.forProperty("stack")!.toString()! : ""
+        if let m = stack.firstMatch(of: /script\.js:(\d+):/) { s += " (line \(m.1))" }
+        else if let line = e.forProperty("line"), line.isNumber { s += " (line \(line.toInt32()))" }
         return s
     }
 

@@ -26,12 +26,13 @@ extension DottieScript {
         + "and run_script also checks scripts against dottie.d.ts, catching misspelled options and values."
 
     /// For a folder of scripts: each `.js` file is its own module (so two scripts can both declare `const a`),
-    /// checked with no DOM. modules/ is left out: libraries are `any`.
+    /// checked with no DOM. modules/ is left out: libraries are `any`. ES2023 is what JavaScriptCore has on
+    /// macOS 14, the oldest Dottie runs on.
     public static let typeScriptConfig = """
     {
       "compilerOptions": {
-        "target": "es2022",
-        "lib": ["es2022"],
+        "target": "es2023",
+        "lib": ["es2023"],
         "types": [],
         "allowJs": true,
         "checkJs": true,

@@ -22,6 +22,14 @@ enum ScriptLibrary {
         NSWorkspace.shared.open(directory)
     }
 
+    /// After an update, brings a dottie.d.ts written by an older version up to date. A folder without one is
+    /// left alone until it is revealed.
+    static func refreshTypes() {
+        let types = directory.appendingPathComponent("dottie.d.ts")
+        guard let current = try? String(contentsOf: types, encoding: .utf8), current != DottieScript.typeDefinitions else { return }
+        try? DottieScript.writeTypes(to: directory)
+    }
+
     static let starter = """
     // Runs against this drawing as one undo step. Selected elements: dottie.selection
     // Press the Help button for the full API.

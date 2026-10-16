@@ -125,6 +125,22 @@ final class ScriptTypesTests: XCTestCase {
         XCTAssertTrue(check.diagnostics[1].message.contains(#""elbow""#), check.diagnostics[1].message)
     }
 
+    /// The library the check uses must cover what JavaScriptCore runs on macOS 14 (ES2023), or valid scripts
+    /// get warnings.
+    func testAcceptsES2023() throws {
+        let tsc = try compiler()
+        let source = """
+            const xs = dottie.elements().map(e => e.x).toSorted((a, b) => a - b);
+            const last = xs.findLast(x => x > 0) ?? xs.at(-1);
+            last
+            """
+        XCTAssertEqual(try DottieScript.typeCheck(source, compiler: tsc.url, version: tsc.version).diagnostics, [])
+        var doc = DottieDocument()
+        _ = try DiagramOps.addShape(&doc, kind: .rectangle, frame: nil, at: CGPoint(x: 5, y: 0), text: "A",
+                                    fill: nil, stroke: nil, roughness: nil, look: DiagramOps.Look())
+        XCTAssertNil(DottieScript.run(source, on: &doc, libraries: [.starter]).error)
+    }
+
     func testIgnoresACommandNamedTscThatIsNotTypeScript() throws {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: dir) }
