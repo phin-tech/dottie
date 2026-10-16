@@ -473,6 +473,17 @@ def js_only():
     p.add("rectangle", 360, 40, 120, 60, style=style(fill=rgba(1, 0.85, 0.4), fillStyle="zigzag", dash="wavy"))
     write(JS_ONLY / "future.dottie", [p], version=99)
 
+    # Hostile strings where they end up in the drawn SVG: none may become markup or script.
+    h = Page()
+    evil = 'x" onerror="window.__pwned=1" y="'
+    h.add("image", 40, 40, 80, 60, image={"data": evil, "format": 'png" onload="window.__pwned=1'})
+    h.add("image", 140, 40, 80, 60, image={"ref": "evil"})
+    h.add("rectangle", 240, 40, 160, 60, text='<img src=x onerror="window.__pwned=1">')
+    h.add("note", 40, 140, 200, 100, text='<script>window.__pwned=1</script> **<b onmouseover="window.__pwned=1">x</b>**')
+    h.add('svg onload="window.__pwned=1"', 260, 140, 100, 60, text="</text><script>window.__pwned=1</script>")
+    write(JS_ONLY / "hostile.dottie", [h], images={"evil": {"data": evil, "format": "png"}},
+          extra={})
+
 
 def main():
     shapes()

@@ -60,3 +60,11 @@ test("render draws a page as SVG at a moment, clean or sketchy", () => {
   assert.equal(render(src, { background: null }).includes('fill="#ffffff"/>'), false);
   assert.match(render(read("edge", "themes.dottie"), { page: "midnight" }), /fill="#15161a"/);
 });
+
+test("picture data that isn't base64 is dropped, with a warning", () => {
+  const f = parseDottie(read("js-only", "hostile.dottie"));
+  const pics = f.pages[0].elements.filter((e) => e.kind === "image");
+  assert.deepEqual(pics.map((e) => e.image?.data), ["", ""]);
+  assert.ok(f.warnings.some((w) => /base64/.test(w)));
+  assert.doesNotMatch(render(f), /<script|<img|<b[ >]|<[^>]*\son\w+=/);
+});

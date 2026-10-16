@@ -253,7 +253,16 @@ class Reader {
     const ref = str(v.ref);
     if (ref !== undefined) return table[ref] ?? { data: "", format: "png" };
     const data = str(v.data);
-    return data === undefined ? null : { data, format: str(v.format) ?? "png" };
+    return data === undefined ? null : this.picture(data, str(v.format));
+  }
+
+  /** A picture's bytes, only if they really are base64: they go into an attribute of the drawn SVG. */
+  picture(data: string, format: string | undefined): EmbeddedImage {
+    if (!BASE64.test(data)) {
+      this.warn("Skipped a picture whose data isn't base64");
+      return { data: "", format: "png" };
+    }
+    return { data: data.replace(/\s+/g, ""), format: format === "jpeg" ? "jpeg" : "png" };
   }
 
   element(v: unknown, images: Record<string, EmbeddedImage>): Element | null {
@@ -389,6 +398,8 @@ class Reader {
   }
 }
 
+const BASE64 = /^[A-Za-z0-9+/=\s]*$/;
+
 export function repeatIsValid(r: Repeat): boolean {
   return Number.isFinite(r.start) && Number.isFinite(r.end) && r.start >= 0 && r.end - r.start > 1e-3 && r.end <= MAX_DURATION
     && (r.count === null || (r.count >= 1 && r.count <= 10_000));
@@ -417,7 +428,7 @@ export function parseDottie(source: string | unknown): DottieFile {
   const images: Record<string, EmbeddedImage> = {};
   if (isObj(json.images)) {
     for (const [k, v] of Object.entries(json.images)) {
-      if (isObj(v) && typeof v.data === "string") images[k] = { data: v.data, format: str(v.format) ?? "png" };
+      if (isObj(v) && typeof v.data === "string") images[k] = reader.picture(v.data, str(v.format));
     }
   }
   const pages = json.pages.map((p, i) => reader.page(p, images, i + 1));

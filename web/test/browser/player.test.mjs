@@ -124,3 +124,20 @@ test("a file it can't read shows why, and unknown kinds draw as placeholders", a
   assert.match(text, /hexagon/);
   await close();
 });
+
+test("strings from a hostile file never become markup or script", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/js-only/hostile.dottie"></dottie-player>`);
+  await ready(page);
+  await page.waitForTimeout(300);
+  const found = await page.evaluate(() => {
+    const root = document.querySelector("dottie-player").shadowRoot;
+    const all = [...root.querySelectorAll("*")];
+    return {
+      pwned: window.__pwned === 1,
+      handlers: all.flatMap((el) => [...el.attributes].filter((a) => /^on/i.test(a.name)).map((a) => `${el.tagName} ${a.name}`)),
+      tags: [...new Set(all.map((el) => el.tagName.toLowerCase()))].filter((t) => ["script", "img", "b", "foreignobject"].includes(t)),
+    };
+  });
+  assert.deepEqual(found, { pwned: false, handlers: [], tags: [] });
+  await close();
+});
