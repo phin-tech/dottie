@@ -1412,6 +1412,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     // MARK: Mouse
 
+    /// A click on the canvas of a window in the background acts straight away (selecting the shape under it),
+    /// rather than only bringing the window forward and needing a second click.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func mouseDown(with event: NSEvent) {
         endEditing()
         stopJumpAnimation()
