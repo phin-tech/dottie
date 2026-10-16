@@ -34,7 +34,7 @@ dottie.timeline({duration: t + 2.2});
 const byText = t => dottie.elements({text: t})[0];
 const all = dottie.elements().filter(e => e.kind !== "connector").map(e => e.id);
 dottie.camera(0, [byText("Browser"), byText("API gateway")], {padding: 30});
-dottie.scene(0, "The request comes in");
+dottie.scene(1.2, "The request comes in");   // once Browser and its arrow are drawn
 dottie.camera(3.2, [byText("API gateway"), byText("Auth"), byText("Orders")], {padding: 30});
 dottie.scene(3.2, "The gateway checks it");
 dottie.camera(6.2, [byText("Orders"), byText("Postgres"), byText("Queue"), byText("Worker")], {padding: 30});
