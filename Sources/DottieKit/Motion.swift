@@ -133,16 +133,29 @@ extension DottieDocument {
     /// A dot that travels along `connector` from `t` for `duration` seconds and is hidden otherwise:
     /// a request, message or packet on its way. Returns the dot.
     @discardableResult
+    /// With a `label`, the packet is a pill carrying that text ("POST /orders") instead of a dot.
     public mutating func addPacket(along connector: UUID, at t: Double, duration: Double = 0.6,
-                                   color: RGBA = RGBA(r: 0.95, g: 0.36, b: 0.33), size: Double = 14) throws -> Element {
+                                   color: RGBA = RGBA(r: 0.95, g: 0.36, b: 0.33), size: Double = 14,
+                                   label: String? = nil) throws -> Element {
         guard let c = elements.first(where: { $0.id == connector }), c.kind == .connector else {
             throw OpsError.invalid("A packet travels along a connector")
         }
         let start = Connector.endpoints(of: c, in: self).0
         var style = Style()
         style.fill = color; style.stroke = color; style.roughness = min(c.style.roughness, 1); style.strokeWidth = 1.5
-        let dot = Element(kind: .ellipse, frame: CGRect(x: start.x - size / 2, y: start.y - size / 2, width: size, height: size),
-                          style: style, layerID: c.layerID)
+        var frame = CGSize(width: size, height: size)
+        let text = label.map { String($0.prefix(60)) }.flatMap { $0.isEmpty ? nil : $0 }
+        if let text {
+            // White lettering on the packet's color; the pill hugs the text.
+            style.stroke = RGBA(r: 1, g: 1, b: 1)
+            style.fontSize = 12
+            style.roughness = 0
+            let fit = Renderer.textSize(text, fontSize: style.fontSize, maxWidth: 400)
+            frame = CGSize(width: ceil(fit.width) + 24, height: max(size, ceil(fit.height) + 14))
+        }
+        let dot = Element(kind: .ellipse, frame: CGRect(x: start.x - frame.width / 2, y: start.y - frame.height / 2,
+                                                        width: frame.width, height: frame.height),
+                          style: style, layerID: c.layerID, text: text)
         elements.append(dot)
         let t = Timeline.clampTime(t)
         let d = min(max(0.05, duration), 60)
