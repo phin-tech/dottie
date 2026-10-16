@@ -41,6 +41,17 @@ extension Exporter {
         if let d = Renderer.dashPattern(e.style.dash, width: e.style.strokeWidth) {
             strokeAttrs += " stroke-dasharray=\"\(d.map { num($0) }.joined(separator: " "))\""
         }
+        var e = e
+        if let r = e.revealProgress { // drawing on: a partial stroke, as Renderer.draw does
+            switch e.kind {
+            case .text: e.text = e.typed(e.text ?? "", r)
+            case .connector:
+                let line = Renderer.connectorParts(for: e, in: doc, index: index).line.trimmed(to: r)
+                return "<path d=\"\(pathData(line))\" fill=\"none\" \(strokeAttrs)/>\n"
+            default:
+                return "<path d=\"\(pathData(Renderer.outline(for: e).trimmed(to: r)))\" fill=\"none\" \(strokeAttrs)/>\n"
+            }
+        }
         switch e.kind {
         case .connector:
             let (line, filled) = Renderer.connectorParts(for: e, in: doc, index: index)

@@ -83,7 +83,7 @@ final class MotionTests: XCTestCase {
         var doc = DottieDocument()
         let a = try box(&doc, x: 0), b = try box(&doc, x: 300)
         let c = try DiagramOps.addConnector(&doc, from: a.id, to: b.id)
-        try doc.addBuild(.popIn, packets: true, packetDuration: 1)
+        try doc.addBuild(.popIn, packets: true, travel: 1)
         // a enters 0...0.4; the packet runs 0.4...1.4 along a visible arrow; b enters at 1.4.
         let during = doc.resolved(at: 0.9).elements.map(\.id)
         XCTAssertTrue(during.contains(c.id))

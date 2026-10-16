@@ -129,6 +129,9 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var anchor: String?
     /// Only set for `.image`: the picture's bytes.
     public var image: EmbeddedImage?
+    /// How much of the stroke is drawn, 0...1, in an animation frame (see `Keyframe.reveal`). Fill and label
+    /// wait for the whole stroke; text types out. nil is fully drawn.
+    public var reveal: Double?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,

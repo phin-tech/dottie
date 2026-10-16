@@ -30,15 +30,17 @@ public struct Keyframe: Codable, Equatable, Sendable {
     /// Shown or hidden from this key on; never tweened. Before an element's first `visible` key it has the
     /// opposite value, so a single `visible: true` key is where the element appears.
     public var visible: Bool?
+    /// How much of the stroke is drawn, 0...1: tweening it up draws the element on. Also keys connectors.
+    public var reveal: Double?
     /// The curve towards the next key; nil is `.linear`.
     public var ease: Ease?
 
     public init(t: Double, x: Double? = nil, y: Double? = nil, width: Double? = nil, height: Double? = nil,
                 rotation: Double? = nil, strokeWidth: Double? = nil, stroke: RGBA? = nil, fill: RGBA? = nil,
-                visible: Bool? = nil, ease: Ease? = nil) {
+                visible: Bool? = nil, reveal: Double? = nil, ease: Ease? = nil) {
         self.t = t; self.x = x; self.y = y; self.width = width; self.height = height
         self.rotation = rotation; self.strokeWidth = strokeWidth; self.stroke = stroke; self.fill = fill
-        self.visible = visible; self.ease = ease
+        self.visible = visible; self.reveal = reveal; self.ease = ease
     }
 }
 
@@ -116,7 +118,7 @@ extension Keyframe {
         k.x = other.x ?? x; k.y = other.y ?? y; k.width = other.width ?? width; k.height = other.height ?? height
         k.rotation = other.rotation ?? rotation; k.strokeWidth = other.strokeWidth ?? strokeWidth
         k.stroke = other.stroke ?? stroke; k.fill = other.fill ?? fill
-        k.visible = other.visible ?? visible; k.ease = other.ease ?? ease
+        k.visible = other.visible ?? visible; k.reveal = other.reveal ?? reveal; k.ease = other.ease ?? ease
         return k
     }
 }
@@ -149,6 +151,7 @@ extension Track {
         }
         return changing(\.x) || changing(\.y) || changing(\.width) || changing(\.height)
             || changing(\.rotation) || changing(\.strokeWidth) || changing(\.stroke) || changing(\.fill)
+            || changing(\.reveal)
     }
 
     /// Whether the element is shown at time `t`.
@@ -169,6 +172,12 @@ extension Track {
             }
         }
         var e = e
+        if keys.contains(where: { $0.reveal != nil }) {
+            let r = num(\.reveal, e.reveal ?? 1)
+            e.reveal = r >= 1 ? nil : max(0, r)
+        }
+        // A connector's geometry comes from its shapes; only its drawing-on is keyed.
+        if e.kind == .connector { return e }
         e.x = num(\.x, e.x); e.y = num(\.y, e.y)
         e.width = num(\.width, e.width); e.height = num(\.height, e.height)
         if keys.contains(where: { $0.rotation != nil }) { e.rotation = num(\.rotation, e.angle) }
@@ -201,7 +210,7 @@ extension DottieDocument {
         }
         for i in copy.elements.indices {
             let e = copy.elements[i]
-            if e.kind != .connector, let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
+            if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
         }
         // A hidden shape waits at its resting place, not at the start of the entrance it is about to make,

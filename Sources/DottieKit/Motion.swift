@@ -53,37 +53,8 @@ struct Polyline {
         return CGPoint(x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f)
     }
 
-    /// Flattens a path's first contour into points, curves into short segments.
-    init(path: CGPath) {
-        var pts: [CGPoint] = []
-        var start = CGPoint.zero
-        var done = false
-        path.applyWithBlock { el in
-            guard !done else { return }
-            let e = el.pointee, p = e.points
-            let last = pts.last ?? .zero
-            switch e.type {
-            case .moveToPoint:
-                if !pts.isEmpty { done = true; return }
-                start = p[0]; pts.append(p[0])
-            case .addLineToPoint: pts.append(p[0])
-            case .addQuadCurveToPoint:
-                for i in 1...12 {
-                    let t = CGFloat(i) / 12, u = 1 - t
-                    pts.append(CGPoint(x: u*u*last.x + 2*u*t*p[0].x + t*t*p[1].x, y: u*u*last.y + 2*u*t*p[0].y + t*t*p[1].y))
-                }
-            case .addCurveToPoint:
-                for i in 1...16 {
-                    let t = CGFloat(i) / 16, u = 1 - t
-                    pts.append(CGPoint(x: u*u*u*last.x + 3*u*u*t*p[0].x + 3*u*t*t*p[1].x + t*t*t*p[2].x,
-                                       y: u*u*u*last.y + 3*u*u*t*p[0].y + 3*u*t*t*p[1].y + t*t*t*p[2].y))
-                }
-            case .closeSubpath: pts.append(start); done = true
-            @unknown default: break
-            }
-        }
-        self.init(pts)
-    }
+    /// The path's first contour.
+    init(path: CGPath) { self.init(path.contours.first ?? []) }
 
     /// The clean route of a connector, or the clean, rotated outline of any other element.
     init(tracing e: Element, in doc: DottieDocument) {
@@ -139,7 +110,8 @@ extension DottieDocument {
     /// Makes element `id` travel along `path` (a connector or a shape's outline) from `t` for `duration` seconds.
     public mutating func addFollow(_ id: UUID, along path: UUID, at t: Double, duration: Double = 1, ease: Ease? = nil,
                                    reverse: Bool = false, orient: Bool = false, laps: Double? = nil) throws {
-        guard elements.contains(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        guard let e = elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        guard e.kind != .connector else { throw OpsError.invalid("Connectors follow their shapes; move those instead") }
         guard elements.contains(where: { $0.id == path }) else { throw OpsError.notFound("No path element \(path.uuidString)") }
         guard id != path else { throw OpsError.invalid("An element can't follow itself") }
         var tl = timeline ?? Timeline(duration: 0)
@@ -173,9 +145,10 @@ extension DottieDocument {
 
     /// Reveals the page's shapes in connector order: shapes nothing points to first, then what they point to,
     /// a step of `stagger` seconds per rank. With `packets`, a packet runs down each arrow (which appears as
-    /// it sets off) and the shape it points to enters when it arrives.
+    /// it sets off); with `drawArrows`, each arrow draws itself on. Either way the shape an arrow points to
+    /// enters once it gets there, `travel` seconds later.
     public mutating func addBuild(_ transition: Transition = .popIn, at start: Double = 0, stagger: Double = 0.4,
-                                  packets: Bool = false, packetDuration: Double = 0.6) throws {
+                                  packets: Bool = false, drawArrows: Bool = false, travel: Double = 0.6) throws {
         guard transition.isEntrance else { throw OpsError.invalid("A build needs an entrance transition") }
         let shapes = elements.filter { $0.kind != .connector }
         guard !shapes.isEmpty else { throw OpsError.invalid("The page has no shapes to build") }
@@ -210,14 +183,24 @@ extension DottieDocument {
             let level = byPosition.filter { rank[$0.id] == r }
             for (j, e) in level.enumerated() {
                 var t = start + Double(r) * stagger + Double(j) * 0.08
-                if packets, let (c, source) = parentEdge[e.id], let sourceT = appear[source] {
+                if packets || drawArrows, let (c, source) = parentEdge[e.id], let sourceT = appear[source] {
                     let leave = sourceT + d
-                    try addPacket(along: c, at: leave, duration: packetDuration)
-                    timeline!.setKey(Keyframe(t: leave, visible: true), for: c)
-                    t = leave + packetDuration
+                    if drawArrows { try addTransition(.drawIn, to: c, at: leave, duration: travel) }
+                    if packets {
+                        try addPacket(along: c, at: leave, duration: travel)
+                        timeline!.setKey(Keyframe(t: leave, visible: true), for: c)
+                    }
+                    t = leave + travel
                 }
                 appear[e.id] = t
                 try addTransition(transition, to: e.id, at: t)
+            }
+        }
+        // Arrows that didn't lead the build draw on once both their shapes are in.
+        if drawArrows {
+            let led = Set(parentEdge.values.map(\.0))
+            for (c, a, b) in edges where !led.contains(c) {
+                if let ta = appear[a], let tb = appear[b] { try addTransition(.drawIn, to: c, at: max(ta, tb) + d, duration: travel) }
             }
         }
         timeline!.duration += 0.75   // a beat on the finished diagram before the loop restarts

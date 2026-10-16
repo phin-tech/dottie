@@ -14,6 +14,8 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
     case dropIn
     /// Slides in from the left.
     case slideIn
+    /// Its outline is sketched on, then it fills in; a connector draws from its start to its arrowhead.
+    case drawIn
     // Exits: the element starts in its pose and is hidden once the transition ends.
     /// Swells a little, then shrinks away.
     case popOut
@@ -31,11 +33,12 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
         switch self {
         case .popIn, .popOut, .shrinkOut: 0.4
         case .dropIn: 0.6
+        case .drawIn: 0.8
         default: 0.5
         }
     }
 
-    var isEntrance: Bool { [.popIn, .growIn, .wipeIn, .dropIn, .slideIn].contains(self) }
+    var isEntrance: Bool { [.popIn, .growIn, .wipeIn, .dropIn, .slideIn, .drawIn].contains(self) }
     var isExit: Bool { [.popOut, .shrinkOut, .wipeOut].contains(self) }
 }
 
@@ -46,7 +49,9 @@ extension DottieDocument {
     public mutating func addTransition(_ transition: Transition, to id: UUID, at t: Double,
                                        duration: Double? = nil) throws {
         guard let e = elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
-        guard e.kind != .connector else { throw OpsError.invalid("Connectors follow their shapes; animate those instead") }
+        guard e.kind != .connector || transition == .drawIn else {
+            throw OpsError.invalid("Connectors follow their shapes; only drawIn applies to them")
+        }
         let d = max(0.05, duration ?? transition.defaultDuration)
         var tl = timeline ?? Timeline(duration: t + d)
         tl.duration = max(tl.duration, t + d)
@@ -82,6 +87,8 @@ extension DottieDocument {
                     at(t + 0.82 * d, y: land - lift * 0.12, .easeIn), at(t + d, y: land)]
         case .slideIn:
             keys = [at(t, x: f.minX - max(120, f.width), .easeOut, visible: true), at(t + d, x: f.minX)]
+        case .drawIn:
+            keys = [Keyframe(t: t, visible: true, reveal: 0, ease: .easeInOut), Keyframe(t: t + d, reveal: 1)]
         case .popOut:
             keys = [scaled(t, 1, .easeOut), scaled(t + 0.35 * d, 1.15, .easeIn), scaled(t + d, 0.2, visible: false)]
         case .shrinkOut:
