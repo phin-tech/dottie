@@ -1,0 +1,508 @@
+{
+  "pages" : [
+    {
+      "elements" : [
+        {
+          "height" : 60,
+          "id" : "81E23212-D776-487F-BD1C-486896D5E5B4",
+          "kind" : "rectangle",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 2280436570,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.4,
+              "g" : 0.8509803921568627,
+              "r" : 1
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Checkout",
+          "width" : 120.64,
+          "x" : 40,
+          "y" : 150
+        },
+        {
+          "height" : 60,
+          "id" : "A940C89B-FCD9-4D44-892D-82B3D39874F8",
+          "kind" : "rectangle",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 4248914181,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 1,
+              "g" : 0.7490196078431373,
+              "r" : 0.8156862745098039
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Event stream",
+          "width" : 160.96,
+          "x" : 250.64,
+          "y" : 150
+        },
+        {
+          "height" : 60,
+          "id" : "67973E4F-3584-446B-954B-B0BD12D80DF2",
+          "kind" : "rectangle",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 276854587,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 1,
+              "g" : 0.7490196078431373,
+              "r" : 0.5490196078431373
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Emails",
+          "width" : 120,
+          "x" : 506.96,
+          "y" : 40
+        },
+        {
+          "height" : 60,
+          "id" : "073DFA43-D2BF-46CB-98D8-C0C99A92EBBA",
+          "kind" : "rectangle",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 2920030709,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.6039215686274509,
+              "g" : 0.9137254901960784,
+              "r" : 0.5490196078431373
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Analytics",
+          "width" : 130.72,
+          "x" : 501.6,
+          "y" : 150
+        },
+        {
+          "height" : 60,
+          "id" : "99337B2C-98EB-4E81-9545-059965BD2BEE",
+          "kind" : "rectangle",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 3244136728,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "solid",
+            "fill" : {
+              "a" : 1,
+              "b" : 0.6588235294117647,
+              "g" : 0.6588235294117647,
+              "r" : 1
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "text" : "Inventory",
+          "width" : 130.72,
+          "x" : 501.6,
+          "y" : 260
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "A940C89B-FCD9-4D44-892D-82B3D39874F8",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "81E23212-D776-487F-BD1C-486896D5E5B4",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "22B79DB4-5407-4580-AA33-29EDDE3DF4B6",
+          "kind" : "connector",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 1730563228,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "dashed",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "67973E4F-3584-446B-954B-B0BD12D80DF2",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "A940C89B-FCD9-4D44-892D-82B3D39874F8",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "5FA25D79-1CBF-47DE-90C3-EA0A1467DD19",
+          "kind" : "connector",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 648626072,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "dashed",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "073DFA43-D2BF-46CB-98D8-C0C99A92EBBA",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "A940C89B-FCD9-4D44-892D-82B3D39874F8",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "5055D69F-BF0D-4B66-8F96-58435D2EC6B5",
+          "kind" : "connector",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 1154928717,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "dashed",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        },
+        {
+          "connector" : {
+            "end" : {
+              "elementID" : "99337B2C-98EB-4E81-9545-059965BD2BEE",
+              "port" : "left",
+              "x" : 0,
+              "y" : 0
+            },
+            "endHead" : "arrow",
+            "routing" : "elbow",
+            "start" : {
+              "elementID" : "A940C89B-FCD9-4D44-892D-82B3D39874F8",
+              "port" : "right",
+              "x" : 0,
+              "y" : 0
+            },
+            "startHead" : "none"
+          },
+          "height" : 0,
+          "id" : "1CECF017-8899-48CE-8774-CABB84955759",
+          "kind" : "connector",
+          "layerID" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "seed" : 1588356398,
+          "style" : {
+            "bowing" : 1,
+            "dash" : "dashed",
+            "fill" : {
+              "a" : 0,
+              "b" : 0,
+              "g" : 0,
+              "r" : 0
+            },
+            "fillStyle" : "solid",
+            "fontSize" : 18,
+            "roughness" : 1,
+            "stroke" : {
+              "a" : 1,
+              "b" : 0.13,
+              "g" : 0.12,
+              "r" : 0.12
+            },
+            "strokeWidth" : 2
+          },
+          "width" : 0,
+          "x" : 0,
+          "y" : 0
+        }
+      ],
+      "id" : "23B245D4-43A5-4796-813E-64B40B34DEE9",
+      "layers" : [
+        {
+          "id" : "EB54AE81-1AEF-48E2-8DEE-E2CE9096F75A",
+          "locked" : false,
+          "name" : "Layer 1",
+          "visible" : true
+        }
+      ],
+      "name" : "Page 1",
+      "timeline" : {
+        "boil" : 3,
+        "duration" : 5,
+        "fps" : 24,
+        "tracks" : [
+          {
+            "element" : "81E23212-D776-487F-BD1C-486896D5E5B4",
+            "keys" : [
+              {
+                "ease" : "bounce",
+                "t" : 0,
+                "visible" : true,
+                "y" : 30
+              },
+              {
+                "t" : 0.9,
+                "y" : 150
+              }
+            ]
+          },
+          {
+            "element" : "A940C89B-FCD9-4D44-892D-82B3D39874F8",
+            "keys" : [
+              {
+                "ease" : "bounce",
+                "t" : 0.2,
+                "visible" : true,
+                "y" : 30
+              },
+              {
+                "t" : 1.1,
+                "y" : 150
+              }
+            ]
+          },
+          {
+            "element" : "67973E4F-3584-446B-954B-B0BD12D80DF2",
+            "keys" : [
+              {
+                "ease" : "bounce",
+                "t" : 0.4,
+                "visible" : true,
+                "y" : -80
+              },
+              {
+                "t" : 1.3,
+                "y" : 40
+              }
+            ]
+          },
+          {
+            "element" : "073DFA43-D2BF-46CB-98D8-C0C99A92EBBA",
+            "keys" : [
+              {
+                "ease" : "bounce",
+                "t" : 0.6000000000000001,
+                "visible" : true,
+                "y" : 30
+              },
+              {
+                "t" : 1.5,
+                "y" : 150
+              }
+            ]
+          },
+          {
+            "element" : "99337B2C-98EB-4E81-9545-059965BD2BEE",
+            "keys" : [
+              {
+                "ease" : "bounce",
+                "t" : 0.8,
+                "visible" : true,
+                "y" : 140
+              },
+              {
+                "t" : 1.7000000000000002,
+                "y" : 260
+              }
+            ]
+          },
+          {
+            "element" : "22B79DB4-5407-4580-AA33-29EDDE3DF4B6",
+            "keys" : [
+              {
+                "ease" : "easeInOut",
+                "reveal" : 0,
+                "t" : 1.6,
+                "visible" : true
+              },
+              {
+                "reveal" : 1,
+                "t" : 2.1
+              }
+            ],
+            "march" : 32
+          },
+          {
+            "element" : "5FA25D79-1CBF-47DE-90C3-EA0A1467DD19",
+            "keys" : [
+              {
+                "ease" : "easeInOut",
+                "reveal" : 0,
+                "t" : 1.6,
+                "visible" : true
+              },
+              {
+                "reveal" : 1,
+                "t" : 2.1
+              }
+            ],
+            "march" : 32
+          },
+          {
+            "element" : "5055D69F-BF0D-4B66-8F96-58435D2EC6B5",
+            "keys" : [
+              {
+                "ease" : "easeInOut",
+                "reveal" : 0,
+                "t" : 1.6,
+                "visible" : true
+              },
+              {
+                "reveal" : 1,
+                "t" : 2.1
+              }
+            ],
+            "march" : 32
+          },
+          {
+            "element" : "1CECF017-8899-48CE-8774-CABB84955759",
+            "keys" : [
+              {
+                "ease" : "easeInOut",
+                "reveal" : 0,
+                "t" : 1.6,
+                "visible" : true
+              },
+              {
+                "reveal" : 1,
+                "t" : 2.1
+              }
+            ],
+            "march" : 32
+          }
+        ]
+      }
+    }
+  ],
+  "version" : 2
+}

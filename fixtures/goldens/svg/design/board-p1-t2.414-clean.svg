@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="798" height="304" viewBox="16 -4 798 304">
+<rect x="16" y="-4" width="798" height="304" fill="#ffffff"/>
+<path d="M40 20 L270 20 L270 64 L40 64 Z" fill="#e9ecef" stroke="none"/>
+<path d="M40 20 L270 20 L270 64 L40 64 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="155" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="155" y="48.48">To do</tspan></text>
+<path d="M300 20 L530 20 L530 64 L300 64 Z" fill="#e9ecef" stroke="none"/>
+<path d="M300 20 L530 20 L530 64 L300 64 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="415" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="415" y="48.48">Doing</tspan></text>
+<path d="M560 20 L790 20 L790 64 L560 64 Z" fill="#e9ecef" stroke="none"/>
+<path d="M560 20 L790 20 L790 64 L560 64 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="675" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="675" y="48.48">Done</tspan></text>
+<path d="M317 87 L517 87 L517 175 L317 175 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M315 84 L515 84 L515 172 L315 172 Z" fill="#a5d8ff" stroke="none"/>
+<path d="M315 84 L515 84 L515 172 L315 172 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="111" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="327" font-size="16">Design login</tspan></text>
+<path d="M317 191 L517 191 L517 279 L317 279 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M315 188 L515 188 L515 276 L315 276 Z" fill="#a5d8ff" stroke="none"/>
+<path d="M315 188 L515 188 L515 276 L315 276 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="215" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="327" font-size="16">API for orders</tspan></text>
+<path d="M577 87 L777 87 L777 175 L577 175 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M575 84 L775 84 L775 172 L575 172 Z" fill="#b2f2bb" stroke="none"/>
+<path d="M575 84 L775 84 L775 172 L575 172 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="111" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="587" font-size="16">Fix flaky test</tspan></text>
+<path d="M577 191 L777 191 L777 279 L577 279 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M575 188 L775 188 L775 276 L575 276 Z" fill="#b2f2bb" stroke="none"/>
+<path d="M575 188 L775 188 L775 276 L575 276 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="215" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="587" font-size="16">Set up CI</tspan></text>
+<path d="M57 87 L257 87 L257 175 L57 175 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M55 84 L255 84 L255 172 L55 172 Z" fill="#ffe066" stroke="none"/>
+<path d="M55 84 L255 84 L255 172 L55 172 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="111" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="67" font-size="16">Write the docs</tspan></text>
+</svg>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="798" height="408" viewBox="16 -4 798 408">
+<rect x="16" y="-4" width="798" height="408" fill="#ffffff"/>
+<path d="M40 20 L270 20 L270 64 L40 64 Z" fill="#e9ecef" stroke="none"/>
+<path d="M40 20 L270 20 L270 64 L40 64 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="155" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="155" y="48.48">To do</tspan></text>
+<path d="M300 20 L530 20 L530 64 L300 64 Z" fill="#e9ecef" stroke="none"/>
+<path d="M300 20 L530 20 L530 64 L300 64 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="415" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="415" y="48.48">Doing</tspan></text>
+<path d="M560 20 L790 20 L790 64 L560 64 Z" fill="#e9ecef" stroke="none"/>
+<path d="M560 20 L790 20 L790 64 L560 64 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="675" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="675" y="48.48">Done</tspan></text>
+<path d="M57 87 L257 87 L257 175 L57 175 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M55 84 L255 84 L255 172 L55 172 Z" fill="#ffe066" stroke="none"/>
+<path d="M55 84 L255 84 L255 172 L55 172 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="111" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="67" font-size="16">Design login</tspan></text>
+<path d="M57 191 L257 191 L257 279 L57 279 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M55 188 L255 188 L255 276 L55 276 Z" fill="#ffe066" stroke="none"/>
+<path d="M55 188 L255 188 L255 276 L55 276 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="215" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="67" font-size="16">API for orders</tspan></text>
+<path d="M57 295 L257 295 L257 383 L57 383 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M55 292 L255 292 L255 380 L55 380 Z" fill="#ffc9c9" stroke="none"/>
+<path d="M55 292 L255 292 L255 380 L55 380 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="319" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="67" font-size="16">Spike: caching</tspan></text>
+<path d="M317 87 L517 87 L517 175 L317 175 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M315 84 L515 84 L515 172 L315 172 Z" fill="#a5d8ff" stroke="none"/>
+<path d="M315 84 L515 84 L515 172 L315 172 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="111" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="327" font-size="16">Fix flaky test</tspan></text>
+<path d="M577 87 L777 87 L777 175 L577 175 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M575 84 L775 84 L775 172 L575 172 Z" fill="#b2f2bb" stroke="none"/>
+<path d="M575 84 L775 84 L775 172 L575 172 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="111" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="587" font-size="16">Set up CI</tspan></text>
+</svg>
