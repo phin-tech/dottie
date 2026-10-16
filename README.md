@@ -102,7 +102,7 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 
 ![An architecture diagram drawing itself, arrows sketching out and dots running along them](Design/animation.gif)
 
-Any page can be animated, and exported as a GIF, an animated PNG (full color, optionally transparent), an MP4
+Any page can be animated, and exported from File ▸ Export Animation as a GIF, an animated PNG (full color, optionally transparent), an MP4
 ([this one](Design/animation.mp4)), a web page with a play button, or Lottie: vector animation for websites and
 iOS and Android apps, either smooth (tweened by the player) or exact (every frame as Dottie draws it). The Animate menu does the common things in one go:
 

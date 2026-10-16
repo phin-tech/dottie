@@ -16,6 +16,63 @@ enum ExportFormat: String, CaseIterable {
     var fileExtension: String { self == .mermaid ? "mmd" : rawValue.lowercased() }
 }
 
+/// The ways File ▸ Export Animation writes the page's timeline.
+enum AnimationExportFormat: CaseIterable {
+    case gif, apng, mp4, player, lottieSmooth, lottieExact
+    var title: String {
+        switch self {
+        case .gif: "GIF"
+        case .apng: "Animated PNG"
+        case .mp4: "MP4 Movie"
+        case .player: "Web Page with Player"
+        case .lottieSmooth: "Lottie (Smooth)"
+        case .lottieExact: "Lottie (Exact)"
+        }
+    }
+    var help: String {
+        switch self {
+        case .gif: "A looping GIF, for chat and email"
+        case .apng: "Like a GIF, in full color"
+        case .mp4: "A movie, for slides and video"
+        case .player: "One HTML file with play, pause and a scrubber; steps through scenes like slides"
+        case .lottieSmooth: "Vector animation for websites and apps, tweened smoothly, lines held steady"
+        case .lottieExact: "Vector animation with every frame exactly as Dottie draws it, boil included"
+        }
+    }
+    var fileExtension: String {
+        switch self {
+        case .gif: "gif"
+        case .apng: "png"
+        case .mp4: "mp4"
+        case .player: "html"
+        case .lottieSmooth, .lottieExact: "json"
+        }
+    }
+    /// Draws `model`'s animation in this format and writes it to `url`. Slow for long animations: call it off
+    /// the main thread.
+    func write(_ model: DottieDocument, to url: URL) throws {
+        let data: Data? = switch self {
+        case .gif: Exporter.gif(model, scale: 1.5)
+        case .apng: Exporter.apng(model, scale: 1.5)
+        case .mp4: Exporter.mp4(model, scale: 2)
+        case .player: Exporter.player(model, title: model.name).map { Data($0.utf8) }
+        case .lottieSmooth: Exporter.lottie(model, mode: .smooth, name: model.name)
+        case .lottieExact: Exporter.lottie(model, mode: .exact, name: model.name)
+        }
+        guard let data else { throw CocoaError(.fileWriteUnknown) }
+        try data.write(to: url, options: .atomic)
+    }
+    var contentType: UTType {
+        switch self {
+        case .gif: .gif
+        case .apng: .png
+        case .mp4: .mpeg4Movie
+        case .player: .html
+        case .lottieSmooth, .lottieExact: .json
+        }
+    }
+}
+
 /// Window-level commands that act on the document and selection. Reached from the menu bar through
 /// a focused scene value, so each window's commands target its own document.
 struct EditorActions {
@@ -26,6 +83,7 @@ struct EditorActions {
     var distribute: (DistributeAxis) -> Void
     var reorder: (DottieDocument.ZMove) -> Void
     var export: (ExportFormat) -> Void
+    var exportAnimation: (AnimationExportFormat) -> Void
     var openScriptConsole: () -> Void
     var runScriptFile: (URL) -> Void
     var pageCount: Int
@@ -110,6 +168,7 @@ extension ContentView {
             distribute: { axis in edit("Distribute") { $0.distribute(ids, along: axis) } },
             reorder: { move in edit("Arrange") { $0.reorder(ids, move) } },
             export: { format in exportDocument(format) },
+            exportAnimation: { format in exportAnimation(format) },
             openScriptConsole: { openScriptConsole() },
             runScriptFile: { openScriptConsole(running: $0) },
             pageCount: document.file.pages.count,
@@ -205,6 +264,37 @@ extension ContentView {
         var next = document.model
         guard (try? change(&next)) == true else { NSSound.beep(); return }
         document.commit(next, actionName: name, undoManager: undoManager)
+    }
+
+    /// Writes the page's animation, drawing the frames in the background so the window stays responsive.
+    @MainActor
+    private func exportAnimation(_ format: AnimationExportFormat) {
+        let model = document.model
+        guard model.timeline != nil, !model.elements.isEmpty else { NSSound.beep(); return }
+        guard !Exporter.animationTooLong(model) else {
+            let alert = NSAlert()
+            alert.messageText = "This animation is too long to export"
+            alert.informativeText = "It has more than \(Exporter.maxAnimationFrames) frames. Shorten it or lower its frame rate."
+            alert.runModal()
+            return
+        }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [format.contentType]
+        let base = document.file.pages.count > 1 ? model.name : "Animation"
+        panel.nameFieldStringValue = "\(base).\(format.fileExtension)"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        Task.detached(priority: .userInitiated) {
+            let failure: String?
+            do { try format.write(model, to: url); failure = nil } catch { failure = error.localizedDescription }
+            await MainActor.run {
+                guard let failure else { return }
+                let alert = NSAlert()
+                alert.messageText = "Couldn't export the animation"
+                alert.informativeText = failure
+                alert.runModal()
+            }
+        }
     }
 
     @MainActor
