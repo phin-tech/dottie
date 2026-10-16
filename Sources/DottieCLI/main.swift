@@ -12,6 +12,7 @@ USAGE
   dottie inspect <file.dottie> [-p <page>] [--at <seconds>]...
   dottie library list
   dottie library install <file.dottielib>...
+  dottie script-types [<dir>]
   dottie --help | --version
 
 RENDER
@@ -50,6 +51,12 @@ INSPECT
 LIBRARY
   list      Shows the libraries installed for the Dottie app.
   install   Copies .dottielib files into ~/Library/Application Support/Dottie/Libraries.
+
+SCRIPT-TYPES
+  Writes dottie.d.ts, TypeScript declarations for the `dottie` object scripts use, and a tsconfig.json
+  (unless there is one) into <dir>, default ~/Library/Application Support/Dottie/Scripts. Editors then
+  complete and check the .js scripts there, and `tsc -p <dir>` lists mistakes. Install TypeScript with
+  `npm install -g typescript` or `brew install typescript`.
 
 EXIT STATUS
   0 on success, 1 if any input failed, 2 for a usage error.
@@ -342,6 +349,15 @@ func runLibrary(_ args: [String]) -> Int32 {
     }
 }
 
+func runScriptTypes(_ args: [String]) -> Int32 {
+    guard args.count <= 1 else { fail("script-types takes at most one directory", code: 2) }
+    let dir = args.first.map(absolute) ?? DottieScript.scriptsDirectory
+    do {
+        for url in try DottieScript.writeTypes(to: dir) { print("Wrote \(url.path)") }
+    } catch { fail("\(dir.path): \(error.localizedDescription)") }
+    return 0
+}
+
 let argv = Array(CommandLine.arguments.dropFirst())
 switch argv.first {
 case nil, "-h", "--help", "help":
@@ -355,6 +371,8 @@ case "inspect":
     exit(runInspect(Array(argv.dropFirst())))
 case "library", "lib":
     exit(runLibrary(Array(argv.dropFirst())))
+case "script-types":
+    exit(runScriptTypes(Array(argv.dropFirst())))
 default:
     fail("unknown command '\(argv[0])'. Run 'dottie --help'.", code: 2)
 }

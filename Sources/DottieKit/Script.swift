@@ -711,6 +711,11 @@ public enum DottieScript {
     is returned as JSON; console.log output is returned too. Ids are strings; any call that takes an id also takes an \
     element object returned by another call. Colors are hex strings like "#ffcc00". Units are canvas points, y down.
 
+    Types: the same API as TypeScript declarations is script_api with format "typescript" (the resource \
+    dottie://dottie.d.ts); `dottie script-types <dir>` writes it with a tsconfig.json for an editor or `tsc -p .`. \
+    When TypeScript's tsc is installed, run_script checks each script against it and lists mistakes (unknown \
+    options, misspelled values) after the script's output; the script runs either way.
+
     Reading
       dottie.elements({kind?, text?, anchor?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
       dottie.get(id)                   one element

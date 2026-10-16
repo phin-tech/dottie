@@ -17,6 +17,8 @@ enum ScriptLibrary {
 
     static func reveal() {
         try? FileManager.default.createDirectory(at: DottieScript.modulesDirectory, withIntermediateDirectories: true)
+        // dottie.d.ts and a tsconfig.json, so an editor opened on the folder completes and checks the scripts.
+        try? DottieScript.writeTypes(to: directory)
         NSWorkspace.shared.open(directory)
     }
 
@@ -117,10 +119,10 @@ extension ContentView {
         let file = document.file
         let ids = Array(selection)
         Task {
-            let (doc, result) = await Task.detached(priority: .userInitiated) { () -> (DottieDocument, ScriptResult) in
+            let (doc, result, typeCheck) = await Task.detached(priority: .userInitiated) { () -> (DottieDocument, ScriptResult, [String]?) in
                 var working = original
                 let r = DottieScript.run(source, on: &working, in: file, selection: ids)
-                return (working, r)
+                return (working, r, DottieScript.typeCheckSummary(source))
             }.value
             if result.succeeded { document.commit(doc, actionName: "Run Script", undoManager: undoManager) }
             var lines = result.logs
@@ -131,6 +133,7 @@ extension ContentView {
                 if let value = result.value { lines.append("→ \(value)") }
                 lines.append(doc == original ? "No changes." : "Applied (\(result.operations) calls); undo with ⌘Z.")
             }
+            lines += typeCheck ?? []
             scriptOutput = lines.joined(separator: "\n")
             scriptRunning = false
         }
