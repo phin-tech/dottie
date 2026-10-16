@@ -15,8 +15,8 @@ USAGE
   dottie --help | --version
 
 RENDER
-  Writes png, svg, pdf, html, mermaid (.mmd, a flowchart of the shapes and connectors), gif, mp4 or js.
-  An animated page renders as a still of its poster frame, except to gif and mp4, and to html, which
+  Writes png, svg, pdf, html, mermaid (.mmd, a flowchart of the shapes and connectors), gif, apng, mp4 or js.
+  An animated page renders as a still of its poster frame, except to gif, apng and mp4, and to html, which
   becomes a player. js is the page and dottie.js's player in one script: <script src="drawing.js"></script>
   shows it where the tag is, playing if it is animated (--at makes it a still, --clean draws it clean).
   The format comes from the extension of -o, or --format.
@@ -25,14 +25,15 @@ RENDER
 
   -o, --output <path>   Output file, or "-" for stdout. Needs a single input.
   -d, --out-dir <dir>   Directory for the results of one or more inputs.
-  -f, --format <fmt>    png (default), svg, pdf, html, mermaid, gif, mp4 or js.
+  -f, --format <fmt>    png (default), svg, pdf, html, mermaid, gif, apng, mp4 or js. apng is the gif's
+                        animation in full color (a .png of an animated page is still its poster).
   -p, --page <page>     Page (tab) to render, by name or 1-based number (default the first).
   -s, --scale <n>       PNG, GIF and MP4 pixel scale, 0.25 to 8 (default 2).
       --clean           Render precisely instead of sketchy.
       --sketchy         Render sketchy even if the drawing is clean.
-      --transparent     No page background (png, svg, html).
+      --transparent     No page background (png, apng, svg, html).
       --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
-                        unless set). An html export becomes a still; gif and mp4 ignore it.
+                        unless set). An html export becomes a still; gif, apng and mp4 ignore it.
 
 INSPECT
   Prints, as JSON, what each page resolves to with no drawing: every element's frame, rotation,
@@ -64,7 +65,7 @@ func warn(_ message: String) {
 }
 
 enum Format: String, CaseIterable {
-    case png, svg, pdf, html, mermaid, gif, mp4, js
+    case png, svg, pdf, html, mermaid, gif, apng, mp4, js
     init?(extension ext: String) {
         switch ext.lowercased() {
         case "htm": self = .html
@@ -104,7 +105,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "-f", "--format":
             let v = try value(a)
             guard let f = Format(extension: v) else {
-                throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html, mermaid, gif, mp4, js)", code: 2)
+                throw CLIError(message: "unknown format '\(v)' (png, svg, pdf, html, mermaid, gif, apng, mp4, js)", code: 2)
             }
             o.format = f
         case "-p", "--page": o.page = try value(a)
@@ -149,7 +150,7 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
         guard !doc.elements.isEmpty else { throw CLIError(message: "the drawing is empty; nothing to render") }
         return Data(try Exporter.script(doc, options: Exporter.ScriptOptions(at: o.at, clean: o.roughness == 0)).utf8)
     }
-    let plays = format == .gif || format == .mp4 || (format == .html && doc.timeline != nil && o.at == nil)
+    let plays = format == .gif || format == .apng || format == .mp4 || (format == .html && doc.timeline != nil && o.at == nil)
     var doc = plays ? doc : o.at.map(doc.resolved) ?? doc.still
     if plays, Exporter.animationTooLong(doc) {
         throw CLIError(message: "the animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
@@ -178,6 +179,10 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
     case .gif:
         guard let d = Exporter.gif(doc, scale: o.scale) else { throw CLIError(message: "rendering failed") }
         return d
+    case .apng:
+        guard let d = Exporter.apng(doc, scale: o.scale, background: o.transparent ? nil : CGColor(gray: 1, alpha: 1))
+        else { throw CLIError(message: "rendering failed") }
+        return d
     case .js:
         preconditionFailure("handled above")
     case .mp4:
@@ -193,9 +198,9 @@ func runRender(_ args: [String]) -> Int32 {
     var format = o.format
     if format == nil, let out = o.output, out != "-" { format = Format(extension: URL(fileURLWithPath: out).pathExtension) }
     guard let format = format ?? (o.output == nil || o.output == "-" ? .png : nil) else {
-        fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html, .mmd, .gif, .mp4, .js or --format", code: 2)
+        fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html, .mmd, .gif, .apng, .mp4, .js or --format", code: 2)
     }
-    if o.output == "-", format == .png || format == .pdf || format == .gif || format == .mp4, isatty(STDOUT_FILENO) != 0 {
+    if o.output == "-", format == .png || format == .pdf || format == .gif || format == .apng || format == .mp4, isatty(STDOUT_FILENO) != 0 {
         fail("refusing to write binary \(format.rawValue) to a terminal; redirect it or use -o <file>", code: 2)
     }
 
