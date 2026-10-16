@@ -22,7 +22,7 @@ struct ContentView: View {
     @State var scriptOutput = ""
     @State var scriptRunning = false
     @AppStorage(Pref.scriptSource) var scriptSource = ""
-    /// Seconds into the page's animation while previewing it (see `TimelineBar`); nil while editing.
+    /// Seconds into the page's animation while previewing it (see `TimelinePanel`); nil while editing.
     @State private var playhead: Double?
 
     var body: some View {
@@ -30,9 +30,12 @@ struct ContentView: View {
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil ? nil : playhead, onExitPreview: { playhead = nil })
-            if let timeline = document.model.timeline {
+            if document.model.timeline != nil {
                 Divider()
-                TimelineBar(timeline: timeline, playhead: $playhead)
+                TimelinePanel(page: document.model, playhead: $playhead) { id in
+                    playhead = nil
+                    selection = [id]
+                }
             }
             Divider()
             PageBar(document: document, undoManager: undoManager)
