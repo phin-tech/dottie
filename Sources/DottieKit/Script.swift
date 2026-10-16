@@ -478,7 +478,16 @@ public enum DottieScript {
                 guard let tr = try a.enumValue("name", as: Transition.self) else {
                     throw OpsError.invalid("'name' must be one of \(Transition.allCases.map(\.rawValue).joined(separator: ", "))")
                 }
-                try doc.addTransition(tr, to: try a.uuid("id"), at: max(0, a.double("t") ?? 0), duration: a.double("duration"))
+                let t = Timeline.clampTime(a.double("t") ?? 0)
+                if let list = a.raw["ids"] as? [Any] {
+                    let ids = try list.map { v -> UUID in
+                        guard let s = v as? String, let u = UUID(uuidString: s) else { throw OpsError.invalid("'ids' must be element ids") }
+                        return u
+                    }
+                    let stagger = a.double("stagger").map { $0.isFinite ? min(max($0, 0), 60) : 0.15 } ?? 0.15
+                    return try doc.addTransition(tr, to: ids, at: t, stagger: stagger, duration: a.double("duration"))
+                }
+                try doc.addTransition(tr, to: try a.uuid("id"), at: t, duration: a.double("duration"))
                 return nil
 
             case "follow":
@@ -548,7 +557,10 @@ public enum DottieScript {
         pages: function () { return call("pages"); },
         timeline: function (o) { return call("timeline", o); },
         key: function (id, t, props) { call("key", merge(props, { id: idOf(id), t: t })); },
-        transition: function (id, name, t, o) { call("transition", merge(o, { id: idOf(id), name: name, t: t })); },
+        transition: function (id, name, t, o) {
+          if (Array.isArray(id)) return call("transition", merge(o, { ids: id.map(idOf), name: name, t: t }));
+          call("transition", merge(o, { id: idOf(id), name: name, t: t }));
+        },
         boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
         follow: function (id, path, t, o) { call("follow", merge(o, { id: idOf(id), path: idOf(path), t: t })); },
         packet: function (connector, t, o) { return call("packet", merge(o, { id: idOf(connector), t: t })); },
@@ -645,7 +657,9 @@ public enum DottieScript {
     linear | easeIn | easeOut | easeInOut | hold. visible switches at the key: a lone visible:true key is where the \
     element appears. reveal 0-1 draws the stroke on (fill and text follow once it is complete); opacity 0-1 fades. \
     Connectors follow their shapes and hide with them; key only their visible, reveal and opacity.
-      dottie.transition(id, name, t, {duration?})  canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
+      dottie.transition(id | [ids], name, t, {duration?, stagger?})  given a list, starts each stagger seconds \
+    (default 0.15) after the last, in list order, and returns how many it animated (arrows only take drawIn and \
+    fades). Canned keys: popIn, growIn, wipeIn, dropIn, slideIn, drawIn, fadeIn \
     (enter), popOut, shrinkOut, wipeOut, fadeOut (exit), pulse, wiggle (emphasis); arrows take drawIn, fadeIn, fadeOut
       dottie.boil(id, true|false|null)  keep this element boiling while still, never boil it, or follow the timeline
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \

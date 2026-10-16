@@ -290,4 +290,17 @@ final class ScriptTests: XCTestCase {
         XCTAssertNotNil(r.error)
         XCTAssertNil(doc.timeline)
     }
+
+    func testTransitionStaggersAList() throws {
+        var doc = DottieDocument()
+        let r = run("""
+            const a = dottie.rect({x: 0, y: 0}), b = dottie.rect({x: 200, y: 0}), c = dottie.connect(a, b);
+            return dottie.transition([b, c, a], "popIn", 1, {stagger: 0.5});
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(r.value, "2", "the arrow can't pop in, so two")
+        let first = { (id: UUID) in doc.timeline?.track(for: id)?.keys.first?.t }
+        XCTAssertEqual(first(doc.elements[1].id), 1)
+        XCTAssertEqual(first(doc.elements[0].id), 1.5, "list order, not page order")
+    }
 }
