@@ -14,6 +14,8 @@ final class LiveRegistry {
     private var entries: [String: Entry] = [:]
     /// The document whose window was most recently key; reachable as path "current", even unsaved.
     private var frontmost: Entry?
+    /// Handles `debug` requests; only Debug builds of the app set it (see `DebugDriver`).
+    var debugHandler: (([String]) -> LiveResponse)?
 
     func markFront(_ document: DrawingDocument, undoManager: UndoManager?) {
         frontmost = Entry(document: document, undoManager: undoManager)
@@ -49,6 +51,9 @@ final class LiveRegistry {
                   let new = request.file else { return LiveResponse(open: false) }
             doc.commitFile(new, actionName: request.actionName ?? "Agent Edit", undoManager: entry.undoManager)
             return LiveResponse(open: true)
+        case .debug:
+            return debugHandler?(request.args ?? [])
+                ?? LiveResponse(open: false, error: "Debug commands need a Debug build of Dottie")
         }
     }
 }
@@ -94,6 +99,7 @@ final class LiveServer: @unchecked Sendable {
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         guard let line = LiveSocket.readLine(fd: fd),
               let request = try? JSONDecoder().decode(LiveRequest.self, from: line) else { return }
+        if let wait = request.wait, wait > 0 { Thread.sleep(forTimeInterval: min(wait, 30)) }
         let response = DispatchQueue.main.sync {
             MainActor.assumeIsolated { LiveRegistry.shared.handle(request) }
         }

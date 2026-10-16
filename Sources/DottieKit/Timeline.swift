@@ -239,6 +239,14 @@ extension DottieDocument {
         return copy
     }
 
+    /// Elements that only exist in motion: hidden at the start and in the still (packets, mostly). The
+    /// editor leaves them out of the page it edits, since its base pose would draw them where they never are.
+    public var transientElements: Set<UUID> {
+        guard let timeline else { return [] }
+        let end = timeline.poster ?? timeline.duration
+        return Set(timeline.tracks.filter { !$0.isVisible(at: 0) && !$0.isVisible(at: end) }.map(\.element))
+    }
+
     /// The page as a still picture: its poster frame when it is animated, the end unless set otherwise.
     /// The editor works on the page itself; exports, previews and thumbnails show this.
     public var still: DottieDocument {

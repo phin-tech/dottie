@@ -22,17 +22,24 @@ struct ContentView: View {
     @State var scriptOutput = ""
     @State var scriptRunning = false
     @AppStorage(Pref.scriptSource) var scriptSource = ""
-    /// Seconds into the page's animation while previewing it (see `TimelineBar`); nil while editing.
-    @State private var playhead: Double?
+    /// Seconds into the page's animation while previewing it (see `TimelinePanel`); nil while editing.
+    @State var playhead: Double?
+    /// Playing through the animation; when paused with a playhead, edits on the canvas pose that frame.
+    @State var playing = false
 
     var body: some View {
         VStack(spacing: 0) {
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
-                       playhead: document.model.timeline == nil ? nil : playhead, onExitPreview: { playhead = nil })
-            if let timeline = document.model.timeline {
+                       playhead: document.model.timeline == nil || !playing ? nil : playhead,
+                       pose: document.model.timeline == nil || playing ? nil : playhead,
+                       onExitPreview: { playing = false; playhead = nil })
+            if document.model.timeline != nil {
                 Divider()
-                TimelineBar(timeline: timeline, playhead: $playhead)
+                TimelinePanel(page: document.model, playhead: $playhead, playing: $playing) { id in
+                    playing = false
+                    selection = [id]
+                }
             }
             Divider()
             PageBar(document: document, undoManager: undoManager)
@@ -42,6 +49,7 @@ struct ContentView: View {
                 // Keep only what is on the new page: a link picked on another page brings its sources back selected.
                 selection = selection.intersection(document.model.elements.map(\.id))
                 activeLayer = nil
+                playing = false
                 playhead = nil
             }
             .inspector(isPresented: $showInspector) {
@@ -89,10 +97,11 @@ struct ContentView: View {
         // A new window counts as current until another becomes key, so "current" works before first focus.
         .onAppear {
             LiveRegistry.shared.markFront(document, undoManager: undoManager)
+            registerDebugHooks()
             UpdateChecker.shared.checkIfDue()
         }
         .onChange(of: activeState) { _, state in
-            if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager) }
+            if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager); registerDebugHooks() }
         }
         .sheet(isPresented: $showScriptConsole) {
             ScriptConsole(source: $scriptSource, output: $scriptOutput, selectionCount: selection.count,
@@ -109,6 +118,21 @@ struct ContentView: View {
         .onChange(of: newStyle) { _, style in storedStyle = Pref.encode(style) }
         .onChange(of: prefRouting, initial: true) { _, v in newRouting = Routing(rawValue: v) ?? .straight }
         .onChange(of: newRouting) { _, r in prefRouting = r.rawValue }
+    }
+}
+
+extension ContentView {
+    /// Lets `scripts/dottie-debug.py` drive this window in Debug builds (see `DebugDriver`).
+    @MainActor
+    func registerDebugHooks() {
+        #if DEBUG
+        LiveRegistry.shared.debugHandler = { DebugDriver.shared.handle($0) }
+        DebugDriver.shared.front = DebugHooks(
+            document: document, undoManager: undoManager, editor: { editorActions },
+            playhead: { playhead }, setPlayhead: { playhead = $0 },
+            playing: { playing }, setPlaying: { playing = $0 },
+            selection: { selection }, setSelection: { selection = $0 })
+        #endif
     }
 }
 

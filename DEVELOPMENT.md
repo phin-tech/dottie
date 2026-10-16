@@ -21,6 +21,13 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 
 `Dottie.xcodeproj` is generated from `project.yml` and gitignored, so change settings there, not in Xcode.
 
+**Looking at the running app.** `just debug-app file.dottie` launches a Debug build in the background on its own
+live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and
+`just debug <command>` drives it through `scripts/dottie-debug.py`: `snapshot out.png [canvas]` has the window
+render itself to a PNG (no screen-recording permission needed; translucent toolbars and the inspector come out
+blank), and `playhead`, `play`, `action`, `select`, `drag`, `key` and `menu` move it around. `just debug help`
+lists everything. The commands exist only in Debug builds (`App/DebugDriver.swift`).
+
 **Targets.** `Dottie` (the app) embeds `DottieCLI` and `DottieMCP` in `Contents/Helpers` and two Quick Look
 app extensions in `Contents/PlugIns`, all linking DottieKit:
 

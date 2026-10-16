@@ -781,6 +781,40 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertNil(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 150))))
     }
 
+    func testPosingADragBecomesKeysInOneCommit() {
+        let e = redBox()   // x keyed 100 -> 500 over 1s
+        let base = view.model
+        // What CanvasView does while paused at 0.5s: show that frame, and turn the finished edit into keys.
+        view.model = base.resolved(at: 0.5)
+        view.poseTime = 0.5
+        var posed: DottieDocument?
+        view.onPreview = { _ in }
+        view.onCommit = { [unowned self] new, name in commits.append((new, name)); posed = base.applyingPose(new, at: 0.5) }
+        drag(CGPoint(x: 350, y: 150), CGPoint(x: 350, y: 300))
+        XCTAssertEqual(commits.count, 1)
+        let result = try! XCTUnwrap(posed)
+        XCTAssertEqual(result.elements[0].frame, e.frame, "the page's own geometry is untouched")
+        XCTAssertEqual(result.resolved(at: 0.5).elements[0].y, 250, accuracy: 1)
+        XCTAssertEqual(result.resolved(at: 0).elements[0].y, 100, accuracy: 1, "pinned where it was at the start")
+        XCTAssertEqual(result.resolved(at: 1).elements[0].x, 500, accuracy: 1, "the x tween is kept")
+    }
+
+    func testPacketsAreHiddenWhileEditingUnlessSelected() {
+        var st = Style(); st.roughness = 0; st.fill = RGBA(r: 1, g: 0, b: 0)
+        let dot = Element(kind: .ellipse, frame: CGRect(x: 100, y: 100, width: 100, height: 100), style: st, layerID: layer)
+        view.model.elements.append(dot)
+        var tl = Timeline(duration: 2)
+        tl.setKey(Keyframe(t: 0.5, visible: true), for: dot.id)
+        tl.setKey(Keyframe(t: 1, visible: false), for: dot.id)
+        view.model.timeline = tl
+        XCTAssertFalse(isRed(at: CGPoint(x: 150, y: 150)), "a packet's base pose is not drawn")
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 150, y: 150)))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 150, y: 150)))
+        XCTAssertTrue(view.selection.isEmpty, "nor clickable")
+        view.selection = [dot.id]
+        XCTAssertTrue(isRed(at: CGPoint(x: 150, y: 150)), "picked from the timeline, it shows")
+    }
+
     func testPreviewClearsSelectionAndEscLeavesIt() {
         let e = redBox()
         view.selection = [e.id]
