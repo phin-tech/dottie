@@ -12,8 +12,11 @@ public enum Exporter {
             let reach = DungeonGrid.isFloor(e) ? (DungeonGrid.band + 0.25) * e.style.cellSize : 0
             return e.rotatedBounds.insetBy(dx: -reach, dy: -reach)
         }
-        guard var r = doc.elements.first.map(frame) else { return CGRect(x: 0, y: 0, width: 200, height: 200) }
-        for e in doc.elements { r = r.union(frame(e)) }
+        // Fully transparent elements (an entrance about to fade up) take no room, unless nothing else is there.
+        let shown = doc.elements.filter { ($0.style.opacity ?? 1) > 0 }
+        let counted = shown.isEmpty ? doc.elements : shown
+        guard var r = counted.first.map(frame) else { return CGRect(x: 0, y: 0, width: 200, height: 200) }
+        for e in counted { r = r.union(frame(e)) }
         return r.insetBy(dx: -padding, dy: -padding)
     }
 
@@ -40,6 +43,26 @@ public enum Exporter {
             guard let img = bitmap(doc.resolved(at: t), bounds: plan.rects[i], scale: scale,
                                    background: CGColor(gray: 1, alpha: 1), pixels: size) else { return nil }
             let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: plan.durations[i]]]
+            CGImageDestinationAddImage(dest, img, delay as CFDictionary)
+        }
+        return CGImageDestinationFinalize(dest) ? data as Data : nil
+    }
+
+    /// The page's timeline as a looping animated PNG: the GIF's frames in full color, with alpha. Pass
+    /// `background: nil` for a transparent page (a themed drawing keeps its page color otherwise).
+    /// nil when the animation is too long to export (see `maxAnimationFrames`).
+    public static func apng(_ doc: DottieDocument, scale: Double = 1, background: CGColor? = CGColor(gray: 1, alpha: 1)) -> Data? {
+        guard let plan = animation(doc) else { return nil }
+        let size = (width: max(1, Int((plan.size.width * scale).rounded())), height: max(1, Int((plan.size.height * scale).rounded())))
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, plan.times.count, nil)
+        else { return nil }
+        let loop = [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGLoopCount: 0]]
+        CGImageDestinationSetProperties(dest, loop as CFDictionary)
+        for (i, t) in plan.times.enumerated() {
+            guard let img = bitmap(doc.resolved(at: t), bounds: plan.rects[i], scale: scale, background: background, pixels: size)
+            else { return nil }
+            let delay = [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: plan.durations[i]]]
             CGImageDestinationAddImage(dest, img, delay as CFDictionary)
         }
         return CGImageDestinationFinalize(dest) ? data as Data : nil

@@ -42,6 +42,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Grid fill (`fillStyle: grid`, `gridSize`): dungeon floor ruled on a page-wide lattice, with Dyson rock hatching drawn once per page around every grid-filled shape (ported from Guildhall's map renderer)
 - [x] Quick Look: Space in Finder previews a drawing (every page, as a PDF) or a stencil library; Finder thumbnails show the first page on its theme's color
 - [x] dottie.js (`web/`): `<dottie-player>` renders and plays `.dottie` files in the browser from their source, matching Dottie's SVG export exactly; `dottie inspect`, goldens, a JSON Schema and CI keep the two in step; the Pages site plays its demos with it
+- [x] Animation extras: spring, bounce and elastic eases; marching-ants lines; Magic Move between pages; APNG and Lottie (smooth or exact) export
 
 ## Next
 - Custom themes and a color palette per theme

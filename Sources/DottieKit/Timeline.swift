@@ -1,10 +1,23 @@
 import Foundation
 
-/// The curve from one keyframe to the next.
+/// The curve from one keyframe to the next. Each is a pure function of the fraction of the way between the
+/// keys, 0 at the first and exactly 1 at the second; spring and elastic pass 1 on the way, overshooting the
+/// next key's value and settling back onto it.
 public enum Ease: String, Codable, Sendable, CaseIterable {
     case linear, easeIn, easeOut, easeInOut
     /// Keep this key's value until the next key, then jump (a Flash "keyframe without a tween").
     case hold
+    /// Starts gently, overshoots and settles, like a weight on a spring.
+    case spring
+    /// Lands and bounces a few times, each lower, like a dropped ball.
+    case bounce
+    /// Snaps there and wobbles about it, like a plucked rubber band.
+    case elastic
+
+    /// A name this version doesn't know (written by a newer Dottie) plays linear rather than failing the file.
+    public init(from decoder: Decoder) throws {
+        self = Ease(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .linear
+    }
 
     func apply(_ u: Double) -> Double {
         switch self {
@@ -13,7 +26,37 @@ public enum Ease: String, Codable, Sendable, CaseIterable {
         case .easeOut: 1 - pow(1 - u, 3)
         case .easeInOut: u < 0.5 ? 4 * u * u * u : 1 - pow(-2 * u + 2, 3) / 2
         case .hold: 0
+        case .spring: Self.spring(u)
+        case .bounce: Self.bounce(u)
+        case .elastic: Self.elastic(u)
         }
+    }
+
+    /// A damped spring released from rest, nudged so it is exactly 1 at the end.
+    static func spring(_ u: Double) -> Double {
+        if u <= 0 { return 0 }
+        if u >= 1 { return 1 }
+        func s(_ u: Double) -> Double { 1 - exp(-6 * u) * (cos(3 * .pi * u) + 6 / (3 * .pi) * sin(3 * .pi * u)) }
+        return s(u) + u * (1 - s(1))
+    }
+
+    /// Robert Penner's ease-out bounce: four arcs, each landing on 1.
+    static func bounce(_ u: Double) -> Double {
+        if u <= 0 { return 0 }
+        if u >= 1 { return 1 }
+        let n = 7.5625, d = 2.75
+        if u < 1 / d { return n * u * u }
+        if u < 2 / d { let v = u - 1.5 / d; return n * v * v + 0.75 }
+        if u < 2.5 / d { let v = u - 2.25 / d; return n * v * v + 0.9375 }
+        let v = u - 2.625 / d
+        return n * v * v + 0.984375
+    }
+
+    /// Robert Penner's ease-out elastic.
+    static func elastic(_ u: Double) -> Double {
+        if u <= 0 { return 0 }
+        if u >= 1 { return 1 }
+        return pow(2, -10 * u) * sin((u * 10 - 0.75) * (2 * .pi / 3)) + 1
     }
 }
 
@@ -57,15 +100,28 @@ public struct Track: Codable, Equatable, Sendable {
     public var follow: [Follow]?
     /// Spans of the keys that play again (a pulse that never stops, a wiggle three times).
     public var repeats: [Repeat]?
-    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil, repeats: [Repeat]? = nil) {
+    /// Marching ants: the element's dashes travel along its line at this many points per second, from its
+    /// start towards its end (backwards when negative), for the whole timeline. Only a dashed or dotted line
+    /// shows it. The speed is evened out so the dashes come round to where they started as the timeline loops.
+    public var march: Double?
+    public init(element: UUID, keys: [Keyframe], boil: Bool? = nil, follow: [Follow]? = nil, repeats: [Repeat]? = nil,
+                march: Double? = nil) {
         self.element = element
         self.keys = keys.sorted { $0.t < $1.t }
         self.boil = boil
         self.follow = follow
         self.repeats = repeats
+        self.march = march.flatMap(Self.clampMarch)
     }
 
-    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow, repeats }
+    /// The fastest march, points per second.
+    public static let maxMarch = 10_000.0
+    static func clampMarch(_ v: Double) -> Double? {
+        guard v.isFinite, v != 0 else { return nil }
+        return min(max(v, -maxMarch), maxMarch)
+    }
+
+    private enum CodingKeys: String, CodingKey { case element, keys, boil, follow, repeats, march }
 
     /// Hand- or agent-written files may list keys out of order or with impossible times: keep the usable
     /// keys, in time order, so interpolation (which walks them in order) stays right.
@@ -79,6 +135,7 @@ public struct Track: Codable, Equatable, Sendable {
         follow = try c.decodeIfPresent([Follow].self, forKey: .follow)?
             .filter { $0.start.isFinite && $0.end.isFinite && $0.start >= 0 && $0.end <= Timeline.maxDuration }
         repeats = try c.decodeIfPresent([Repeat].self, forKey: .repeats)?.filter(\.isValid)
+        march = try c.decodeIfPresent(Double.self, forKey: .march).flatMap(Self.clampMarch)
     }
 
     /// The time inside the element's own keys that `t` plays: within a repeat, the same moment of the
@@ -200,7 +257,8 @@ public struct Timeline: Codable, Equatable, Sendable {
         guard let a = after else { return b.rect }
         let u = (b.ease ?? .easeInOut).apply((t - b.t) / max(a.t - b.t, 1e-9))
         func mix(_ p: Double, _ q: Double) -> Double { p + (q - p) * u }
-        return CGRect(x: mix(b.x, a.x), y: mix(b.y, a.y), width: mix(b.width, a.width), height: mix(b.height, a.height))
+        // A springy ease can overshoot a zoom past nothing.
+        return CGRect(x: mix(b.x, a.x), y: mix(b.y, a.y), width: max(1, mix(b.width, a.width)), height: max(1, mix(b.height, a.height)))
     }
 
     /// What exports show at `t`: the camera's view widened (never cropped) to the first key's shape, so
@@ -265,6 +323,34 @@ public struct Timeline: Codable, Equatable, Sendable {
         else { tracks.append(Track(element: id, keys: [], boil: boil)) }
     }
 
+    /// Sets how fast the element's dashes march (see `Track.march`; nil or 0 stops them), creating an empty
+    /// track if needed.
+    public mutating func setMarch(_ speed: Double?, for id: UUID) {
+        let speed = speed.flatMap(Track.clampMarch)
+        if let ti = tracks.firstIndex(where: { $0.element == id }) {
+            tracks[ti].march = speed
+            let t = tracks[ti]
+            if speed == nil, t.keys.isEmpty, (t.follow ?? []).isEmpty, (t.repeats ?? []).isEmpty, t.boil == nil { tracks.remove(at: ti) }
+        } else if speed != nil {
+            tracks.append(Track(element: id, keys: [], march: speed))
+        }
+    }
+
+    /// Where the dashes of a line marching at `speed` stand at `t`: the dash phase, within one pattern
+    /// `period`. The speed is rounded to a whole number of patterns over the timeline, so a loop is seamless.
+    func marchOffset(speed: Double, period: Double, at t: Double) -> Double {
+        guard period > 0 else { return 0 }
+        var speed = speed
+        let d = Self.clampTime(duration)
+        if d > 0 {
+            let laps = (speed * d / period).rounded()
+            if laps != 0 { speed = laps * period / d }
+        }
+        let r = (speed * t).truncatingRemainder(dividingBy: period)
+        // Positive phase pulls the pattern back towards the start, so going forward is a falling phase.
+        return r < 0 ? -r : r == 0 ? 0 : period - r
+    }
+
     /// The element's keyframes, or nil if it isn't animated.
     public func track(for id: UUID) -> Track? { tracks.first { $0.element == id } }
 
@@ -318,7 +404,9 @@ public struct Timeline: Codable, Equatable, Sendable {
     public mutating func removeKey(of id: UUID, at t: Double) {
         guard let (ti, ki) = keyIndex(of: id, at: t) else { return }
         tracks[ti].keys.remove(at: ki)
-        if tracks[ti].keys.isEmpty, (tracks[ti].follow ?? []).isEmpty, tracks[ti].boil == nil { tracks.remove(at: ti) }
+        if tracks[ti].keys.isEmpty, (tracks[ti].follow ?? []).isEmpty, tracks[ti].boil == nil, tracks[ti].march == nil {
+            tracks.remove(at: ti)
+        }
     }
 
     /// Sets the curve from the element's key at `t` to the next one.
@@ -388,8 +476,10 @@ extension Track {
             value(at: t, p, base: base) { a, b, u in a + (b - a) * u }
         }
         func color(_ p: (Keyframe) -> RGBA?, _ base: RGBA) -> RGBA {
+            // Springy eases overshoot: a color can't go past white or black.
             value(at: t, p, base: base) { a, b, u in
-                RGBA(r: a.r + (b.r - a.r) * u, g: a.g + (b.g - a.g) * u, b: a.b + (b.b - a.b) * u, a: a.a + (b.a - a.a) * u)
+                func mix(_ p: Double, _ q: Double) -> Double { min(max(p + (q - p) * u, 0), 1) }
+                return RGBA(r: mix(a.r, b.r), g: mix(a.g, b.g), b: mix(a.b, b.b), a: mix(a.a, b.a))
             }
         }
         var e = e
@@ -404,9 +494,10 @@ extension Track {
         // A connector's geometry comes from its shapes; only its drawing-on and opacity are keyed.
         if e.kind == .connector { return e }
         e.x = num(\.x, e.x); e.y = num(\.y, e.y)
-        e.width = num(\.width, e.width); e.height = num(\.height, e.height)
+        // Nor can a size or a line width go below nothing.
+        e.width = max(0, num(\.width, e.width)); e.height = max(0, num(\.height, e.height))
         if keys.contains(where: { $0.rotation != nil }) { e.rotation = num(\.rotation, e.angle) }
-        e.style.strokeWidth = num(\.strokeWidth, e.style.strokeWidth)
+        e.style.strokeWidth = max(0, num(\.strokeWidth, e.style.strokeWidth))
         e.style.stroke = color(\.stroke, e.style.stroke)
         e.style.fill = color(\.fill, e.style.fill)
         return e
@@ -439,6 +530,9 @@ extension DottieDocument {
             let e = copy.elements[i]
             if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
+            if let speed = tracks[e.id]?.march, let pattern = Renderer.dashPattern(copy.elements[i].style.dash, width: copy.elements[i].style.strokeWidth) {
+                copy.elements[i].style.dashOffset = timeline.marchOffset(speed: speed, period: pattern.reduce(0, +), at: t)
+            }
         }
         // A hidden shape waits at its resting place, not at the start of the entrance it is about to make,
         // so arrows and paths leading to it already end where it will appear.

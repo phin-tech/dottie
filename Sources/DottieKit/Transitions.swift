@@ -10,7 +10,7 @@ public enum Transition: String, Codable, Sendable, CaseIterable {
     case growIn
     /// Grows rightwards from its left edge.
     case wipeIn
-    /// Falls from above and bounces once.
+    /// Falls from above and bounces to a stop.
     case dropIn
     /// Slides in from the left.
     case slideIn
@@ -92,8 +92,7 @@ extension DottieDocument {
             keys = [wiped(t, 0, .easeOut, visible: true), wiped(t + d, 1)]
         case .dropIn:
             let land = f.minY, lift = max(80, f.height * 2)
-            keys = [at(t, y: land - lift, .easeIn, visible: true), at(t + 0.65 * d, y: land, .easeOut),
-                    at(t + 0.82 * d, y: land - lift * 0.12, .easeIn), at(t + d, y: land)]
+            keys = [at(t, y: land - lift, .bounce, visible: true), at(t + d, y: land)]
         case .slideIn:
             keys = [at(t, x: f.minX - max(120, f.width), .easeOut, visible: true), at(t + d, x: f.minX)]
         case .drawIn:

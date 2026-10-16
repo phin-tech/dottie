@@ -74,7 +74,8 @@
         "bowing": { "type": "number" },
         "fontSize": { "type": "number" },
         "gridSize": { "type": "number" },
-        "opacity": { "type": "number" }
+        "opacity": { "type": "number" },
+        "dashOffset": { "type": "number" }
       }
     },
     "element": {
@@ -164,7 +165,7 @@
       }
     },
     "arrowhead": { "enum": ["none", "arrow", "triangle", "dot", "bar"] },
-    "ease": { "enum": ["linear", "easeIn", "easeOut", "easeInOut", "hold"] },
+    "ease": { "enum": ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"] },
     "timeline": {
       "type": "object",
       "additionalProperties": false,
@@ -188,7 +189,8 @@
         "keys": { "type": "array", "items": { "$ref": "#/$defs/keyframe" } },
         "boil": { "type": "boolean" },
         "follow": { "type": "array", "items": { "$ref": "#/$defs/follow" } },
-        "repeats": { "type": "array", "items": { "$ref": "#/$defs/repeat" } }
+        "repeats": { "type": "array", "items": { "$ref": "#/$defs/repeat" } },
+        "march": { "type": "number" }
       }
     },
     "keyframe": {

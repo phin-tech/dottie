@@ -98,9 +98,9 @@ final class ReviewRegressionTests: XCTestCase {
         try doc.addTransition(.popIn, to: a.id, at: 0)
         XCTAssertEqual(doc.timeline?.track(for: a.id)?.keys.count, 3)
         try doc.addTransition(.dropIn, to: a.id, at: 2)
-        XCTAssertEqual(doc.timeline?.track(for: a.id)?.keys.count, 7, "dropIn keeps its bounce")
+        XCTAssertEqual(doc.timeline?.track(for: a.id)?.keys.count, 5, "dropIn keeps both its keys")
         doc.timeline!.removeKey(of: a.id, at: 0)
-        XCTAssertEqual(doc.timeline?.track(for: a.id)?.keys.count, 6, "only the one key goes")
+        XCTAssertEqual(doc.timeline?.track(for: a.id)?.keys.count, 4, "only the one key goes")
     }
 
     // 7. Duplicate ids don't hang a build.

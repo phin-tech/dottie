@@ -9,7 +9,7 @@ export type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connec
 export type Port = "top" | "right" | "bottom" | "left";
 export type Routing = "straight" | "curved" | "elbow";
 export type Arrowhead = "none" | "arrow" | "triangle" | "dot" | "bar";
-export type Ease = "linear" | "easeIn" | "easeOut" | "easeInOut" | "hold";
+export type Ease = "linear" | "easeIn" | "easeOut" | "easeInOut" | "hold" | "spring" | "bounce" | "elastic";
 
 export interface Style {
   stroke: RGBA;
@@ -22,6 +22,8 @@ export interface Style {
   fontSize: number;
   gridSize: number | null;
   opacity: number | null;
+  /** How far into its dash pattern a dashed or dotted line starts; marching ants set it on every frame. */
+  dashOffset: number | null;
 }
 
 export interface Endpoint { elementID: string | null; port: Port | null; x: number; y: number }
@@ -92,6 +94,8 @@ export interface Track {
   boil: boolean | null;
   follow: Follow[] | null;
   repeats: Repeat[] | null;
+  /** Marching ants: points per second the dashes travel (Track.march). */
+  march: number | null;
 }
 
 export interface CameraKey { t: number; x: number; y: number; width: number; height: number; ease: Ease | null }
@@ -127,7 +131,7 @@ export interface DottieFile {
 /** The newest file version this library was written for. Newer files still load, with a warning. */
 export const SUPPORTED_VERSION = 2;
 export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image"];
-const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold"];
+const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"];
 
 /** The fields dottie.js reads, per object; the schema test checks they're exactly the schema's. Anything else
  * in a file is newer than this version and is reported in `warnings`. */
@@ -136,7 +140,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
-  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity"],
+  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "image", "reveal"],
   strokePoint: ["x", "y"],
@@ -145,7 +149,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   endpoint: ["elementID", "port", "x", "y"],
   connector: ["start", "end", "routing", "startHead", "endHead"],
   timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
-  track: ["element", "keys", "boil", "follow", "repeats"],
+  track: ["element", "keys", "boil", "follow", "repeats", "march"],
   keyframe: ["t", "x", "y", "width", "height", "rotation", "strokeWidth", "stroke", "fill", "visible", "reveal", "opacity", "ease"],
   follow: ["path", "start", "end", "ease", "reverse", "orient", "laps"],
   repeat: ["start", "end", "count"],
@@ -154,6 +158,10 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
 };
 
 export const MAX_DURATION = 3600;
+/** The fastest march, points per second (Track.maxMarch). */
+export const MAX_MARCH = 10_000;
+export const clampMarch = (v: number | undefined): number | null =>
+  v === undefined || !Number.isFinite(v) || v === 0 ? null : Math.min(Math.max(v, -MAX_MARCH), MAX_MARCH);
 export const BOIL_DRAWINGS = 3;
 
 export const black: RGBA = { r: 0.12, g: 0.12, b: 0.13, a: 1 };
@@ -217,6 +225,7 @@ class Reader {
       fontSize: num(s.fontSize) ?? 18,
       gridSize: num(s.gridSize) ?? null,
       opacity: num(s.opacity) ?? null,
+      dashOffset: num(s.dashOffset) ?? null,
     };
   }
 
@@ -343,7 +352,7 @@ class Reader {
         return repeatIsValid(rep) ? [rep] : [];
       })
       : null;
-    return { element, keys, boil: bool(v.boil) ?? null, follow, repeats };
+    return { element, keys, boil: bool(v.boil) ?? null, follow, repeats, march: clampMarch(num(v.march)) };
   }
 
   timeline(v: unknown): Timeline | null {

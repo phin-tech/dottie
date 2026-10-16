@@ -44,6 +44,7 @@ export function inspectFrame(page: Page, t: number): Record<string, unknown> {
     if (e.rotation !== null) d.rotation = r4(e.rotation);
     if (e.style.opacity !== null) d.opacity = r4(e.style.opacity);
     if (e.reveal !== null) d.reveal = r4(e.reveal);
+    if (e.style.dashOffset !== null) d.dashOffset = r4(e.style.dashOffset);
     d.strokeWidth = r4(e.style.strokeWidth);
     d.stroke = rgba(e.style.stroke);
     d.fill = rgba(e.style.fill);

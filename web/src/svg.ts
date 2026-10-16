@@ -22,8 +22,10 @@ export function bounds(page: Page, padding = 24): Rect {
     return inset(rotatedBounds(e), -reach, -reach);
   };
   if (page.elements.length === 0) return { x: 0, y: 0, width: 200, height: 200 };
+  // Fully transparent elements (an entrance about to fade up) take no room, unless nothing else is there.
+  const shown = page.elements.filter((e) => (e.style.opacity ?? 1) > 0);
   let r: Rect | null = null;
-  for (const e of page.elements) r = union(r, box(e));
+  for (const e of shown.length ? shown : page.elements) r = union(r, box(e));
   return inset(r!, -padding, -padding);
 }
 
@@ -128,6 +130,7 @@ function svgElement(e: Element, index: Index, labelBackground: RGBA | null): str
   let strokeAttrs = `stroke="${stroke}" stroke-width="${fmt(e.style.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"`;
   const dash = dashPattern(e.style.dash, e.style.strokeWidth);
   if (dash) strokeAttrs += ` stroke-dasharray="${dash.map(fmt).join(" ")}"`;
+  if (dash && e.style.dashOffset !== null && fmt(e.style.dashOffset) !== "0") strokeAttrs += ` stroke-dashoffset="${fmt(e.style.dashOffset)}"`;
   let text = e.text;
   const r = revealProgress(e);
   if (r !== null) {

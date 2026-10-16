@@ -102,14 +102,20 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
 
 ![An architecture diagram drawing itself, arrows sketching out and dots running along them](Design/animation.gif)
 
-Any page can be animated, and exported as a GIF, an MP4 ([this one](Design/animation.mp4)) or a web page with a
-play button. The Animate menu does the common things in one go:
+Any page can be animated, and exported as a GIF, an animated PNG (full color, optionally transparent), an MP4
+([this one](Design/animation.mp4)), a web page with a play button, or Lottie: vector animation for websites and
+iOS and Android apps, either smooth (tweened by the player) or exact (every frame as Dottie draws it). The Animate menu does the common things in one go:
 
 - **Build Diagram** reveals the shapes in the order the arrows connect them, sketching each one in, drawing
   the arrows out, or sending a dot along each arrow to the next shape.
 - **Add Transition** gives the selected shapes an entrance, an exit or a bit of emphasis: pop, grow, wipe,
   drop, slide, draw or fade in, the same ways out, and pulse or wiggle.
 - **Send Packet Along Arrow** runs a dot down the selected arrows, like a request on its way.
+- **March Selected Lines** sets the dashes of the selected arrows travelling along them, like marching ants,
+  for a live stream or the direction of a flow.
+- **Magic Move to Next Page** works like Keynote's: draw the start and the end as two pages, and Dottie
+  animates the first into the second. Shapes with the same anchor or text, or copies made by Duplicate Page,
+  slide, resize and recolor into place; whatever is only on one page fades out or in.
 - **Boil Lines** makes the sketchy lines jitter like hand-drawn animation; **Settle When Still** calms them
   once a shape stops moving.
 - **Repeat Selection's Animation** plays a shape's animation over and over, like a light that keeps pulsing.
@@ -121,7 +127,8 @@ play button. The Animate menu does the common things in one go:
 The timeline under the canvas shows every animated shape with its keyframes. Press play to watch, or drag
 along it to scrub. Stop on any moment and change the drawing there, moving, resizing or recoloring a
 shape, and Dottie remembers that pose for that moment and moves smoothly between poses. Drag a keyframe to
-retime it, ⌥-drag to copy it, and pick its easing from the bar above. **Onion Skin** shows the moments just
+retime it, ⌥-drag to copy it, and pick its easing from the bar above: smooth in and out, or a spring, a
+bounce or an elastic snap that overshoots and settles. **Onion Skin** shows the moments just
 before and after, faintly.
 
 Assistants can animate too: ask for *"a version of this diagram that builds itself, with a request moving
@@ -140,8 +147,8 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
 - **Scripting.** Script ▸ Script Console… (⌥⌘J) runs JavaScript to draw or change many things at once, such as
   a grid of boxes or restyling everything labelled "TODO". The console includes a full reference.
 - **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
-  from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.mp4`) for an
-  animated page. Run `dottie --help` for more.
+  from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng`,
+  `.mp4`, or `.json` for Lottie) for an animated page. Run `dottie --help` for more.
 
 ## Help and feedback
 

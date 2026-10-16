@@ -446,7 +446,7 @@ public enum Renderer {
             ctx.setLineWidth(e.style.strokeWidth)
             ctx.setLineCap(.round); ctx.setLineJoin(.round)
             if lod?.dashes ?? true, let d = dashPattern(e.style.dash, width: e.style.strokeWidth) {
-                ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) })
+                ctx.setLineDash(phase: e.style.dashOffset ?? 0, lengths: d.map { CGFloat($0) })
             }
         }
         if let r = e.revealProgress, e.kind == .text { e.text = e.typed(e.text ?? "", r) }
@@ -564,11 +564,24 @@ public enum Renderer {
         ctx.setStrokeColor(e.style.stroke.cgColor)
         ctx.setLineWidth(e.style.strokeWidth)
         ctx.setLineCap(.round); ctx.setLineJoin(.round)
-        if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) { ctx.setLineDash(phase: 0, lengths: d.map { CGFloat($0) }) }
+        if let d = dashPattern(e.style.dash, width: e.style.strokeWidth) {
+            ctx.setLineDash(phase: e.style.dashOffset ?? 0, lengths: d.map { CGFloat($0) })
+        }
         ctx.strokePath()
     }
 
     static func drawText(_ s: String, in rect: CGRect, fontSize: Double, color: CGColor, ctx: CGContext, centered: Bool = false) {
+        let (frame, box) = textFrame(s, in: rect, fontSize: fontSize, color: color, centered: centered)
+        // CoreText draws y-up; flip locally within the top-left-origin context.
+        ctx.saveGState()
+        ctx.translateBy(x: 0, y: box.minY + box.maxY)
+        ctx.scaleBy(x: 1, y: -1)
+        CTFrameDraw(frame, ctx)
+        ctx.restoreGState()
+    }
+
+    /// `s` laid out as `drawText` draws it: the CoreText frame and the box (top-left coordinates) it fills.
+    static func textFrame(_ s: String, in rect: CGRect, fontSize: Double, color: CGColor, centered: Bool) -> (frame: CTFrame, box: CGRect) {
         let font = CTFontCreateWithName("Helvetica Neue" as CFString, fontSize, nil)
         var align: CTTextAlignment = centered ? .center : .left
         let para = withUnsafeBytes(of: &align) { buf -> CTParagraphStyle in
@@ -581,12 +594,6 @@ public enum Renderer {
         let size = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(), nil, CGSize(width: rect.width, height: .greatestFiniteMagnitude), nil)
         let y = centered ? rect.midY - size.height / 2 : rect.minY
         let box = CGRect(x: rect.minX, y: y, width: rect.width, height: size.height)
-        // CoreText draws y-up; flip locally within the top-left-origin context.
-        ctx.saveGState()
-        ctx.translateBy(x: 0, y: box.minY + box.maxY)
-        ctx.scaleBy(x: 1, y: -1)
-        let frame = CTFramesetterCreateFrame(setter, CFRange(), CGPath(rect: box, transform: nil), nil)
-        CTFrameDraw(frame, ctx)
-        ctx.restoreGState()
+        return (CTFramesetterCreateFrame(setter, CFRange(), CGPath(rect: box, transform: nil), nil), box)
     }
 }

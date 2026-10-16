@@ -407,14 +407,19 @@ actor DottieTools {
              ], required: ["path"])),
         Tool(name: "export_animation",
              description: "Export the page's animation (made with the animation tools, or run_script's dottie.timeline/key/"
-                + "transition/packet/camera/scene) as a looping GIF, an MP4 movie, or a self-contained HTML player with "
+                + "transition/packet/camera/scene) as a looping GIF, an animated PNG (full color, can be transparent), "
+                + "an MP4 movie, Lottie JSON (.json, vector, for lottie-web and the iOS/Android players), "
+                + "or a self-contained HTML player with "
                 + "play/pause and a scrubber (a click-through presentation when it has scenes). The format comes from "
                 + "out_path's extension. Returns a PNG of the frame at `preview` seconds (default the poster frame) so "
                 + "you can check it.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
-                "out_path": prop("string", "Absolute path ending in .gif, .mp4 or .html"),
-                "scale": prop("number", "Pixel scale for gif and mp4, 0.25 to 4 (default 1.5)"),
+                "out_path": prop("string", "Absolute path ending in .gif, .apng, .mp4, .json (Lottie) or .html"),
+                "lottie_mode": prop("string", "For .json: smooth (default; tweened, lines held steady) or exact "
+                                    + "(every frame as the GIF draws it, boil included)", enum: Exporter.LottieMode.allCases.map(\.rawValue)),
+                "scale": prop("number", "Pixel scale for gif, apng and mp4, 0.25 to 4 (default 1.5)"),
+                "transparent": prop("boolean", "No page background (apng and json only)"),
                 "sketchy": prop("boolean", "Override the look for this export only"),
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
              ], required: ["path", "out_path"])),
@@ -829,7 +834,13 @@ actor DottieTools {
             }
             let raw = try a.require("out_path")
             let ext = URL(fileURLWithPath: raw).pathExtension.lowercased()
-            guard ["gif", "mp4", "html"].contains(ext) else { throw ToolFailure(message: "'out_path' must end in .gif, .mp4 or .html") }
+            guard ["gif", "apng", "mp4", "json", "html"].contains(ext) else {
+                throw ToolFailure(message: "'out_path' must end in .gif, .apng, .mp4, .json or .html")
+            }
+            let lottieMode = try a.string("lottie_mode").map { s -> Exporter.LottieMode in
+                guard let m = Exporter.LottieMode(rawValue: s) else { throw ToolFailure(message: "'lottie_mode' must be smooth or exact") }
+                return m
+            } ?? .smooth
             let out = try fileURL(a, key: "out_path", ext: ext)
             let scale = min(max(a.double("scale") ?? 1.5, 0.25), 4)
             guard !Exporter.animationTooLong(doc) else {
@@ -837,7 +848,9 @@ actor DottieTools {
             }
             let data: Data? = switch ext {
             case "gif": Exporter.gif(doc, scale: scale)
+            case "apng": Exporter.apng(doc, scale: scale, background: a.bool("transparent") == true ? nil : CGColor(gray: 1, alpha: 1))
             case "mp4": Exporter.mp4(doc, scale: scale)
+            case "json": Exporter.lottie(doc, mode: lottieMode, transparent: a.bool("transparent") == true, name: doc.name)
             default: Exporter.player(doc, title: doc.name).map { Data($0.utf8) }
             }
             guard let data else { throw ToolFailure(message: "Rendering failed") }

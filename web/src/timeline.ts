@@ -7,9 +7,9 @@ import {
   BOIL_DRAWINGS, type CameraKey, type Ease, type Element, type Follow, type Keyframe, type Page, type RGBA, type Timeline,
   type Track, clampFPS, clampTime, cloneElement, repeatIsValid, sameColor,
 } from "./model.ts";
-import { Polyline, type Point, type Rect } from "./path.ts";
+import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
-import { outline } from "./shapes.ts";
+import { dashPattern, outline } from "./shapes.ts";
 
 export function applyEase(ease: Ease, u: number): number {
   switch (ease) {
@@ -18,7 +18,37 @@ export function applyEase(ease: Ease, u: number): number {
     case "easeOut": return 1 - Math.pow(1 - u, 3);
     case "easeInOut": return u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2;
     case "hold": return 0;
+    case "spring": return spring(u);
+    case "bounce": return bounce(u);
+    case "elastic": return elastic(u);
   }
+}
+
+/** A damped spring released from rest, nudged so it is exactly 1 at the end. */
+function spring(u: number): number {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  const s = (u: number): number => 1 - Math.exp(-6 * u) * (Math.cos(3 * Math.PI * u) + (6 / (3 * Math.PI)) * Math.sin(3 * Math.PI * u));
+  return s(u) + u * (1 - s(1));
+}
+
+/** Robert Penner's ease-out bounce: four arcs, each landing on 1. */
+function bounce(u: number): number {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  const n = 7.5625, d = 2.75;
+  if (u < 1 / d) return n * u * u;
+  if (u < 2 / d) { const v = u - 1.5 / d; return n * v * v + 0.75; }
+  if (u < 2.5 / d) { const v = u - 2.25 / d; return n * v * v + 0.9375; }
+  const v = u - 2.625 / d;
+  return n * v * v + 0.984375;
+}
+
+/** Robert Penner's ease-out elastic. */
+function elastic(u: number): number {
+  if (u <= 0) return 0;
+  if (u >= 1) return 1;
+  return Math.pow(2, -10 * u) * Math.sin((u * 10 - 0.75) * ((2 * Math.PI) / 3)) + 1;
 }
 
 /** Swift's truncatingRemainder. */
@@ -57,8 +87,10 @@ function value<V>(track: Track, t: number, get: (k: Keyframe) => V | undefined, 
 }
 
 const lerpNum = (a: number, b: number, u: number): number => a + (b - a) * u;
+// Springy eases overshoot: a color can't go past white or black.
+const mix01 = (a: number, b: number, u: number): number => Math.min(Math.max(a + (b - a) * u, 0), 1);
 const lerpColor = (a: RGBA, b: RGBA, u: number): RGBA => ({
-  r: a.r + (b.r - a.r) * u, g: a.g + (b.g - a.g) * u, b: a.b + (b.b - a.b) * u, a: a.a + (b.a - a.a) * u,
+  r: mix01(a.r, b.r, u), g: mix01(a.g, b.g, u), b: mix01(a.b, b.b, u), a: mix01(a.a, b.a, u),
 });
 
 function num(track: Track, t: number, p: Prop, base: number): number {
@@ -103,9 +135,10 @@ export function applyTrack(track: Track, e: Element, t: number): Element {
   }
   if (e.kind === "connector") return e;
   e.x = num(track, t, "x", e.x); e.y = num(track, t, "y", e.y);
-  e.width = num(track, t, "width", e.width); e.height = num(track, t, "height", e.height);
+  // Nor can a size or a line width go below nothing.
+  e.width = Math.max(0, num(track, t, "width", e.width)); e.height = Math.max(0, num(track, t, "height", e.height));
   if (track.keys.some((k) => k.rotation !== undefined)) e.rotation = num(track, t, "rotation", angle(e));
-  e.style.strokeWidth = num(track, t, "strokeWidth", e.style.strokeWidth);
+  e.style.strokeWidth = Math.max(0, num(track, t, "strokeWidth", e.style.strokeWidth));
   e.style.stroke = value(track, t, (k) => k.stroke, e.style.stroke, lerpColor);
   e.style.fill = value(track, t, (k) => k.fill, e.style.fill, lerpColor);
   return e;
@@ -140,7 +173,8 @@ export function following(track: Track, e: Element, t: number, page: Page): Elem
   if (!pathElement || pathElement.id === e.id) return e;
   const line = tracing(pathElement, page);
   const span = f.end - f.start;
-  let u = applyEase(f.ease ?? "easeInOut", span > 0 ? Math.min(1, (t - f.start) / span) : 1) * (f.laps ?? 1);
+  // An overshooting ease stops at the end of the path rather than wrapping round to its start.
+  let u = Math.min(Math.max(applyEase(f.ease ?? "easeInOut", span > 0 ? Math.min(1, (t - f.start) / span) : 1), 0), 1) * (f.laps ?? 1);
   if (u > 1) u = rem(u, 1) === 0 ? 1 : rem(u, 1);
   if (f.reverse === true) u = 1 - u;
   const p = line.point(u);
@@ -153,6 +187,20 @@ export function following(track: Track, e: Element, t: number, page: Page): Elem
     if (a.x !== b.x || a.y !== b.y) moved.rotation = Math.atan2(b.y - a.y, b.x - a.x);
   }
   return moved;
+}
+
+/** Where the dashes of a line marching at `speed` stand at `t`, within one pattern `period` (Timeline.marchOffset):
+ * the speed is rounded to a whole number of patterns over the timeline, so a loop is seamless. */
+export function marchOffset(tl: Timeline, speed: number, period: number, t: number): number {
+  if (!(period > 0)) return 0;
+  const d = clampTime(tl.duration);
+  if (d > 0) {
+    const laps = roundHalfAway((speed * d) / period);
+    if (laps !== 0) speed = (laps * period) / d;
+  }
+  const r = rem(speed * t, period);
+  // Positive phase pulls the pattern back towards the start, so going forward is a falling phase.
+  return r < 0 ? -r : r === 0 ? 0 : period - r;
 }
 
 /** Tracks by element; when two name the same element the first wins. */
@@ -190,6 +238,11 @@ export function resolved(page: Page, t: number): Page {
     if (reseed !== null && reseed > 0 && boils(e)) {
       if (out === e) out = cloneElement(e);
       out.seed = boiled(e.seed, reseed);
+    }
+    const pattern = track?.march != null ? dashPattern(out.style.dash, out.style.strokeWidth) : null;
+    if (track?.march != null && pattern) {
+      if (out === e) out = cloneElement(e);
+      out.style.dashOffset = marchOffset(timeline, track.march, pattern.reduce((a, b) => a + b, 0), t);
     }
     return out;
   });
@@ -241,7 +294,8 @@ export function cameraRect(tl: Timeline, t: number): Rect | null {
   if (!after) return rectOf(before);
   const u = applyEase(before.ease ?? "easeInOut", (t - before.t) / Math.max(after.t - before.t, 1e-9));
   const mix = (p: number, q: number) => p + (q - p) * u;
-  return { x: mix(before.x, after.x), y: mix(before.y, after.y), width: mix(before.width, after.width), height: mix(before.height, after.height) };
+  // A springy ease can overshoot a zoom past nothing.
+  return { x: mix(before.x, after.x), y: mix(before.y, after.y), width: Math.max(1, mix(before.width, after.width)), height: Math.max(1, mix(before.height, after.height)) };
 }
 
 const rectOf = (k: CameraKey): Rect => ({ x: k.x, y: k.y, width: k.width, height: k.height });

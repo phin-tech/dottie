@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="808" height="403.01" viewBox="16 91 808 403.01">
-<rect x="16" y="91" width="808" height="403.01" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="808" height="399.51" viewBox="16 94.5 808 399.51">
+<rect x="16" y="94.5" width="808" height="399.51" fill="#ffffff"/>
 <path d="M40 120 L160 120 L160 190 L40 190 Z" fill="#ffd966" stroke="none"/>
 <path d="M40 120 L160 120 L160 190 L40 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="161.48">popIn</tspan></text>
@@ -9,9 +9,9 @@
 <path d="M360 120 L480 120 L480 190 L360 190 Z" fill="#ffd966" stroke="none"/>
 <path d="M360 120 L480 120 L480 190 L360 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="161.48">wipeIn</tspan></text>
-<path d="M520 115 L640 115 L640 185 L520 185 Z" fill="#ffd966" stroke="none"/>
-<path d="M520 115 L640 115 L640 185 L520 185 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="580" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="580" y="156.48">dropIn</tspan></text>
+<path d="M520 118.5 L640 118.5 L640 188.5 L520 188.5 Z" fill="#ffd966" stroke="none"/>
+<path d="M520 118.5 L640 118.5 L640 188.5 L520 188.5 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="580" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="580" y="159.98">dropIn</tspan></text>
 <path d="M680 120 L800 120 L800 190 L680 190 Z" fill="#ffd966" stroke="none"/>
 <path d="M680 120 L800 120 L800 190 L680 190 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="740" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="740" y="161.48">slideIn</tspan></text>

@@ -133,6 +133,12 @@ struct DottieCommands: Commands {
                 ForEach(BuildStyle.allCases, id: \.self) { s in Button(s.title) { editor?.buildDiagram(s) } }
             }
             .disabled(editor == nil)
+            Button("Magic Move to Next Page") { editor?.magicMove() }
+                .disabled(editor?.hasNextPage != true)
+                .help("Tween this page into the next one: shapes with the same anchor, seed or text move, the rest fade")
+            Button("March Selected Lines") { editor?.marchSelection() }
+                .disabled(n == 0)
+                .help("Marching ants: the dashes travel along the line (again to stop)")
             Divider()
             Toggle("Boil Lines", isOn: Binding(get: { editor?.boils ?? false }, set: { _ in editor?.toggleBoil() }))
                 .disabled(editor == nil)

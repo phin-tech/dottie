@@ -24,11 +24,12 @@ fixture, so the gap is visible rather than silent.
 | Ports and edge-following, rotated shapes, free ends | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Arrowheads: arrow, triangle, dot, bar | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Connector labels | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | Label boxes sized with CoreText's measurements. The player paints them on the page color, like the app; Dottie's flipbook export leaves them unpainted |
-| Keys and eases (linear, in, out, in-out, hold) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
+| Keys and eases (linear, in, out, in-out, hold, spring, bounce, elastic) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie), [edge/eases](../fixtures/edge/eases.dottie) | Unknown ease names play linear, with a warning |
 | Visibility, reveal (draw-on, typing), opacity | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
 | Transitions | Supported | [edge/transitions](../fixtures/edge/transitions.dottie) | They are ordinary keys in the file |
 | Follow paths (connectors, outlines, orient, reverse, laps) | Supported | [edge/follow](../fixtures/edge/follow.dottie) | |
 | Packets, labelled packets | Supported | [design/labels](../fixtures/design/labels.dottie) | |
+| Marching ants (dashes travelling along a line) | Supported | [edge/march](../fixtures/edge/march.dottie) | `stroke-dashoffset` per frame, evened out to loop |
 | Repeats (counted and forever) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
 | Boil (three drawings) and settle | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | Boiled seeds match bit for bit |
 | Camera views | Supported | [edge/camera](../fixtures/edge/camera.dottie), [design/zoom](../fixtures/design/zoom.dottie) | |

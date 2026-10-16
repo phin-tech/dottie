@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="628" height="248" viewBox="16 16 628 248">
+<rect x="16" y="16" width="628" height="248" fill="#ffffff"/>
+<path d="M40 40 L140 40 L140 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="90" y="76.48">a</tspan></text>
+<path d="M360 40 L460 40 L460 100 L360 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="410" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="410" y="76.48">b</tspan></text>
+<path d="M140 70 L360 70 M350.99 65.66 L360 70 M350.99 74.34 L360 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6" stroke-dashoffset="7.28"/>
+<path d="M90 100 C250 100 250 100 410 100 M396.49 93.49 L410 100 M396.49 106.51 L410 100" fill="none" stroke="#1f1f21" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.01 7.8" stroke-dashoffset="6.64"/>
+<path d="M410 40 L410 40 M410 40 L90 40 M90 40 L90 40 M80.99 35.66 L90 40 M80.99 44.34 L90 40" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M620 90 C620 117.61 597.61 140 570 140 C542.39 140 520 117.61 520 90 C520 62.39 542.39 40 570 40 C597.61 40 620 62.39 620 90 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6" stroke-dashoffset="10.22"/>
+<path d="M520 180 L620 180 L620 240 L520 240 Z" fill="none" stroke="#1f1f21" stroke-width="3.11" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="12.44 9.33" stroke-dashoffset="5.66"/>
+<path d="M40 180 L140 180 L140 240 L40 240 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6" stroke-dashoffset="7"/>
+</svg>
