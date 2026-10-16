@@ -114,7 +114,8 @@ play button. The Animate menu does the common things in one go:
   once a shape stops moving.
 - **Repeat Selection's Animation** plays a shape's animation over and over, like a light that keeps pulsing.
 - **Frame Camera on Selection** points the export's view at the selected shapes from that moment on, so a big
-  diagram can pan and zoom from one part to the next. **Add Scene Marker** names a stop: the web page export
+  diagram can pan and zoom from one part to the next. While stopped on the timeline, drag the dashed camera
+  frame's edge to move the view, or a corner to resize it. **Add Scene Marker** names a stop: the web page export
   then pauses at each scene and steps through them with its next and back buttons, like slides.
 
 The timeline under the canvas shows every animated shape with its keyframes. Press play to watch, or drag
@@ -124,7 +125,8 @@ retime it, ⌥-drag to copy it, and pick its easing from the bar above. **Onion 
 before and after, faintly.
 
 Assistants can animate too: ask for *"a version of this diagram that builds itself, with a request moving
-through it"*, then *"export it as a GIF"*.
+through it"*, *"send a POST /orders packet from the client every second"*, or *"zoom in on each service in turn,
+as scenes"*, then *"export it as a GIF"*.
 
 More examples, each made by a short script in [scripts/demos](scripts/demos): a sprint board whose notes
 [pop in one after another](Design/demos/stagger.gif), a service map with
