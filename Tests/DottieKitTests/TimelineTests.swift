@@ -1,4 +1,5 @@
 import XCTest
+import ImageIO
 @testable import DottieKit
 
 final class TimelineTests: XCTestCase {
@@ -116,5 +117,19 @@ final class TimelineTests: XCTestCase {
         doc.timeline = tl
         doc.remove([a.id])
         XCTAssertEqual(doc.timeline?.tracks, [])
+    }
+
+    func testGIFHasOneFramePerTimelineFrame() throws {
+        var doc = DottieDocument()
+        let a = try box(&doc)
+        var tl = Timeline(fps: 10, duration: 0.5)
+        tl.setKey(Keyframe(t: 0, x: 0), for: a.id)
+        tl.setKey(Keyframe(t: 0.5, x: 300), for: a.id)
+        doc.timeline = tl
+        let data = try XCTUnwrap(Exporter.gif(doc))
+        let src = try XCTUnwrap(CGImageSourceCreateWithData(data as CFData, nil))
+        XCTAssertEqual(CGImageSourceGetCount(src), 5)
+        let first = try XCTUnwrap(CGImageSourceCreateImageAtIndex(src, 0, nil))
+        XCTAssertGreaterThan(first.width, 300, "every frame is framed to the whole motion")
     }
 }
