@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="748" height="508" viewBox="-24 -24 748 508">
-<rect x="-24" y="-24" width="748" height="508" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="888" height="518" viewBox="-24 -24 888 518">
+<rect x="-24" y="-24" width="888" height="518" fill="#ffffff"/>
 <path d="M40 40 L160 40 L160 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="76.48">A</tspan></text>
 <path d="M440 195 C440 214.33 413.14 230 380 230 C346.86 230 320 214.33 320 195 C320 175.67 346.86 160 380 160 C413.14 160 440 175.67 440 195 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -43,6 +43,20 @@
 <path d="M159.23 325.58 C359.61 325.58 359.61 329.51 560 329.51 M550.99 325.16 L560 329.51 M550.99 333.84 L560 329.51" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6"/>
 <path d="M560 304.51 L158.85 100 M170.96 115.92 L158.85 100 M178.84 100.45 L158.85 100" fill="none" stroke="#1f1f21" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="0.01 10.4"/>
 <path d="M560.7 301.6 C560.7 305.14 557.83 308 554.3 308 C550.76 308 547.9 305.14 547.9 301.6 C547.9 298.07 550.76 295.2 554.3 295.2 C557.83 295.2 560.7 298.07 560.7 301.6 Z" fill="#1f1f21" stroke="none"/>
+<path d="M760 40 L840 40 L840 90 L760 90 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M760 420 L840 420 L840 470 L760 470 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M800 90 L800 420 M804.34 410.99 L800 420 M795.66 410.99 L800 420" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="696.5" y="219.5" width="207" height="71" fill="#ffffff"/>
+<text x="800" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="800" y="261.48">a label much too long to fit on one line, so it wraps onto several lines</tspan></text>
+<path d="M840 65 L840 65 M840 65 L840 445 M840 445 L840 445 M830.99 440.66 L840 445 M830.99 449.34 L840 445" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="749" y="208.5" width="182" height="93" fill="#ffffff"/>
+<text x="840" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="840" y="261.48">GET https://api.example.com/v1/orders/12345/line-items?expand=true</tspan></text>
+<path d="M760 421.19 L422 220 M427.52 228.33 L422 220 M431.96 220.88 L422 220" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="485.5" y="285.09" width="211" height="71" fill="#ffffff"/>
+<text x="591" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="591" y="327.07">well-known state-of-the-art hyphenated-words-in-a-row</tspan></text>
+<path d="M760 66.11 L679.55 68.35 M688.67 72.43 L679.55 68.35 M688.43 63.76 L679.55 68.35" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="614.77" y="42.73" width="210" height="49" fill="#ffffff"/>
+<text x="719.77" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="719.77" y="73.71">Supercalifragilisticexpialidociousnessofthelabel</tspan></text>
 <path d="M300 420 L340 420 L340 460 L300 460 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M320 440 L320 440 M310.99 435.66 L320 440 M310.99 444.34 L320 440" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

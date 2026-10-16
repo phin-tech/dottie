@@ -26,17 +26,38 @@ export function lineHeights(fontSize: number): [number, number] {
   return [a + d, a + d + l];
 }
 
-/** Lines `s` wraps into within `maxWidth`, breaking at spaces (or inside a word too long for a line). */
+/** Whether a line may break after `ch` when `next` follows (Unicode line breaking as CoreText does it: after
+ * a space, and after a slash or hyphen not followed by a digit, a space or another of itself). */
+export function breaksAfter(ch: string, next: string): boolean {
+  if (ch === " ") return true;
+  return (ch === "/" || ch === "-") && next !== "" && !/[\d\s/-]/.test(next);
+}
+
+/** `para` cut into pieces that each end where a line may break. */
+function pieces(para: string): string[] {
+  const chars = [...para];
+  const out: string[] = [];
+  let cur = "";
+  chars.forEach((ch, i) => {
+    cur += ch;
+    const next = chars[i + 1] ?? "";
+    // Spaces stay with the piece they follow, so they hang at the end of a line.
+    if (breaksAfter(ch, next) && next !== " ") { out.push(cur); cur = ""; }
+  });
+  if (cur || out.length === 0) out.push(cur);
+  return out;
+}
+
+/** Lines `s` wraps into within `maxWidth` (or inside a piece too long for a line). */
 export function wrap(s: string, fontSize: number, maxWidth: number, face: Face = "regular"): string[] {
   const out: string[] = [];
   for (const para of s.split(/\r\n|\n|\r|\u2028|\u2029/)) {
-    const words = para.match(/\S+\s*|\s+/g) ?? [""];
     let line = "";
-    for (const word of words) {
-      const candidate = line + word;
+    for (const piece of pieces(para)) {
+      const candidate = line + piece;
       if (line === "" || measure(candidate.trimEnd(), fontSize, face) <= maxWidth) { line = candidate; }
-      else { out.push(line); line = word; }
-      // A word wider than the line breaks between characters.
+      else { out.push(line); line = piece; }
+      // A piece wider than the line breaks between characters.
       while (measure(line.trimEnd(), fontSize, face) > maxWidth && [...line.trimEnd()].length > 1) {
         const chars = [...line];
         let n = chars.length - 1;

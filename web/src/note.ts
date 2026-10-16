@@ -11,6 +11,7 @@ import {
 } from "./metrics.ts";
 import { type Rect, fmt } from "./path.ts";
 import { color, escapeXML } from "./svg-util.ts";
+import { breaksAfter } from "./text.ts";
 
 export const PADDING = 12;
 const SEP = "\u2028";
@@ -452,8 +453,7 @@ function layoutLines(paras: Para[], width: number, height: number, fontSize: num
         x += w;
         // Break opportunities (Unicode line breaking, as CoreText does it): after a space, and after a slash
         // or hyphen that isn't followed by a digit or another of itself.
-        const next = chars[end + 1]?.ch ?? "";
-        if (ch === " " || ((ch === "/" || ch === "-") && next !== "" && !/[\d\s/-]/.test(next))) lastSpace = glyphs.length - 1;
+        if (breaksAfter(ch, chars[end + 1]?.ch ?? "")) lastSpace = glyphs.length - 1;
       }
       if (glyphs.length === 0 && end === k && k < chars.length) { // a single character wider than the line
         const { ch, run } = chars[k];

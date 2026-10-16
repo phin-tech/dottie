@@ -225,6 +225,14 @@ def connectors():
     # Clean, dashed, thick.
     p.connect(c, e, routing="curved", st=style(roughness=0, dash="dashed"))
     p.connect(e, a, routing="straight", st=style(strokeWidth=4, dash="dotted"), start_head="dot")
+    # Long labels wrap at 200 points, breaking after spaces, slashes and hyphens as CoreText does.
+    g = p.add("rectangle", 760, 40, 80, 50)
+    h = p.add("rectangle", 760, 420, 80, 50)
+    p.connect(g, h, text="a label much too long to fit on one line, so it wraps onto several lines")
+    p.connect(g, h, routing="elbow", start_port="right", end_port="right",
+              text="GET https://api.example.com/v1/orders/12345/line-items?expand=true")
+    p.connect(h, b, text="well-known state-of-the-art hyphenated-words-in-a-row")
+    p.connect(g, d, text="Supercalifragilisticexpialidociousnessofthelabel")
     # Coincident shapes: zero-length route.
     f = p.add("rectangle", 300, 420, 40, 40)
     p.connect(f, f)
