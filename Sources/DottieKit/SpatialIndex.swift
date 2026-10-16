@@ -154,15 +154,18 @@ public struct SpatialIndex: Sendable {
 
     /// The topmost element under `point` on a visible, unlocked layer.
     /// `skipping` passes clicks through elements the editor isn't showing.
-    public func element(at point: CGPoint, in doc: DottieDocument, skipping: Set<UUID> = []) -> Element? {
+    /// The topmost element under `point`: a shape within `tolerance` of its frame, a connector within
+    /// `tolerance + 2` of its line.
+    public func element(at point: CGPoint, in doc: DottieDocument, skipping: Set<UUID> = [], tolerance: Double = 4) -> Element? {
         let open = Set(doc.layers.filter { $0.visible && !$0.locked }.map(\.id))
-        let probe = CGRect(x: point.x - 1, y: point.y - 1, width: 2, height: 2)
+        let r = max(1, tolerance - 3)
+        let probe = CGRect(x: point.x - r, y: point.y - r, width: 2 * r, height: 2 * r)
         for pos in candidates(in: probe).reversed() {
             let e = ordered[pos]
             guard open.contains(e.layerID), !skipping.contains(e.id) else { continue }
             if e.kind == .connector {
-                if Connector.distance(from: point, to: e, in: doc, index: byID) <= 6 { return e }
-            } else if e.frame.insetBy(dx: -4, dy: -4).contains(e.unrotated(point)) {
+                if Connector.distance(from: point, to: e, in: doc, index: byID) <= tolerance + 2 { return e }
+            } else if e.frame.insetBy(dx: -tolerance, dy: -tolerance).contains(e.unrotated(point)) {
                 return e
             }
         }
