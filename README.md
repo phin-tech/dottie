@@ -139,8 +139,9 @@ as scenes"*, then *"export it as a GIF"*.
 **[Play the demos in your browser](https://phin-tech.github.io/dottie/demos/)**: a camera that
 [zooms through a checkout flow](Design/demos/zoom.gif), a [click-through tour](Design/demos/tour.gif) of the
 diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /orders`, `order.created`),
-[traffic that never stops](Design/demos/live.gif), and a sprint board whose notes
-[pop in one after another](Design/demos/stagger.gif). Each is made by a short script in
+[traffic that never stops](Design/demos/live.gif), a sprint board whose notes
+[pop in one after another](Design/demos/stagger.gif), the same board two days on by
+[Magic Move](Design/demos/board.gif), and an event stream whose arrows [march](Design/demos/stream.gif). Each is made by a short script in
 [scripts/demos](scripts/demos).
 
 ## Extras for power users

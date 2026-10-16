@@ -50,8 +50,11 @@ zip="$out/Dottie-$version.zip"
 ditto -c -k --sequesterRsrc --keepParent "$app" "$zip"
 sum=$(shasum -a 256 "$zip" | cut -d' ' -f1)
 
-# Notes are generated from the commits since the previous release.
-gh release create "$tag" "$zip" --target "$(git rev-parse HEAD)" --title "Dottie $version" --generate-notes >/dev/null
+# Notes come from release-notes/<version>.md when there is one, and are generated from the commits since the
+# previous release otherwise.
+notes=release-notes/$version.md
+if [[ -f $notes ]]; then notes_flags=(--notes-file "$notes"); else notes_flags=(--generate-notes); fi
+gh release create "$tag" "$zip" --target "$(git rev-parse HEAD)" --title "Dottie $version" "${notes_flags[@]}" >/dev/null
 echo "Released $tag (build $build): Dottie-$version.zip, sha256 $sum"
 gh release view "$tag" --json url -q .url
 

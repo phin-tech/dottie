@@ -117,8 +117,9 @@ just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm r
    This needs a Developer ID Application certificate.
 4. `just release`: finds the newest notarized `Dottie.app` Xcode kept in the archive's `Submissions` folder,
    checks it is a stapled, notarized Developer ID build of the version in `project.yml` and that `main` is clean
-   and pushed, then publishes `Dottie-<version>.zip` as a GitHub release tagged `v<version>` with generated
-   notes. Last, it points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at
+   and pushed, then publishes `Dottie-<version>.zip` as a GitHub release tagged `v<version>`. Its notes are
+   `release-notes/<version>.md` when that exists (write it before archiving), and generated from the commits
+   otherwise. Last, it points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at
    the new zip; `just tap` does that step alone if it failed.
 
 The app's update check (`UpdateChecker`) reads GitHub's latest release, which skips drafts and pre-releases. It
