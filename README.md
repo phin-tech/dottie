@@ -158,7 +158,9 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
 ## Extras for power users
 
 - **Scripting.** Script ▸ Script Console… (⌥⌘J) runs JavaScript to draw or change many things at once, such as
-  a grid of boxes or restyling everything labelled "TODO". The console includes a full reference.
+  a grid of boxes or restyling everything labelled "TODO". The console includes a full reference. The scripts
+  folder has TypeScript declarations (`dottie.d.ts`) for completion in an editor, and with TypeScript installed
+  (`npm install -g typescript`) the console and the MCP server's `run_script` point out misspelled options.
 - **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
   from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng`,
   `.mp4`, or `.json` for Lottie) for an animated page. Run `dottie --help` for more.

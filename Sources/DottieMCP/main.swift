@@ -25,14 +25,22 @@ await server.withMethodHandler(ListTools.self) { _ in
 }
 
 let scriptAPIURI = "dottie://script-api"
+let scriptTypesURI = "dottie://dottie.d.ts"
 
 await server.withMethodHandler(ListResources.self) { _ in
     .init(resources: [Resource(name: "script-api", uri: scriptAPIURI, title: "Dottie JavaScript API",
                                description: "Reference for the `dottie` object used by the run_script tool",
-                               mimeType: "text/plain")])
+                               mimeType: "text/plain"),
+                      Resource(name: "dottie.d.ts", uri: scriptTypesURI, title: "Dottie script types",
+                               description: "TypeScript declarations for run_script's `dottie` object; run_script checks "
+                                + "scripts against them when TypeScript is installed",
+                               mimeType: "application/typescript")])
 }
 
 await server.withMethodHandler(ReadResource.self) { params in
+    if params.uri == scriptTypesURI {
+        return .init(contents: [.text(DottieScript.typeDefinitions, uri: scriptTypesURI, mimeType: "application/typescript")])
+    }
     guard params.uri == scriptAPIURI else { throw MCPError.invalidParams("Unknown resource \(params.uri)") }
     let installed = DottieScript.installedModules()
     let text = DottieScript.apiReference + "\n\nInstalled modules for require(): "

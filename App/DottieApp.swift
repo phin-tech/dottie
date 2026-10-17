@@ -8,6 +8,7 @@ struct DottieApp: App {
         #endif
         LiveServer.shared.start()
         AppearanceMode.stored.apply()
+        ScriptLibrary.refreshTypes()
     }
 
     var body: some Scene {

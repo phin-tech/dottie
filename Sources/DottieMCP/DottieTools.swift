@@ -234,10 +234,15 @@ actor DottieTools {
                 "render": prop("boolean", "Also return a PNG of the result (default false)"),
                 "scale": prop("number", "Pixel scale for render, default 2"),
                 "timeout": prop("number", "Seconds before the script is stopped, default 10, at most 60"),
+                "typecheck": prop("boolean", "Check the script against dottie.d.ts with the TypeScript compiler, when one is "
+                    + "installed, and list any problems as warnings (default true; the script runs either way)"),
              ], required: ["path", "code"])),
         Tool(name: "script_api",
-             description: "Reference for the JavaScript API available to run_script (also served as the resource dottie://script-api).",
-             inputSchema: schema([:])),
+             description: "Reference for the JavaScript API available to run_script (also served as the resource dottie://script-api). "
+                + "format \"typescript\" returns it as dottie.d.ts declarations instead (the resource dottie://dottie.d.ts).",
+             inputSchema: schema([
+                "format": prop("string", "reference (default) or typescript", enum: ["reference", "typescript"]),
+             ])),
         Tool(name: "list_stencils",
              description: "List the stencil items (reusable shapes: flowchart symbols, icons, imported SVG sets) available "
                 + "to add_stencil, from the built-in Basics library and the user's libraries in Application Support/Dottie/Libraries.",
@@ -680,6 +685,7 @@ actor DottieTools {
             return text("Updated")
 
         case "script_api":
+            if a.string("format") == "typescript" { return text(DottieScript.typeDefinitions) }
             let installed = DottieScript.installedModules()
             return text(DottieScript.apiReference + "\n\nInstalled modules for require(): "
                 + (installed.isEmpty ? "none (add .js files to \(DottieScript.modulesDirectory.path))" : installed.joined(separator: ", ")))
@@ -694,11 +700,13 @@ actor DottieTools {
             let limit = min(max(a.double("timeout") ?? DottieScript.defaultTimeLimit, 1), 60)
             let modules = (a.raw["modules"]?.objectValue ?? [:]).compactMapValues(\.stringValue)
             let result = DottieScript.run(code, on: &doc, in: file, modules: modules, timeLimit: limit)
+            let typeCheck = a.bool("typecheck") == false ? [] : DottieScript.typeCheckSummary(code)
             var report = result.logs.joined(separator: "\n")
             func append(_ line: String) { report += (report.isEmpty ? "" : "\n") + line }
             if let error = result.error {
                 append("Script error: \(error)")
                 append("Nothing was changed.")
+                if let typeCheck { typeCheck.forEach(append) } else { append(DottieScript.typeScriptHint) }
                 return .init(content: [.plain(report)], isError: true)
             }
             if doc != before {
@@ -708,6 +716,7 @@ actor DottieTools {
             }
             else { append("No changes.") }
             if let value = result.value { append("Result: \(value)") }
+            typeCheck?.forEach(append)
             var content: [Tool.Content] = [.plain(report)]
             if a.bool("render") == true, !doc.elements.isEmpty {
                 let scale = min(max(a.double("scale") ?? 2, 0.25), 4)

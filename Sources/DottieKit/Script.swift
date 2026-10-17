@@ -85,11 +85,12 @@ public enum DottieScript {
 
         var failure: String?
         var json: String?
-        var result = context.evaluateScript(source)
-        // A top-level `return` is a syntax error for a plain script; nothing ran, so wrap and retry.
+        var result = context.evaluateScript(source, withSourceURL: scriptURL)
+        // A top-level `return` is a syntax error for a plain script; nothing ran, so wrap and retry. The source
+        // starts on the wrapper's first line, so errors keep its line numbers.
         if let e = context.exception, isReturnSyntaxError(e) {
             context.exception = nil
-            result = context.evaluateScript("(function () {\n" + source + "\n})()")
+            result = context.evaluateScript("(function () {" + source + "\n})()", withSourceURL: scriptURL)
         }
         if let e = context.exception {
             failure = describe(e)
@@ -105,9 +106,16 @@ public enum DottieScript {
         e.forProperty("name")?.toString() == "SyntaxError" && (e.forProperty("message")?.toString() ?? "").lowercased().contains("return")
     }
 
+    /// The script's source URL, so its frames can be told from the prelude's and modules' in a stack.
+    private static let scriptURL = URL(string: "script.js")
+
     private static func describe(_ e: JSValue) -> String {
         var s = e.forProperty("message")?.isString == true ? (e.forProperty("name")?.toString() ?? "Error") + ": " + e.forProperty("message")!.toString() : e.toString() ?? "Error"
-        if let line = e.forProperty("line"), line.isNumber { s += " (line \(line.toInt32()))" }
+        // An error from a dottie call is made in the prelude, so its `line` is the prelude's; the innermost
+        // frame in the script is the line that made the call.
+        let stack = e.forProperty("stack")?.isString == true ? e.forProperty("stack")!.toString()! : ""
+        if let m = stack.firstMatch(of: /script\.js:(\d+):/) { s += " (line \(m.1))" }
+        else if let line = e.forProperty("line"), line.isNumber { s += " (line \(line.toInt32()))" }
         return s
     }
 
@@ -798,6 +806,11 @@ public enum DottieScript {
     Edits apply only if the script finishes without throwing. The value of the last expression (or of a top-level `return`) \
     is returned as JSON; console.log output is returned too. Ids are strings; any call that takes an id also takes an \
     element object returned by another call. Colors are hex strings like "#ffcc00". Units are canvas points, y down.
+
+    Types: the same API as TypeScript declarations is script_api with format "typescript" (the resource \
+    dottie://dottie.d.ts); `dottie script-types <dir>` writes it with a tsconfig.json for an editor or `tsc -p .`. \
+    When TypeScript's tsc is installed, run_script checks each script against it and lists mistakes (unknown \
+    options, misspelled values) after the script's output; the script runs either way.
 
     Reading
       dottie.elements({kind?, text?, anchor?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
