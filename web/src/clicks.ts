@@ -90,11 +90,11 @@ export function partsOf(page: Page, instances: Set<string>): Map<string, string>
 export const CLICK_STYLE = `
 .dottie-a { cursor: pointer; outline: none; }
 .dottie-a .dottie-h { display: none; }
-.dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
-.dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
+.dottie-a:hover .dottie-h, .dottie-a.dottie-hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
+.dottie-a:hover .dottie-n, .dottie-a.dottie-hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
 .dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
-.dottie-a:not(.dottie-b):active { transform: translate(1px, 1px); }
+.dottie-a:not(.dottie-b):active, .dottie-a.dottie-press:not(.dottie-b) { transform: translate(1px, 1px); }
 .dottie-a .dottie-d { display: none; }
-.dottie-b:active .dottie-n, .dottie-b:active .dottie-h { display: none; }
-.dottie-b:active .dottie-d { display: inline; }
+.dottie-b:active .dottie-n, .dottie-b:active .dottie-h, .dottie-b.dottie-press .dottie-n, .dottie-b.dottie-press .dottie-h { display: none; }
+.dottie-b:active .dottie-d, .dottie-b.dottie-press .dottie-d { display: inline; }
 `;

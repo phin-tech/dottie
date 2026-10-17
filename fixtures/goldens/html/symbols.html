@@ -1214,6 +1214,7 @@ output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right
     var a = document.activeElement, held = a && a.getAttribute && frames[i].contains(a) ? a.getAttribute("data-a") : null;
     frames[i].classList.remove("on"); i = (k + n) % n; frames[i].classList.add("on");
     if (held !== null) { var same = frames[i].querySelector('[data-a="' + held + '"]'); if (same) same.focus({ preventScroll: true }); }
+    if (hovered !== null || holding !== null) mark();
     scrub.value = i; time.textContent = times[i].toFixed(1) + "s";
     if (sceneLabel) { var s = sceneAt(i); sceneLabel.textContent = s < 0 ? "" : names[s]; }
   }
@@ -1257,12 +1258,29 @@ output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right
   function button(t) { return t && t.closest ? t.closest(".dottie-a") : null; }
   // Frames are swapped while playing, so a press and its release can land on different copies of a button,
   // and the click then reaches only the stage: the button pressed still counts if it is under the release.
-  var pressed = null;
-  document.querySelector(".stage").addEventListener("pointerdown", function (e) {
+  // The button under the pointer, and the one held down, are marked in each frame shown, since the browser
+  // only counts a newly shown copy as hovered once the pointer moves.
+  var stage = document.querySelector(".stage"), pressed = null, hovered = null, holding = null;
+  function mark() {
+    var old = document.querySelectorAll(".dottie-hover, .dottie-press");
+    for (var j = 0; j < old.length; j++) old[j].classList.remove("dottie-hover", "dottie-press");
+    if (hovered !== null) { var h = frames[i].querySelector('[data-a="' + hovered + '"]'); if (h) h.classList.add("dottie-hover"); }
+    if (holding !== null) { var p = frames[i].querySelector('[data-a="' + holding + '"]'); if (p) p.classList.add("dottie-press"); }
+  }
+  stage.addEventListener("pointermove", function (e) {
+    var b = button(e.target), a = b ? b.getAttribute("data-a") : null;
+    if (a !== hovered) { hovered = a; mark(); }
+  });
+  stage.addEventListener("pointerleave", function () { hovered = null; holding = null; mark(); });
+  document.addEventListener("pointerup", function () { if (holding !== null) { holding = null; mark(); } });
+  document.addEventListener("pointercancel", function () { holding = null; mark(); });
+  stage.addEventListener("pointerdown", function (e) {
     var b = button(e.target);
     pressed = b ? b.getAttribute("data-a") : null;
+    holding = pressed;
+    mark();
   });
-  document.querySelector(".stage").addEventListener("click", function (e) {
+  stage.addEventListener("click", function (e) {
     var b = button(e.target), held = pressed;
     pressed = null;
     if (!b && held !== null) {
