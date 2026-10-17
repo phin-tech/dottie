@@ -30,6 +30,8 @@ struct ContextBar: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
         }
+        // A sideways scroll view has no height of its own; without one the bar collapses to nothing.
+        .frame(height: 32)
         .controlSize(.small)
         .background(.bar)
     }
