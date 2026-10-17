@@ -88,6 +88,7 @@ struct TimelinePanel: View {
             }
             .buttonStyle(.plain)
             .help("Change the animation's length and frame rate")
+            .contextMenu { Button("Timing…") { editingTiming = true } }
             .popover(isPresented: $editingTiming, arrowEdge: .bottom) {
                 TimingPopover(timeline: timeline) { duration, fps in
                     onEdit("Change Timing") { $0.duration = duration; $0.fps = fps }
