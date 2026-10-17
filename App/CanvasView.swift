@@ -168,6 +168,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
     }
     private let rulerSize: CGFloat = 20
+    /// Where the pointer is, in view coordinates, for the marks on the rulers; nil when it is outside the view.
+    private var rulerCursor: CGPoint? {
+        didSet { if showRulers, rulerCursor != oldValue { invalidateRulers() } }
+    }
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
@@ -577,8 +581,34 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         ticks(origin: pan.x, length: bounds.width, horizontal: true)
         ticks(origin: pan.y, length: bounds.height, horizontal: false)
+
+        // Where the pointer is, marked across each ruler.
+        if let c = rulerCursor {
+            ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
+            ctx.setLineWidth(1)
+            if c.x >= t { ctx.move(to: CGPoint(x: c.x.rounded() + 0.5, y: 0)); ctx.addLine(to: CGPoint(x: c.x.rounded() + 0.5, y: t)) }
+            if c.y >= t { ctx.move(to: CGPoint(x: 0, y: c.y.rounded() + 0.5)); ctx.addLine(to: CGPoint(x: t, y: c.y.rounded() + 0.5)) }
+            ctx.strokePath()
+        }
         ctx.restoreGState()
     }
+
+    /// Redraws just the two ruler strips (the pointer's marks moved).
+    private func invalidateRulers() {
+        setNeedsDisplay(CGRect(x: 0, y: 0, width: bounds.width, height: rulerSize))
+        setNeedsDisplay(CGRect(x: 0, y: 0, width: rulerSize, height: bounds.height))
+    }
+
+    private lazy var pointerTracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                                      owner: self)
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if !trackingAreas.contains(pointerTracking) { addTrackingArea(pointerTracking) }
+    }
+
+    override func mouseMoved(with event: NSEvent) { rulerCursor = convert(event.locationInWindow, from: nil) }
+    override func mouseExited(with event: NSEvent) { rulerCursor = nil }
 
     /// The guide under a model-space point (within a few screen pixels), if any.
     private func guideHit(_ p: CGPoint) -> (vertical: Bool, index: Int)? {
@@ -1664,6 +1694,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        rulerCursor = convert(event.locationInWindow, from: nil)
         if case .panning? = gesture {
             let raw = convert(event.locationInWindow, from: nil)
             pan = CGPoint(x: panAnchor.pan.x + raw.x - panAnchor.raw.x, y: panAnchor.pan.y + raw.y - panAnchor.raw.y)
@@ -2309,6 +2340,9 @@ struct CanvasView: NSViewRepresentable {
     }
 
     func updateNSView(_ v: CanvasNSView, context: Context) {
+        #if DEBUG
+        DebugDriver.shared.register(v, for: document)
+        #endif
         if let t = pose {
             // Posing: the canvas edits the frame at `t`; only the finished edit reaches the page, as keys.
             v.onPreview = { _ in }
