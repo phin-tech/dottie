@@ -17,6 +17,9 @@ root = pathlib.Path(__file__).resolve().parent.parent
 bin_dir = root / ".build" / "debug"
 drawings = root / "website" / "docs" / "drawings"
 compiled = root / "website" / "docs" / "compiled"
+examples = root / "website" / "docs" / "examples"
+# Demos also shown as File > Export Animation's web page, which needs nothing but itself.
+EXPORTED = {"flows"}
 
 
 def run_script(script: pathlib.Path, page: pathlib.Path, after=None) -> None:
@@ -70,10 +73,12 @@ def render(page: pathlib.Path, out: pathlib.Path, scale: str) -> None:
 
 def publish(page: pathlib.Path, name: str) -> None:
     """Puts a copy of the drawing on the Pages site, which plays it live, and the drawing compiled into one
-    script (`dottie render -f js`) for the dottie.js page."""
+    script (`dottie render -f js`) for the dottie.js page; for the demos in EXPORTED, the web page export too."""
     drawings.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(page, drawings / f"{name}.dottie")
     render(page, compiled / f"{name}.js", "1")
+    if name in EXPORTED:
+        render(page, examples / f"{name}.html", "1")
 
 
 def readme() -> None:

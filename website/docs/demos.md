@@ -53,7 +53,10 @@ The diagram waits: click Auth or Orders (or Tab to one and press Enter) to watch
 Back to return. Back is a button symbol, with its own looks under the pointer and while pressed. In the inspector, **When Clicked on the Web** makes a shape play a scene or open a link, here and
 in the web page export, with a color for when the pointer is over it.
 
-<dottie-player class="player" src="../drawings/flows.dottie" label="Click to follow a request"></dottie-player>
+This one is File ▸ Export Animation's web page, exactly as Dottie saves it: one self-contained file, no
+script to install ([open it on its own](examples/flows.html)).
+
+<iframe class="player export" src="../examples/flows.html" title="Click to follow a request" loading="lazy"></iframe>
 
 ## Symbols
 
