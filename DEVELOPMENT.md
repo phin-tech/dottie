@@ -21,8 +21,10 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 
 `Dottie.xcodeproj` is generated from `project.yml` and gitignored, so change settings there, not in Xcode.
 
-**Website.** `website/` is the GitHub Pages site (Material for MkDocs), published by
-`.github/workflows/pages.yml` on pushes to `main` that touch it. Its demos are the drawings in
+**Website.** `website/` is the GitHub Pages site (Material for MkDocs) at https://dottie.phin.tech, published by
+`.github/workflows/pages.yml` on pushes to `main` that touch it. The domain is the repo's Pages custom domain, with
+a DNS-only CNAME from `dottie.phin.tech` to `phin-tech.github.io` in Cloudflare (proxying it would get in the way
+of GitHub's certificate); the old `phin-tech.github.io/dottie/` address redirects there. Its demos are the drawings in
 `website/docs/drawings`, made by `just demos` (and `just readme-animation`) on a Mac and committed, and played
 live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.5.1` via jsDelivr, set in
 `website/mkdocs.yml`), so a change to `web/` reaches the site once it is published. Preview it with
