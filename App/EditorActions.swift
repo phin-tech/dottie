@@ -335,10 +335,8 @@ extension ContentView {
         let model = document.model
         guard model.timeline != nil, !model.elements.isEmpty else { NSSound.beep(); return }
         guard !Exporter.animationTooLong(model) else {
-            let alert = NSAlert()
-            alert.messageText = "This animation is too long to export"
-            alert.informativeText = "It has more than \(Exporter.maxAnimationFrames) frames. Shorten it or lower its frame rate."
-            alert.runModal()
+            Alerts.show("This animation is too long to export",
+                        "It has more than \(Exporter.maxAnimationFrames) frames. Shorten it or lower its frame rate.")
             return
         }
         let panel = NSSavePanel()
@@ -352,10 +350,7 @@ extension ContentView {
             do { try format.write(model, to: url); failure = nil } catch { failure = error.localizedDescription }
             await MainActor.run {
                 guard let failure else { return }
-                let alert = NSAlert()
-                alert.messageText = "Couldn't export the animation"
-                alert.informativeText = failure
-                alert.runModal()
+                Alerts.show("Couldn't export the animation", failure)
             }
         }
     }
@@ -382,7 +377,7 @@ extension ContentView {
             guard let data else { throw CocoaError(.fileWriteUnknown) }
             try data.write(to: url, options: .atomic)
         } catch {
-            NSAlert(error: error).runModal()
+            Alerts.show(error)
         }
     }
 }

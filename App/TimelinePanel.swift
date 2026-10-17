@@ -72,11 +72,9 @@ struct TimelinePanel: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Button { collapsed.toggle() } label: {
-                Image(systemName: "chevron.right").rotationEffect(.degrees(collapsed ? 0 : 90))
+            DisclosureButton(isExpanded: !collapsed, expandHelp: "Show Timeline", collapseHelp: "Hide Timeline") {
+                collapsed.toggle()
             }
-            .buttonStyle(.borderless)
-            .help(collapsed ? "Show Timeline" : "Hide Timeline")
             IconButton(playing ? "pause.fill" : "play.fill", help: playing ? "Pause" : "Play") {
                 if playhead == nil { playhead = 0 }
                 playing.toggle()
@@ -339,9 +337,8 @@ struct TimelinePanel: View {
     private func layerHeader(_ group: TimelineRows.Group) -> some View {
         let closed = collapsedLayers.contains(group.layer)
         return HStack(spacing: 4) {
-            Image(systemName: "chevron.right")
+            DisclosureChevron(isExpanded: !closed)
                 .font(.system(size: 9, weight: .semibold))
-                .rotationEffect(.degrees(closed ? 0 : 90))
             Image(systemName: "square.3.layers.3d").font(.system(size: 10))
             Text(group.name).font(.caption.weight(.semibold))
             Spacer()

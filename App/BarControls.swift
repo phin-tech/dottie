@@ -24,3 +24,28 @@ struct IconButton: View {
 struct BarDivider: View {
     var body: some View { Divider().frame(height: 16) }
 }
+
+/// The chevron by something that opens and closes: right when closed, down when open, turning between them.
+struct DisclosureChevron: View {
+    var isExpanded: Bool
+
+    var body: some View {
+        Image(systemName: "chevron.right")
+            .rotationEffect(.degrees(isExpanded ? 90 : 0))
+            .animation(.snappy(duration: 0.15), value: isExpanded)
+    }
+}
+
+/// A borderless button that opens and closes something, its chevron and tooltip saying which it will do.
+struct DisclosureButton: View {
+    var isExpanded: Bool
+    var expandHelp: String
+    var collapseHelp: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) { DisclosureChevron(isExpanded: isExpanded).frame(width: 12) }
+            .buttonStyle(.borderless)
+            .help(isExpanded ? collapseHelp : expandHelp)
+    }
+}

@@ -644,8 +644,7 @@ private struct LayerRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Button(action: toggleExpanded) { Image(systemName: isExpanded ? "chevron.down" : "chevron.right").frame(width: 10) }
-                .help(isExpanded ? "Hide elements" : "Show elements")
+            DisclosureButton(isExpanded: isExpanded, expandHelp: "Show elements", collapseHelp: "Hide elements", action: toggleExpanded)
             Button(action: toggleVisible) { Image(systemName: layer.visible ? "eye" : "eye.slash") }
                 .help(layer.visible ? "Hide layer" : "Show layer")
             Button(action: toggleLocked) { Image(systemName: layer.locked ? "lock.fill" : "lock.open") }

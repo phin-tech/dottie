@@ -65,7 +65,7 @@ struct ScriptConsole: View {
         panel.directoryURL = ScriptLibrary.directory
         panel.nameFieldStringValue = "Script.js"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { try source.write(to: url, atomically: true, encoding: .utf8) } catch { NSAlert(error: error).runModal() }
+        do { try source.write(to: url, atomically: true, encoding: .utf8) } catch { Alerts.show(error) }
     }
 
     var body: some View {

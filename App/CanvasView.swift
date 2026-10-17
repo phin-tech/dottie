@@ -1151,10 +1151,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
         let art: (elements: [Element], size: CGSize, notes: [String])
         do { art = try MermaidImporter.elements(from: text) } catch {
-            let alert = NSAlert()
-            alert.messageText = "Couldn't import the Mermaid diagram"
-            alert.informativeText = error.localizedDescription
-            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+            Alerts.show(error, title: "Couldn't import the Mermaid diagram", over: window)
             return false
         }
         var next = model

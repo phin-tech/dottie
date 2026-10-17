@@ -151,7 +151,7 @@ struct LibraryPanel: View {
     private func addSelection(named name: String) {
         guard let e = entry, !e.isBuiltIn,
               let item = StencilLibrary.item(from: document.model, ids: selection, name: name) else { return }
-        do { try store.append(item, to: e.id); message = "Added “\(item.name)”." } catch { NSAlert(error: error).runModal() }
+        do { try store.append(item, to: e.id); message = "Added “\(item.name)”." } catch { Alerts.show(error) }
     }
 
     private func importSVGs() {
@@ -206,15 +206,15 @@ struct LibraryPanel: View {
         panel.allowedContentTypes = [.dottieLibrary]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do { selectedID = try store.importLibrary(file: url) } catch { NSAlert(error: error).runModal() }
+        do { selectedID = try store.importLibrary(file: url) } catch { Alerts.show(error) }
     }
 
     private func change(_ id: String, _ edit: (inout StencilLibrary) -> Void) {
-        do { try store.update(id, edit) } catch { NSAlert(error: error).runModal() }
+        do { try store.update(id, edit) } catch { Alerts.show(error) }
     }
 
     private func remove(_ item: StencilItem, from id: String) {
-        do { try store.remove(item, from: id) } catch { NSAlert(error: error).runModal() }
+        do { try store.remove(item, from: id) } catch { Alerts.show(error) }
     }
 
     private struct Tile: View {
