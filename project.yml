@@ -221,6 +221,8 @@ targets:
       - App/LiveServer.swift
       - App/DrawingDocument.swift
       - App/UpdateChecker.swift
+      - App/Alerts.swift
+      - App/EditorActions.swift
     dependencies:
       - package: Dottie
         product: DottieKit

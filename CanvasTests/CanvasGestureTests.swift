@@ -606,15 +606,20 @@ final class CanvasGestureTests: XCTestCase {
     // MARK: Context menu
 
     func testRightClickSelectsTheShapeAndOffersLinkItems() throws {
+        view.editorActions = { .inert(selectionCount: $0.count) } // the window's actions, doing nothing here
         let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let b = add(.rectangle, CGRect(x: 500, y: 400, width: 120, height: 60))
         let menu = try XCTUnwrap(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 130))))
         XCTAssertEqual(view.selection, [a.id])
         let titles = menu.items.map(\.title)
         XCTAssertTrue(titles.contains("Link to Element…"))
         XCTAssertTrue(titles.contains("Copy"))
-        let follow = try XCTUnwrap(menu.items.first { $0.title == "Follow Link" })
-        XCTAssertFalse(view.validateMenuItem(follow)) // nothing to follow yet
-        _ = view.menu(for: event(.rightMouseDown, CGPoint(x: 600, y: 500)))
+        XCTAssertFalse(titles.contains("Follow Link")) // nothing to follow yet
+        view.model.elements[0].link = b.id
+        let linked = try XCTUnwrap(view.menu(for: event(.rightMouseDown, CGPoint(x: 150, y: 130))))
+        let follow = try XCTUnwrap(linked.items.first { $0.title == "Follow Link" })
+        XCTAssertTrue(view.validateMenuItem(follow))
+        _ = view.menu(for: event(.rightMouseDown, CGPoint(x: 800, y: 650)))
         XCTAssertTrue(view.selection.isEmpty)
     }
 
@@ -702,6 +707,22 @@ final class CanvasGestureTests: XCTestCase {
         key(124, .command)
         click(CGPoint(x: 800, y: 600))       // ⌘ let go out of the window: the next click keeps the row
         XCTAssertEqual(commits.map(\.name), ["Add Node"])
+    }
+
+    func testArrowsNudgeTheSelectionAsOneStepUntilTheKeyComesUp() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        view.selection = [a.id]
+        key(124); key(124, repeating: true); key(124, repeating: true) // a held → repeats
+        XCTAssertEqual(element(a.id).frame.origin, CGPoint(x: 103, y: 100))
+        XCTAssertTrue(commits.isEmpty)
+        view.keyUp(with: NSEvent.keyEvent(with: .keyUp, location: .zero, modifierFlags: [.function, .numericPad], timestamp: 0,
+                                          windowNumber: window.windowNumber, context: nil, characters: "\u{F703}",
+                                          charactersIgnoringModifiers: "\u{F703}", isARepeat: false, keyCode: 124)!)
+        XCTAssertEqual(commits.map(\.name), ["Nudge"])
+        key(125, .shift)
+        key(48) // another key keeps the nudge before acting
+        XCTAssertEqual(commits.map(\.name), ["Nudge", "Nudge", "Change Shape"])
+        XCTAssertEqual(element(a.id).frame.origin, CGPoint(x: 103, y: 110))
     }
 
     func testOptionArrowWalksAndTabChangesTheShape() {
@@ -996,5 +1017,22 @@ final class SymbolEditingTests: XCTestCase {
         doc.currentPageID = doc.file.pages[0].id
         step { doc.addPage(undoManager: undo) }
         XCTAssertNil(doc.editingSymbol, "changing pages leaves the symbol")
+    }
+}
+
+extension EditorActions {
+    /// Actions that do nothing, for the canvas's menus under test.
+    static func inert(selectionCount: Int) -> EditorActions {
+        EditorActions(
+            selectionCount: selectionCount, grouped: false, group: {}, ungroup: {},
+            instanceSelected: false, editingSymbol: false, makeSymbol: {}, breakApart: {}, editSymbol: {},
+            doneEditingSymbol: {}, align: { _ in }, distribute: { _ in }, reorder: { _ in }, export: { _ in },
+            exportAnimation: { _ in }, openScriptConsole: {}, runScriptFile: { _ in }, pageCount: 1, newPage: {},
+            duplicatePage: {}, deletePage: {}, showPage: { _ in }, renamePage: {}, movePage: { _ in }, pageIndex: 0,
+            linkSelected: false, linkToElement: {}, removeLink: {}, hasAnimation: false, boils: false, settles: false,
+            connectorsSelected: 0, newAnimation: {}, editTiming: {}, removeAnimation: {}, addTransition: { _ in },
+            sendPacket: {}, buildDiagram: { _ in }, hasNextPage: false, magicMove: {}, marchSelection: {},
+            toggleBoil: {}, toggleSettle: {}, clearKeys: {}, hasCamera: false, scenes: [], addScene: { _ in },
+            showScene: { _ in }, playScene: { _ in }, frameCamera: {}, removeCamera: {}, repeatSelection: {})
     }
 }
