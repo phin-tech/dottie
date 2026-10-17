@@ -574,10 +574,13 @@ struct TimelinePanel: View {
             }
             .onEnded { _ in
                 defer { sceneDrag = nil; scrubbing = false }
-                guard let d = sceneDrag, abs(d.to - d.from) >= 0.5 / timeline.fps else { return }
+                guard let d = sceneDrag else { return }
+                // A click on a flag (no move) goes to its scene, as a click there scrubbed before flags could move.
+                guard abs(d.to - d.from) >= 0.5 / timeline.fps else { scrub(to: d.from); return }
                 var probe = timeline
                 guard probe.moveMarker(from: d.from, to: d.to) else { NSSound.beep(); return }   // another scene is there
                 onEdit("Move Scene") { $0.moveMarker(from: d.from, to: d.to) }
+                scrub(to: d.to)
             }
     }
 

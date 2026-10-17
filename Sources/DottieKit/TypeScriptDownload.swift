@@ -56,7 +56,8 @@ public enum TypeScriptDownload {
 
         let tar = Process()
         tar.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
-        tar.arguments = ["-xzf", archive.path, "-C", stage.path, "package/lib"]
+        // -m: npm's files are dated 1985, and the compiler's version is cached by modification date.
+        tar.arguments = ["-xzmf", archive.path, "-C", stage.path, "package/lib"]
         tar.standardOutput = FileHandle.nullDevice
         tar.standardError = FileHandle.nullDevice
         try tar.run()

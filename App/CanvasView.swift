@@ -156,7 +156,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         spatialStale = false
         return s
     }
-    var showRulers = false { didSet { needsDisplay = true } }
+    var showRulers = false { didSet { needsDisplay = true; placeRulerMarks() } }
     /// Seconds into the page's animation while previewing it; nil while editing. A preview draws that frame and
     /// takes no edits, since shapes are not where the frame shows them.
     var playhead: Double? {
@@ -169,9 +169,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
     private let rulerSize: CGFloat = 20
     /// Where the pointer is, in view coordinates, for the marks on the rulers; nil when it is outside the view.
-    private var rulerCursor: CGPoint? {
-        didSet { if showRulers, rulerCursor != oldValue { invalidateRulers() } }
-    }
+    private var rulerCursor: CGPoint? { didSet { if rulerCursor != oldValue { placeRulerMarks() } } }
+    /// The pointer's marks across the top and left rulers: views of their own, so following the pointer moves them
+    /// without redrawing the canvas.
+    private let rulerMarkX = RulerMark(), rulerMarkY = RulerMark()
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
@@ -581,22 +582,18 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         ticks(origin: pan.x, length: bounds.width, horizontal: true)
         ticks(origin: pan.y, length: bounds.height, horizontal: false)
-
-        // Where the pointer is, marked across each ruler.
-        if let c = rulerCursor {
-            ctx.setStrokeColor(NSColor.controlAccentColor.cgColor)
-            ctx.setLineWidth(1)
-            if c.x >= t { ctx.move(to: CGPoint(x: c.x.rounded() + 0.5, y: 0)); ctx.addLine(to: CGPoint(x: c.x.rounded() + 0.5, y: t)) }
-            if c.y >= t { ctx.move(to: CGPoint(x: 0, y: c.y.rounded() + 0.5)); ctx.addLine(to: CGPoint(x: t, y: c.y.rounded() + 0.5)) }
-            ctx.strokePath()
-        }
         ctx.restoreGState()
     }
 
-    /// Redraws just the two ruler strips (the pointer's marks moved).
-    private func invalidateRulers() {
-        setNeedsDisplay(CGRect(x: 0, y: 0, width: bounds.width, height: rulerSize))
-        setNeedsDisplay(CGRect(x: 0, y: 0, width: rulerSize, height: bounds.height))
+    private func placeRulerMarks() {
+        for m in [rulerMarkX, rulerMarkY] where m.superview !== self { addSubview(m) }
+        let c = showRulers ? rulerCursor : nil
+        rulerMarkX.isHidden = (c?.x ?? 0) < rulerSize
+        rulerMarkY.isHidden = (c?.y ?? 0) < rulerSize
+        if let c {
+            rulerMarkX.frame = CGRect(x: c.x.rounded(), y: 0, width: 1, height: rulerSize)
+            rulerMarkY.frame = CGRect(x: 0, y: c.y.rounded(), width: rulerSize, height: 1)
+        }
     }
 
     private lazy var pointerTracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
@@ -2300,6 +2297,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         switchTool(.select)
         return true
     }
+}
+
+/// A hairline in the accent color: the pointer's mark on a ruler. Clicks go through it to the canvas.
+final class RulerMark: NSView {
+    override func draw(_ dirtyRect: NSRect) { NSColor.controlAccentColor.setFill(); bounds.fill() }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 #if DEBUG
