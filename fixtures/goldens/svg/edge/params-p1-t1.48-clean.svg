@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="488" height="298.19" viewBox="16 16 488 298.19">
+<rect x="16" y="16" width="488" height="298.19" fill="#ffffff"/>
+<g opacity="0.07">
+<path d="M40 40 L240 40 L240 90 L40 90 Z" fill="#333340" stroke="none"/>
+<path d="M40 40 L240 40 L240 90 L40 90 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="140" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="140" y="71.48">Upload failed (3) {{missing}}</tspan></text>
+</g>
+<text x="50" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="50" y="111.28">Upload failed!</tspan></text>
+<path d="M150 94 L230 94 L230 118 L150 118 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M150 94 L230 94 L230 118 L150 118 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="190" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="190" y="112.48">by Sam</tspan></text>
+<g opacity="0.07">
+<path d="M280 40 L480 40 L480 90 L280 90 Z" fill="#333340" stroke="none"/>
+<path d="M280 40 L480 40 L480 90 L280 90 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="380" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="380" y="71.48">Saved (1) {{missing}}</tspan></text>
+</g>
+<text x="290" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="290" y="111.28">Saved!</tspan></text>
+<path d="M390 94 L470 94 L470 118 L390 118 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M390 94 L470 94 L470 118 L390 118 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="430" y="112.48">by me</tspan></text>
+<g transform="rotate(5.73 186.41 255.82)">
+<text x="51.41" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" fill="#1f1f21"><tspan x="51.41" y="266.74"></tspan></text>
+</g>
+<g transform="rotate(5.73 260.73 266.29)">
+<path d="M200.73 248.29 L320.73 248.29 L320.73 284.29 L200.73 284.29 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M200.73 248.29 L320.73 248.29 L320.73 284.29 L200.73 284.29 Z" fill="none" stroke="#1f1f21" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260.73" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" fill="#1f1f21" text-anchor="middle"><tspan x="260.73" y="276.01">by me</tspan></text>
+</g>
+<path d="M380 160 L460 160 L460 184 L380 184 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M380 160 L460 160 L460 184 L380 184 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="178.48">{{message}}</tspan></text>
+</svg>

@@ -40,6 +40,7 @@ fixture, so the gap is visible rather than silent.
 | Text fonts | Partial | | Positions use Helvetica Neue's metrics; browsers without Helvetica Neue draw Helvetica or Arial in the same places, so runs of mixed styles may sit slightly apart |
 | Symbols: instances on their own clocks (loop, once, still, offset), nested, scaled and turned | Supported | [edge/symbols](../fixtures/edge/symbols.dottie) | Expanded as DottieKit expands them, with the same ids, seeds and limits ([js-only/hostile-symbols](../fixtures/js-only/hostile-symbols.dottie)) |
 | Button symbols (up, over, down, hit) and clickable copies | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | As the HTML export draws them |
+| Symbol parameters (`{{name}}` in a symbol's text, filled per copy) | Supported | [edge/params](../fixtures/edge/params.dottie) | Defaults, undeclared names left as written, values passed into nested copies, filled before text types out |
 | Copies that play when clicked | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | `<dottie-player>` only: the HTML export is drawn ahead of time and shows them at rest |
 | Clicks: play a scene, open a link, hover looks, keyboard | Supported | [edge/clicks](../fixtures/edge/clicks.dottie) | As the HTML export does; only http, https and mailto links are followed |
 | Links between shapes and pages | Partial | [edge/clicks](../fixtures/edge/clicks.dottie) | A link to a shape on another page shows that page; one on the same page does nothing. The HTML export holds one page, so it has neither |

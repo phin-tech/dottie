@@ -13,7 +13,7 @@ struct SymbolSection: View {
     var body: some View {
         Section("Symbol") {
             if let symbol {
-                NameField(name: symbol.name) { name in
+                CommitField(label: "Name", value: symbol.name) { name in
                     var next = document.model
                     next.renameSymbol(symbol.id, to: name)
                     document.commit(next, actionName: "Rename Symbol", undoManager: undoManager)
@@ -36,10 +36,15 @@ struct SymbolSection: View {
                           + "Other exports show the start")
                 }
                 if !symbol.isButton, (symbol.timeline?.duration ?? 0) > 0, playback.wrappedValue != .still {
-                    Stepper(value: offset, in: 0...max(symbol.timeline?.duration ?? 0, 0.1), step: 0.1) {
-                        LabeledContent("Starts", value: String(format: "%.1f s in", offset.wrappedValue))
+                    // Played once, a copy can also wait: a negative offset holds it at its start until then.
+                    let wait = playback.wrappedValue == .once ? -(document.model.timeline?.duration ?? 0) : 0
+                    Stepper(value: offset, in: wait...max(symbol.timeline?.duration ?? 0, 0.1), step: 0.1) {
+                        LabeledContent("Starts", value: offset.wrappedValue < 0
+                                       ? String(format: "after %.1f s", -offset.wrappedValue)
+                                       : String(format: "%.1f s in", offset.wrappedValue))
                     }
-                    .help("How far into the symbol's animation this copy is when the page's starts, so copies don't move in step")
+                    .help("How far into the symbol's animation this copy is when the page's starts, so copies don't move "
+                          + "in step. Played once, it can instead wait, to pop in later (a toast)")
                 }
                 LabeledContent("Instances", value: "\(document.model.elements.filter { $0.symbol == symbol.id }.count)")
                 HStack {
@@ -57,6 +62,61 @@ struct SymbolSection: View {
                 Text("Its symbol is missing from this page.").foregroundStyle(.secondary)
             }
         }
+        if let symbol, !(symbol.params ?? [:]).isEmpty || !symbol.placeholders.isEmpty {
+            parameters(symbol)
+        }
+    }
+
+    /// What this copy fills in: a field per parameter, its default as the placeholder. Under it, the symbol's own
+    /// list: defaults to change, and names its text writes as {{name}} that it doesn't have yet, to add.
+    @ViewBuilder private func parameters(_ symbol: Symbol) -> some View {
+        let params = symbol.params ?? [:]
+        let names = params.keys.sorted()
+        let missing = symbol.placeholders.filter { params[$0] == nil }
+        Section("Parameters") {
+            ForEach(names, id: \.self) { name in
+                CommitField(label: name, value: instance.args?[name] ?? "", prompt: params[name] ?? "", allowsEmpty: true) { v in
+                    set("Change Parameter") { e in
+                        var args = e.args ?? [:]
+                        args[name] = v.isEmpty ? nil : v
+                        e.args = args.isEmpty ? nil : args
+                    }
+                }
+                    .help("This copy's \(name), shown where the symbol's text says {{\(name)}}; empty uses the default")
+            }
+            if !missing.isEmpty {
+                Button("Add \(missing.map { "{{\($0)}}" }.joined(separator: ", "))") {
+                    changeParams("Add Parameter") { p in for n in missing { p[n] = n } }
+                }
+                .help("Make the names the symbol's text writes in braces into parameters each copy can fill in")
+            }
+            if !names.isEmpty {
+                DisclosureGroup("Defaults") {
+                    ForEach(names, id: \.self) { name in
+                        HStack {
+                            CommitField(label: name, value: params[name] ?? "", allowsEmpty: true) { v in
+                                changeParams("Change Default") { $0[name] = v }
+                            }
+                            Button { changeParams("Remove Parameter") { $0[name] = nil } } label: { Image(systemName: "minus.circle") }
+                                .buttonStyle(.borderless)
+                                .help("Stop \(name) being a parameter; {{\(name)}} then shows as written")
+                        }
+                    }
+                }
+            } else {
+                Text("Write {{name}} in the symbol's text (Edit Symbol) for something each copy fills in.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func changeParams(_ action: String, _ change: (inout [String: String]) -> Void) {
+        var next = document.model
+        guard let id = symbol?.id, let i = next.symbols?.firstIndex(where: { $0.id == id }) else { return }
+        var p = next.symbols![i].params ?? [:]
+        change(&p)
+        next.symbols![i].params = p.isEmpty ? nil : p
+        document.commit(next, actionName: action, undoManager: undoManager)
     }
 
     private func set(_ name: String, _ change: @escaping (inout Element) -> Void) {
@@ -88,24 +148,28 @@ struct SymbolSection: View {
     }
 }
 
-/// A name committed on Return or when the field loses focus.
-private struct NameField: View {
-    var name: String
+/// Text committed on Return or when the field loses focus, so typing makes one undo step. Empty is ignored unless
+/// `allowsEmpty`.
+private struct CommitField: View {
+    var label: String
+    var value: String
+    var prompt = ""
+    var allowsEmpty = false
     var commit: (String) -> Void
     @State private var text = ""
     @FocusState private var focused: Bool
 
     var body: some View {
-        TextField("Name", text: $text)
+        TextField(label, text: $text, prompt: Text(prompt))
             .focused($focused)
             .onSubmit(save)
             .onChange(of: focused) { _, now in if !now { save() } }
-            .onAppear { text = name }
-            .onChange(of: name) { _, n in if !focused { text = n } }
+            .onAppear { text = value }
+            .onChange(of: value) { _, v in if !focused { text = v } }
     }
 
     private func save() {
-        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !t.isEmpty, t != name { commit(t) }
+        let t = allowsEmpty ? text : text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if allowsEmpty || !t.isEmpty, t != value { commit(t) }
     }
 }

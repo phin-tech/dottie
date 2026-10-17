@@ -1,0 +1,373 @@
+{
+  "pages": [
+    {
+      "elements": [
+        {
+          "args": {
+            "author": "Sam",
+            "count": "3",
+            "message": "Upload failed"
+          },
+          "height": 80,
+          "id": "000001E1-0000-4000-8000-0000000001E1",
+          "kind": "symbol",
+          "layerID": "000001D8-0000-4000-8000-0000000001D8",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "000001DC-0000-4000-8000-0000000001DC",
+          "width": 200,
+          "x": 40,
+          "y": 40
+        },
+        {
+          "height": 80,
+          "id": "000001E2-0000-4000-8000-0000000001E2",
+          "kind": "symbol",
+          "layerID": "000001D8-0000-4000-8000-0000000001D8",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "000001DC-0000-4000-8000-0000000001DC",
+          "width": 200,
+          "x": 280,
+          "y": 40
+        },
+        {
+          "args": {
+            "message": "Later",
+            "nope": "x"
+          },
+          "height": 120,
+          "id": "000001E3-0000-4000-8000-0000000001E3",
+          "kind": "symbol",
+          "layerID": "000001D8-0000-4000-8000-0000000001D8",
+          "offset": -1.5,
+          "playback": "once",
+          "rotation": 0.1,
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "000001DC-0000-4000-8000-0000000001DC",
+          "width": 300,
+          "x": 40,
+          "y": 160
+        },
+        {
+          "args": {
+            "who": "{{message}}"
+          },
+          "height": 24,
+          "id": "000001E4-0000-4000-8000-0000000001E4",
+          "kind": "symbol",
+          "layerID": "000001D8-0000-4000-8000-0000000001D8",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "000001D9-0000-4000-8000-0000000001D9",
+          "width": 80,
+          "x": 380,
+          "y": 160
+        }
+      ],
+      "id": "000001D7-0000-4000-8000-0000000001D7",
+      "layers": [
+        {
+          "id": "000001D8-0000-4000-8000-0000000001D8",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Page 1",
+      "symbols": [
+        {
+          "elements": [
+            {
+              "height": 50,
+              "id": "000001DE-0000-4000-8000-0000000001DE",
+              "kind": "rectangle",
+              "layerID": "000001DD-0000-4000-8000-0000000001DD",
+              "seed": 4003630850,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 1,
+                  "b": 0.25,
+                  "g": 0.2,
+                  "r": 0.2
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 1,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "text": "{{message}} ({{count}}) {{missing}}",
+              "width": 200,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "height": 20,
+              "id": "000001DF-0000-4000-8000-0000000001DF",
+              "kind": "text",
+              "layerID": "000001DD-0000-4000-8000-0000000001DD",
+              "seed": 1927697874,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 1,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "text": "{{message}}!",
+              "width": 180,
+              "x": 10,
+              "y": 54
+            },
+            {
+              "args": {
+                "who": "by {{author}}"
+              },
+              "height": 24,
+              "id": "000001E0-0000-4000-8000-0000000001E0",
+              "kind": "symbol",
+              "layerID": "000001DD-0000-4000-8000-0000000001DD",
+              "seed": 1614817368,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 0,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "symbol": "000001D9-0000-4000-8000-0000000001D9",
+              "width": 80,
+              "x": 110,
+              "y": 54
+            }
+          ],
+          "height": 80,
+          "id": "000001DC-0000-4000-8000-0000000001DC",
+          "layers": [
+            {
+              "id": "000001DD-0000-4000-8000-0000000001DD",
+              "locked": false,
+              "name": "Layer 1",
+              "visible": true
+            }
+          ],
+          "name": "Toast",
+          "params": {
+            "author": "me",
+            "count": "1",
+            "message": "Saved"
+          },
+          "timeline": {
+            "duration": 1.5,
+            "fps": 10,
+            "tracks": [
+              {
+                "element": "000001DE-0000-4000-8000-0000000001DE",
+                "keys": [
+                  {
+                    "opacity": 0,
+                    "t": 0,
+                    "visible": true
+                  },
+                  {
+                    "opacity": 1,
+                    "t": 0.3
+                  },
+                  {
+                    "opacity": 1,
+                    "t": 1.2
+                  },
+                  {
+                    "opacity": 0,
+                    "t": 1.5
+                  }
+                ]
+              },
+              {
+                "element": "000001DF-0000-4000-8000-0000000001DF",
+                "keys": [
+                  {
+                    "reveal": 0,
+                    "t": 0
+                  },
+                  {
+                    "reveal": 1,
+                    "t": 1
+                  }
+                ]
+              }
+            ]
+          },
+          "width": 200
+        },
+        {
+          "elements": [
+            {
+              "height": 24,
+              "id": "000001DB-0000-4000-8000-0000000001DB",
+              "kind": "rectangle",
+              "layerID": "000001DA-0000-4000-8000-0000000001DA",
+              "seed": 4003630850,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 1,
+                  "b": 0.85,
+                  "g": 0.95,
+                  "r": 0.85
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 0,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "text": "{{ who }}",
+              "width": 80,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "height": 24,
+          "id": "000001D9-0000-4000-8000-0000000001D9",
+          "layers": [
+            {
+              "id": "000001DA-0000-4000-8000-0000000001DA",
+              "locked": false,
+              "name": "Layer 1",
+              "visible": true
+            }
+          ],
+          "name": "Tag",
+          "params": {
+            "who": "nobody"
+          },
+          "width": 80
+        }
+      ],
+      "timeline": {
+        "duration": 4,
+        "fps": 10,
+        "tracks": []
+      }
+    }
+  ],
+  "version": 2
+}

@@ -15,15 +15,18 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
     /// playback, and on the web the moments of its `over` and `down` scenes under the pointer and while pressed. A
     /// `hit` scene, if there is one, draws the area that takes clicks. nil is a plain symbol.
     public var button: Bool?
+    /// What each copy can fill in, as Flash's component parameters were: a name and its default. Text in the
+    /// symbol says `{{name}}` where a copy's value (`Element.args`) goes. nil has none.
+    public var params: [String: String]?
 
     public init(id: UUID = UUID(), name: String, width: Double, height: Double, layers: [Layer]? = nil,
-                elements: [Element] = [], timeline: Timeline? = nil, button: Bool? = nil) {
+                elements: [Element] = [], timeline: Timeline? = nil, button: Bool? = nil, params: [String: String]? = nil) {
         self.id = id; self.name = name; self.width = width; self.height = height
         self.layers = layers ?? [Layer(name: "Layer 1")]
-        self.elements = elements; self.timeline = timeline; self.button = button
+        self.elements = elements; self.timeline = timeline; self.button = button; self.params = params
     }
 
-    private enum CodingKeys: String, CodingKey { case id, name, width, height, layers, elements, timeline, button }
+    private enum CodingKeys: String, CodingKey { case id, name, width, height, layers, elements, timeline, button, params }
 
     /// Lenient, as pages are: a symbol with no layers gets one, and a box is never empty.
     public init(from decoder: Decoder) throws {
@@ -37,6 +40,7 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
         elements = try c.decodeIfPresent([Element].self, forKey: .elements) ?? []
         timeline = try c.decodeIfPresent(Timeline.self, forKey: .timeline)
         button = try c.decodeIfPresent(Bool.self, forKey: .button)
+        params = try? c.decodeIfPresent([String: String].self, forKey: .params)
     }
 
     /// A button's states, each the moment of the scene of that name in its timeline (any case).
@@ -66,6 +70,39 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
         var p = DottieDocument(id: id, name: name, layers: layers, elements: elements)
         p.timeline = timeline
         return p
+    }
+
+    /// The symbol as copy `args` shows it: each `{{name}}` in its elements' text (and in the args of copies inside
+    /// it, so a value can pass down) replaced by the copy's value for that parameter, or the default. Names it
+    /// doesn't declare are left as written.
+    public func filled(_ args: [String: String]?) -> Symbol {
+        guard let params, !params.isEmpty else { return self }
+        let values = params.merging((args ?? [:]).filter { params[$0.key] != nil }) { _, arg in arg }
+        func fill(_ s: String) -> String {
+            guard s.contains("{{") else { return s }
+            return s.replacing(/\{\{\s*([^{}]*?)\s*\}\}/) { m in values[String(m.1)] ?? String(m.0) }
+        }
+        var out = self
+        for i in out.elements.indices {
+            out.elements[i].text = out.elements[i].text.map(fill)
+            out.elements[i].args = out.elements[i].args?.mapValues(fill)
+        }
+        return out
+    }
+
+    /// The names its elements' text (and the args of copies inside it) write as `{{name}}`, in order, once each:
+    /// the parameters it could have.
+    public var placeholders: [String] {
+        var seen = Set<String>(), out: [String] = []
+        for e in elements {
+            for s in [e.text].compactMap({ $0 }) + (e.args?.keys.sorted().compactMap { e.args?[$0] } ?? []) where s.contains("{{") {
+                for m in s.matches(of: /\{\{\s*([^{}]*?)\s*\}\}/) {
+                    let name = String(m.1)
+                    if !name.isEmpty, seen.insert(name).inserted { out.append(name) }
+                }
+            }
+        }
+        return out
     }
 
     /// The box its elements are drawn in.
@@ -152,7 +189,8 @@ extension DottieDocument {
             guard let id = e.symbol, let symbol = symbols[id], !stack.contains(id), stack.count < Symbol.maxDepth else { continue }
             let u = (stack.isEmpty ? times[e.id].map { min(max($0, 0), Timeline.clampTime(symbol.timeline?.duration ?? 0)) } : nil)
                 ?? symbol.localTime(t, playback: e.playback, offset: e.offset)
-            let inner = posing ? symbol.page.posed(at: u) : symbol.page
+            let page = symbol.filled(e.args).page
+            let inner = posing ? page.posed(at: u) : page
             let visible = Set(inner.layers.filter(\.visible).map(\.id))
             var drawn = inner
             drawn.elements = inner.orderedElements.filter { visible.contains($0.layerID) }
