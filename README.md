@@ -20,9 +20,9 @@ brew install --cask phin-tech/tap/dottie
 Or download the latest `Dottie-x.y.z.zip` from [Releases](https://github.com/phin-tech/dottie/releases), unzip
 it, and drag **Dottie** into your Applications folder. You need macOS 14 Sonoma or later.
 
-Dottie checks GitHub once a day and tells you when a new version is out (turn that off in Settings ▸ General,
-or use Dottie ▸ Check for Updates… any time). It never updates itself: with Homebrew, run
-`brew upgrade --cask dottie`; otherwise download the new version.
+Dottie updates itself: once a day it checks GitHub for a newer release and offers to install it and relaunch
+(turn that off in Settings ▸ General, or use Dottie ▸ Check for Updates… any time). Updates are notarized and
+checked against a signing key built into the app. With Homebrew, `brew upgrade --greedy --cask dottie` also works.
 
 ## Ask your AI assistant to draw
 

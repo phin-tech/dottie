@@ -58,5 +58,8 @@ gh release create "$tag" "$zip" --target "$(git rev-parse HEAD)" --title "Dottie
 echo "Released $tag (build $build): Dottie-$version.zip, sha256 $sum"
 gh release view "$tag" --json url -q .url
 
+# The Sparkle appcast, so installed copies update in place; if this fails, `just appcast` retries it.
+scripts/appcast.sh "$version"
+
 # The Homebrew cask; if this fails, `just tap` retries it.
 scripts/update-tap.sh "$version"

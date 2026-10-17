@@ -47,7 +47,7 @@ struct DottieCommands: Commands {
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
-            Button("Check for Updates…") { Task { await UpdateChecker.shared.check(userInitiated: true) } }
+            Button("Check for Updates…") { UpdateChecker.shared.checkForUpdates() }
         }
         CommandGroup(after: .toolbar) {
             Button("Zoom In") { send(#selector(CanvasNSView.zoomIn(_:))) }

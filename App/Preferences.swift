@@ -18,11 +18,6 @@ enum Pref {
     static let showRulers = "showRulers"
     /// The script console's text, kept across launches.
     static let scriptSource = "scriptSource"
-    static let checkForUpdates = "checkForUpdates"
-    /// Seconds since 1970 of the last successful update check.
-    static let lastUpdateCheck = "lastUpdateCheck"
-    /// A version the automatic check should not offer again.
-    static let skippedUpdate = "skippedUpdateVersion"
 
     static let routingDefault = Routing.straight.rawValue
     static let gridSizeDefault = 20.0
@@ -94,7 +89,6 @@ private struct GeneralSettings: View {
     @AppStorage(Pref.returnToSelect) private var returnToSelect = true
     @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
-    @AppStorage(Pref.checkForUpdates) private var checkForUpdates = true
 
     var body: some View {
         Form {
@@ -129,12 +123,14 @@ private struct GeneralSettings: View {
                 Toggle("Single-key tool shortcuts (V, R, O, D, T, C, P)", isOn: $singleKeyShortcuts)
             }
             Section {
-                Toggle("Check for updates automatically", isOn: $checkForUpdates)
-                Button("Check Now") { Task { await UpdateChecker.shared.check(userInitiated: true) } }
+                Toggle("Check for updates automatically", isOn: Binding(
+                    get: { UpdateChecker.shared.automaticChecks },
+                    set: { UpdateChecker.shared.automaticChecks = $0 }))
+                Button("Check Now") { UpdateChecker.shared.checkForUpdates() }
             } header: {
                 Text("Updates")
             } footer: {
-                Text("Once a day, Dottie asks GitHub for the latest release. It never downloads or installs anything by itself.")
+                Text("Once a day, Dottie asks GitHub for a newer release, and offers to install it and relaunch.")
                     .foregroundStyle(.secondary)
             }
             Section {

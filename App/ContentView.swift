@@ -141,7 +141,7 @@ struct ContentView: View {
         .onAppear {
             LiveRegistry.shared.markFront(document, undoManager: undoManager)
             registerDebugHooks()
-            UpdateChecker.shared.checkIfDue()
+            UpdateChecker.shared.start()
         }
         .onChange(of: activeState) { _, state in
             if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager); registerDebugHooks() }

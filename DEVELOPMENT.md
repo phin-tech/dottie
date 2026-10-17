@@ -138,8 +138,17 @@ The steps by hand, if one fails halfway:
    points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at the new zip;
    `just tap` does that step alone if it failed.
 
-The app's update check (`UpdateChecker`) reads GitHub's latest release, which skips drafts and pre-releases. It
-only tells people: Homebrew installs get the `brew upgrade` command, others the release page.
+**Updates.** The app updates itself in place with [Sparkle](https://sparkle-project.org) (`UpdateChecker`). Its feed,
+`SUFeedURL`, is `releases/latest/download/appcast.xml`: an asset of the newest release (GitHub skips drafts and
+pre-releases) that `scripts/appcast.sh` makes and uploads as part of `just release` (`just appcast` redoes it).
+It signs the published zip with the EdDSA key in the Mac App Release 1Password item (`sparkle_private_key`; the
+public half is `SUPublicEDKey` in `project.yml`), so installed copies only accept updates from this key. Do not
+lose or replace that key: copies already out there would reject every later update. To use the key on another
+Mac, `scripts/sparkle-tools.sh` fetches Sparkle's tools; `generate_keys -f <file>` imports it into the keychain
+(only needed to run Sparkle's tools by hand: `appcast.sh` reads it straight from 1Password). The cask sets
+`auto_updates true`, so `brew upgrade` skips Dottie unless `--greedy`. Debug builds do not check for updates.
+
+Copies older than the first Sparkle release (0.5.3) have to be updated by hand once.
 
 ## File format
 

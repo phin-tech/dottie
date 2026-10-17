@@ -109,3 +109,7 @@ notarize:
 # The whole release in one command: bump, commit, push, npm publish, notarize, GitHub release, Homebrew cask
 ship part:
     scripts/ship.sh "{{part}}"
+
+# Make and upload the Sparkle appcast for a published release (default: the current version); `just release` does this
+appcast version="":
+    scripts/appcast.sh {{version}}
