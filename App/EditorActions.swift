@@ -113,6 +113,7 @@ struct EditorActions {
     var settles: Bool
     var connectorsSelected: Int
     var newAnimation: () -> Void
+    var editTiming: () -> Void
     var removeAnimation: () -> Void
     var addTransition: (DottieKit.Transition) -> Void
     var sendPacket: () -> Void
@@ -236,6 +237,7 @@ extension ContentView {
             settles: document.model.timeline?.settle == true,
             connectorsSelected: document.model.elements.filter { ids.contains($0.id) && $0.kind == .connector }.count,
             newAnimation: { edit("New Animation") { $0.startAnimation() } },
+            editTiming: { editingTiming = true },
             removeAnimation: {
                 playing = false; playhead = nil
                 edit("Remove Animation") { $0.timeline = nil }

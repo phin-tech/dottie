@@ -174,6 +174,9 @@ struct DottieCommands: Commands {
             let animated = editor?.hasAnimation == true
             Button("New Animation") { editor?.newAnimation() }
                 .disabled(editor == nil || animated)
+            Button("Timing…") { editor?.editTiming() }
+                .disabled(!animated)
+                .help("The animation's length and frame rate")
             Divider()
             // Ways to make keys for you: the selection's, the page's, or the next page's.
             transitionMenu.disabled(n == 0)

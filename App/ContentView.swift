@@ -32,6 +32,8 @@ struct ContentView: View {
     @State var playing = false
     /// The key picked in the timeline, if any.
     @State var selectedKey: KeyRef?
+    /// The timeline's timing popover is open.
+    @State var editingTiming = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -53,6 +55,7 @@ struct ContentView: View {
             if document.model.timeline != nil {
                 Divider()
                 TimelinePanel(page: document.model, playhead: $playhead, playing: $playing, selectedKey: $selectedKey,
+                              editingTiming: $editingTiming,
                               onSelect: { id in
                                   playing = false
                                   selection = [id]

@@ -191,4 +191,18 @@ final class TimelineTests: XCTestCase {
         let first = try XCTUnwrap(CGImageSourceCreateImageAtIndex(src, 0, nil))
         XCTAssertGreaterThan(first.width, 300, "every frame is framed to the whole motion")
     }
+
+    func testCutOffCountsKeysAndScenesPastTheEnd() {
+        let a = UUID(), b = UUID()
+        var tl = Timeline(duration: 4)
+        tl.setKey(Keyframe(t: 1, x: 0), for: a)
+        tl.setKey(Keyframe(t: 3, x: 10), for: a)
+        tl.setKey(Keyframe(t: 4, x: 20), for: b)
+        tl.setCamera(CameraKey(t: 3.5, rect: CGRect(x: 0, y: 0, width: 100, height: 100)))
+        tl.addMarker(at: 2, name: "Middle")
+        tl.addMarker(at: 3.2, name: "Late")
+        XCTAssertTrue(tl.cutOff(by: 4) == (0, 0), "a key right at the end still plays")
+        XCTAssertTrue(tl.cutOff(by: 3) == (2, 1), "b's key and the camera key, and the late scene")
+        XCTAssertTrue(tl.cutOff(by: 0.5) == (4, 2))
+    }
 }
