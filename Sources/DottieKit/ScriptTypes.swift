@@ -203,7 +203,7 @@ extension DottieScript {
         /** An element id, or any element object a `dottie` call returned. */
         type Ref = string | { id: string };
 
-        type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connector" | "freehand" | "path" | "note" | "image";
+        type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connector" | "freehand" | "path" | "note" | "image" | "symbol";
         type ShapeKind = "rectangle" | "ellipse" | "diamond" | "text" | "note";
         type FillStyle = "solid" | "hachure" | "crossHatch" | "grid";
         type Dash = "solid" | "dashed" | "dotted";
@@ -219,6 +219,24 @@ extension DottieScript {
             | "pulse" | "wiggle";
         /** A hex color like "#ffcc00", or "#ffcc0080" with alpha. */
         type Color = string;
+        /** How a symbol's copy plays its animation: over and over, once, or standing still on its poster frame. */
+        type Playback = "loop" | "once" | "still";
+
+        /** What clicking a shape does when the drawing plays on the web (HTML export, <dottie-player>). */
+        interface Click {
+            /** A scene's name: jump there and play on to the next one. */
+            scene?: string;
+            /** An http, https or mailto link, opened in a new tab. */
+            url?: string;
+        }
+
+        /** How a clickable shape looks under the pointer. */
+        interface Hover {
+            stroke?: Color;
+            fill?: Color;
+            /** 0-1. */
+            opacity?: number;
+        }
 
         interface Rect { x: number; y: number; width: number; height: number }
 
@@ -247,6 +265,12 @@ extension DottieScript {
             /** Connectors: the shape at each end, when attached. */
             from?: string;
             to?: string;
+            click?: Click;
+            hover?: Hover;
+            /** A symbol's copy: the symbol's id, how it plays, and seconds into it at the page's start. */
+            symbol?: string;
+            playback?: Playback;
+            offset?: number;
         }
 
         /** Look fields any shape or connector takes. */
@@ -305,6 +329,14 @@ extension DottieScript {
             link?: Ref | null;
             /** "" removes it. */
             anchor?: string;
+            /** What clicking it does on the web; null removes it. Not for a symbol's copies yet. */
+            click?: Click | null;
+            /** Its look under the pointer when clickable; null removes it. */
+            hover?: Hover | null;
+            /** A symbol's copy only. */
+            playback?: Playback;
+            /** A symbol's copy only: seconds into the symbol's animation at the page's start. */
+            offset?: number;
         }
 
         interface BuildNode {
@@ -412,6 +444,15 @@ extension DottieScript {
             transition(id: Ref, name: TransitionName, t: number, options?: { duration?: number; repeat?: boolean | number }): void;
             /** Keep it boiling while still (true), never boil it (false), or follow the timeline (null). */
             boil(id: Ref, on: boolean | null): void;
+            /** Turns shapes, the arrows between them and their keys into a symbol, put back as one copy where they were.
+             * Its animation is as long as the page timeline when made. */
+            symbol(ids: Ref | Ref[], options?: { name?: string }): { symbol: string; instance: Element };
+            /** Another copy of a symbol (its id or name), its top-left at x, y; one of width or height keeps its shape. */
+            place(symbol: string | { symbol: string } | { id: string }, options: { x?: number; y?: number; width?: number; height?: number; playback?: Playback; offset?: number }): Element;
+            /** The page's symbols. */
+            symbols(): { id: string; name: string; width: number; height: number; duration: number; instances: number }[];
+            /** Replaces a symbol's copy with plain copies of its shapes; returns their ids. */
+            breakApart(id: Ref): string[];
             /** Keynote-style Magic Move into another page (its name, number or id) from t (default the end). */
             magicMove(page: string | number | { id: string }, options?: { t?: number; duration?: number; ease?: Ease }): { moved: number; entering: number; leaving: number };
             /** Marching ants at speed points per second (default 40, negative runs backwards); null stops them. */

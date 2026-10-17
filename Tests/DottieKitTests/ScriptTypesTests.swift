@@ -45,6 +45,7 @@ final class ScriptTypesTests: XCTestCase {
         XCTAssertEqual(union("Ease"), Ease.allCases.map(\.rawValue))
         XCTAssertEqual(union("TransitionName"), Transition.allCases.map(\.rawValue))
         XCTAssertEqual(union("Direction"), ["TB", "LR"])
+        XCTAssertEqual(union("Playback"), SymbolPlayback.allCases.map(\.rawValue))
         for kind in union("ElementKind") { XCTAssertNotNil(ElementKind(rawValue: kind), kind) }
     }
 
