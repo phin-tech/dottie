@@ -42,7 +42,7 @@ final class DebugDriver {
     drag <x1> <y1> <x2> <y2>     drag on the canvas, in canvas points (top-left origin)
     click <x> <y>                click on the canvas
     rightclick <x> <y> [Item/Sub]   right-click the canvas and list its context menu, or choose an item in it
-    key <esc|delete|text>        send a key to the canvas
+    key [mods+]<key>|release    send a key to the canvas (cmd+right, opt+down, tab, shift+1, esc); release lets go of modifiers
     keys <text>                  list the keys of the element whose text contains <text>
     keysel <text> <t>            select that element's key at <t> in the timeline (none: clear)
     keymove <text> <from> <to> [copy]   retime (or copy) a key, as dragging a diamond does
@@ -316,14 +316,44 @@ final class DebugDriver {
         c.mouseUp(with: mouse(.leftMouseUp, b, in: c, window: w))
     }
 
+    /// A key press, with modifiers as prefixes (`cmd+right`, `opt+down`, `shift+1`, `tab`), or `release` to let go
+    /// of every modifier (what ends a ⌘-arrow flowchart row).
     private func key(_ k: String) throws -> String {
         let c = try canvas(), w = try window()
-        let (chars, code): (String, UInt16) = switch k {
+        var parts = k.split(separator: "+").map(String.init)
+        let name = parts.popLast() ?? ""
+        var flags: NSEvent.ModifierFlags = []
+        for m in parts {
+            switch m {
+            case "cmd": flags.insert(.command)
+            case "opt": flags.insert(.option)
+            case "shift": flags.insert(.shift)
+            case "ctrl": flags.insert(.control)
+            default: throw DebugError("unknown modifier '\(m)' (cmd, opt, shift, ctrl)")
+            }
+        }
+        if name == "release" {
+            let event = NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: [],
+                                         timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber,
+                                         context: nil, characters: "", charactersIgnoringModifiers: "", isARepeat: false,
+                                         keyCode: 55)!
+            c.flagsChanged(with: event)
+            return "released modifiers"
+        }
+        let (chars, code): (String, UInt16) = switch name {
         case "esc": ("\u{1b}", 53)
         case "delete": ("\u{7f}", 51)
-        default: (k, 0)
+        case "tab": ("\t", 48)
+        case "return": ("\r", 36)
+        case "left": ("\u{F702}", 123)
+        case "right": ("\u{F703}", 124)
+        case "down": ("\u{F701}", 125)
+        case "up": ("\u{F700}", 126)
+        case "1": (flags.contains(.shift) ? "!" : "1", 18)
+        default: (name, 0)
         }
-        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+        if (123...126).contains(code) { flags.formUnion([.function, .numericPad]) } // as real arrow keys carry
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: ProcessInfo.processInfo.systemUptime,
                                      windowNumber: w.windowNumber, context: nil, characters: chars,
                                      charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!
         c.keyDown(with: event)
