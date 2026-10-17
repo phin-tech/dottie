@@ -660,6 +660,43 @@ def buttons():
     write(EDGE / "buttons.dottie", [p])
 
 
+def params():
+    """Symbol parameters: copies of one toast with their own text, one with none (the defaults), one naming a param
+    the symbol doesn't have (left as written), a value passed down into a nested copy, text that types out, and
+    toasts that pop in at their own moment (once, with a negative offset)."""
+    p = Page()
+    p.animate(4, fps=10)
+
+    def symbol(name, w, h, build, **extra):
+        sp = Page(name)
+        build(sp)
+        d = {"id": sp.id, "name": name, "width": w, "height": h, "layers": sp.layers, "elements": sp.elements}
+        if sp.timeline is not None:
+            d["timeline"] = sp.timeline
+        d.update(extra)
+        return d
+
+    def tag(sp):
+        sp.add("rectangle", 0, 0, 80, 24, text="{{ who }}", style=style(fill=rgba(0.85, 0.95, 0.85), roughness=0))
+    t = symbol("Tag", 80, 24, tag, params={"who": "nobody"})
+
+    def toast(sp):
+        sp.animate(1.5, fps=10)
+        box = sp.add("rectangle", 0, 0, 200, 50, text="{{message}} ({{count}}) {{missing}}", style=style(fill=rgba(0.2, 0.2, 0.25)))
+        note = sp.add("text", 10, 54, 180, 20, text="{{message}}!")
+        sp.add("symbol", 110, 54, 80, 24, symbol=t["id"], args={"who": "by {{author}}"}, style=style(roughness=0))
+        sp.track(box, [{"t": 0, "opacity": 0, "visible": True}, {"t": 0.3, "opacity": 1}, {"t": 1.2, "opacity": 1}, {"t": 1.5, "opacity": 0}])
+        sp.track(note, [{"t": 0, "reveal": 0}, {"t": 1, "reveal": 1}])
+    s = symbol("Toast", 200, 80, toast, params={"message": "Saved", "count": "1", "author": "me"})
+    p.extra = {"symbols": [s, t]}
+
+    p.add("symbol", 40, 40, 200, 80, symbol=s["id"], args={"message": "Upload failed", "count": "3", "author": "Sam"}, style=style(roughness=0))
+    p.add("symbol", 280, 40, 200, 80, symbol=s["id"], style=style(roughness=0))
+    p.add("symbol", 40, 160, 300, 120, symbol=s["id"], args={"message": "Later", "nope": "x"}, playback="once", offset=-1.5, rotation=0.1, style=style(roughness=0))
+    p.add("symbol", 380, 160, 80, 24, symbol=t["id"], args={"who": "{{message}}"}, style=style(roughness=0))
+    write(EDGE / "params.dottie", [p])
+
+
 def js_only():
     p = Page()
     p.add("rectangle", 40, 40, 120, 60, text="known")
@@ -695,6 +732,7 @@ def main():
     clicks()
     symbols()
     buttons()
+    params()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

@@ -165,6 +165,9 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Only for `.symbol`: seconds into the symbol's timeline it is at when the page's starts, so copies needn't
     /// move in step. nil is 0.
     public var offset: Double?
+    /// Only for `.symbol`: its values for the symbol's parameters (`Symbol.params`); one it doesn't give takes the
+    /// default.
+    public var args: [String: String]?
     /// Only set for `.image`: the picture's bytes.
     public var image: EmbeddedImage?
     /// How much of the stroke is drawn, 0...1, in an animation frame (see `Keyframe.reveal`). Fill and label

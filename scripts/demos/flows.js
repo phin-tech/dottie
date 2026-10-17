@@ -26,6 +26,16 @@ dottie.scene(0.4, "over");
 dottie.scene(0.8, "down");
 const backButton = dottie.symbol([back], {name: "Back", button: true}).instance;
 
+// A toast pops in to name each request, then fades. It is one symbol with a message parameter: {{message}} in its
+// text, and each copy's own args fill it in. Copies play once, held back by a negative offset until their scene.
+dottie.timeline({duration: 1.7});
+const toast = dottie.rect({x: box.x + box.width / 2 - 200, y: box.y - 64, width: 400, height: 44, text: "{{message}}",
+                           fill: "#fff3bf", stroke: "#f08c00", sketchy: false});
+dottie.key(toast, 0, {visible: false});
+dottie.transition(toast, "popIn", 0.05);
+dottie.transition(toast, "fadeOut", 1.35, {duration: 0.3});
+const toastMade = dottie.symbol([toast], {name: "Toast", params: {message: "Following a request"}});
+
 const arrows = dottie.elements({kind: "connector"});
 const arrow = (a, b) => arrows.find(c => c.from === k[a] && c.to === k[b]);
 const run = (t, hops, color) => {
@@ -36,9 +46,12 @@ const run = (t, hops, color) => {
 // Each flow is a scene: a click plays it on to the next scene, and the player waits there.
 dottie.scene(0, "Overview");
 dottie.scene(0.5, "Sign in");
+dottie.update(toastMade.instance, {playback: "once", offset: -0.5, args: {message: "Sign in: Browser → API gateway → Auth"}});
 let t = run(0.6, [["b", "g"], ["g", "a"]], "#7048e8");
 dottie.transition(k.a, "pulse", t);
 dottie.scene(t + 1, "Place an order");
+dottie.place("Toast", {x: box.x + box.width / 2 - 200, y: box.y - 64, playback: "once", offset: -(t + 1),
+                     args: {message: "Order: Orders → Postgres, Queue → Worker"}});
 t = run(t + 1.1, [["b", "g"], ["g", "o"], ["o", "d"]], "#e8590c");
 t = run(t, [["o", "q"], ["q", "w"]], "#2f9e44");
 dottie.transition(k.w, "pulse", t);

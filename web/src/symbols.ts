@@ -51,6 +51,23 @@ export function symbolTime(s: Symbol, t: number, playback: SymbolPlayback | null
   }
 }
 
+/** The symbol as copy `args` shows it: `{{name}}` in its text, and in the args of copies inside it, replaced by
+ * the copy's value or the default; undeclared names left as written (Symbol.filled). */
+export function filled(s: Symbol, args: Record<string, string> | null): Symbol {
+  const params = s.params;
+  if (!params || Object.keys(params).length === 0) return s;
+  const values = new Map(Object.entries(params));
+  for (const [k, v] of Object.entries(args ?? {})) if (values.has(k)) values.set(k, v);
+  const fill = (x: string) => !x.includes("{{") ? x : x.replace(/\{\{\s*([^{}]*?)\s*\}\}/g, (m, name: string) => values.get(name) ?? m);
+  return { ...s, elements: s.elements.map((x) => {
+    if (x.text === null && x.args === null) return x;
+    const e = cloneElement(x);
+    if (e.text !== null) e.text = fill(e.text);
+    if (e.args !== null) e.args = Object.fromEntries(Object.entries(e.args).map(([k, v]) => [k, fill(v)]));
+    return e;
+  }) };
+}
+
 /** The symbol as a page of its own (Symbol.page). */
 export function symbolPage(s: Symbol): Page {
   return { id: s.id, name: s.name, layers: s.layers, elements: s.elements, theme: null, timeline: s.timeline, symbols: null };
@@ -100,7 +117,8 @@ function expand(elements: Element[], page: Page, t: number, table: Map<string, S
     const override = stack.length === 0 ? times.get(e.id) : undefined;
     const u = override !== undefined ? Math.min(Math.max(override, 0), clampTime(symbol.timeline?.duration ?? 0))
       : symbolTime(symbol, t, e.playback, e.offset);
-    const inner = posing ? posed(symbolPage(symbol), u) : symbolPage(symbol);
+    const page = symbolPage(filled(symbol, e.args));
+    const inner = posing ? posed(page, u) : page;
     const visible = new Set(inner.layers.filter((l) => l.visible).map((l) => l.id));
     const drawn: Page = { ...inner, elements: orderedElements(inner).filter((x) => visible.has(x.layerID)),
       layers: [{ id: e.layerID, name: "", visible: true, locked: false }] };

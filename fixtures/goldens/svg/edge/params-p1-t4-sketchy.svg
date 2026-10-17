@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="488" height="298.19" viewBox="16 16 488 298.19">
+<rect x="16" y="16" width="488" height="298.19" fill="#ffffff"/>
+<path d="M40 40 L240 40 L240 90 L40 90 Z" fill="#333340" stroke="none"/>
+<path d="M40.42 38.88 C125.77 39.47 204.42 38.39 241.63 41.41 M40.39 39.28 C102.73 37.09 187.78 37.87 240.6 40.48 M240.61 38.64 C239.37 63.04 239.89 81.84 239.03 91.51 M240.49 39.99 C239.32 63.1 239.67 82.23 240.67 89.42 M238.36 90.94 C167.92 90.23 86.46 90.05 41.39 89.09 M239.72 90.48 C158.14 89.87 78.13 90.03 40.9 90.15 M38.73 89.5 C39.52 67.46 38.25 48.51 38.14 41.05 M40.19 89.82 C39.3 71.19 39.98 50.81 39.18 39.66" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="140" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="140" y="71.48">Upload failed (3) {{missing}}</tspan></text>
+<text x="50" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="50" y="111.28">Upload failed!</tspan></text>
+<path d="M150 94 L230 94 L230 118 L150 118 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M150 94 L230 94 L230 118 L150 118 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="190" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="190" y="112.48">by Sam</tspan></text>
+<path d="M280 40 L480 40 L480 90 L280 90 Z" fill="#333340" stroke="none"/>
+<path d="M278.83 38.57 C350.26 39.87 432.16 39.95 479.67 39.11 M280.19 40.79 C369.62 40.58 448 40.59 480.24 40.03 M480.18 39.12 C481.26 57.68 481.2 77.31 480.51 91.17 M480.51 39.92 C480.9 51.04 480.36 73.22 479.06 90.48 M481.07 91 C422.71 90 336.28 90.49 278.73 89.3 M480.42 90.66 C423.14 89.39 337.08 89.95 280.28 90.64 M281.34 91.82 C280.42 75.46 281.16 53.09 280.22 40.65 M279.42 90.69 C280.02 68.19 279.72 49.01 279.42 39.15" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="380" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="380" y="71.48">Saved (1) {{missing}}</tspan></text>
+<text x="290" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="290" y="111.28">Saved!</tspan></text>
+<path d="M390 94 L470 94 L470 118 L390 118 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M390 94 L470 94 L470 118 L390 118 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="430" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="430" y="112.48">by me</tspan></text>
+<g transform="rotate(5.73 186.41 255.82)">
+<text x="51.41" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" fill="#1f1f21"><tspan x="51.41" y="266.74">Later!</tspan></text>
+</g>
+<g transform="rotate(5.73 260.73 266.29)">
+<path d="M200.73 248.29 L320.73 248.29 L320.73 284.29 L200.73 284.29 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M200.73 248.29 L320.73 248.29 L320.73 284.29 L200.73 284.29 Z" fill="none" stroke="#1f1f21" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260.73" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="27" fill="#1f1f21" text-anchor="middle"><tspan x="260.73" y="276.01">by me</tspan></text>
+</g>
+<path d="M380 160 L460 160 L460 184 L380 184 Z" fill="#d9f2d9" stroke="none"/>
+<path d="M380 160 L460 160 L460 184 L380 184 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="178.48">{{message}}</tspan></text>
+</svg>

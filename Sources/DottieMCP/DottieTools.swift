@@ -54,6 +54,19 @@ private struct Args {
     func double(_ k: String) -> Double? { raw[k]?.doubleValue ?? raw[k]?.intValue.map(Double.init) }
     func bool(_ k: String) -> Bool? { raw[k]?.boolValue }
     func array(_ k: String) -> [Args]? { raw[k]?.arrayValue?.map { Args(raw: $0.objectValue ?? [:]) } }
+    /// A map of names to text (a symbol's params, a copy's args); numbers and booleans become text. Empty is nil.
+    func strings(_ k: String) throws -> [String: String]? {
+        guard let v = raw[k], !v.isNull else { return nil }
+        guard let d = v.objectValue else { throw ToolFailure(message: "'\(k)' must be an object of names to text") }
+        var out: [String: String] = [:]
+        for (name, x) in d where !x.isNull {
+            if let t = x.stringValue { out[name] = t }
+            else if let n = x.doubleValue ?? x.intValue.map(Double.init) { out[name] = n == n.rounded() && abs(n) < 1e15 ? String(Int(n)) : String(n) }
+            else if let b = x.boolValue { out[name] = String(b) }
+            else { throw ToolFailure(message: "'\(k).\(name)' must be text") }
+        }
+        return out.isEmpty ? nil : out
+    }
 
     func require(_ k: String) throws -> String {
         guard let s = string(k), !s.isEmpty else { throw ToolFailure(message: "Missing required argument '\(k)'") }
@@ -219,6 +232,8 @@ actor DottieTools {
                 "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
                 "playback": prop("string", "For a symbol instance: loop, once, still or click", enum: SymbolPlayback.allCases.map(\.rawValue)),
                 "offset": prop("number", "For a symbol instance: seconds into its symbol's animation at the page's start"),
+                "args": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                                 "description": "For a symbol instance: its values for the symbol's params, replacing the ones it had ({} clears them)"]),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
         Tool(name: "run_script",
              description: "Code mode: run a JavaScript program that edits the diagram through a `dottie` object, in one call "
@@ -272,6 +287,9 @@ actor DottieTools {
                 "path": pathProp, "page": pageProp,
                 "ids": .object(["type": "array", "items": .object(["type": "string"]), "description": "Element ids to turn into the symbol"]),
                 "name": prop("string", "The symbol's name"),
+                "params": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                                   "description": .string("Parameters copies fill in, like Flash component parameters: name to default. "
+                                    + "Write {{name}} in the shapes' text; each copy shows its own args value there")]),
                 "button": prop("boolean", "Make a Flash-style button: the page's scenes named up, over, down and hit (see add_scene) "
                     + "move into it as its states. Copies show up; on the web, over under the pointer, down while pressed, and the hit "
                     + "state's shapes take clicks. Give a copy click_scene or click_url with update_element"),
@@ -288,7 +306,10 @@ actor DottieTools {
                 "height": prop("number", "Height"),
                 "playback": prop("string", "loop (default), once, still (its poster frame), or click (rests at the start; in "
                     + "<dottie-player> a click plays it once)", enum: SymbolPlayback.allCases.map(\.rawValue)),
-                "offset": prop("number", "Seconds into the symbol's animation at the page's start, so copies don't move in step"),
+                "offset": prop("number", "Seconds into the symbol's animation at the page's start, so copies don't move in step; "
+                    + "negative starts a once copy that many seconds into the page"),
+                "args": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                                 "description": "Values for the symbol's params (see make_symbol); ones left out take the default"]),
              ], required: ["path", "symbol", "x", "y"])),
         Tool(name: "open_document",
              description: "Open a .dottie file in the Dottie app (launching it if needed) so edits show live and are undoable. "
@@ -677,6 +698,7 @@ actor DottieTools {
                         file.pages[p].elements[i].playback = v == .loop ? nil : v
                     }
                     if let o = a.double("offset") { file.pages[p].elements[i].offset = o == 0 || !o.isFinite ? nil : o }
+                    if a.raw["args"] != nil { file.pages[p].elements[i].args = try a.strings("args") }
                 }
                 try DiagramOps.update(&file.pages[p], id: id, text: a.string("text").map { Optional($0) },
                                       x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
@@ -766,6 +788,9 @@ actor DottieTools {
             guard let made = file.pages[p].makeSymbol(of: Set(ids), name: name, button: a.bool("button") ?? false) else {
                 throw ToolFailure(message: "None of those ids is a shape on this page.")
             }
+            if let params = try a.strings("params"), let i = file.pages[p].symbols?.firstIndex(where: { $0.id == made.symbol.id }) {
+                file.pages[p].symbols![i].params = params
+            }
             try save(file, to: url)
             return text("symbol: \(made.symbol.id.uuidString)\ninstance: \(made.instance.id.uuidString)")
 
@@ -794,6 +819,9 @@ actor DottieTools {
             }
             guard let e = file.pages[p].placeSymbol(symbol.id, at: CGPoint(x: x, y: y), size: size, playback: playback,
                                                     offset: a.double("offset")) else { throw ToolFailure(message: "Couldn't place it") }
+            if let args = try a.strings("args"), let i = file.pages[p].elements.lastIndex(where: { $0.id == e.id }) {
+                file.pages[p].elements[i].args = args
+            }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)")
 

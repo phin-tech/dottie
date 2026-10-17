@@ -272,6 +272,8 @@ extension DottieScript {
             symbol?: string;
             playback?: Playback;
             offset?: number;
+            /** A symbol's copy: its values for the symbol's params. */
+            args?: Record<string, string>;
         }
 
         /** Look fields any shape or connector takes. */
@@ -338,6 +340,8 @@ extension DottieScript {
             playback?: Playback;
             /** A symbol's copy only: seconds into the symbol's animation at the page's start. */
             offset?: number;
+            /** A symbol's copy only: its values for the symbol's params, replacing the ones it had. */
+            args?: Record<string, string | number> | null;
         }
 
         interface BuildNode {
@@ -446,12 +450,13 @@ extension DottieScript {
             /** Keep it boiling while still (true), never boil it (false), or follow the timeline (null). */
             boil(id: Ref, on: boolean | null): void;
             /** Turns shapes, the arrows between them and their keys into a symbol, put back as one copy where they were.
-             * Its animation is as long as the page timeline when made. */
-            symbol(ids: Ref | Ref[], options?: { name?: string; button?: boolean }): { symbol: string; instance: Element };
+             * Its animation is as long as the page timeline when made. params: names copies fill in, with defaults;
+             * {{name}} in the symbol's text shows each copy's value. */
+            symbol(ids: Ref | Ref[], options?: { name?: string; button?: boolean; params?: Record<string, string | number> }): { symbol: string; instance: Element };
             /** Another copy of a symbol (its id or name), its top-left at x, y; one of width or height keeps its shape. */
-            place(symbol: string | { symbol: string } | { id: string }, options: { x?: number; y?: number; width?: number; height?: number; playback?: Playback; offset?: number }): Element;
+            place(symbol: string | { symbol: string } | { id: string }, options: { x?: number; y?: number; width?: number; height?: number; playback?: Playback; offset?: number; args?: Record<string, string | number> }): Element;
             /** The page's symbols. */
-            symbols(): { id: string; name: string; width: number; height: number; duration: number; instances: number }[];
+            symbols(): { id: string; name: string; width: number; height: number; duration: number; instances: number; params?: Record<string, string> }[];
             /** Replaces a symbol's copy with plain copies of its shapes; returns their ids. */
             breakApart(id: Ref): string[];
             /** Keynote-style Magic Move into another page (its name, number or id) from t (default the end). */

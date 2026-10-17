@@ -69,6 +69,8 @@ export interface Element {
   symbol: string | null;
   playback: SymbolPlayback | null;
   offset: number | null;
+  /** For a `symbol` element: its values for the symbol's parameters (Element.args). */
+  args: Record<string, string> | null;
   /** Base64 bytes; an empty `data` is a picture that couldn't be found (drawn crossed out). */
   image: EmbeddedImage | null;
   reveal: number | null;
@@ -144,6 +146,8 @@ export interface Symbol {
   timeline: Timeline | null;
   /** A Flash-style button: copies show its up scene; on the web, over, down and hit (Symbol.button). */
   button: boolean | null;
+  /** What each copy can fill in, by name, with defaults; `{{name}}` in its text (Symbol.params). */
+  params: Record<string, string> | null;
 }
 
 export interface DottieFile {
@@ -163,12 +167,12 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
   page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols"],
-  symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button"],
+  symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "symbol", "playback", "offset", "image", "reveal"],
+    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
   inlineImage: ["data", "format"],
@@ -202,6 +206,9 @@ type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === "object" && v !== null && !Array.isArray(v);
 const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
 const str = (v: unknown): string | undefined => (typeof v === "string" ? v : undefined);
+/** A map of strings, as Swift's [String: String]; anything else in it makes it nil. */
+const strings = (v: unknown): Record<string, string> | null =>
+  isObj(v) && Object.values(v).every((x) => typeof x === "string") ? { ...(v as Record<string, string>) } : null;
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 /** UUIDs compare by value in Swift; uppercase them so string comparison agrees. */
 const uuid = (v: unknown): string | undefined => (typeof v === "string" ? v.toUpperCase() : undefined);
@@ -340,6 +347,7 @@ class Reader {
       symbol: uuid(v.symbol) ?? null,
       playback: this.playback(v.playback),
       offset: num(v.offset) ?? null,
+      args: strings(v.args),
       image: this.image(v.image, images),
       reveal: num(v.reveal) ?? null,
     };
@@ -376,6 +384,7 @@ class Reader {
       elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
       timeline: this.timeline(v.timeline),
       button: bool(v.button) ?? null,
+      params: strings(v.params),
     };
   }
 
