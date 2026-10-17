@@ -48,10 +48,10 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Symbol parameters, like Flash component parameters: a symbol declares names with defaults, `{{name}}` in its text, and each copy fills them in (`args`); over MCP and scripts, and in dottie.js
 - [x] Flowcharts from the keyboard: ⌘-arrow grows joined nodes (held ⌘ previews a row, letting go keeps it), ⌥-arrow walks along connectors, Tab cycles rectangle/diamond/ellipse, ⇧1 zooms to fit
 - [x] Screenshot markup: lossless pictures keep up to 8192 px as PNG; Highlighter (H); Redact (X) pixelates a picture's own pixels under a dragged box
+- [x] Rulers mark the pointer's position; scene flags drag to retime them; the poster frame is set, shown and cleared on the timeline ruler; a Layers list context menu; Settings ▸ Scripting downloads TypeScript for script type checks
 
 ## Next
 - Custom themes and a color palette per theme
-- Cursor-position marker on the rulers
 - Visio (`.vsdx`) import
 - Links: a Sections list in the sidebar, URL links, clickable links in PDF and SVG export, links to other drawings
 
@@ -62,6 +62,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] `export_png` returns an element-id -> kind, text and pixel box map
 - [x] Look options on shapes and connectors: `fill_style`, `dash`, `stroke_width`, `bowing`, `rotation`, `start_head`, `end_head`
 - [x] `link` on `update_element` (and in `list_elements`)
+- [x] `update_scene`: rename, move or remove a scene (and `dottie.renameScene` / `moveScene` / `removeScene` in scripts)
 
 ## Open questions
 - Hand-drawn font: Excalidraw's Virgil/Excalifont have their own license; using system font until decided.
