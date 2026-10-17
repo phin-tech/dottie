@@ -42,6 +42,8 @@ struct ContentView: View {
                 }
                 Divider()
             }
+            ContextBar(document: document, style: selectionStyle, tool: tool, undoManager: undoManager)
+            Divider()
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
