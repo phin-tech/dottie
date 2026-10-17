@@ -164,7 +164,8 @@ public enum DiagramOps {
         let size = CGSize(width: item.width * k, height: item.height * k)
         let layer = doc.layers.first { !$0.locked && $0.visible }?.id ?? doc.layers[0].id
         let art = item.placed(keepOriginalColors: keepOriginalColors, roughness: roughness ?? Style().roughness, scale: k)
-        let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer)
+        let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer,
+                             symbols: item.symbols ?? [])
         return (ids, size)
     }
 

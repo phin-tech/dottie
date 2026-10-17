@@ -71,6 +71,7 @@ extension StencilLibrary {
                 }
                 doc.elements.append(e)
             }
+            doc.adoptSymbols(item.symbols ?? [])
         }
         return doc
     }

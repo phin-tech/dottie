@@ -454,6 +454,7 @@ struct TimelinePanel: View {
         case .path: return "point.bottomleft.forward.to.point.topright.scurvepath"
         case .note: return "note.text"
         case .image: return "photo"
+        case .symbol: return "square.on.square.dashed"
         }
     }
 }

@@ -31,6 +31,13 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let id = document.editingSymbol, let symbol = document.page.symbolIndex[id] {
+                SymbolBar(pageName: document.page.name, symbolName: symbol.name,
+                          instances: document.page.elements.filter { $0.symbol == id }.count) {
+                    document.editingSymbol = nil
+                }
+                Divider()
+            }
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
@@ -52,6 +59,14 @@ struct ContentView: View {
             .onChange(of: document.currentPageID) { _, _ in
                 // Keep only what is on the new page: a link picked on another page brings its sources back selected.
                 selection = selection.intersection(document.model.elements.map(\.id))
+                activeLayer = nil
+                playing = false
+                playhead = nil
+                selectedKey = nil
+            }
+            .onChange(of: document.editingSymbol) { old, _ in
+                // Into a symbol, or back out of one: nothing selected carries over, except the instance just left.
+                selection = old.map { s in Set(document.model.elements.filter { $0.symbol == s }.prefix(1).map(\.id)) } ?? []
                 activeLayer = nil
                 playing = false
                 playhead = nil
@@ -298,6 +313,9 @@ struct Inspector: View {
                         Button("Go") { onJump(id) }
                     }
                 }
+            }
+            if selected.count == 1, let e = selected.first, e.kind == .symbol {
+                SymbolSection(document: document, instance: e, undoManager: undoManager, onBreakApart: onSelect)
             }
             if !selected.isEmpty {
                 ClickSection(document: document, selection: selection, undoManager: undoManager)
@@ -605,6 +623,7 @@ private struct ElementRow: View {
         case .freehand: "scribble"
         case .path: "scribble.variable"
         case .image: "photo"
+        case .symbol: "square.on.square.dashed"
         }
     }
 

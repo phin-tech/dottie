@@ -202,6 +202,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
     /// Shows another page; `model` is that page when it returns.
     var onShowPage: ((UUID) -> Void)?
+    /// Edits the symbol an instance shows (double-clicking it).
+    var onEditSymbol: ((UUID) -> Void)?
+    /// `model` is a symbol being edited in its own right, not a page. Set before `model`.
+    var showsSymbol = false
     /// The page holding a followable shape (on a visible layer), searching the whole file.
     var findPage: ((UUID) -> UUID?)?
     /// Whether an element exists anywhere in the file, so a paste keeps links to other pages.
@@ -600,6 +604,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if !selection.isEmpty { selection = [] }
         let v = pageViewports[model.id] ?? Viewport(pan: .zero, zoom: 1)
         zoom = v.zoom; pan = v.pan
+        // A symbol's box starts at the origin: on a first visit its content gets a margin from the top left.
+        if showsSymbol, pageViewports[model.id] == nil, !model.elements.isEmpty {
+            let b = Exporter.bounds(of: model, padding: 0)
+            if b.minX < 40 || b.minY < 40 { pan = CGPoint(x: 80 - b.minX, y: 80 - b.minY) }
+        }
     }
 
     private var here: Viewport { Viewport(page: model.id, pan: pan, zoom: zoom) }
@@ -1471,6 +1480,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
         if event.clickCount == 2, tool == .select, let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) {
             selection = [hit.id]
+            if hit.kind == .symbol { gesture = nil; onEditSymbol?(hit.id); return }
             beginEditing(hit.id)
             gesture = nil
             return
@@ -1999,6 +2009,7 @@ struct CanvasView: NSViewRepresentable {
             document.currentPageID = page
             v?.model = document.model
         }
+        v.onEditSymbol = { [document] id in DispatchQueue.main.async { document.editSymbol(of: id) } }
         v.findPage = { [document] id in document.linkTargetPages[id] }
         v.elementExists = { [document] id in document.file.pageIndex(containing: id) != nil }
         return v
@@ -2022,6 +2033,7 @@ struct CanvasView: NSViewRepresentable {
             document.commitFile(next, actionName: "Link", undoManager: undoManager)
             return true
         }
+        v.showsSymbol = document.editingSymbol != nil
         if let t = pose {
             if v.poseSource != document.model || v.poseTime != t {
                 v.poseSource = document.model

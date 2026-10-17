@@ -335,7 +335,12 @@ extension DottieDocument {
     /// Copies in the symbols `other` defines that instances here use, directly or nested, and this page lacks, so
     /// instances brought over from another page (pasted, Magic Moved) still show something.
     public mutating func adoptSymbols(from other: DottieDocument) {
-        let theirs = other.symbolIndex
+        adoptSymbols(other.symbols ?? [])
+    }
+
+    /// Copies in those of `offered` that instances here use, directly or nested, and this page lacks.
+    public mutating func adoptSymbols(_ offered: [Symbol]) {
+        let theirs = Dictionary(offered.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         guard !theirs.isEmpty else { return }
         var have = Set((symbols ?? []).map(\.id))
         var queue = elements.compactMap(\.symbol)
@@ -347,6 +352,47 @@ extension DottieDocument {
             queue += s.elements.compactMap(\.symbol)
         }
         if !added.isEmpty { symbols = (symbols ?? []) + added }
+    }
+
+    /// The symbols `elements` show, directly or nested, as this page defines them.
+    public func symbolsUsed(by elements: [Element]) -> [Symbol] {
+        let table = symbolIndex
+        guard !table.isEmpty else { return [] }
+        var seen = Set<UUID>(), out: [Symbol] = [], queue = elements.compactMap(\.symbol)
+        while let id = queue.popLast() {
+            guard seen.insert(id).inserted, let s = table[id] else { continue }
+            out.append(s)
+            queue += s.elements.compactMap(\.symbol)
+        }
+        return out
+    }
+
+    /// Puts `edited` (one of this page's symbols, edited as a page: see `Symbol.page`) back into the symbol. The
+    /// symbols it carries come along, so a symbol made inside it is kept.
+    public mutating func storeSymbol(_ edited: DottieDocument) {
+        var list = edited.symbols ?? symbols ?? []
+        guard let i = list.firstIndex(where: { $0.id == edited.id }) else { return }
+        list[i].name = edited.name
+        list[i].layers = edited.layers
+        list[i].elements = edited.elements
+        list[i].timeline = edited.timeline
+        symbols = list
+    }
+
+    /// One of the page's symbols as a page to edit: its symbols and theme come along, so instances inside it show.
+    public func editingPage(of symbol: UUID) -> DottieDocument? {
+        guard let s = symbolIndex[symbol] else { return nil }
+        var p = s.page
+        p.symbols = symbols
+        p.theme = theme
+        return p
+    }
+
+    /// Renames symbol `id`.
+    public mutating func renameSymbol(_ id: UUID, to name: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, let i = symbols?.firstIndex(where: { $0.id == id }) else { return }
+        symbols![i].name = n
     }
 
     /// Drops symbols no instance on the page uses, directly or inside another symbol it uses.

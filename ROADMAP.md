@@ -43,6 +43,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Quick Look: Space in Finder previews a drawing (every page, as a PDF) or a stencil library; Finder thumbnails show the first page on its theme's color
 - [x] dottie.js (`web/`): `<dottie-player>` renders and plays `.dottie` files in the browser from their source, matching Dottie's SVG export exactly; `dottie inspect`, goldens, a JSON Schema and CI keep the two in step; the Pages site plays its demos with it
 - [x] Animation extras: spring, bounce and elastic eases; marching-ants lines; Magic Move between pages; APNG and Lottie (smooth or exact) export
+- [x] Symbols (movie clips): drawings defined once per page with their own animation, placed by instances that loop, play once or stand still from any offset; Convert to Symbol, Edit Symbol, Break Apart; nested; in libraries, over MCP and scripts, and in dottie.js
 - [x] Clicks in the web players: a shape plays a scene or opens a link when clicked, with a hover look and keyboard access, in the HTML export and `<dottie-player>` (which also follows links to other pages)
 
 ## Next

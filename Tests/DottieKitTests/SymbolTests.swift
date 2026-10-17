@@ -214,3 +214,31 @@ extension SymbolTests {
         XCTAssertEqual(doc.elements.filter { $0.kind == .symbol }.count, 1)
     }
 }
+
+extension SymbolTests {
+    func testCopiesAndLibraryItemsBringTheirSymbols() throws {
+        var (page, symbol, _, _) = gear()
+        let inst = try XCTUnwrap(page.placeSymbol(symbol.id, at: CGPoint(x: 10, y: 10)))
+        let plain = try DiagramOps.addShape(&page, kind: .rectangle, frame: CGRect(x: 300, y: 0, width: 10, height: 10), at: .zero,
+                                            text: nil, fill: nil, stroke: nil, roughness: 0)
+        // Plain shapes copy as they always did: a bare list.
+        let bare = try XCTUnwrap(page.clipboardData(for: [plain.id]))
+        XCTAssertNoThrow(try JSONDecoder().decode([Element].self, from: bare))
+
+        var other = DottieDocument()
+        let pasted = other.paste(try XCTUnwrap(page.clipboardData(for: [inst.id])))
+        XCTAssertEqual(pasted.count, 1)
+        XCTAssertEqual(other.symbols?.map(\.id), [symbol.id])
+        XCTAssertEqual(other.resolved(at: 1.5).elements.count, 2, "it plays on the other page")
+
+        let item = try XCTUnwrap(StencilLibrary.item(from: page, ids: [inst.id], name: "Gear"))
+        XCTAssertEqual(item.symbols?.map(\.id), [symbol.id])
+        let back = try JSONDecoder().decode(StencilItem.self, from: JSONEncoder().encode(item))
+        var fresh = DottieDocument()
+        let ids = fresh.place(back, center: CGPoint(x: 200, y: 200), layerID: fresh.layers[0].id, keepOriginalColors: true)
+        XCTAssertEqual(ids.count, 1)
+        XCTAssertEqual(fresh.symbols?.count, 1)
+        XCTAssertGreaterThan(fresh.resolved(at: 0).elements.count, 0)
+        XCTAssertEqual(StencilLibrary(name: "L", items: [back]).sheet().symbols?.count, 1)
+    }
+}

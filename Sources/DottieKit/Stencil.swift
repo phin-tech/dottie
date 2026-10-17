@@ -13,11 +13,13 @@ public struct StencilItem: Codable, Equatable, Identifiable, Sendable {
     /// True for art that came from outside Dottie (an SVG, a built-in shape): placing it can restyle it
     /// to the document's look. Items made from a selection already look the way their author styled them.
     public var imported: Bool
+    /// The symbols its instances show, so an animated symbol in a library plays wherever it is placed.
+    public var symbols: [Symbol]?
 
     public init(id: UUID = UUID(), name: String, tags: [String] = [], width: Double, height: Double,
-                elements: [Element], imported: Bool) {
+                elements: [Element], imported: Bool, symbols: [Symbol]? = nil) {
         self.id = id; self.name = name; self.tags = tags; self.width = width; self.height = height
-        self.elements = elements; self.imported = imported
+        self.elements = elements; self.imported = imported; self.symbols = symbols
     }
 
     public var size: CGSize { CGSize(width: width, height: height) }
@@ -67,6 +69,7 @@ public struct StencilItem: Codable, Equatable, Identifiable, Sendable {
         doc.elements = placed(keepOriginalColors: keepOriginalColors, roughness: roughness).map {
             var e = $0; e.layerID = layer; return e
         }
+        doc.symbols = symbols
         return doc
     }
 }
@@ -133,10 +136,11 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
 
     /// An item holding `ids` of `doc`. Connectors bound to shapes outside the set are frozen in place.
     public static func item(from doc: DottieDocument, ids: Set<UUID>, name: String, tags: [String] = []) -> StencilItem? {
-        guard let data = doc.clipboardData(for: ids),
-              var items = try? JSONDecoder().decode([Element].self, from: data), !items.isEmpty else { return nil }
+        guard let data = doc.clipboardData(for: ids), let clip = DottieDocument.clip(data), !clip.elements.isEmpty else { return nil }
+        var items = clip.elements
         let box = normalizeToOrigin(&items)
-        return StencilItem(name: name, tags: tags, width: box.width, height: box.height, elements: items, imported: false)
+        return StencilItem(name: name, tags: tags, width: box.width, height: box.height, elements: items, imported: false,
+                           symbols: clip.symbols.isEmpty ? nil : clip.symbols)
     }
 
     // MARK: Editing items
@@ -233,7 +237,8 @@ extension DottieDocument {
                                roughness: Double = Style().roughness) -> Set<UUID> {
         let k = item.readableScale
         return insert(item.placed(keepOriginalColors: keepOriginalColors, roughness: roughness, scale: k),
-                      size: CGSize(width: item.width * k, height: item.height * k), center: center, layerID: layerID)
+                      size: CGSize(width: item.width * k, height: item.height * k), center: center, layerID: layerID,
+                      symbols: item.symbols ?? [])
     }
 }
 
