@@ -24,14 +24,14 @@ just cli           # release build of dottie; just cli-install links it into ~/.
 **Website.** `website/` is the GitHub Pages site (Material for MkDocs), published by
 `.github/workflows/pages.yml` on pushes to `main` that touch it. Its demos are the drawings in
 `website/docs/drawings`, made by `just demos` (and `just readme-animation`) on a Mac and committed, and played
-live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.2` via jsDelivr, set in
+live by `<dottie-player>` from the published npm package (`@phin-tech/dottie@0.5.1` via jsDelivr, set in
 `website/mkdocs.yml`), so a change to `web/` reaches the site once it is published. Preview it with
 `pip install -r website/requirements.txt && just site`.
 
 **Publishing dottie.js.** dottie.js goes out at Dottie's own version: `just bump` sets `web/package.json` and
 `VERSION` in `web/src/index.ts` along with the app's, and a test fails if they ever differ. Publish it with each
 release: `cd web && npm publish` (it runs the tests and builds first; the `@phin-tech` npm organization owns it).
-Once a new minor version is on npm, point `website/mkdocs.yml` at it.
+Once it is on npm, point `website/mkdocs.yml` at the exact new version (a range is cached for days).
 
 **Looking at the running app.** `just debug-app file.dottie` launches a Debug build in the background on its own
 live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and
@@ -151,7 +151,7 @@ hashed from the instance's and their own (`derivedID`, SplitMix64, ported exactl
 from frame to frame. Anything that iterates a page's elements to draw or export must start from the expansion,
 not the page: Lottie and the web page export take their element order from `expandingSymbols(at: 0, posing:
 false)`. Cycles are cut, and depth and the number of expanded elements are capped (`Symbol.maxDepth`,
-`.maxElements`), the same in dottie.js. Dottie 0.5 and earlier cannot open a file containing a symbol.
+`.maxElements`), the same in dottie.js. Dottie 0.5.0 and earlier cannot open a file containing a symbol.
 An element's `click` (a scene name or an `http`, `https` or `mailto` link) and `hover` look are only used by the
 web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read. A symbol with
 `button: true` is a button: its copies always show its `up` scene (else the start), whatever their playback, and
