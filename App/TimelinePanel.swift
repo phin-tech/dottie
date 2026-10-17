@@ -36,10 +36,8 @@ struct TimelinePanel: View {
     /// The time under the pointer. A reference, not state: it changes every few points, and redrawing the
     /// panel that often would be wasted, since only the menus' actions read it.
     @State private var pointerTime = PointerTime()
-    /// The scene whose name is being edited in the popover under its flag, and the name typed so far.
+    /// The scene whose name is being edited in the popover under its flag.
     @State private var renamingScene: Marker?
-    @State private var sceneDraft = ""
-    @FocusState private var sceneFieldFocused: Bool
 
     private let labelWidth: CGFloat = 170
     private let rowHeight: CGFloat = 22
@@ -169,54 +167,17 @@ struct TimelinePanel: View {
         onEdit("Add Scene") { $0.addScene(at: t) }
     }
 
-    private func renameScene(_ m: Marker) {
-        sceneDraft = m.name
-        renamingScene = m
-    }
+    private func renameScene(_ m: Marker) { renamingScene = m }
 
-    /// Why `sceneDraft` can't name the scene being renamed, or nil when it can.
-    private var sceneDraftProblem: String? {
-        guard let m = renamingScene else { return nil }
-        let name = sceneDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        if name.isEmpty { return "A scene needs a name." }
-        if rows.markers.contains(where: { $0.t != m.t && $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
-            return "Another scene is called that."
-        }
-        return nil
-    }
-
-    private func finishRenamingScene() {
-        guard let m = renamingScene, sceneDraftProblem == nil else { return }
-        renamingScene = nil
-        onRenameScene(m.t, sceneDraft)
-    }
-
-    /// The scene's name in a field, under its flag: Return renames, Esc leaves it.
-    private var sceneRenamer: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label("Rename Scene", systemImage: "flag.fill")
-                .font(.headline)
-                .foregroundStyle(.orange)
-            TextField("Scene name", text: $sceneDraft)
-                .textFieldStyle(.roundedBorder)
-                .frame(width: 220)
-                .focused($sceneFieldFocused)
-                .onSubmit { finishRenamingScene() }
-            Text(sceneDraftProblem ?? "Clicks that play it follow the new name.")
-                .font(.caption)
-                .foregroundStyle(sceneDraftProblem == nil ? Color.secondary : Color.red)
-            HStack {
-                Spacer()
-                Button("Cancel") { renamingScene = nil }
-                    .keyboardShortcut(.cancelAction)
-                Button("Rename") { finishRenamingScene() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(sceneDraftProblem != nil)
-            }
-            .controlSize(.small)
-        }
-        .padding(12)
-        .onAppear { DispatchQueue.main.async { sceneFieldFocused = true } }
+    /// The scene's name under its flag. Clicks find scenes by name, so two may not share one, in any case.
+    private func sceneRenamer(_ m: Marker) -> some View {
+        NamePopover(title: "Rename Scene", systemImage: "flag.fill", tint: .orange, name: m.name, placeholder: "Scene name",
+                    hint: "Clicks that play it follow the new name.",
+                    problem: { name in
+                        if name.isEmpty { return "A scene needs a name." }
+                        let taken = rows.markers.contains { $0.t != m.t && $0.name.caseInsensitiveCompare(name) == .orderedSame }
+                        return taken ? "Another scene is called that." : nil
+                    }) { onRenameScene(m.t, $0) }
     }
 
     static func title(_ e: Ease) -> String {
@@ -370,7 +331,7 @@ struct TimelinePanel: View {
         .contextMenu { rulerMenu }
         .popover(isPresented: Binding(get: { renamingScene != nil }, set: { if !$0 { renamingScene = nil } }),
                  attachmentAnchor: .rect(.rect(CGRect(x: renamingScene.map { x($0.t, trackWidth) } ?? 0, y: 0, width: 8, height: 18))),
-                 arrowEdge: .bottom) { sceneRenamer }
+                 arrowEdge: .bottom) { if let m = renamingScene { sceneRenamer(m) } }
     }
 
     /// The scene under the pointer, or adding one there.
