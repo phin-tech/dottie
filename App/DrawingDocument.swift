@@ -23,6 +23,8 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     }
     /// The symbol of the page on screen being edited in its own right (Edit Symbol), if any. Window state.
     @Published var editingSymbol: UUID?
+    /// A page whose tab should start renaming (Page ▸ Rename Page…); the page bar takes it and clears it.
+    @Published var renamingPage: UUID?
 
     /// The page on screen, or the symbol being edited as a page of its own.
     var model: DottieDocument {

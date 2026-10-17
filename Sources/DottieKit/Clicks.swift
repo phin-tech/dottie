@@ -31,6 +31,24 @@ extension DottieDocument {
             ?? markers.firstIndex { $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
+    /// Renames the scene marker at `t`, and every click on the page that plays it, so they keep playing it.
+    /// Refuses a blank name, or one another scene has in any case (clicks find scenes by name). Returns whether
+    /// the scene is now called `name`.
+    @discardableResult
+    public mutating func renameScene(at t: Double, to name: String) -> Bool {
+        guard var tl = timeline, let markers = tl.markers, let i = markers.firstIndex(where: { abs($0.t - t) < 1e-6 }) else { return false }
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, !markers.indices.contains(where: { $0 != i && markers[$0].name.caseInsensitiveCompare(name) == .orderedSame })
+        else { return false }
+        guard name != markers[i].name else { return true }
+        for e in elements.indices {
+            if let s = elements[e].click?.scene, Self.scene(named: s, in: markers) == i { elements[e].click?.scene = name }
+        }
+        tl.markers![i].name = name
+        timeline = tl
+        return true
+    }
+
     /// `self` with `ids` drawn as they look hovered.
     func hovered(_ ids: Set<UUID>) -> DottieDocument {
         var copy = self

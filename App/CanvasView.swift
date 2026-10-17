@@ -210,6 +210,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var findPage: ((UUID) -> UUID?)?
     /// Whether an element exists anywhere in the file, so a paste keeps links to other pages.
     var elementExists: ((UUID) -> Bool)?
+    /// The window's commands for a selection, for the context menu; nil leaves the canvas without one.
+    var editorActions: ((Set<UUID>) -> EditorActions)?
     /// Links shapes on page `page` (not the one on screen) to `target`, as one undo step.
     var onLinkOtherPage: ((_ sources: Set<UUID>, _ page: UUID, _ target: UUID) -> Bool)?
 
@@ -1149,10 +1151,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return false }
         let art: (elements: [Element], size: CGSize, notes: [String])
         do { art = try MermaidImporter.elements(from: text) } catch {
-            let alert = NSAlert()
-            alert.messageText = "Couldn't import the Mermaid diagram"
-            alert.informativeText = error.localizedDescription
-            if let window { alert.beginSheetModal(for: window) } else { alert.runModal() }
+            Alerts.show(error, title: "Couldn't import the Mermaid diagram", over: window)
             return false
         }
         var next = model
@@ -1262,7 +1261,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     // MARK: Context menu
 
-    /// Right-clicking a shape selects it (with its group) unless it is already selected; empty canvas clears the selection.
+    /// Right-clicking a shape selects it (with its group) unless it is already selected, and shows what can be done
+    /// to the selection; empty canvas clears the selection and shows what can be added to the page.
     override func menu(for event: NSEvent) -> NSMenu? {
         if playhead != nil { return nil }
         endEditing()
@@ -1273,6 +1273,13 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             selection = []
         }
         let menu = NSMenu()
+        guard let actions = editorActions?(selection) else { return nil }
+        if selection.isEmpty { fillCanvasMenu(menu, actions) } else { fillSelectionMenu(menu, actions) }
+        return menu
+    }
+
+    /// A shape's menu: editing, then arranging, symbols, links and animation, each only where it applies.
+    private func fillSelectionMenu(_ menu: NSMenu, _ actions: EditorActions) {
         func add(_ title: String, _ action: Selector) { menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self }
         add("Cut", #selector(cut(_:)))
         add("Copy", #selector(copy(_:)))
@@ -1280,15 +1287,91 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         add("Duplicate", #selector(duplicate(_:)))
         add("Delete", #selector(delete(_:)))
         menu.addItem(.separator())
-        add("Link to Element…", #selector(linkToElement(_:)))
-        add("Follow Link", #selector(followLink(_:)))
-        add("Remove Link", #selector(removeLink(_:)))
+        let elements = model.elements.filter { selection.contains($0.id) }
+        if actions.selectionCount >= 2 { menu.addItem(ClosureMenuItem("Group", actions.group)) }
+        if actions.grouped { menu.addItem(ClosureMenuItem("Ungroup", actions.ungroup)) }
+        menu.addItem(.submenu("Arrange") { m in
+            m.addItem(ClosureMenuItem("Bring to Front") { actions.reorder(.toFront) })
+            m.addItem(ClosureMenuItem("Bring Forward") { actions.reorder(.forward) })
+            m.addItem(ClosureMenuItem("Send Backward") { actions.reorder(.backward) })
+            m.addItem(ClosureMenuItem("Send to Back") { actions.reorder(.toBack) })
+        })
+        if actions.selectionCount >= 2 {
+            menu.addItem(.submenu("Align") { m in
+                m.addItem(ClosureMenuItem("Left") { actions.align(.left) })
+                m.addItem(ClosureMenuItem("Center Horizontally") { actions.align(.centerX) })
+                m.addItem(ClosureMenuItem("Right") { actions.align(.right) })
+                m.addItem(.separator())
+                m.addItem(ClosureMenuItem("Top") { actions.align(.top) })
+                m.addItem(ClosureMenuItem("Center Vertically") { actions.align(.centerY) })
+                m.addItem(ClosureMenuItem("Bottom") { actions.align(.bottom) })
+            })
+        }
+        if actions.selectionCount >= 3 {
+            menu.addItem(.submenu("Distribute") { m in
+                m.addItem(ClosureMenuItem("Horizontally") { actions.distribute(.horizontal) })
+                m.addItem(ClosureMenuItem("Vertically") { actions.distribute(.vertical) })
+            })
+        }
         menu.addItem(.separator())
-        add("Bring to Front", #selector(bringToFront(_:)))
-        add("Send to Back", #selector(sendToBack(_:)))
-        add("Group", #selector(groupSelection(_:)))
-        add("Ungroup", #selector(ungroupSelection(_:)))
-        return menu
+        if actions.instanceSelected {
+            menu.addItem(ClosureMenuItem("Edit Symbol", actions.editSymbol))
+            menu.addItem(ClosureMenuItem("Break Apart", actions.breakApart))
+        } else {
+            menu.addItem(ClosureMenuItem("Convert to Symbol", actions.makeSymbol))
+        }
+        menu.addItem(.separator())
+        add("Link to Element…", #selector(linkToElement(_:)))
+        if selectionHasLink {
+            add("Follow Link", #selector(followLink(_:)))
+            add("Remove Link", #selector(removeLink(_:)))
+        }
+        menu.addItem(.separator())
+        menu.addItem(.submenu("Animate") { m in
+            m.addItem(.submenu("Add Transition") { t in
+                for (i, group) in [DottieKit.Transition.entrances, DottieKit.Transition.exits, DottieKit.Transition.emphasis].enumerated() {
+                    if i > 0 { t.addItem(.separator()) }
+                    for tr in group { t.addItem(ClosureMenuItem(tr.title) { actions.addTransition(tr) }) }
+                }
+            })
+            if actions.connectorsSelected > 0 {
+                m.addItem(ClosureMenuItem("Send Packet Along Arrow", actions.sendPacket))
+            }
+            if elements.contains(where: { $0.kind == .connector || $0.kind == .freehand }) {
+                m.addItem(ClosureMenuItem("March Selected Lines", actions.marchSelection))
+            }
+            if actions.hasAnimation {
+                m.addItem(ClosureMenuItem("Repeat Selection's Animation", actions.repeatSelection))
+                m.addItem(ClosureMenuItem("Clear Keys from Selection", actions.clearKeys))
+            }
+            m.addItem(.separator())
+            m.addItem(ClosureMenuItem("Frame Camera on Selection", actions.frameCamera))
+        })
+    }
+
+    /// Empty canvas: what can be added to the page, and its animation.
+    private func fillCanvasMenu(_ menu: NSMenu, _ actions: EditorActions) {
+        menu.addItem(withTitle: "Paste", action: #selector(paste(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Select All", action: #selector(selectAll(_:)), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "Insert Image…", action: #selector(insertImage(_:)), keyEquivalent: "").target = self
+        if actions.editingSymbol {
+            menu.addItem(.separator())
+            menu.addItem(ClosureMenuItem("Done Editing Symbol", actions.doneEditingSymbol))
+        }
+        menu.addItem(.separator())
+        if actions.hasAnimation {
+            menu.addItem(ClosureMenuItem("Add Scene Marker") { actions.addScene(nil) })
+        } else {
+            menu.addItem(ClosureMenuItem("New Animation", actions.newAnimation))
+        }
+        if !model.elements.isEmpty {
+            menu.addItem(.submenu("Build Diagram") { m in
+                for style in BuildStyle.allCases { m.addItem(ClosureMenuItem(style.title) { actions.buildDiagram(style) }) }
+            })
+        }
+        if actions.hasNextPage {
+            menu.addItem(ClosureMenuItem("Magic Move to Next Page", actions.magicMove))
+        }
     }
 
     private var selectionHasLink: Bool { model.elements.contains { selection.contains($0.id) && $0.link != nil } }
@@ -1307,16 +1390,6 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         onCommit?(next, "Remove Link")
     }
 
-    private func edit(_ name: String, _ change: (inout DottieDocument) -> Void) {
-        var next = model
-        change(&next)
-        if next != model { onCommit?(next, name) }
-    }
-
-    @objc func bringToFront(_ sender: Any?) { let ids = selection; edit("Arrange") { $0.reorder(ids, .toFront) } }
-    @objc func sendToBack(_ sender: Any?) { let ids = selection; edit("Arrange") { $0.reorder(ids, .toBack) } }
-    @objc func groupSelection(_ sender: Any?) { let ids = selection; edit("Group") { $0.group(ids) } }
-    @objc func ungroupSelection(_ sender: Any?) { let ids = selection; edit("Ungroup") { $0.ungroup(ids) } }
 
     /// Ends Link to Element… with a click at `p`: a shape outside the sources gets the link; empty canvas cancels;
     /// a connector or one of the sources beeps and keeps waiting.
@@ -1340,14 +1413,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
-        case #selector(linkToElement(_:)), #selector(bringToFront(_:)), #selector(sendToBack(_:)):
+        case #selector(linkToElement(_:)):
             return !selection.isEmpty
         case #selector(followLink(_:)), #selector(removeLink(_:)):
             return selectionHasLink
-        case #selector(groupSelection(_:)):
-            return model.expandingGroups(selection).count >= 2
-        case #selector(ungroupSelection(_:)):
-            return model.elements.contains { selection.contains($0.id) && $0.groupID != nil }
         case #selector(delete(_:)), #selector(copy(_:)), #selector(cut(_:)), #selector(duplicate(_:)):
             return !selection.isEmpty
         case #selector(paste(_:)):
@@ -1997,6 +2066,8 @@ struct CanvasView: NSViewRepresentable {
     /// Seconds into the animation to pose, while paused on the timeline; nil edits the page itself.
     var pose: Double?
     var onExitPreview: () -> Void = {}
+    /// The window's commands for a selection, for the context menu.
+    var editorActions: ((Set<UUID>) -> EditorActions)?
     @Environment(\.undoManager) private var undoManager
     @AppStorage("onionSkin") private var onionSkin = false
 
@@ -2055,6 +2126,7 @@ struct CanvasView: NSViewRepresentable {
         v.activeLayerID = activeLayerID
         v.showRulers = showRulers
         v.onExitPreview = onExitPreview
+        v.editorActions = editorActions
         v.onCameraEdit = pose.map { t in
             { [document, undoManager] view in
                 var next = document.model
@@ -2084,5 +2156,31 @@ struct CanvasView: NSViewRepresentable {
                 if jumpRequest == req { jumpRequest = nil }
             }
         }
+    }
+}
+
+/// A menu item that runs a closure, for menus built in code.
+final class ClosureMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(_ title: String, _ handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run(_:)), keyEquivalent: "")
+        target = self
+    }
+
+    required init(coder: NSCoder) { fatalError("not used from a nib") }
+
+    @objc private func run(_ sender: Any?) { handler() }
+}
+
+extension NSMenuItem {
+    /// An item opening a submenu that `fill` builds.
+    static func submenu(_ title: String, _ fill: (NSMenu) -> Void) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let menu = NSMenu(title: title)
+        fill(menu)
+        item.submenu = menu
+        return item
     }
 }

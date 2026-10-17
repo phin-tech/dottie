@@ -77,6 +77,8 @@ enum AnimationExportFormat: CaseIterable {
 /// a focused scene value, so each window's commands target its own document.
 struct EditorActions {
     var selectionCount: Int
+    /// Some of the selection is in a group.
+    var grouped: Bool
     var group: () -> Void
     var ungroup: () -> Void
     // Symbols
@@ -98,6 +100,13 @@ struct EditorActions {
     var duplicatePage: () -> Void
     var deletePage: () -> Void
     var showPage: (_ offset: Int) -> Void
+    var renamePage: () -> Void
+    var movePage: (_ offset: Int) -> Void
+    var pageIndex: Int
+    // Links
+    var linkSelected: Bool
+    var linkToElement: () -> Void
+    var removeLink: () -> Void
     // Animate
     var hasAnimation: Bool
     var boils: Bool
@@ -115,7 +124,13 @@ struct EditorActions {
     var toggleSettle: () -> Void
     var clearKeys: () -> Void
     var hasCamera: Bool
-    var addScene: () -> Void
+    /// The page's scenes, in time order.
+    var scenes: [Marker]
+    /// Adds a scene marker at a time, or at the playhead when nil.
+    var addScene: (Double?) -> Void
+    /// Shows the scene before (-1) or after (1) the playhead.
+    var showScene: (_ offset: Int) -> Void
+    var playScene: (Marker) -> Void
     var frameCamera: () -> Void
     var removeCamera: () -> Void
     var repeatSelection: () -> Void
@@ -165,10 +180,15 @@ extension ContentView {
     }
 
     @MainActor
-    var editorActions: EditorActions {
-        let ids = selection
-        return EditorActions(
+    var editorActions: EditorActions { editorActions(for: selection) }
+
+    /// The commands acting on `ids`: the canvas's context menu passes the selection it just made, which reaches
+    /// `selection` only on the next turn of the run loop.
+    @MainActor
+    func editorActions(for ids: Set<UUID>) -> EditorActions {
+        EditorActions(
             selectionCount: ids.count,
+            grouped: document.model.elements.contains { ids.contains($0.id) && $0.groupID != nil },
             group: { edit("Group") { $0.group(ids) } },
             ungroup: { edit("Ungroup") { $0.ungroup(ids) } },
             instanceSelected: ids.count == 1 && document.model.elements.contains { ids.contains($0.id) && $0.kind == .symbol },
@@ -202,6 +222,15 @@ extension ContentView {
             duplicatePage: { document.duplicatePage(document.currentPageID, undoManager: undoManager) },
             deletePage: { document.deletePage(document.currentPageID, undoManager: undoManager) },
             showPage: { document.showPage(offset: $0) },
+            renamePage: { document.renamingPage = document.currentPageID },
+            movePage: { offset in
+                guard let i = document.file.index(of: document.currentPageID) else { return }
+                document.movePage(document.currentPageID, to: i + offset, undoManager: undoManager)
+            },
+            pageIndex: document.file.index(of: document.currentPageID) ?? 0,
+            linkSelected: document.model.elements.contains { ids.contains($0.id) && $0.link != nil },
+            linkToElement: { NSApp.sendAction(#selector(CanvasNSView.linkToElement(_:)), to: nil, from: nil) },
+            removeLink: { edit("Remove Link") { try? $0.setLink(ids, to: nil) } },
             hasAnimation: document.model.timeline != nil,
             boils: document.model.timeline?.boil != nil,
             settles: document.model.timeline?.settle == true,
@@ -255,11 +284,19 @@ extension ContentView {
             toggleSettle: { edit("Settle When Still") { $0.startAnimation(); $0.timeline!.settle = $0.timeline!.settle == true ? nil : true } },
             clearKeys: { edit("Clear Keys") { $0.clearAnimation(of: ids) } },
             hasCamera: !(document.model.timeline?.camera ?? []).isEmpty,
-            addScene: { edit("Add Scene") { doc in
+            scenes: document.model.timeline?.markers ?? [],
+            addScene: { at in animate("Add Scene") { doc in
                 doc.startAnimation()
-                let n = (doc.timeline!.markers?.count ?? 0) + 1
-                doc.timeline!.addMarker(at: playhead ?? 0, name: "Scene \(n)")
+                return doc.timeline!.addScene(at: at ?? playhead ?? 0)
             } },
+            showScene: { offset in
+                let markers = document.model.timeline?.markers ?? [], t = playhead ?? 0
+                let to = offset < 0 ? markers.last { $0.t < t - 1e-6 }?.t ?? 0 : markers.first { $0.t > t + 1e-6 }?.t
+                guard let to else { NSSound.beep(); return }
+                playing = false
+                playhead = to
+            },
+            playScene: { m in playing = false; playhead = m.t },
             frameCamera: { animate("Frame Camera") { doc in
                 let index = doc.elementIndex
                 let boxes = doc.posed(at: playhead ?? 0).elements.filter { ids.contains($0.id) }
@@ -298,10 +335,8 @@ extension ContentView {
         let model = document.model
         guard model.timeline != nil, !model.elements.isEmpty else { NSSound.beep(); return }
         guard !Exporter.animationTooLong(model) else {
-            let alert = NSAlert()
-            alert.messageText = "This animation is too long to export"
-            alert.informativeText = "It has more than \(Exporter.maxAnimationFrames) frames. Shorten it or lower its frame rate."
-            alert.runModal()
+            Alerts.show("This animation is too long to export",
+                        "It has more than \(Exporter.maxAnimationFrames) frames. Shorten it or lower its frame rate.")
             return
         }
         let panel = NSSavePanel()
@@ -315,10 +350,7 @@ extension ContentView {
             do { try format.write(model, to: url); failure = nil } catch { failure = error.localizedDescription }
             await MainActor.run {
                 guard let failure else { return }
-                let alert = NSAlert()
-                alert.messageText = "Couldn't export the animation"
-                alert.informativeText = failure
-                alert.runModal()
+                Alerts.show("Couldn't export the animation", failure)
             }
         }
     }
@@ -345,7 +377,7 @@ extension ContentView {
             guard let data else { throw CocoaError(.fileWriteUnknown) }
             try data.write(to: url, options: .atomic)
         } catch {
-            NSAlert(error: error).runModal()
+            Alerts.show(error)
         }
     }
 }

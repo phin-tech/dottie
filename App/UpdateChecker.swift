@@ -42,12 +42,12 @@ final class UpdateChecker {
         do {
             release = try await fetchLatest()
         } catch {
-            if userInitiated { show("Couldn't check for updates", error.localizedDescription) }
+            if userInitiated { Alerts.show(error, title: "Couldn't check for updates") }
             return
         }
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Pref.lastUpdateCheck)
         guard let newer = release.newer(than: currentVersion) else {
-            if userInitiated { show("Dottie is up to date", "You have version \(currentVersion), the latest.") }
+            if userInitiated { Alerts.show("Dottie is up to date", "You have version \(currentVersion), the latest.") }
             return
         }
         if !userInitiated, UserDefaults.standard.string(forKey: Pref.skippedUpdate) == newer.description { return }
@@ -89,12 +89,5 @@ final class UpdateChecker {
         default:
             break
         }
-    }
-
-    private func show(_ title: String, _ text: String) {
-        let alert = NSAlert()
-        alert.messageText = title
-        alert.informativeText = text
-        alert.runModal()
     }
 }

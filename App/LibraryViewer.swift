@@ -83,7 +83,7 @@ struct LibraryViewer: View {
             try store.create(library)
             message = "Installed “\(library.name)”. It is in the Library tab of every drawing."
         } catch {
-            NSAlert(error: error).runModal()
+            Alerts.show(error)
         }
     }
 
@@ -203,7 +203,7 @@ struct LibraryViewer: View {
             do {
                 guard let data else { throw CocoaError(.fileWriteUnknown) }
                 try data.write(to: url, options: .atomic)
-            } catch { NSAlert(error: error).runModal() }
+            } catch { Alerts.show(error) }
         }
     }
 }

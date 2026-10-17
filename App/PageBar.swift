@@ -2,7 +2,7 @@ import SwiftUI
 import DottieKit
 
 /// The page tabs under the canvas. Click to show a page, double-click to rename, drag to reorder;
-/// the context menu duplicates and deletes.
+/// the context menu renames, duplicates, adds, moves and deletes.
 struct PageBar: View {
     @ObservedObject var document: DrawingDocument
     var undoManager: UndoManager?
@@ -23,14 +23,17 @@ struct PageBar: View {
                 }
                 .onChange(of: document.currentPageID) { _, id in withAnimation { scroller.scrollTo(id) } }
             }
-            Divider().frame(height: 16)
-            Button { document.addPage(undoManager: undoManager) } label: { Image(systemName: "plus") }
-                .buttonStyle(.borderless)
-                .help("New Page (⌥⌘N)")
+            BarDivider()
+            IconButton("plus", help: "New Page (⌥⌘N)") { document.addPage(undoManager: undoManager) }
                 .padding(.horizontal, 10)
         }
         .frame(height: 30)
         .background(.bar)
+        .onChange(of: document.renamingPage) { _, id in
+            guard let id, let page = document.file.page(id) else { return }
+            document.renamingPage = nil
+            beginRename(page)
+        }
     }
 
     @ViewBuilder
@@ -68,6 +71,7 @@ struct PageBar: View {
         .contextMenu {
             Button("Rename…") { beginRename(page) }
             Button("Duplicate") { document.duplicatePage(page.id, undoManager: undoManager) }
+            Button("New Page After") { document.currentPageID = page.id; document.addPage(undoManager: undoManager) }
             Divider()
             let i = document.file.index(of: page.id) ?? 0
             Button("Move Left") { document.movePage(page.id, to: i - 1, undoManager: undoManager) }.disabled(i == 0)

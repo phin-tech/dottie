@@ -41,6 +41,7 @@ final class DebugDriver {
                                  doneSymbol, breakApart, undo, redo
     drag <x1> <y1> <x2> <y2>     drag on the canvas, in canvas points (top-left origin)
     click <x> <y>                click on the canvas
+    rightclick <x> <y> [Item/Sub]   right-click the canvas and list its context menu, or choose an item in it
     key <esc|delete|text>        send a key to the canvas
     keys <text>                  list the keys of the element whose text contains <text>
     keysel <text> <t>            select that element's key at <t> in the timeline (none: clear)
@@ -99,6 +100,18 @@ final class DebugDriver {
                 guard let x = Double(try arg(rest, 0, "x")), let y = Double(try arg(rest, 1, "y")) else { throw DebugError("click takes two numbers") }
                 try drag(CGPoint(x: x, y: y), CGPoint(x: x, y: y), steps: 0)
                 return ok("clicked")
+            case "rightclick":
+                guard let x = Double(try arg(rest, 0, "x")), let y = Double(try arg(rest, 1, "y")) else { throw DebugError("rightclick takes two numbers") }
+                let c = try canvas()
+                guard var m = c.menu(for: mouse(.rightMouseDown, CGPoint(x: x, y: y), in: c, window: try window())) else { return ok("no menu") }
+                guard rest.count > 2 else { return ok(Self.dump(m, open: true)) }
+                // An item path: choose it, as clicking it would.
+                let path = rest[2...].joined(separator: " ").split(separator: "/").map(String.init)
+                for (i, title) in path.enumerated() {
+                    guard let index = m.items.firstIndex(where: { $0.title == title }) else { throw DebugError("no item '\(title)'") }
+                    if i == path.count - 1 { let item = m.items[index]; guard let action = item.action, NSApp.sendAction(action, to: item.target, from: item) else { throw DebugError("'\(title)' did nothing") } } else if let sub = m.items[index].submenu { m = sub }
+                }
+                return ok("chose \(path.joined(separator: " > ")) (canvas \(c.model.elements.count) elements, \(c.selection.count) selected; page \(try hooks().document.model.elements.count))")
             case "key": return ok(try key(rest.joined(separator: " ")))
             case "menu": return ok(try menu(rest.first))
             case "keys", "keysel", "keymove", "keyease", "keydel": return ok(try keyCommand(command, rest))
@@ -218,7 +231,7 @@ final class DebugDriver {
         case "boil": e.toggleBoil()
         case "settle": e.toggleSettle()
         case "clearKeys": e.clearKeys()
-        case "scene": e.addScene()
+        case "scene": e.addScene(a.count > 1 ? Double(a[1]) : nil)
         case "camera": e.frameCamera()
         case "removeCamera": e.removeCamera()
         case "repeat": e.repeatSelection()
@@ -310,21 +323,25 @@ final class DebugDriver {
             }
             menu = sub
         }
-        menu.update()
-        func dump(_ m: NSMenu, _ depth: Int) -> [String] {
-            m.items.flatMap { item -> [String] in
+        // Only open submenus of the menu asked for, so the whole menu bar stays readable.
+        return Self.dump(menu, open: path != nil)
+    }
+
+    /// A menu as indented lines; `open` lists its submenus too.
+    private static func dump(_ menu: NSMenu, open: Bool) -> String {
+        func lines(_ m: NSMenu, _ depth: Int) -> [String] {
+            m.update()
+            return m.items.flatMap { item -> [String] in
                 let pad = String(repeating: "  ", count: depth)
                 if item.isSeparatorItem { return ["\(pad)---"] }
                 if item.isSectionHeader { return ["\(pad)[\(item.title)]"] }
                 let mark = item.state == .on ? "✓ " : ""
                 let line = "\(pad)\(mark)\(item.title)\(item.isEnabled ? "" : "  (disabled)")\(item.keyEquivalent.isEmpty ? "" : "  ⌘\(item.keyEquivalent)")"
-                // Only open submenus of the menu asked for, so the whole menu bar stays readable.
-                guard let sub = item.submenu, path != nil else { return [line] }
-                sub.update()
-                return [line] + dump(sub, depth + 1)
+                guard let sub = item.submenu, open else { return [line] }
+                return [line] + lines(sub, depth + 1)
             }
         }
-        return dump(menu, 0).joined(separator: "\n")
+        return lines(menu, 0).joined(separator: "\n")
     }
 }
 

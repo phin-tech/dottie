@@ -8,7 +8,9 @@ import DottieKit
 /// Esc) goes back to editing the page itself. Clicking a row's name selects that element.
 ///
 /// Keys are edited here too: click a diamond to select it (the playhead jumps there), drag it to retime it
-/// (Option-drag copies it), and change its ease or delete it from the header or the row's context menu.
+/// (Option-drag copies it), and change its ease or delete it from the header or by right-clicking it.
+/// Right-clicking the ruler adds a scene marker there, or renames (in a popover under its flag) or deletes the one
+/// under the pointer; the flag in the header adds one at the playhead.
 struct TimelinePanel: View {
     let page: DottieDocument
     @Binding var playhead: Double?
@@ -17,6 +19,8 @@ struct TimelinePanel: View {
     var onSelect: (UUID) -> Void
     /// Applies a change to the page's timeline as one undo step, named for the Edit menu.
     var onEdit: (String, (inout Timeline) -> Void) -> Void
+    /// Renames the scene at a time, with the clicks that play it.
+    var onRenameScene: (Double, String) -> Void
     /// A key being dragged: drawn at `to` until the drag ends, then moved (or copied) there in one step.
     @State private var keyDrag: KeyDrag?
     @State private var scrubbing = false
@@ -26,6 +30,14 @@ struct TimelinePanel: View {
     /// The rows' height when a resize began.
     @State private var resizeFrom: CGFloat?
     @State private var collapsedLayers: Set<UUID> = []
+    /// What the pointer is over in the ruler or a track, for their context menus, which aren't told where the
+    /// right-click was.
+    @State private var pointer = Pointer()
+    /// The time under the pointer. A reference, not state: it changes every few points, and redrawing the
+    /// panel that often would be wasted, since only the menus' actions read it.
+    @State private var pointerTime = PointerTime()
+    /// The scene whose name is being edited in the popover under its flag.
+    @State private var renamingScene: Marker?
 
     private let labelWidth: CGFloat = 170
     private let rowHeight: CGFloat = 22
@@ -60,19 +72,13 @@ struct TimelinePanel: View {
 
     private var header: some View {
         HStack(spacing: 10) {
-            Button { collapsed.toggle() } label: {
-                Image(systemName: "chevron.right").rotationEffect(.degrees(collapsed ? 0 : 90))
+            DisclosureButton(isExpanded: !collapsed, expandHelp: "Show Timeline", collapseHelp: "Hide Timeline") {
+                collapsed.toggle()
             }
-            .buttonStyle(.borderless)
-            .help(collapsed ? "Show Timeline" : "Hide Timeline")
-            Button {
+            IconButton(playing ? "pause.fill" : "play.fill", help: playing ? "Pause" : "Play") {
                 if playhead == nil { playhead = 0 }
                 playing.toggle()
-            } label: {
-                Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 16)
             }
-            .buttonStyle(.borderless)
-            .help(playing ? "Pause" : "Play")
             Text(timeText)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
@@ -83,6 +89,8 @@ struct TimelinePanel: View {
             } else {
                 Spacer()
             }
+            BarDivider()
+            IconButton("flag", help: "Add Scene Marker at the Playhead") { addScene(at: playhead ?? 0) }
             if let markers = timeline.markers, !markers.isEmpty {
                 sceneControls(markers)
             }
@@ -105,20 +113,17 @@ struct TimelinePanel: View {
     private func sceneControls(_ markers: [Marker]) -> some View {
         let t = playhead ?? 0
         let current = markers.last { $0.t <= t + 1e-6 }
-        Divider().frame(height: 16)
-        Button { scrub(to: markers.last { $0.t < t - 1e-6 }?.t ?? 0) } label: { Image(systemName: "backward.end.fill") }
-            .buttonStyle(.borderless)
-            .help("Previous Scene")
+        IconButton("backward.end.fill", help: "Previous Scene") { scrub(to: markers.last { $0.t < t - 1e-6 }?.t ?? 0) }
         Text(current?.name ?? "Start").lineLimit(1).frame(maxWidth: 140)
-        Button { if let next = markers.first(where: { $0.t > t + 1e-6 }) { scrub(to: next.t) } } label: { Image(systemName: "forward.end.fill") }
-            .buttonStyle(.borderless)
-            .help("Next Scene")
+        IconButton("forward.end.fill", help: "Next Scene") {
+            if let next = markers.first(where: { $0.t > t + 1e-6 }) { scrub(to: next.t) }
+        }
     }
 
     /// The selected key's ease and a delete button.
     @ViewBuilder
     private func keyControls(_ k: KeyRef, _ key: Keyframe) -> some View {
-        Divider().frame(height: 16)
+        BarDivider()
         Image(systemName: "diamond.fill").font(.system(size: 9)).foregroundStyle(Color.accentColor)
         Text("\(key.t.formatted(.number.precision(.fractionLength(1))))s").monospacedDigit().foregroundStyle(.secondary)
         Picker("Ease", selection: Binding(get: { key.ease ?? .linear }, set: { e in
@@ -130,15 +135,37 @@ struct TimelinePanel: View {
         .controlSize(.small)
         .fixedSize()
         .help("How it moves from this key to the next")
-        Button { deleteSelectedKey() } label: { Image(systemName: "trash") }
-            .buttonStyle(.borderless)
-            .help("Delete Key")
+        IconButton("trash", help: "Delete Key") { deleteSelectedKey() }
     }
 
     private func deleteSelectedKey() {
         guard let k = selectedKey else { return }
+        deleteKey(k)
+    }
+
+    private func deleteKey(_ k: KeyRef) {
         onEdit("Delete Key") { $0.removeKey(of: k.element, at: k.t) }
-        selectedKey = nil
+        if selectedKey == k { selectedKey = nil }
+    }
+
+    /// Adds a scene at `t`; beeps if there is one there already.
+    private func addScene(at t: Double) {
+        var probe = timeline
+        guard probe.addScene(at: t) else { NSSound.beep(); return }
+        onEdit("Add Scene") { $0.addScene(at: t) }
+    }
+
+    private func renameScene(_ m: Marker) { renamingScene = m }
+
+    /// The scene's name under its flag. Clicks find scenes by name, so two may not share one, in any case.
+    private func sceneRenamer(_ m: Marker) -> some View {
+        NamePopover(title: "Rename Scene", systemImage: "flag.fill", tint: .orange, name: m.name, placeholder: "Scene name",
+                    hint: "Clicks that play it follow the new name.",
+                    problem: { name in
+                        if name.isEmpty { return "A scene needs a name." }
+                        let taken = rows.markers.contains { $0.t != m.t && $0.name.caseInsensitiveCompare(name) == .orderedSame }
+                        return taken ? "Another scene is called that." : nil
+                    }) { onRenameScene(m.t, $0) }
     }
 
     static func title(_ e: Ease) -> String {
@@ -247,6 +274,13 @@ struct TimelinePanel: View {
             }
             .contentShape(Rectangle())
             .gesture(scrubGesture)
+            .onContinuousHover { if case .active(let p) = $0 { point(at: p.x, camera: true) } }
+            .contextMenu {
+                if let t = pointer.key {
+                    Button("Delete Camera Key") { onEdit("Delete Camera Key") { tl in tl.camera?.removeAll { abs($0.t - t) < 1e-6 } } }
+                }
+                Button("Remove Camera") { onEdit("Remove Camera") { $0.camera = nil } }
+            }
         }
         .frame(height: rowHeight)
         .background(Color.primary.opacity(0.04))
@@ -281,14 +315,30 @@ struct TimelinePanel: View {
         }
         .contentShape(Rectangle())
         .gesture(scrubGesture)
+        .onContinuousHover { if case .active(let p) = $0 { point(at: p.x) } }
+        .contextMenu { rulerMenu }
+        .popover(isPresented: Binding(get: { renamingScene != nil }, set: { if !$0 { renamingScene = nil } }),
+                 attachmentAnchor: .rect(.rect(CGRect(x: renamingScene.map { x($0.t, trackWidth) } ?? 0, y: 0, width: 8, height: 18))),
+                 arrowEdge: .bottom) { if let m = renamingScene { sceneRenamer(m) } }
+    }
+
+    /// The scene under the pointer, or adding one there.
+    @ViewBuilder private var rulerMenu: some View {
+        if let t = pointer.marker, let m = rows.markers.first(where: { $0.t == t }) {
+            Button("Go to “\(m.name)”") { scrub(to: m.t) }
+            Button("Rename Scene…") { renameScene(m) }
+            Divider()
+            Button("Delete Scene") { onEdit("Delete Scene") { $0.removeMarker(at: m.t) } }
+        } else {
+            Button("Add Scene Marker Here") { addScene(at: pointerTime.t) }
+        }
     }
 
     private func layerHeader(_ group: TimelineRows.Group) -> some View {
         let closed = collapsedLayers.contains(group.layer)
         return HStack(spacing: 4) {
-            Image(systemName: "chevron.right")
+            DisclosureChevron(isExpanded: !closed)
                 .font(.system(size: 9, weight: .semibold))
-                .rotationEffect(.degrees(closed ? 0 : 90))
             Image(systemName: "square.3.layers.3d").font(.system(size: 10))
             Text(group.name).font(.caption.weight(.semibold))
             Spacer()
@@ -322,19 +372,51 @@ struct TimelinePanel: View {
             Canvas { ctx, size in drawTrack(row, in: &ctx, size: size) }
                 .contentShape(Rectangle())
                 .gesture(rowGesture(row))
-                .contextMenu {
-                    if let k = selectedKey, k.element == row.element, timeline.key(of: k.element, at: k.t) != nil {
-                        Picker("Ease", selection: Binding(get: { timeline.key(of: k.element, at: k.t)?.ease ?? .linear },
-                                                          set: { e in onEdit("Set Ease") { $0.setEase(e, of: k.element, at: k.t) } })) {
-                            ForEach(Ease.allCases, id: \.self) { Text(Self.title($0)).tag($0) }
-                        }
-                        Button("Delete Key") { deleteSelectedKey() }
-                    } else {
-                        Text("Click a key to select it").foregroundStyle(.secondary)
-                    }
-                }
+                .onContinuousHover { if case .active(let p) = $0 { point(at: p.x, row: row) } }
+                .contextMenu { rowMenu(row) }
         }
         .frame(height: rowHeight)
+    }
+
+    /// The key under the pointer, if it is over one of this row's; then the element and adding a scene there.
+    @ViewBuilder private func rowMenu(_ row: TimelineRows.Row) -> some View {
+        if pointer.element == row.element, let t = pointer.key, let key = timeline.key(of: row.element, at: t) {
+            let k = KeyRef(element: row.element, t: key.t)
+            Picker("Ease", selection: Binding(get: { key.ease ?? .linear }, set: { e in
+                selectedKey = k
+                onEdit("Set Ease") { $0.setEase(e, of: k.element, at: k.t) }
+            })) {
+                ForEach(Ease.allCases, id: \.self) { Text(Self.title($0)).tag($0) }
+            }
+            Button("Delete Key") { deleteKey(k) }
+            Divider()
+        }
+        Button("Select \(row.label)") { onSelect(row.element) }
+        Button("Add Scene Marker Here") { addScene(at: pointerTime.t) }
+        Divider()
+        Button("Clear Keys") {
+            if selectedKey?.element == row.element { selectedKey = nil }
+            onEdit("Clear Keys") { $0.tracks.removeAll { $0.element == row.element } }
+        }
+    }
+
+    /// Notes what is under the pointer at `px` in the ruler (no row), a row's track or the camera's, changing state
+    /// only when that changes so hovering doesn't redraw the panel at every pixel.
+    private func point(at px: CGFloat, row: TimelineRows.Row? = nil, camera: Bool = false) {
+        pointerTime.t = time(atX: px)
+        var p = Pointer(element: row?.element)
+        if let row { p.key = nearestKey(in: row, x: px)?.t }
+        else if camera { p.key = rows.camera.first { abs(x($0, trackWidth) - px) <= 7 } }
+        else { p.marker = rows.markers.min { abs(x($0.t, trackWidth) - px) < abs(x($1.t, trackWidth) - px) }
+            .flatMap { abs(x($0.t, trackWidth) - px) <= 6 ? $0.t : nil } }
+        if p != pointer { pointer = p }
+    }
+
+    /// The row's key within 7 points of `px`, the nearest if several are.
+    private func nearestKey(in row: TimelineRows.Row, x px: CGFloat) -> TimelineRows.Mark? {
+        guard let k = row.keys.min(by: { abs(x($0.t, trackWidth) - px) < abs(x($1.t, trackWidth) - px) }),
+              abs(x(k.t, trackWidth) - px) <= 7 else { return nil }
+        return k
     }
 
     // MARK: Drawing
@@ -418,8 +500,7 @@ struct TimelinePanel: View {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { v in
                 if keyDrag == nil, !scrubbing {
-                    if let k = row.keys.min(by: { abs(x($0.t, trackWidth) - v.startLocation.x) < abs(x($1.t, trackWidth) - v.startLocation.x) }),
-                       abs(x(k.t, trackWidth) - v.startLocation.x) <= 7 {
+                    if let k = nearestKey(in: row, x: v.startLocation.x) {
                         keyDrag = KeyDrag(element: row.element, from: k.t, to: k.t,
                                           copy: NSEvent.modifierFlags.contains(.option))
                     } else {
@@ -494,6 +575,18 @@ struct TimelinePanel: View {
 struct KeyRef: Equatable {
     var element: UUID
     var t: Double
+}
+
+/// What the pointer is over in the timeline: in a track the key there, or on the ruler the scene.
+private struct Pointer: Equatable {
+    var element: UUID?
+    var key: Double?
+    var marker: Double?
+}
+
+/// The time under the pointer in the timeline.
+private final class PointerTime {
+    var t = 0.0
 }
 
 /// A key being dragged in the timeline.
