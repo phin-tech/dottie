@@ -24,7 +24,10 @@ output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right
 .dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
 .dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
 .dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
-.dottie-a:active { transform: translate(1px, 1px); }
+.dottie-a:not(.dottie-b):active { transform: translate(1px, 1px); }
+.dottie-a .dottie-d { display: none; }
+.dottie-b:active .dottie-n, .dottie-b:active .dottie-h { display: none; }
+.dottie-b:active .dottie-d { display: inline; }
 </style>
 </head>
 <body>

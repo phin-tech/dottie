@@ -1,5 +1,5 @@
 // Clicks: an architecture diagram that waits for you. Click Auth or Orders (in the .html export or
-// <dottie-player>) to watch that request go through; Back returns to the overview.
+// <dottie-player>) to watch that request go through; Back, a button symbol, returns to the overview.
 const k = dottie.build({direction: "LR", sketchy: true,
   nodes: [
     {key: "b", text: "Browser", fill: "#ffd966"},
@@ -12,7 +12,19 @@ const k = dottie.build({direction: "LR", sketchy: true,
   ],
   edges: [{from: "b", to: "g"}, {from: "g", to: "a"}, {from: "g", to: "o"},
           {from: "o", to: "d"}, {from: "o", to: "q"}, {from: "q", to: "w"}]});
-dottie.timeline({fps: 24, boil: 3, settle: true});
+dottie.timeline({fps: 24, boil: 3, settle: true, duration: 1});
+
+// Back is a Flash-style button symbol: grey up, blue under the pointer (its "over" scene), darker while pressed
+// ("down"). Its keys and those scenes move into the symbol when it is made.
+const box = dottie.bounds();
+const back = dottie.rect({x: box.x + box.width - 90, y: box.y + box.height + 14, width: 90, height: 40, text: "Back",
+                          fill: "#e9ecef", sketchy: false});
+dottie.key(back, 0, {fill: "#e9ecef", ease: "hold"});
+dottie.key(back, 0.4, {fill: "#a5d8ff", ease: "hold"});
+dottie.key(back, 0.8, {fill: "#4dabf7", ease: "hold"});
+dottie.scene(0.4, "over");
+dottie.scene(0.8, "down");
+const backButton = dottie.symbol([back], {name: "Back", button: true}).instance;
 
 const arrows = dottie.elements({kind: "connector"});
 const arrow = (a, b) => arrows.find(c => c.from === k[a] && c.to === k[b]);
@@ -32,13 +44,11 @@ t = run(t, [["o", "q"], ["q", "w"]], "#2f9e44");
 dottie.transition(k.w, "pulse", t);
 dottie.timeline({duration: t + 1});
 
-const box = dottie.bounds();
 const hint = dottie.text({x: box.x, y: box.y + box.height + 20, width: box.width - 110, height: 30,
                           text: "Click Auth or Orders to follow a request"});
-const back = dottie.rect({x: box.x + box.width - 90, y: box.y + box.height + 14, width: 90, height: 40, text: "Back"});
 const look = {stroke: "#1c7ed6", fill: "#d0ebff"};
 dottie.update(k.a, {click: {scene: "Sign in"}, hover: look});
 dottie.update(k.o, {click: {scene: "Place an order"}, hover: look});
-dottie.update(back, {click: {scene: "Overview"}, hover: look});
+dottie.update(backButton, {click: {scene: "Overview"}});
 dottie.timeline({poster: 0});
 return dottie.timeline();

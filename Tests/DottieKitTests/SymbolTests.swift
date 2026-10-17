@@ -244,11 +244,12 @@ extension SymbolTests {
 }
 
 extension SymbolTests {
-    func testInstancesRefuseClicksForNow() throws {
+    func testInstancesTakeClicksButNotHoverColors() throws {
         var (page, symbol, _, _) = gear()
         let inst = try XCTUnwrap(page.placeSymbol(symbol.id, at: .zero))
-        XCTAssertThrowsError(try DiagramOps.update(&page, id: inst.id, click: .some(ClickAction(url: "https://example.com"))))
-        XCTAssertNoThrow(try DiagramOps.update(&page, id: inst.id, click: .some(nil)), "removing one is fine")
+        XCTAssertNoThrow(try DiagramOps.update(&page, id: inst.id, click: .some(ClickAction(url: "https://example.com"))))
+        XCTAssertThrowsError(try DiagramOps.update(&page, id: inst.id, hover: .some(HoverLook(fill: .black))))
+        XCTAssertNoThrow(try DiagramOps.update(&page, id: inst.id, hover: .some(nil)), "removing one is fine")
     }
 
     func testLottieDrawsWhatInstancesShow() throws {

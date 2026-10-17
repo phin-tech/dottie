@@ -51,7 +51,8 @@
         "height": { "type": "number" },
         "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" } },
         "elements": { "type": "array", "items": { "$ref": "#/$defs/element" } },
-        "timeline": { "$ref": "#/$defs/timeline" }
+        "timeline": { "$ref": "#/$defs/timeline" },
+        "button": { "type": "boolean", "description": "Copies show its up scene (or the start); on the web its over and down scenes, and its hit scene takes clicks." }
       }
     },
     "layer": {
@@ -120,7 +121,7 @@
         "click": { "$ref": "#/$defs/click" },
         "hover": { "$ref": "#/$defs/hover" },
         "symbol": { "$ref": "#/$defs/uuid", "description": "For a symbol element: the page's symbol it shows." },
-        "playback": { "enum": ["loop", "once", "still"], "description": "How a symbol element plays its symbol's timeline; loop by default." },
+        "playback": { "enum": ["loop", "once", "still", "click"], "description": "How a symbol element plays its symbol's timeline; loop by default. click rests at the start and plays once when clicked in <dottie-player>." },
         "offset": { "type": "number", "description": "Seconds into its symbol's timeline a symbol element is when the page's starts." },
         "image": { "$ref": "#/$defs/image" },
         "reveal": { "type": "number" }

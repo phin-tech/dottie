@@ -62,7 +62,7 @@ final class SchemaTests: XCTestCase {
         tl.addMarker(at: 1, name: "m")
         page.timeline = tl
         page.symbols = [Symbol(name: "S", width: 10, height: 10, elements: [Element(kind: .rectangle, frame: .zero, layerID: layer.id)],
-                               timeline: Timeline(duration: 1))]
+                               timeline: Timeline(duration: 1), button: true)]
         let json = try JSONSerialization.jsonObject(with: DottieFile(pages: [page]).encoded())
         XCTAssertEqual(try SchemaValidator(schema()).validate(json), [])
     }

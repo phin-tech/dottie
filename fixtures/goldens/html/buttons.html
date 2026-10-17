@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>buttons</title>
+<style>
+:root { --page: #ffffff; --ink: #1f1f21; }
+html, body { margin: 0; min-height: 100%; background: var(--page); color: var(--ink);
+  font: 14px -apple-system, system-ui, sans-serif; }
+body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  min-height: 100vh; padding: 16px; box-sizing: border-box; }
+.stage { width: min(100%, 398px); }
+.f { display: none; } .f.on { display: block; }
+.f svg { width: 100%; height: auto; display: block; }
+.bar { display: flex; align-items: center; gap: 12px; width: min(100%, 560px); }
+button { font: inherit; color: inherit; background: none; border: 1.5px solid currentColor; border-radius: 6px;
+  width: 34px; height: 30px; cursor: pointer; }
+input[type=range] { flex: 1; accent-color: var(--ink); }
+output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
+#scene { min-width: 0; text-align: center; font-weight: 600; white-space: nowrap; }
+.dottie-a { cursor: pointer; outline: none; }
+.dottie-a .dottie-h { display: none; }
+.dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
+.dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
+.dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
+.dottie-a:not(.dottie-b):active { transform: translate(1px, 1px); }
+.dottie-a .dottie-d { display: none; }
+.dottie-b:active .dottie-n, .dottie-b:active .dottie-h { display: none; }
+.dottie-b:active .dottie-d { display: inline; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute;overflow:hidden" aria-hidden="true"><defs>
+<g id="ds0">
+<path d="M349.53 45.66 C352.74 43.06 354.83 40.75 356.47 39.53 M350.06 45.25 C352.53 43.07 354.94 41.02 356.05 39.85 M349.76 56.89 C356.89 50.54 363.47 43.83 369.38 39.35 M350.34 56.11 C354.66 51.21 362.65 44.49 367.98 40.38 M348.92 67.23 C356.54 61.4 370.61 48.84 379.77 39.5 M350.54 65.9 C359.73 57.38 372.7 46.51 381.04 39.83 M351.14 77.08 C366.25 62.95 382.32 48.62 389.34 41.78 M350.33 77.2 C367.71 62.16 383.18 48.42 389.76 42.92 M358.16 79.08 C367.5 71.6 380.85 59.98 390.51 51.92 M359.46 79.5 C365.66 74.08 379.28 61.68 389.85 52.84 M371.41 79.61 C375.19 76.45 383.57 69.15 391.03 63.68 M371.61 80.29 C376.23 75.58 384.33 68.5 390.04 63.35 M383.08 79.49 C385.03 78.46 388.3 75.74 390.16 73.71 M383.04 80.05 C385.41 78.21 388.31 75.76 389.85 74.39" fill="none" stroke="#f28c1a" stroke-width="1" stroke-linecap="round"/>
+<path d="M351.03 40.28 C364.91 40.93 380.25 41.52 391.25 40.63 M349.91 39.14 C365.67 39.76 381.24 40.3 389.88 40.37 M390.84 41.9 C390.58 57.56 390.59 72.59 390.43 78.17 M389.41 40.91 C390.48 56.71 389.91 72.86 389.08 79.11 M388.95 81.12 C372.48 79.33 358.29 80.82 348.91 79.12 M389.47 79.98 C378.74 79.03 361.59 79.62 350.3 80.61 M348.46 78.44 C350.46 67.15 349.69 50.31 348.47 40.35 M350.68 80.63 C349.99 65.85 349.67 49.82 350.04 40.69" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M40 120 L160 120 L160 160 L40 160 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 120 L160 120 L160 160 L40 160 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="146.48">Go</tspan></text>
+</g>
+<g id="dp0">
+<path d="M76 208 C76 212.42 72.42 216 68 216 C63.58 216 60 212.42 60 208 C60 203.58 63.58 200 68 200 C72.42 200 76 203.58 76 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M61.49 203.49 C62.3 202.88 64.48 200.08 66.36 199.8 C68.24 199.53 71.21 200.75 72.78 201.86 C74.34 202.97 75.46 204.82 75.74 206.47 C76.02 208.12 75.44 210.23 74.44 211.78 C73.44 213.32 71.58 215.22 69.74 215.74 C67.91 216.27 64.9 215.97 63.41 214.93 C61.92 213.88 61.17 211.31 60.81 209.46 C60.44 207.62 61.16 204.79 61.23 203.85 M76.42 209.42 C75.66 210.18 73.6 212.95 71.88 214.01 C70.15 215.08 67.96 216.07 66.06 215.8 C64.17 215.53 61.4 214 60.49 212.39 C59.57 210.78 59.84 208.07 60.57 206.16 C61.3 204.26 63.07 201.88 64.88 200.97 C66.68 200.06 69.71 200.03 71.4 200.71 C73.1 201.4 74.4 203.23 75.07 205.07 C75.74 206.9 75.37 210.61 75.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</defs></svg>
+<div class="stage">
+<div class="f on"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<use href="#dp0"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M100 208 C100 212.42 96.42 216 92 216 C87.58 216 84 212.42 84 208 C84 203.58 87.58 200 92 200 C96.42 200 100 203.58 100 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M85.49 203.49 C86.3 202.88 88.48 200.08 90.36 199.8 C92.24 199.53 95.21 200.75 96.78 201.86 C98.34 202.97 99.46 204.82 99.74 206.47 C100.02 208.12 99.44 210.23 98.44 211.78 C97.44 213.32 95.58 215.22 93.74 215.74 C91.91 216.27 88.9 215.97 87.41 214.93 C85.92 213.88 85.17 211.31 84.81 209.46 C84.44 207.62 85.16 204.79 85.23 203.85 M100.42 209.42 C99.66 210.18 97.6 212.95 95.88 214.01 C94.15 215.08 91.96 216.07 90.06 215.8 C88.17 215.53 85.4 214 84.49 212.39 C83.57 210.78 83.84 208.07 84.57 206.16 C85.3 204.26 87.07 201.88 88.88 200.97 C90.68 200.06 93.71 200.03 95.4 200.71 C97.1 201.4 98.4 203.23 99.07 205.07 C99.74 206.9 99.37 210.61 99.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M124 208 C124 212.42 120.42 216 116 216 C111.58 216 108 212.42 108 208 C108 203.58 111.58 200 116 200 C120.42 200 124 203.58 124 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M109.49 203.49 C110.3 202.88 112.48 200.08 114.36 199.8 C116.24 199.53 119.21 200.75 120.78 201.86 C122.34 202.97 123.46 204.82 123.74 206.47 C124.02 208.12 123.44 210.23 122.44 211.78 C121.44 213.32 119.58 215.22 117.74 215.74 C115.91 216.27 112.9 215.97 111.41 214.93 C109.92 213.88 109.17 211.31 108.81 209.46 C108.44 207.62 109.16 204.79 109.23 203.85 M124.42 209.42 C123.66 210.18 121.6 212.95 119.88 214.01 C118.15 215.08 115.96 216.07 114.06 215.8 C112.17 215.53 109.4 214 108.49 212.39 C107.57 210.78 107.84 208.07 108.57 206.16 C109.3 204.26 111.07 201.88 112.88 200.97 C114.68 200.06 117.71 200.03 119.4 200.71 C121.1 201.4 122.4 203.23 123.07 205.07 C123.74 206.9 123.37 210.61 123.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M148 208 C148 212.42 144.42 216 140 216 C135.58 216 132 212.42 132 208 C132 203.58 135.58 200 140 200 C144.42 200 148 203.58 148 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M133.49 203.49 C134.3 202.88 136.48 200.08 138.36 199.8 C140.24 199.53 143.21 200.75 144.78 201.86 C146.34 202.97 147.46 204.82 147.74 206.47 C148.02 208.12 147.44 210.23 146.44 211.78 C145.44 213.32 143.58 215.22 141.74 215.74 C139.91 216.27 136.9 215.97 135.41 214.93 C133.92 213.88 133.17 211.31 132.81 209.46 C132.44 207.62 133.16 204.79 133.23 203.85 M148.42 209.42 C147.66 210.18 145.6 212.95 143.88 214.01 C142.15 215.08 139.96 216.07 138.06 215.8 C136.17 215.53 133.4 214 132.49 212.39 C131.57 210.78 131.84 208.07 132.57 206.16 C133.3 204.26 135.07 201.88 136.88 200.97 C138.68 200.06 141.71 200.03 143.4 200.71 C145.1 201.4 146.4 203.23 147.07 205.07 C147.74 206.9 147.37 210.61 147.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M172 208 C172 212.42 168.42 216 164 216 C159.58 216 156 212.42 156 208 C156 203.58 159.58 200 164 200 C168.42 200 172 203.58 172 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M157.49 203.49 C158.3 202.88 160.48 200.08 162.36 199.8 C164.24 199.53 167.21 200.75 168.78 201.86 C170.34 202.97 171.46 204.82 171.74 206.47 C172.02 208.12 171.44 210.23 170.44 211.78 C169.44 213.32 167.58 215.22 165.74 215.74 C163.91 216.27 160.9 215.97 159.41 214.93 C157.92 213.88 157.17 211.31 156.81 209.46 C156.44 207.62 157.16 204.79 157.23 203.85 M172.42 209.42 C171.66 210.18 169.6 212.95 167.88 214.01 C166.15 215.08 163.96 216.07 162.06 215.8 C160.17 215.53 157.4 214 156.49 212.39 C155.57 210.78 155.84 208.07 156.57 206.16 C157.3 204.26 159.07 201.88 160.88 200.97 C162.68 200.06 165.71 200.03 167.4 200.71 C169.1 201.4 170.4 203.23 171.07 205.07 C171.74 206.9 171.37 210.61 171.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M196 208 C196 212.42 192.42 216 188 216 C183.58 216 180 212.42 180 208 C180 203.58 183.58 200 188 200 C192.42 200 196 203.58 196 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M181.49 203.49 C182.3 202.88 184.48 200.08 186.36 199.8 C188.24 199.53 191.21 200.75 192.78 201.86 C194.34 202.97 195.46 204.82 195.74 206.47 C196.02 208.12 195.44 210.23 194.44 211.78 C193.44 213.32 191.58 215.22 189.74 215.74 C187.91 216.27 184.9 215.97 183.41 214.93 C181.92 213.88 181.17 211.31 180.81 209.46 C180.44 207.62 181.16 204.79 181.23 203.85 M196.42 209.42 C195.66 210.18 193.6 212.95 191.88 214.01 C190.15 215.08 187.96 216.07 186.06 215.8 C184.17 215.53 181.4 214 180.49 212.39 C179.57 210.78 179.84 208.07 180.57 206.16 C181.3 204.26 183.07 201.88 184.88 200.97 C186.68 200.06 189.71 200.03 191.4 200.71 C193.1 201.4 194.4 203.23 195.07 205.07 C195.74 206.9 195.37 210.61 195.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M220 208 C220 212.42 216.42 216 212 216 C207.58 216 204 212.42 204 208 C204 203.58 207.58 200 212 200 C216.42 200 220 203.58 220 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M205.49 203.49 C206.3 202.88 208.48 200.08 210.36 199.8 C212.24 199.53 215.21 200.75 216.78 201.86 C218.34 202.97 219.46 204.82 219.74 206.47 C220.02 208.12 219.44 210.23 218.44 211.78 C217.44 213.32 215.58 215.22 213.74 215.74 C211.91 216.27 208.9 215.97 207.41 214.93 C205.92 213.88 205.17 211.31 204.81 209.46 C204.44 207.62 205.16 204.79 205.23 203.85 M220.42 209.42 C219.66 210.18 217.6 212.95 215.88 214.01 C214.15 215.08 211.96 216.07 210.06 215.8 C208.17 215.53 205.4 214 204.49 212.39 C203.57 210.78 203.84 208.07 204.57 206.16 C205.3 204.26 207.07 201.88 208.88 200.97 C210.68 200.06 213.71 200.03 215.4 200.71 C217.1 201.4 218.4 203.23 219.07 205.07 C219.74 206.9 219.37 210.61 219.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M244 208 C244 212.42 240.42 216 236 216 C231.58 216 228 212.42 228 208 C228 203.58 231.58 200 236 200 C240.42 200 244 203.58 244 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M229.49 203.49 C230.3 202.88 232.48 200.08 234.36 199.8 C236.24 199.53 239.21 200.75 240.78 201.86 C242.34 202.97 243.46 204.82 243.74 206.47 C244.02 208.12 243.44 210.23 242.44 211.78 C241.44 213.32 239.58 215.22 237.74 215.74 C235.91 216.27 232.9 215.97 231.41 214.93 C229.92 213.88 229.17 211.31 228.81 209.46 C228.44 207.62 229.16 204.79 229.23 203.85 M244.42 209.42 C243.66 210.18 241.6 212.95 239.88 214.01 C238.15 215.08 235.96 216.07 234.06 215.8 C232.17 215.53 229.4 214 228.49 212.39 C227.57 210.78 227.84 208.07 228.57 206.16 C229.3 204.26 231.07 201.88 232.88 200.97 C234.68 200.06 237.71 200.03 239.4 200.71 C241.1 201.4 242.4 203.23 243.07 205.07 C243.74 206.9 243.37 210.61 243.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M268 208 C268 212.42 264.42 216 260 216 C255.58 216 252 212.42 252 208 C252 203.58 255.58 200 260 200 C264.42 200 268 203.58 268 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M253.49 203.49 C254.3 202.88 256.48 200.08 258.36 199.8 C260.24 199.53 263.21 200.75 264.78 201.86 C266.34 202.97 267.46 204.82 267.74 206.47 C268.02 208.12 267.44 210.23 266.44 211.78 C265.44 213.32 263.58 215.22 261.74 215.74 C259.91 216.27 256.9 215.97 255.41 214.93 C253.92 213.88 253.17 211.31 252.81 209.46 C252.44 207.62 253.16 204.79 253.23 203.85 M268.42 209.42 C267.66 210.18 265.6 212.95 263.88 214.01 C262.15 215.08 259.96 216.07 258.06 215.8 C256.17 215.53 253.4 214 252.49 212.39 C251.57 210.78 251.84 208.07 252.57 206.16 C253.3 204.26 255.07 201.88 256.88 200.97 C258.68 200.06 261.71 200.03 263.4 200.71 C265.1 201.4 266.4 203.23 267.07 205.07 C267.74 206.9 267.37 210.61 267.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M292 208 C292 212.42 288.42 216 284 216 C279.58 216 276 212.42 276 208 C276 203.58 279.58 200 284 200 C288.42 200 292 203.58 292 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M277.49 203.49 C278.3 202.88 280.48 200.08 282.36 199.8 C284.24 199.53 287.21 200.75 288.78 201.86 C290.34 202.97 291.46 204.82 291.74 206.47 C292.02 208.12 291.44 210.23 290.44 211.78 C289.44 213.32 287.58 215.22 285.74 215.74 C283.91 216.27 280.9 215.97 279.41 214.93 C277.92 213.88 277.17 211.31 276.81 209.46 C276.44 207.62 277.16 204.79 277.23 203.85 M292.42 209.42 C291.66 210.18 289.6 212.95 287.88 214.01 C286.15 215.08 283.96 216.07 282.06 215.8 C280.17 215.53 277.4 214 276.49 212.39 C275.57 210.78 275.84 208.07 276.57 206.16 C277.3 204.26 279.07 201.88 280.88 200.97 C282.68 200.06 285.71 200.03 287.4 200.71 C289.1 201.4 290.4 203.23 291.07 205.07 C291.74 206.9 291.37 210.61 291.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+<div class="f"><svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<g class="dottie-a dottie-b" data-a="0" tabindex="0" role="button" aria-label="Go">
+<g class="dottie-n" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-h" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#6699ff" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-d" pointer-events="none">
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#1a3399" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+</g>
+<g class="dottie-hit" opacity="0" pointer-events="all">
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="#000000" stroke="none"/>
+<path d="M110 60 C110 65.52 105.52 70 100 70 C94.48 70 90 65.52 90 60 C90 54.48 94.48 50 100 50 C105.52 50 110 54.48 110 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</g>
+<g class="dottie-a" data-a="1" tabindex="0" role="button" aria-label="Docs button">
+<g class="dottie-n" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<g class="dottie-h" pointer-events="none">
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+</g>
+<path class="dottie-hit" d="M204.97 30.47 L302.98 50.33 L295.03 89.53 L197.02 69.67 Z" fill="none" stroke="none" pointer-events="all"/>
+</g>
+<use href="#ds0"/>
+<path d="M316 208 C316 212.42 312.42 216 308 216 C303.58 216 300 212.42 300 208 C300 203.58 303.58 200 308 200 C312.42 200 316 203.58 316 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M301.49 203.49 C302.3 202.88 304.48 200.08 306.36 199.8 C308.24 199.53 311.21 200.75 312.78 201.86 C314.34 202.97 315.46 204.82 315.74 206.47 C316.02 208.12 315.44 210.23 314.44 211.78 C313.44 213.32 311.58 215.22 309.74 215.74 C307.91 216.27 304.9 215.97 303.41 214.93 C301.92 213.88 301.17 211.31 300.81 209.46 C300.44 207.62 301.16 204.79 301.23 203.85 M316.42 209.42 C315.66 210.18 313.6 212.95 311.88 214.01 C310.15 215.08 307.96 216.07 306.06 215.8 C304.17 215.53 301.4 214 300.49 212.39 C299.57 210.78 299.84 208.07 300.57 206.16 C301.3 204.26 303.07 201.88 304.88 200.97 C306.68 200.06 309.71 200.03 311.4 200.71 C313.1 201.4 314.4 203.23 315.07 205.07 C315.74 206.9 315.37 210.61 315.43 211.72" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div>
+</div>
+<div class="bar">
+<button id="play" aria-label="Pause">❚❚</button>
+<button id="prev" aria-label="Previous scene">⏮</button>
+<output id="scene"></output>
+<button id="next" aria-label="Next scene">⏭</button>
+<input id="scrub" type="range" min="0" max="20" value="0" aria-label="Frame">
+<output id="time">0.0s</output>
+</div>
+<script>
+(function () {
+  var times = [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2], scenes = [0,10], names = ["Start","Next"];
+  var frames = document.querySelectorAll(".f"), n = frames.length, step = 1000 / 10.0;
+  var play = document.getElementById("play"), scrub = document.getElementById("scrub"), time = document.getElementById("time");
+  var sceneLabel = document.getElementById("scene"), acts = [{"s":"1"},{"u":"https:\/\/example.com\/docs"}];
+  var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var i = 0, playing = n > 1, last = 0, acc = 0;
+  function sceneAt(k) { var s = -1; for (var j = 0; j < scenes.length; j++) if (scenes[j] <= k) s = j; return s; }
+  function show(k) {
+    // Keyboard focus on a clickable element moves to its copy in the frame shown next.
+    var a = document.activeElement, held = a && a.getAttribute && frames[i].contains(a) ? a.getAttribute("data-a") : null;
+    frames[i].classList.remove("on"); i = (k + n) % n; frames[i].classList.add("on");
+    if (held !== null) { var same = frames[i].querySelector('[data-a="' + held + '"]'); if (same) same.focus({ preventScroll: true }); }
+    scrub.value = i; time.textContent = times[i].toFixed(1) + "s";
+    if (sceneLabel) { var s = sceneAt(i); sceneLabel.textContent = s < 0 ? "" : names[s]; }
+  }
+  function setPlaying(p) {
+    playing = p && n > 1; play.textContent = playing ? "❚❚" : "▶";
+    play.setAttribute("aria-label", playing ? "Pause" : "Play"); last = 0; acc = 0;
+  }
+  // With scenes, playing stops on the next scene (and at the end, rather than looping).
+  function advance() {
+    var next = i + 1;
+    if (scenes.length && next >= n) { setPlaying(false); return false; }
+    show(next);
+    if (scenes.indexOf(i) >= 0) { setPlaying(false); return false; }
+    return true;
+  }
+  function tick(now) {
+    if (playing) {
+      if (last) acc += now - last;
+      last = now;
+      while (playing && acc >= step) { acc -= step; if (!advance()) break; }
+    }
+    requestAnimationFrame(tick);
+  }
+  function nextScene() { if (i >= n - 1) show(0); setPlaying(true); }
+  function prevScene() {
+    var s = sceneAt(i);
+    if (s >= 0 && scenes[s] === i) s -= 1;
+    setPlaying(false); show(s >= 0 ? scenes[s] : 0);
+  }
+  // A clickable element jumps to its scene and plays on to the next (with reduced motion, straight to
+  // where that stops), or opens its link.
+  function act(k) {
+    var x = acts[k];
+    if (!x) return;
+    if (x.u) { if (/^(https?:|mailto:)/i.test(x.u)) window.open(x.u, "_blank", "noopener"); return; }
+    var s = +x.s;
+    if (!(s >= 0 && s < scenes.length)) return;
+    if (reduced || n < 2) { setPlaying(false); show(s + 1 < scenes.length ? scenes[s + 1] : n - 1); return; }
+    show(scenes[s]); setPlaying(true);
+  }
+  function button(t) { return t && t.closest ? t.closest(".dottie-a") : null; }
+  document.querySelector(".stage").addEventListener("click", function (e) {
+    var b = button(e.target);
+    if (b) act(+b.getAttribute("data-a"));
+  });
+  play.onclick = function () { if (!playing && scenes.length && i >= n - 1) show(0); setPlaying(!playing); };
+  scrub.oninput = function () { setPlaying(false); show(+scrub.value); };
+  if (scenes.length) {
+    document.getElementById("next").onclick = nextScene;
+    document.getElementById("prev").onclick = prevScene;
+  }
+  document.addEventListener("keydown", function (e) {
+    var b = button(e.target);
+    if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); act(+b.getAttribute("data-a")); return; }
+    if (e.target === scrub && e.key !== " ") return;
+    if (e.key === " ") { e.preventDefault(); scenes.length ? (playing ? setPlaying(false) : nextScene()) : setPlaying(!playing); }
+    else if (e.key === "ArrowRight") { scenes.length ? nextScene() : (setPlaying(false), show(i + 1)); }
+    else if (e.key === "ArrowLeft") { scenes.length ? prevScene() : (setPlaying(false), show(i - 1)); }
+    else if (e.key === ".") { setPlaying(false); show(i + 1); }
+    else if (e.key === ",") { setPlaying(false); show(i - 1); }
+  });
+  show(0);
+  if (scenes.indexOf(0) >= 0) playing = false;
+  if (reduced) { playing = false; show(20); }
+  setPlaying(playing);
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

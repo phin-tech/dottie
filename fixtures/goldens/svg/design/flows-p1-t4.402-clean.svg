@@ -27,9 +27,10 @@
 <path d="M610.88 180 L655.88 180 M655.88 180 L655.88 70 M655.88 70 L700.88 70 M691.87 65.66 L700.88 70 M691.87 74.34 L700.88 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M610.88 180 L656.04 180 M656.04 180 L656.04 180 M656.04 180 L701.2 180 M692.19 175.66 L701.2 180 M692.19 184.34 L701.2 180" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <path d="M821.2 180 L866.36 180 M866.36 180 L866.36 125 M866.36 125 L911.52 125 M902.51 120.66 L911.52 125 M902.51 129.34 L911.52 125" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M941.5 224 L1031.5 224 L1031.5 264 L941.5 264 Z" fill="#e9ecef" stroke="none"/>
+<path d="M941.5 224 L1031.5 224 L1031.5 264 L941.5 264 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="986.5" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="986.5" y="250.48">Back</tspan></text>
 <path d="M641.7 180 C641.7 183.87 638.57 187 634.7 187 C630.84 187 627.7 183.87 627.7 180 C627.7 176.13 630.84 173 634.7 173 C638.57 173 641.7 176.13 641.7 180 Z" fill="#2f9e44" stroke="none"/>
 <path d="M641.7 180 C641.7 183.87 638.57 187 634.7 187 C630.84 187 627.7 183.87 627.7 180 C627.7 176.13 630.84 173 634.7 173 C638.57 173 641.7 176.13 641.7 180 Z" fill="none" stroke="#2f9e44" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="40" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21"><tspan x="40" y="247.28">Click Auth or Orders to follow a request</tspan></text>
-<path d="M941.5 224 L1031.5 224 L1031.5 264 L941.5 264 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<text x="986.5" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="986.5" y="250.48">Back</tspan></text>
 </svg>

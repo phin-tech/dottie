@@ -58,26 +58,63 @@ extension Exporter {
     ///
     /// A clickable element (`clickable`: its id and the index of its action) is drawn in place in every frame,
     /// never shared: a click inside a `<use>` is reported on the `<use>`, and the page's styles can't reach what
-    /// a `<use>` draws. It is a focusable group holding its normal look and, if it has one, its hover look.
+    /// a `<use>` draws. It is one focusable group holding its normal look and, if it has one, its hover look. A
+    /// symbol's copy gathers every part it draws into that group; a button's copy adds its over and down states,
+    /// and a layer on top that takes the clicks: its hit state, or else its frame.
     static func playerFrames(_ doc: DottieDocument, plan: Plan, clickable: [String: Int] = [:]) -> (defs: String, frames: [String]) {
-        let hoverIDs = Set(doc.elements.filter { clickable[$0.id.uuidString] != nil && !($0.hover?.isEmpty ?? true) }.map(\.id))
-        var hoverByKey: [[String: String]] = []
-        let drawn = plan.times.indices.map { i in
-            let frame = doc.resolved(at: plan.times[i])
-            if !hoverIDs.isEmpty {
-                let hovered = svgParts(frame.hovered(hoverIDs), background: nil, bounds: plan.rects[i]).1
-                hoverByKey.append(Dictionary(hovered.filter { clickable[$0.key] != nil }.map { ($0.key, $0.markup) },
-                                             uniquingKeysWith: { a, _ in a }))
-            }
-            return svgParts(frame, background: nil, bounds: plan.rects[i])
+        let clickIDs = Set(doc.elements.filter { clickable[$0.id.uuidString] != nil }.map(\.id))
+        let instanceIDs = Set(doc.elements.filter { clickIDs.contains($0.id) && $0.kind == .symbol }.map(\.id))
+        // Who each drawn part belongs to, when that is a clickable element: itself, or the copy it is part of.
+        var owner: [String: String] = [:]
+        for id in clickIDs.subtracting(instanceIDs) { owner[id.uuidString] = id.uuidString }
+        for (part, id) in doc.parts(of: instanceIDs) { owner[part] = id.uuidString }
+        let hoverIDs = Set(doc.elements.filter { clickIDs.contains($0.id) && $0.kind != .symbol && !($0.hover?.isEmpty ?? true) }.map(\.id))
+        let over = doc.buttonTimes(.over, of: instanceIDs), down = doc.buttonTimes(.down, of: instanceIDs)
+        let hit = doc.buttonTimes(.hit, of: instanceIDs)
+
+        /// One frame: every part's markup, and for clickable owners their markup in each state.
+        struct Frame {
+            var bounds: CGRect
+            var parts: [String: String]
+            var hover: [String: String] = [:], over: [String: String] = [:], down: [String: String] = [:], hit: [String: String] = [:]
+            var frames: [String: CGRect] = [:]
+            var angles: [String: Double] = [:]
         }
-        let labels = Dictionary(doc.elements.map { ($0.id.uuidString, $0.buttonLabel.attributeEscaped) }, uniquingKeysWith: { a, _ in a })
-        // Back to front: the order every frame draws in (a frame only ever leaves things out). Symbols' elements are
-        // in it, even ones hidden at first.
-        let order = ["rock"] + doc.expandingSymbols(at: 0, posing: false).orderedElements.map(\.id.uuidString)
-        let byKey = drawn.map { Dictionary($0.1.map { ($0.key, $0.markup) }, uniquingKeysWith: { a, _ in a }) }
+        /// The parts of `d` belonging to clickable owners; only to the owners in `of` when given (those with that state).
+        func keyed(_ d: DottieDocument, _ r: CGRect, of: [UUID: Double]? = nil) -> [String: String] {
+            let only = of.map { Set($0.keys.map(\.uuidString)) }
+            return Dictionary(svgParts(d, background: nil, bounds: r).1.filter { p in
+                guard let o = owner[p.key] else { return false }
+                return only?.contains(o) ?? true
+            }.map { ($0.key, $0.markup) }, uniquingKeysWith: { a, _ in a })
+        }
+        var order = ["rock"] + doc.expandingSymbols(at: 0, posing: false).orderedElements.map(\.id.uuidString)
+        let frames0 = plan.times.indices.map { i -> Frame in
+            let t = Timeline.clampTime(plan.times[i]), r = plan.rects[i]
+            let posed = doc.posed(at: t)
+            let shown = posed.expandingSymbols(at: t)
+            let (b, parts) = svgParts(shown, background: nil, bounds: r)
+            var f = Frame(bounds: b, parts: Dictionary(parts.map { ($0.key, $0.markup) }, uniquingKeysWith: { a, _ in a }))
+            if !hoverIDs.isEmpty { f.hover = keyed(shown.hovered(hoverIDs), r) }
+            if !over.isEmpty { f.over = keyed(posed.expandingSymbols(at: t, times: over), r, of: over) }
+            if !down.isEmpty { f.down = keyed(posed.expandingSymbols(at: t, times: down), r, of: down) }
+            if !hit.isEmpty { f.hit = keyed(posed.expandingSymbols(at: t, times: hit), r, of: hit) }
+            for e in posed.elements where instanceIDs.contains(e.id) { f.frames[e.id.uuidString] = e.frame; f.angles[e.id.uuidString] = e.angle }
+            return f
+        }
+        // A hit state can draw parts the copy otherwise never shows; they still belong in the order.
+        let known = Set(order)
+        for f in frames0 { for k in f.hit.keys.sorted() where !known.contains(k) { order.append(k) } }
+
+        let byKey = frames0.map(\.parts)
+        let labels: [String: String] = {
+            let table = doc.symbolIndex
+            return Dictionary(doc.elements.map { e in
+                (e.id.uuidString, e.buttonLabel(symbolName: e.symbol.flatMap { table[$0]?.name }).attributeEscaped)
+            }, uniquingKeysWith: { a, _ in a })
+        }()
         let unchanging = Set(order.filter { key in
-            guard clickable[key] == nil, let first = byKey.first?[key] else { return false }
+            guard owner[key] == nil, let first = byKey.first?[key] else { return false }
             return byKey.allSatisfy { $0[key] == first }
         })
         var defs = "", runOf: [String: Int] = [:], runCount = 0
@@ -91,38 +128,77 @@ extension Exporter {
         }
         // The other pieces worth sharing: markup that more than one frame uses.
         var uses: [String: Int] = [:]
-        for frame in byKey { for (key, markup) in frame where !unchanging.contains(key) && clickable[key] == nil { uses[markup, default: 0] += 1 } }
+        for frame in byKey { for (key, markup) in frame where !unchanging.contains(key) && owner[key] == nil { uses[markup, default: 0] += 1 } }
         // Numbered in drawing order, so the same drawing always exports the same page.
         var shared: [String: Int] = [:]
         for frame in byKey {
-            for key in order where !unchanging.contains(key) && clickable[key] == nil {
+            for key in order where !unchanging.contains(key) && owner[key] == nil {
                 if let markup = frame[key], uses[markup, default: 0] > 1, shared[markup] == nil { shared[markup] = shared.count }
             }
         }
         for (markup, id) in shared.sorted(by: { $0.value < $1.value }) { defs += "<g id=\"dp\(id)\">\n\(markup)</g>\n" }
 
-        let frames = drawn.enumerated().map { (f, part) -> String in
-            var out = svgOpen(part.0, background: nil, paint: false)
+        // Each owner's parts, in drawing order.
+        var partsOf: [String: [String]] = [:]
+        for key in order { if let o = owner[key] { partsOf[o, default: []].append(key) } }
+
+        let frames = frames0.map { f -> String in
+            var out = svgOpen(f.bounds, background: nil, paint: false)
             var lastRun = -1
+            var done = Set<String>()
             for key in order {
                 if let run = runOf[key] {
                     if run != lastRun { out += "<use href=\"#ds\(run)\"/>\n"; lastRun = run }
-                } else if let markup = byKey[f][key] {
-                    if let a = clickable[key] {
-                        out += "<g class=\"dottie-a\" data-a=\"\(a)\" tabindex=\"0\" role=\"button\" aria-label=\"\(labels[key] ?? "")\">\n"
-                        if let hover = hoverByKey.isEmpty ? nil : hoverByKey[f][key], hover != markup {
-                            out += "<g class=\"dottie-n\">\n\(markup)</g>\n<g class=\"dottie-h\">\n\(hover)</g>\n"
-                        } else {
-                            out += markup
-                        }
-                        out += "</g>\n"
-                    } else {
-                        out += shared[markup].map { "<use href=\"#dp\($0)\"/>\n" } ?? markup
-                    }
+                } else if let o = owner[key] {
+                    guard !done.contains(o), let a = clickable[o] else { continue }
+                    let keys = partsOf[o] ?? []
+                    let normal = keys.compactMap { f.parts[$0] }.joined()
+                    guard !normal.isEmpty else { continue }
+                    done.insert(o)
+                    out += button(o, index: a, label: labels[o] ?? "", keys: keys, in: f, normal: normal)
+                    lastRun = -1
+                } else if let markup = f.parts[key] {
+                    out += shared[markup].map { "<use href=\"#dp\($0)\"/>\n" } ?? markup
+                    lastRun = -1
                 }
             }
             return out + "</svg>\n"
         }
+
+        /// The group a clickable owner draws as in one frame.
+        func button(_ o: String, index a: Int, label: String, keys: [String], in f: Frame, normal: String) -> String {
+            func state(_ m: [String: String]) -> String? {
+                let s = keys.compactMap { m[$0] }.joined()
+                return s.isEmpty ? nil : s
+            }
+            let isInstance = f.frames[o] != nil
+            let overMarkup = isInstance ? state(f.over) : state(f.hover)
+            let downMarkup = isInstance ? state(f.down) : nil
+            let shownOver = overMarkup.flatMap { $0 == normal ? nil : $0 }
+            let shownDown = downMarkup.flatMap { $0 == (overMarkup ?? normal) ? nil : $0 }
+            var g = "<g class=\"dottie-a\(shownDown == nil ? "" : " dottie-b")\" data-a=\"\(a)\" tabindex=\"0\" role=\"button\" aria-label=\"\(label)\">\n"
+            if !isInstance, shownOver == nil { return g + normal + "</g>\n" }
+            let still = isInstance ? " pointer-events=\"none\"" : ""
+            g += "<g class=\"dottie-n\"\(still)>\n\(normal)</g>\n"
+            if let shownOver { g += "<g class=\"dottie-h\"\(still)>\n\(shownOver)</g>\n" }
+            if let shownDown { g += "<g class=\"dottie-d\"\(still)>\n\(shownDown)</g>\n" }
+            if isInstance {
+                // What takes the clicks: the hit state drawn invisibly, or the copy's frame.
+                if let h = state(f.hit) {
+                    g += "<g class=\"dottie-hit\" opacity=\"0\" pointer-events=\"all\">\n\(h)</g>\n"
+                } else if let r = f.frames[o] {
+                    let c = CGPoint(x: r.midX, y: r.midY), angle = f.angles[o] ?? 0
+                    let corners = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.minX, y: r.maxY)]
+                        .map { Element.rotate($0, about: c, by: angle) }
+                    let path = CGMutablePath()
+                    path.addLines(between: corners)
+                    path.closeSubpath()
+                    g += "<path class=\"dottie-hit\" d=\"\(pathData(path))\" fill=\"none\" stroke=\"none\" pointer-events=\"all\"/>\n"
+                }
+            }
+            return g + "</g>\n"
+        }
+
         let holder = defs.isEmpty ? "" : "<svg width=\"0\" height=\"0\" style=\"position:absolute;overflow:hidden\" aria-hidden=\"true\"><defs>\n\(defs)</defs></svg>\n"
         return (holder, frames)
     }
@@ -197,7 +273,10 @@ extension Exporter {
     .dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
     .dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
     .dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
-    .dottie-a:active { transform: translate(1px, 1px); }
+    .dottie-a:not(.dottie-b):active { transform: translate(1px, 1px); }
+    .dottie-a .dottie-d { display: none; }
+    .dottie-b:active .dottie-n, .dottie-b:active .dottie-h { display: none; }
+    .dottie-b:active .dottie-d { display: inline; }
     """
 
     /// A self-contained web page that plays the page's timeline: every frame as inline SVG, with play/pause,

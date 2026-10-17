@@ -219,8 +219,9 @@ extension DottieScript {
             | "pulse" | "wiggle";
         /** A hex color like "#ffcc00", or "#ffcc0080" with alpha. */
         type Color = string;
-        /** How a symbol's copy plays its animation: over and over, once, or standing still on its poster frame. */
-        type Playback = "loop" | "once" | "still";
+        /** How a symbol's copy plays its animation: over and over, once, standing still on its poster frame, or resting
+         * at the start until clicked (in <dottie-player>). A button's copies ignore it. */
+        type Playback = "loop" | "once" | "still" | "click";
 
         /** What clicking a shape does when the drawing plays on the web (HTML export, <dottie-player>). */
         interface Click {
@@ -329,9 +330,9 @@ extension DottieScript {
             link?: Ref | null;
             /** "" removes it. */
             anchor?: string;
-            /** What clicking it does on the web; null removes it. Not for a symbol's copies yet. */
+            /** What clicking it does on the web; null removes it. */
             click?: Click | null;
-            /** Its look under the pointer when clickable; null removes it. */
+            /** Its look under the pointer when clickable; null removes it. Not for a symbol's copies: draw a button's over state. */
             hover?: Hover | null;
             /** A symbol's copy only. */
             playback?: Playback;
@@ -446,7 +447,7 @@ extension DottieScript {
             boil(id: Ref, on: boolean | null): void;
             /** Turns shapes, the arrows between them and their keys into a symbol, put back as one copy where they were.
              * Its animation is as long as the page timeline when made. */
-            symbol(ids: Ref | Ref[], options?: { name?: string }): { symbol: string; instance: Element };
+            symbol(ids: Ref | Ref[], options?: { name?: string; button?: boolean }): { symbol: string; instance: Element };
             /** Another copy of a symbol (its id or name), its top-left at x, y; one of width or height keeps its shape. */
             place(symbol: string | { symbol: string } | { id: string }, options: { x?: number; y?: number; width?: number; height?: number; playback?: Playback; offset?: number }): Element;
             /** The page's symbols. */

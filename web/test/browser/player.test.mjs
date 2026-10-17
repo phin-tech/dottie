@@ -340,3 +340,81 @@ test("the HTML export draws symbols", async () => {
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+// MARK: Buttons
+
+const shows = (page, root, label) => page.evaluate(([root, label]) => {
+  const base = root ? document.querySelector(root).shadowRoot : document;
+  const g = base.querySelector(`${root ? "" : ".f.on "}.dottie-a[aria-label="${label}"]`);
+  const on = (c) => { const x = g.querySelector(`:scope > .${c}`); return !!x && getComputedStyle(x).display !== "none"; };
+  return ["dottie-n", "dottie-h", "dottie-d"].filter(on).join(" ");
+}, [root, label]);
+
+async function buttonChecks(page, root, sel, frame) {
+  const go = `${sel}[aria-label="Go"]`;
+  assert.equal(await shows(page, root, "Go"), "dottie-n");
+  const hit = await page.locator(`${go} .dottie-hit`).boundingBox();
+  const frameBox = await page.locator(`${go} .dottie-n`).boundingBox();
+  // Inside the button's frame but outside its hit spot: nothing happens.
+  await page.mouse.click(frameBox.x + 4, frameBox.y + 4);
+  assert.equal(await frame(), 0, "a click outside the hit area does nothing");
+  await page.mouse.move(hit.x + hit.width / 2, hit.y + hit.height / 2);
+  assert.equal(await shows(page, root, "Go"), "dottie-h", "over");
+  await page.mouse.down();
+  assert.equal(await shows(page, root, "Go"), "dottie-d", "down");
+  await page.mouse.up();
+  await page.waitForFunction(([root]) => {
+    if (root) { const p = document.querySelector(root); return p.paused && p.playback.frame === 20; }
+    return document.querySelector("#play").textContent === "▶" && document.querySelectorAll(".f")[20].classList.contains("on");
+  }, [root], { timeout: 5000 });
+  assert.equal(await page.locator(`${sel}[aria-label="Go button"], ${sel}[aria-label="Go"]`).count(), 1, "the button with no action isn't one");
+}
+
+test("a button symbol in <dottie-player>: up, over, down, hit area, click", async () => {
+  const { page, errors, close } = await open(`<dottie-player src="/fixtures/edge/buttons.dottie"></dottie-player>`);
+  await ready(page);
+  await buttonChecks(page, "dottie-player", "dottie-player .dottie-a", async () => (await state(page)).frame);
+  assert.deepEqual(errors, []);
+  await close();
+});
+
+test("a clip set to play on click replays in <dottie-player>, and jumps to its end with reduced motion", async () => {
+  for (const reducedMotion of ["no-preference", "reduce"]) {
+    const { page, close } = await open(`<dottie-player src="/fixtures/edge/buttons.dottie"></dottie-player>`, { reducedMotion });
+    await ready(page);
+    const spinner = "dottie-player .dottie-a[aria-label=\"spinner\"]";
+    const before = await page.locator(`${spinner} .dottie-n`).innerHTML();
+    await page.evaluate(() => document.querySelector("dottie-player").addEventListener("action", (e) => { window.__action = e.detail; }));
+    await page.click(spinner);
+    assert.equal(await page.evaluate(() => window.__action.replay), true);
+    const at = (await state(page)).frame;
+    assert.equal(at, reducedMotion === "reduce" ? 20 : 0, "the page itself stays put (on its poster with reduced motion)");
+    if (reducedMotion === "reduce") {
+      assert.equal(await page.evaluate(() => document.querySelector("dottie-player").playback.replaying()), false);
+    } else {
+      assert.equal(await page.evaluate(() => document.querySelector("dottie-player").playback.replaying()), true);
+      await page.waitForFunction(() => !document.querySelector("dottie-player").playback.replaying(), null, { timeout: 3000 });
+    }
+    assert.notEqual(await page.locator(`${spinner} .dottie-n`).innerHTML(), before, "it turned");
+    await close();
+  }
+});
+
+test("a button symbol in the HTML export: up, over, down, hit area, click; no play-on-click there", async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await serve(page);
+  await page.goto("http://dottie.test/fixtures/goldens/html/buttons.html");
+  const frame = () => page.evaluate(() => [...document.querySelectorAll(".f")].findIndex((f) => f.classList.contains("on")));
+  await buttonChecks(page, null, ".f.on .dottie-a", frame);
+  assert.equal(await page.locator('.dottie-a[aria-label="spinner"]').count(), 0, "can't replay here, so it isn't a button");
+  assert.equal(await page.locator("defs .dottie-a, defs .dottie-hit").count(), 0);
+  await page.focus('.f.on .dottie-a[aria-label="Docs button"]');
+  await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
+  await page.keyboard.press("Enter");
+  assert.deepEqual(await page.evaluate(() => window.__opened), [["https://example.com/docs", "_blank", "noopener"]]);
+  assert.deepEqual(errors, []);
+  await context.close();
+});

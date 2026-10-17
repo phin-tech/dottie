@@ -50,7 +50,7 @@ March Selected Lines sets the dashes of a line travelling along it, for anything
 ## Click to follow a request
 
 The diagram waits: click Auth or Orders (or Tab to one and press Enter) to watch that request go through, and
-Back to return. In the inspector, **When Clicked on the Web** makes a shape play a scene or open a link, here and
+Back to return. Back is a button symbol, with its own looks under the pointer and while pressed. In the inspector, **When Clicked on the Web** makes a shape play a scene or open a link, here and
 in the web page export, with a color for when the pointer is over it.
 
 <dottie-player class="player" src="../drawings/flows.dottie" label="Click to follow a request"></dottie-player>

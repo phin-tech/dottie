@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="398" height="233.53" viewBox="16 6.47 398 233.53">
+<rect x="16" y="6.47" width="398" height="233.53" fill="#ffffff"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 40 L160 40 L160 80 L40 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="66.48">Go</tspan></text>
+<g transform="rotate(11.46 250 60)">
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="#ffe699" stroke="none"/>
+<path d="M300 60 C300 71.05 277.61 80 250 80 C222.39 80 200 71.05 200 60 C200 48.95 222.39 40 250 40 C277.61 40 300 48.95 300 60 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="250" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="250" y="66.48">Docs</tspan></text>
+</g>
+<path d="M350 45.3 L356.1 40 M350 55.9 L368.29 40 M350 66.5 L380.49 40 M350 77.1 L390 42.33 M358.86 80 L390 52.93 M371.05 80 L390 63.53 M383.25 80 L390 74.13" fill="none" stroke="#f28c1a" stroke-width="1" stroke-linecap="round"/>
+<path d="M350 40 L390 40 L390 80 L350 80 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M40 120 L160 120 L160 160 L40 160 Z" fill="#d9d9d9" stroke="none"/>
+<path d="M40 120 L160 120 L160 160 L40 160 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="146.48">Go</tspan></text>
+<path d="M176.8 208 C176.8 212.42 173.22 216 168.8 216 C164.38 216 160.8 212.42 160.8 208 C160.8 203.58 164.38 200 168.8 200 C173.22 200 176.8 203.58 176.8 208 Z" fill="#ff6633" stroke="none"/>
+<path d="M176.8 208 C176.8 212.42 173.22 216 168.8 216 C164.38 216 160.8 212.42 160.8 208 C160.8 203.58 164.38 200 168.8 200 C173.22 200 176.8 203.58 176.8 208 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

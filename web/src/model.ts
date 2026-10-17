@@ -6,7 +6,7 @@ export interface RGBA { r: number; g: number; b: number; a: number }
 export type FillStyle = "solid" | "hachure" | "crossHatch" | "grid";
 export type DashStyle = "solid" | "dashed" | "dotted";
 export type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connector" | "freehand" | "path" | "note" | "image" | "symbol";
-export type SymbolPlayback = "loop" | "once" | "still";
+export type SymbolPlayback = "loop" | "once" | "still" | "click";
 export type Port = "top" | "right" | "bottom" | "left";
 export type Routing = "straight" | "curved" | "elbow";
 export type Arrowhead = "none" | "arrow" | "triangle" | "dot" | "bar";
@@ -142,6 +142,8 @@ export interface Symbol {
   layers: Layer[];
   elements: Element[];
   timeline: Timeline | null;
+  /** A Flash-style button: copies show its up scene; on the web, over, down and hit (Symbol.button). */
+  button: boolean | null;
 }
 
 export interface DottieFile {
@@ -161,7 +163,7 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
   page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols"],
-  symbol: ["id", "name", "width", "height", "layers", "elements", "timeline"],
+  symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
@@ -355,7 +357,7 @@ class Reader {
   playback(v: unknown): SymbolPlayback | null {
     const s = str(v);
     if (s === undefined) return null;
-    return (["loop", "once", "still"].includes(s) ? s : "loop") as SymbolPlayback;
+    return (["loop", "once", "still", "click"].includes(s) ? s : "loop") as SymbolPlayback;
   }
 
   symbol(v: unknown, images: Record<string, EmbeddedImage>): Symbol | null {
@@ -373,6 +375,7 @@ class Reader {
       id, name: str(v.name) ?? "Symbol", width: size(v.width), height: size(v.height), layers,
       elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
       timeline: this.timeline(v.timeline),
+      button: bool(v.button) ?? null,
     };
   }
 

@@ -13,12 +13,32 @@ export const MAX_DEPTH = 8;
 export const MAX_ELEMENTS = 20_000;
 const EPSILON = 1e-9;
 
+export type ButtonState = "up" | "over" | "down" | "hit";
+
+/** The moment of the symbol's scene named `state`, any case, within its timeline (Symbol.sceneTime). */
+export function sceneTime(s: Symbol, state: ButtonState): number | null {
+  const m = (s.timeline?.markers ?? []).find((x) => x.name.toLowerCase() === state);
+  return m ? Math.min(Math.max(m.t, 0), clampTime(s.timeline?.duration ?? 0)) : null;
+}
+
+/** Where a button is in each state (Symbol.buttonTime): over falls back to up, down to over; hit to nothing. */
+export function buttonTime(s: Symbol, state: ButtonState): number | null {
+  switch (state) {
+    case "up": return sceneTime(s, "up") ?? 0;
+    case "over": return sceneTime(s, "over") ?? buttonTime(s, "up");
+    case "down": return sceneTime(s, "down") ?? buttonTime(s, "over");
+    default: return sceneTime(s, "hit");
+  }
+}
+
 /** Where an instance is in its symbol's timeline at page time `t` (Symbol.localTime). */
 export function symbolTime(s: Symbol, t: number, playback: SymbolPlayback | null, offset: number | null): number {
   const d = clampTime(s.timeline?.duration ?? 0);
+  if (s.button === true) return buttonTime(s, "up") ?? 0;
   const o = offset !== null && Number.isFinite(offset) ? offset : 0;
   switch (playback ?? "loop") {
     case "still": return Math.min(s.timeline?.poster ?? d, d);
+    case "click": return Math.min(Math.max(o, 0), d);
     case "once": return Math.min(Math.max(t + o, 0), d);
     default: {
       if (d <= 0) return 0;
@@ -40,17 +60,22 @@ export function hasInstances(page: Page): boolean {
   return page.elements.some((e) => e.kind === "symbol");
 }
 
-/** The page with every instance replaced by what it shows at page time `t` (DottieDocument.expandingSymbols). */
-export function expandingSymbols(page: Page, t: number, posing = true): Page {
+/** The page with every instance replaced by what it shows at page time `t` (DottieDocument.expandingSymbols). `times`
+ * puts instances on the page at a moment of their symbol's own: a button's other states, or a clip replaying. */
+export function expandingSymbols(page: Page, t: number, posing = true, times: Map<string, number> = new Map()): Page {
   if (!hasInstances(page)) return page;
+  const budget = { left: MAX_ELEMENTS };
+  return { ...page, elements: expand(page.elements, page, t, symbolTable(page), [], posing, budget, times) };
+}
+
+export function symbolTable(page: Page): Map<string, Symbol> {
   const table = new Map<string, Symbol>();
   for (const s of page.symbols ?? []) if (!table.has(s.id)) table.set(s.id, s);
-  const budget = { left: MAX_ELEMENTS };
-  return { ...page, elements: expand(page.elements, page, t, table, [], posing, budget) };
+  return table;
 }
 
 function expand(elements: Element[], page: Page, t: number, table: Map<string, Symbol>, stack: string[], posing: boolean,
-  budget: { left: number }): Element[] {
+  budget: { left: number }, times: Map<string, number> = new Map()): Element[] {
   const instances = new Set(elements.filter((e) => e.kind === "symbol").map((e) => e.id));
   if (instances.size === 0) { budget.left -= elements.length; return elements; }
   const index = indexOf(page);
@@ -72,7 +97,9 @@ function expand(elements: Element[], page: Page, t: number, table: Map<string, S
     const id = e.symbol;
     const symbol = id === null ? undefined : table.get(id);
     if (id === null || !symbol || stack.includes(id) || stack.length >= MAX_DEPTH) continue;
-    const u = symbolTime(symbol, t, e.playback, e.offset);
+    const override = stack.length === 0 ? times.get(e.id) : undefined;
+    const u = override !== undefined ? Math.min(Math.max(override, 0), clampTime(symbol.timeline?.duration ?? 0))
+      : symbolTime(symbol, t, e.playback, e.offset);
     const inner = posing ? posed(symbolPage(symbol), u) : symbolPage(symbol);
     const visible = new Set(inner.layers.filter((l) => l.visible).map((l) => l.id));
     const drawn: Page = { ...inner, elements: orderedElements(inner).filter((x) => visible.has(x.layerID)),

@@ -129,7 +129,10 @@ The Animate menu does the common things in one go:
   that animation on its own clock: over and over, once, or standing still, and from any point in it, so a row of
   status lights can blink out of step. Double-click a copy (or Arrange ▸ Edit Symbol) to change the symbol itself,
   and every copy follows; Break Apart (⌘B) turns a copy back into plain shapes. A symbol added to a library plays
-  wherever it is placed.
+  wherever it is placed. Tick **Button** in its inspector section to make a Flash-style button: draw its up, over
+  and down looks as scenes inside it (and a hit scene for where it takes clicks), and on the web it changes under
+  the pointer and while pressed. A plain symbol's copy can instead play its animation when clicked, in
+  `<dottie-player>`.
 - **When Clicked on the Web**, in the inspector, makes a shape a button in the web page export and in
   `<dottie-player>`: a click plays a scene on to the next one, or opens a link. Give it a hover color too.
   A diagram can then wait for the reader to pick which request to follow.

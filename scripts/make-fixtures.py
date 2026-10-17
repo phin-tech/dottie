@@ -611,6 +611,55 @@ def symbols():
     write(JS_ONLY / "hostile-symbols.dottie", [h])
 
 
+def buttons():
+    """Button symbols: up, over and down looks, a small hit area, a button whose frame takes clicks (no hit scene), a
+    clip that plays when clicked (<dottie-player> only), and a button with no action (not clickable)."""
+    p = Page()
+    p.animate(2, fps=10)
+    p.timeline["markers"] = [{"t": 0, "name": "Start"}, {"t": 1, "name": "Next"}]
+
+    def symbol(name, w, h, build, **extra):
+        sp = Page(name)
+        build(sp)
+        d = {"id": sp.id, "name": name, "width": w, "height": h, "layers": sp.layers, "elements": sp.elements}
+        if sp.timeline is not None:
+            d["timeline"] = sp.timeline
+        d.update(extra)
+        return d
+
+    def go(sp):
+        sp.animate(1.5, fps=10)
+        sp.timeline["markers"] = [{"t": 0, "name": "up"}, {"t": 0.5, "name": "Over"}, {"t": 1, "name": "down"}, {"t": 1.5, "name": "hit"}]
+        box = sp.add("rectangle", 0, 0, 120, 40, text="Go", style=style(fill=rgba(0.85, 0.85, 0.85), roughness=0))
+        spot = sp.add("ellipse", 50, 10, 20, 20, style=style(fill=rgba(0, 0, 0), roughness=0))
+        sp.track(box, [{"t": 0, "fill": rgba(0.85, 0.85, 0.85), "ease": "hold", "visible": True}, {"t": 0.5, "fill": rgba(0.4, 0.6, 1), "ease": "hold"},
+                       {"t": 1, "fill": rgba(0.1, 0.2, 0.6), "ease": "hold"}, {"t": 1.5, "visible": False}])
+        sp.track(spot, [{"t": 0, "visible": False}, {"t": 1.5, "visible": True}])
+    g = symbol("Go", 120, 40, go, button=True)
+
+    def link(sp):
+        sp.animate(1, fps=10)
+        sp.timeline["markers"] = [{"t": 0.5, "name": "over"}]
+        box = sp.add("ellipse", 0, 0, 100, 40, text="Docs", style=style(fill=rgba(1, 0.9, 0.6), roughness=0))
+        sp.track(box, [{"t": 0, "strokeWidth": 2, "ease": "hold"}, {"t": 0.5, "strokeWidth": 5, "ease": "hold"}])
+    l = symbol("Docs button", 100, 40, link, button=True)
+
+    def spin(sp):
+        sp.animate(1, fps=10)
+        r = sp.add("rectangle", 10, 10, 40, 40, style=style(fill=rgba(0.95, 0.55, 0.1), fillStyle="hachure"))
+        sp.track(r, [{"t": 0, "rotation": 0}, {"t": 1, "rotation": 3.14159}])
+    c = symbol("Spinner", 60, 60, spin)
+    p.extra = {"symbols": [g, l, c]}
+
+    p.add("symbol", 40, 40, 120, 40, symbol=g["id"], click={"scene": "Next"}, playback="loop", offset=0.3, style=style(roughness=0))
+    p.add("symbol", 200, 40, 100, 40, symbol=l["id"], rotation=0.2, click={"url": "https://example.com/docs"}, style=style(roughness=0))
+    p.add("symbol", 340, 30, 60, 60, symbol=c["id"], playback="click", anchor="spinner", style=style(roughness=0))
+    p.add("symbol", 40, 120, 120, 40, symbol=g["id"], style=style(roughness=0))
+    dot = p.add("ellipse", 60, 200, 16, 16, style=style(fill=rgba(1, 0.4, 0.2)))
+    p.track(dot, [{"t": 1, "x": 60}, {"t": 2, "x": 300}])
+    write(EDGE / "buttons.dottie", [p])
+
+
 def js_only():
     p = Page()
     p.add("rectangle", 40, 40, 120, 60, text="known")
@@ -645,6 +694,7 @@ def main():
     march()
     clicks()
     symbols()
+    buttons()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

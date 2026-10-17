@@ -40,7 +40,8 @@ struct ClickSection: View {
             if choice.wrappedValue == .link {
                 LinkField(url: shared?.url ?? "") { url in set(url.isEmpty ? nil : ClickAction(url: url), "Set Click Link") }
             }
-            if shared != nil {
+            // A symbol's copy shows its button's over state instead (see the Symbol section).
+            if shared != nil, !selected.contains(where: { $0.kind == .symbol }) {
                 Toggle("Highlight on hover", isOn: hoverOn)
                 if hoverOn.wrappedValue {
                     ColorPicker("Hover stroke", selection: hoverColor(\.stroke, fallback: \.stroke, "Change Hover Stroke"))
@@ -73,7 +74,7 @@ struct ClickSection: View {
     private func set(_ click: ClickAction?, _ name: String) {
         edit(name) { e in
             e.click = click
-            if click == nil { e.hover = nil }
+            if click == nil || e.kind == .symbol { e.hover = nil }
         }
     }
 
