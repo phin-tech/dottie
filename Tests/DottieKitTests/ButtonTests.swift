@@ -96,7 +96,7 @@ final class ButtonTests: XCTestCase {
             XCTAssertTrue(inside.contains("#6699ff"), "over is blue")
             XCTAssertTrue(inside.contains("#1a3399"), "down is dark blue")
         }
-        XCTAssertTrue(html.contains(".dottie-b:active .dottie-d { display: inline; }"))
+        XCTAssertTrue(html.contains(".dottie-b:active .dottie-d, .dottie-b.dottie-press .dottie-d { display: inline; }"))
     }
 
     func testAPlainCopyTakesClicksOnItsFrame() throws {
