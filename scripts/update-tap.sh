@@ -33,7 +33,7 @@ cask "dottie" do
     strategy :github_latest
   end
 
-  # Dottie updates itself (Sparkle), so `brew upgrade` leaves it alone; `brew upgrade --greedy` still updates it.
+  # Dottie updates itself (Sparkle), so brew upgrade leaves it alone unless given --greedy.
   auto_updates true
   depends_on macos: :sonoma
 
