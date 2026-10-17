@@ -310,3 +310,14 @@ test("the HTML export with reduced motion jumps straight to the stop", async () 
   assert.equal(await frame(), 20);
   await close();
 });
+
+test("symbols play, and a hostile nest of them doesn't hang the player", async () => {
+  const { page, errors, close } = await open(`<dottie-player id="a" src="/fixtures/edge/symbols.dottie"></dottie-player>
+    <dottie-player id="b" src="/fixtures/js-only/hostile-symbols.dottie"></dottie-player>`);
+  await ready(page, "#a");
+  await ready(page, "#b");
+  await page.waitForFunction(() => document.querySelector("#a").playback.frame > 3);
+  assert.ok((await state(page, "#a")).paths > 10);
+  assert.deepEqual(errors, []);
+  await close();
+});

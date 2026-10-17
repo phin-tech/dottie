@@ -9,12 +9,14 @@ import { noteMarkup } from "./note.ts";
 import { color, escapeXML } from "./svg-util.ts";
 import { Path, type Rect, fmt, inset, midX, midY, union } from "./path.ts";
 import { cellSize, connectorParts, dashPattern, fillPath, hachurePath, outline } from "./shapes.ts";
+import { expandingSymbols, hasInstances } from "./symbols.ts";
 import { textSize } from "./text.ts";
 import { themeNamed } from "./theme.ts";
 import { cameraView, frameTimes, resolved } from "./timeline.ts";
 
 /** The drawing's extent plus `padding`; a floor's rock hatching reaches past its shape. */
 export function bounds(page: Page, padding = 24): Rect {
+  if (hasInstances(page)) return bounds(expandingSymbols(page, 0), padding);
   const index = indexOf(page);
   const box = (e: Element): Rect => {
     if (e.kind === "connector") return connectorBounds(e, index);
@@ -74,6 +76,7 @@ export interface Part { key: string; markup: string }
 
 /** The SVG for each thing drawn, back to front, keyed by element id (rock hatching as "rock"). */
 export function svgParts(page: Page, background: RGBA | null, fixed?: Rect): { bounds: Rect; parts: Part[] } {
+  if (hasInstances(page)) return svgParts(expandingSymbols(page, 0), background, fixed);
   const theme = themeNamed(page.theme);
   const bg = background ? (theme?.background ?? background) : null;
   const ink = theme?.ink ?? black;

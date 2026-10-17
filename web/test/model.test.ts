@@ -5,6 +5,8 @@ import { test } from "node:test";
 import { DottieFormatError, KINDS, KNOWN_FIELDS, parseDottie } from "../src/model.ts";
 import { render } from "../src/index.ts";
 import { clickTargets } from "../src/clicks.ts";
+import { MAX_ELEMENTS, derivedID } from "../src/symbols.ts";
+import { posed, resolved } from "../src/timeline.ts";
 import { read } from "./helpers.ts";
 
 const schema = JSON.parse(read("..", "schema", "dottie.schema.json"));
@@ -87,4 +89,24 @@ test("clicks: scenes by name in any case, safe links only, links to other pages"
   const hostile = parseDottie(read("js-only", "hostile-clicks.dottie"));
   assert.deepEqual(hostile.pages[0].elements.map((e) => e.click?.url), [null, null, null]);
   assert.equal(clickTargets(hostile.pages[0], hostile).size, 0);
+});
+
+test("symbols: a self-containing symbol and a flood of nested instances are cut short", () => {
+  const f = parseDottie(read("js-only", "hostile-symbols.dottie"));
+  const start = Date.now();
+  const svg = render(f, { at: 0 });
+  assert.ok(Date.now() - start < 3000, "quick");
+  const shapes = (svg.match(/<path /g) ?? []).length;
+  assert.ok(shapes > 0 && shapes < MAX_ELEMENTS * 4, `${shapes} paths`);
+});
+
+test("symbols: instances expand with ids that are stable and distinct per copy", () => {
+  const f = parseDottie(read("edge", "symbols.dottie"));
+  const p = f.pages[0];
+  const a = resolved(p, 1.5), b = resolved(p, 1.5);
+  assert.deepEqual(a.elements.map((e) => e.id), b.elements.map((e) => e.id));
+  assert.equal(new Set(a.elements.map((e) => e.id)).size, a.elements.length);
+  assert.equal(a.elements.some((e) => e.kind === "symbol"), false);
+  assert.ok(posed(p, 1.5).elements.some((e) => e.kind === "symbol"), "posing keeps instances");
+  assert.equal(derivedID("00000001-0000-4000-8000-000000000001", "00000002-0000-4000-8000-000000000002").length, 36);
 });

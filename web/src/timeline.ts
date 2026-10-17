@@ -9,6 +9,7 @@ import {
 } from "./model.ts";
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
+import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
 
 export function applyEase(ease: Ease, u: number): number {
@@ -210,8 +211,14 @@ function trackMap(tl: Timeline): Map<string, Track> {
   return m;
 }
 
-/** The page as a still drawing at `t` seconds (DottieDocument.resolved(at:)). A page without a timeline is returned as is. */
+/** The page as a still drawing at `t` seconds, symbol instances expanded (DottieDocument.resolved(at:)). A page with
+ * no timeline and no instances is returned as is. */
 export function resolved(page: Page, t: number): Page {
+  return expandingSymbols(posed(page, t), clampTime(t));
+}
+
+/** The page posed at `t` seconds, instances kept (DottieDocument.posed(at:)). */
+export function posed(page: Page, t: number): Page {
   const timeline = page.timeline;
   if (!timeline) return page;
   t = clampTime(t);
@@ -279,7 +286,7 @@ export function posterTime(page: Page): number {
 
 /** The page as a still picture (its poster frame when animated). */
 export function still(page: Page): Page {
-  return page.timeline ? resolved(page, posterTime(page)) : page;
+  return page.timeline ? resolved(page, posterTime(page)) : expandingSymbols(page, 0);
 }
 
 // MARK: Camera, frames and scenes
