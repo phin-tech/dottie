@@ -317,8 +317,8 @@ struct Inspector: View {
             if selected.count == 1, let e = selected.first, e.kind == .symbol {
                 SymbolSection(document: document, instance: e, undoManager: undoManager, onBreakApart: onSelect)
             }
-            // Instances, and shapes inside a symbol, can't be clicked on the web yet.
-            if !selected.isEmpty, document.editingSymbol == nil, !selected.contains(where: { $0.kind == .symbol }) {
+            // Shapes inside a symbol can't be clicked on the web: give the click to its copy instead.
+            if !selected.isEmpty, document.editingSymbol == nil {
                 ClickSection(document: document, selection: selection, undoManager: undoManager)
             }
             if tool == .connector || !selectedConnectors.isEmpty {

@@ -31,8 +31,10 @@ prefer reduced motion. A still page is just the drawing.
 
 Elements the drawing makes clickable work with the mouse and the keyboard (Tab, then Enter or Space). A click plays
 a named scene on to the next one, opens a link in a new tab (only `http`, `https` and `mailto`), or shows the page a
-shape's link points at. Each shows its hover look under the pointer. Every click first fires a cancelable `action`
-event whose `detail` is `{element, scene | url | page}`; call `preventDefault()` to handle it yourself.
+shape's link points at. Each shows its hover look under the pointer; button symbols show their over and down looks
+and take clicks on their hit area, and a symbol's copy set to play when clicked plays its animation through. Every
+click first fires a cancelable `action` event whose `detail` is `{element, scene | url | page, replay?}`; call
+`preventDefault()` to handle it yourself.
 
 The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(elementId)`, `currentTime`
 (settable), `duration`, `paused`, and fires `load`, `frame`, `action` and `error` events. Its page color comes from the drawing's theme; set

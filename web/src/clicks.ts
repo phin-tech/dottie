@@ -1,6 +1,7 @@
 // Clickable elements in a played drawing (Clicks.swift): what a click does, and how an element looks hovered.
 
 import { type DottieFile, type Element, type Marker, type Page, allowedURL } from "./model.ts";
+import { expandingSymbols } from "./symbols.ts";
 
 /** Jump to scene `scene` (an index into the page's markers) and play on to the next; open `url` in a new tab; or,
  * in <dottie-player> only, show page `page` (an index into the file's pages), where the element's link points. */
@@ -62,12 +63,26 @@ export function hasHover(e: Element): boolean {
   return !!e.hover && (e.hover.stroke !== null || e.hover.fill !== null || e.hover.opacity !== null);
 }
 
-/** What a screen reader calls the element as a button: the first line of its text, else its anchor, else its kind. */
-export function buttonLabel(e: Element): string {
+/** What a screen reader calls the element as a button: the first line of its text, else its anchor, else for a
+ * symbol's copy the symbol's name, else its kind. */
+export function buttonLabel(e: Element, symbolName?: string): string {
   const line = (e.text ?? "").split("\n").find((l) => l.length > 0);
   if (line) return line;
   if (e.anchor) return e.anchor;
+  if (symbolName) return symbolName;
   return e.kind;
+}
+
+/** For each of `instances`, the ids of every element it can expand to, mapped to it, in drawing order
+ * (DottieDocument.parts(of:)). */
+export function partsOf(page: Page, instances: Set<string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const e of page.elements) {
+    if (!instances.has(e.id) || e.kind !== "symbol") continue;
+    const alone: Page = { ...page, layers: [{ id: e.layerID, name: "", visible: true, locked: false }], elements: [e] };
+    for (const part of expandingSymbols(alone, 0, false).elements) out.set(part.id, e.id);
+  }
+  return out;
 }
 
 /** How clickable elements look (Exporter.clickStyle): a pointer, their hover look under it or with keyboard focus (a
@@ -78,5 +93,8 @@ export const CLICK_STYLE = `
 .dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
 .dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
 .dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
-.dottie-a:active { transform: translate(1px, 1px); }
+.dottie-a:not(.dottie-b):active { transform: translate(1px, 1px); }
+.dottie-a .dottie-d { display: none; }
+.dottie-b:active .dottie-n, .dottie-b:active .dottie-h { display: none; }
+.dottie-b:active .dottie-d { display: inline; }
 `;

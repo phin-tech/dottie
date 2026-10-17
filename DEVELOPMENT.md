@@ -153,7 +153,12 @@ not the page: Lottie and the web page export take their element order from `expa
 false)`. Cycles are cut, and depth and the number of expanded elements are capped (`Symbol.maxDepth`,
 `.maxElements`), the same in dottie.js. Dottie 0.5 and earlier cannot open a file containing a symbol.
 An element's `click` (a scene name or an `http`, `https` or `mailto` link) and `hover` look are only used by the
-web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read.
+web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read. A symbol with
+`button: true` is a button: its copies always show its `up` scene (else the start), whatever their playback, and
+the web players draw each clickable copy as one focusable group holding its parts at the `over` and `down` scenes
+too, with a layer on top that takes the clicks (the `hit` scene's shapes, invisible, or the copy's frame). Both
+draw the states by expanding with `times`, which puts a copy on the page at a moment of its own symbol; dottie.js
+uses the same to replay a copy whose playback is `click`.
 
 ## Mermaid
 

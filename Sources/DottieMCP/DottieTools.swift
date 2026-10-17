@@ -217,7 +217,7 @@ actor DottieTools {
                 "hover_stroke": prop("string", "Hex stroke color while the pointer is over a clickable element; empty string clears it"),
                 "hover_fill": prop("string", "Hex fill color while the pointer is over a clickable element; empty string clears it"),
                 "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
-                "playback": prop("string", "For a symbol instance: loop, once or still", enum: SymbolPlayback.allCases.map(\.rawValue)),
+                "playback": prop("string", "For a symbol instance: loop, once, still or click", enum: SymbolPlayback.allCases.map(\.rawValue)),
                 "offset": prop("number", "For a symbol instance: seconds into its symbol's animation at the page's start"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
         Tool(name: "run_script",
@@ -272,6 +272,9 @@ actor DottieTools {
                 "path": pathProp, "page": pageProp,
                 "ids": .object(["type": "array", "items": .object(["type": "string"]), "description": "Element ids to turn into the symbol"]),
                 "name": prop("string", "The symbol's name"),
+                "button": prop("boolean", "Make a Flash-style button: the page's scenes named up, over, down and hit (see add_scene) "
+                    + "move into it as its states. Copies show up; on the web, over under the pointer, down while pressed, and the hit "
+                    + "state's shapes take clicks. Give a copy click_scene or click_url with update_element"),
              ], required: ["path", "ids"])),
         Tool(name: "place_symbol",
              description: "Place another instance of a symbol (see make_symbol) with its top-left corner at x, y. Instances move, "
@@ -283,7 +286,8 @@ actor DottieTools {
                 "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
                 "width": prop("number", "Width (default the symbol's; give one of width or height to keep its shape)"),
                 "height": prop("number", "Height"),
-                "playback": prop("string", "loop (default), once, or still (its poster frame)", enum: SymbolPlayback.allCases.map(\.rawValue)),
+                "playback": prop("string", "loop (default), once, still (its poster frame), or click (rests at the start; in "
+                    + "<dottie-player> a click plays it once)", enum: SymbolPlayback.allCases.map(\.rawValue)),
                 "offset": prop("number", "Seconds into the symbol's animation at the page's start, so copies don't move in step"),
              ], required: ["path", "symbol", "x", "y"])),
         Tool(name: "open_document",
@@ -669,7 +673,7 @@ actor DottieTools {
                 }
                 if let i = file.pages[p].elements.firstIndex(where: { $0.id == id }), file.pages[p].elements[i].kind == .symbol {
                     if let s = a.string("playback") {
-                        guard let v = SymbolPlayback(rawValue: s) else { throw ToolFailure(message: "'playback' must be loop, once or still") }
+                        guard let v = SymbolPlayback(rawValue: s) else { throw ToolFailure(message: "'playback' must be loop, once, still or click") }
                         file.pages[p].elements[i].playback = v == .loop ? nil : v
                     }
                     if let o = a.double("offset") { file.pages[p].elements[i].offset = o == 0 || !o.isFinite ? nil : o }
@@ -759,7 +763,7 @@ actor DottieTools {
             guard let ids = try a.uuids("ids"), let first = ids.first else { throw ToolFailure(message: "'ids' is required") }
             let p = try pageIndex(file, a, element: first)
             let name = a.string("name") ?? "Symbol \((file.pages[p].symbols?.count ?? 0) + 1)"
-            guard let made = file.pages[p].makeSymbol(of: Set(ids), name: name) else {
+            guard let made = file.pages[p].makeSymbol(of: Set(ids), name: name, button: a.bool("button") ?? false) else {
                 throw ToolFailure(message: "None of those ids is a shape on this page.")
             }
             try save(file, to: url)
@@ -785,7 +789,7 @@ actor DottieTools {
             }
             var playback: SymbolPlayback?
             if let s = a.string("playback") {
-                guard let v = SymbolPlayback(rawValue: s) else { throw ToolFailure(message: "'playback' must be loop, once or still") }
+                guard let v = SymbolPlayback(rawValue: s) else { throw ToolFailure(message: "'playback' must be loop, once, still or click") }
                 playback = v
             }
             guard let e = file.pages[p].placeSymbol(symbol.id, at: CGPoint(x: x, y: y), size: size, playback: playback,

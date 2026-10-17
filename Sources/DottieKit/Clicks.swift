@@ -69,11 +69,36 @@ extension DiagramOps {
 
 extension Element {
     /// What a screen reader calls the element when it is a button: the first line of its text, else its anchor,
-    /// else its kind.
-    var buttonLabel: String {
+    /// else, for a symbol's copy, the symbol's name (`symbolName`), else its kind.
+    func buttonLabel(symbolName: String? = nil) -> String {
         if let t = text?.split(separator: "\n").first.map(String.init), !t.isEmpty { return t }
         if let a = anchor, !a.isEmpty { return a }
+        if let n = symbolName, !n.isEmpty { return n }
         return kind.rawValue
+    }
+}
+
+extension DottieDocument {
+    /// For each of `instances` (copies of symbols on this page), the ids of every element it can expand to, mapped
+    /// to it: how the web players gather a clickable copy's drawing into one button.
+    func parts(of instances: Set<UUID>) -> [String: UUID] {
+        var out: [String: UUID] = [:]
+        for e in elements where instances.contains(e.id) && e.kind == .symbol {
+            var alone = DottieDocument(id: id, layers: [Layer(id: e.layerID, name: "")], elements: [e])
+            alone.symbols = symbols
+            for part in alone.expandingSymbols(at: 0, posing: false).elements { out[part.id.uuidString] = e.id }
+        }
+        return out
+    }
+
+    /// The moment of each button state for the button copies among `ids`; empty when none is a button.
+    func buttonTimes(_ state: Symbol.ButtonState, of ids: Set<UUID>) -> [UUID: Double] {
+        let table = symbolIndex
+        var out: [UUID: Double] = [:]
+        for e in elements where ids.contains(e.id) {
+            if let s = e.symbol.flatMap({ table[$0] }), s.isButton, let t = s.buttonTime(state) { out[e.id] = t }
+        }
+        return out
     }
 }
 

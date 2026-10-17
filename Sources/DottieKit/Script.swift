@@ -624,7 +624,8 @@ public enum DottieScript {
                     guard let str = v as? String, let id = UUID(uuidString: str) else { throw OpsError.invalid("symbol: 'ids' must be element ids") }
                     ids.append(id)
                 }
-                guard let made = doc.makeSymbol(of: Set(ids), name: a.string("name") ?? "Symbol \((doc.symbols?.count ?? 0) + 1)") else {
+                guard let made = doc.makeSymbol(of: Set(ids), name: a.string("name") ?? "Symbol \((doc.symbols?.count ?? 0) + 1)",
+                                                button: a.bool("button") ?? false) else {
                     throw OpsError.invalid("symbol: give the ids of shapes on this page")
                 }
                 return ["symbol": made.symbol.id.uuidString, "instance": describe(made.instance)]
@@ -842,12 +843,15 @@ public enum DottieScript {
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
 
     Symbols (drawings defined once and placed many times, each copy playing the symbol's own animation on its own clock)
-      dottie.symbol([ids], {name?})    turns those shapes, with the arrows between them and their keys, into a symbol, \
-    put back as one instance where they were; arrows and links from outside attach to the instance. Its animation is \
-    the page timeline's length when made: set dottie.timeline({duration}) first to choose the loop. Returns {symbol, instance}
+      dottie.symbol([ids], {name?, button?})    turns those shapes, with the arrows between them and their keys, into a \
+    symbol, put back as one instance where they were; arrows and links from outside attach to the instance. Its \
+    animation is the page timeline's length when made: set dottie.timeline({duration}) first to choose the loop. \
+    button: true makes a Flash-style button: the page's scenes named up, over, down and hit (dottie.scene) move into \
+    it as its states; copies show up, and on the web over under the pointer, down while pressed, and hit is the area \
+    that takes clicks. Give a copy a click with dottie.update(copy, {click: {scene}}). Returns {symbol, instance}
       dottie.place(symbol, {x, y, width?, height?, playback?, offset?})  another instance (symbol: its id or name); \
-    playback: loop (default) | once | still; offset: seconds into the symbol's animation at the page's start, so copies \
-    don't move in step. An animated symbol gives a still page a timeline. Returns the element
+    playback: loop (default) | once | still | click (rests at the start; in <dottie-player> a click plays it once); \
+    offset: seconds into the symbol's animation at the page's start, so copies don't move in step. An animated symbol gives a still page a timeline. Returns the element
       dottie.symbols()                 [{id, name, width, height, duration, instances}]
       dottie.update(instance, {playback?, offset?, ...})  instances move, resize, turn and fade like shapes, and take keys
       dottie.breakApart(instance)      replaces it with plain copies of what it shows at rest; returns their ids

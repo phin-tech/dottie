@@ -176,8 +176,8 @@ public enum DiagramOps {
                               otherPages: [DottieDocument] = []) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
         if let anchor { doc.elements[i].anchor = anchor.flatMap { $0.isEmpty ? nil : $0 } }
-        if doc.elements[i].kind == .symbol, (click ?? nil) != nil || (hover ?? nil) != nil {
-            throw OpsError.invalid("A symbol instance can't be clicked on the web yet; give the click to a shape beside it")
+        if doc.elements[i].kind == .symbol, (hover ?? nil) != nil {
+            throw OpsError.invalid("A symbol's copy takes no hover colors; make the symbol a button and draw its over state")
         }
         if let click { doc.elements[i].click = click.flatMap { $0.isEmpty ? nil : $0 } }
         if let hover { doc.elements[i].hover = hover.flatMap { $0.isEmpty ? nil : $0 } }

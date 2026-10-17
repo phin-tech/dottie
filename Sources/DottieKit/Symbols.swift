@@ -11,15 +11,19 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
     public var layers: [Layer]
     public var elements: [Element]
     public var timeline: Timeline?
+    /// A button, as Flash had: its copies show the moment of its `up` scene (or the start), whatever their
+    /// playback, and on the web the moments of its `over` and `down` scenes under the pointer and while pressed. A
+    /// `hit` scene, if there is one, draws the area that takes clicks. nil is a plain symbol.
+    public var button: Bool?
 
     public init(id: UUID = UUID(), name: String, width: Double, height: Double, layers: [Layer]? = nil,
-                elements: [Element] = [], timeline: Timeline? = nil) {
+                elements: [Element] = [], timeline: Timeline? = nil, button: Bool? = nil) {
         self.id = id; self.name = name; self.width = width; self.height = height
         self.layers = layers ?? [Layer(name: "Layer 1")]
-        self.elements = elements; self.timeline = timeline
+        self.elements = elements; self.timeline = timeline; self.button = button
     }
 
-    private enum CodingKeys: String, CodingKey { case id, name, width, height, layers, elements, timeline }
+    private enum CodingKeys: String, CodingKey { case id, name, width, height, layers, elements, timeline, button }
 
     /// Lenient, as pages are: a symbol with no layers gets one, and a box is never empty.
     public init(from decoder: Decoder) throws {
@@ -32,6 +36,29 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
         self.layers = layers.isEmpty ? [Layer(name: "Layer 1")] : layers
         elements = try c.decodeIfPresent([Element].self, forKey: .elements) ?? []
         timeline = try c.decodeIfPresent(Timeline.self, forKey: .timeline)
+        button = try c.decodeIfPresent(Bool.self, forKey: .button)
+    }
+
+    /// A button's states, each the moment of the scene of that name in its timeline (any case).
+    public enum ButtonState: String, CaseIterable, Sendable { case up, over, down, hit }
+
+    public var isButton: Bool { button == true }
+
+    /// The moment of the scene named `state`, within the timeline; nil when there is none.
+    public func sceneTime(_ state: ButtonState) -> Double? {
+        guard let m = timeline?.markers?.first(where: { $0.name.caseInsensitiveCompare(state.rawValue) == .orderedSame }) else { return nil }
+        return min(max(m.t, 0), Timeline.clampTime(timeline?.duration ?? 0))
+    }
+
+    /// Where a button is in each state: up at its scene or the start; over at its scene or up; down at its scene
+    /// or over. Hit has no fallback: without its scene, the copy's frame takes clicks.
+    public func buttonTime(_ state: ButtonState) -> Double? {
+        switch state {
+        case .up: return sceneTime(.up) ?? 0
+        case .over: return sceneTime(.over) ?? buttonTime(.up)
+        case .down: return sceneTime(.down) ?? buttonTime(.over)
+        case .hit: return sceneTime(.hit)
+        }
     }
 
     /// The symbol as a page of its own, for resolving its animation and for editing it.
@@ -46,11 +73,14 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
 
     /// Where an instance playing it `playback`, started `offset` seconds in, is at page time `t`. Looping, a
     /// whole number of loops lands on the end pose rather than the start, as the last frame of an animation does.
+    /// A button is always up, whatever the playback.
     public func localTime(_ t: Double, playback: SymbolPlayback?, offset: Double?) -> Double {
         let d = Timeline.clampTime(timeline?.duration ?? 0)
+        if isButton { return buttonTime(.up) ?? 0 }
         let o = offset.flatMap { $0.isFinite ? $0 : nil } ?? 0
         switch playback ?? .loop {
         case .still: return min(timeline?.poster ?? d, d)
+        case .click: return min(max(o, 0), d)
         case .once: return min(max(t + o, 0), d)
         case .loop:
             guard d > 0 else { return 0 }
@@ -83,18 +113,22 @@ extension DottieDocument {
     /// instance's frame. Instances of a symbol that isn't on the page, or that contains itself, draw nothing.
     /// What every renderer draws; the editor works on the instances themselves. With `posing` false, each symbol's
     /// elements are taken as they are, unanimated and none hidden: every element the expansion can ever have.
-    public func expandingSymbols(at t: Double, posing: Bool = true) -> DottieDocument {
+    ///
+    /// `times` puts instances on the page (not inside a symbol) at a moment of their symbol's own: a button's other
+    /// states, or a clip replaying after a click.
+    public func expandingSymbols(at t: Double, posing: Bool = true, times: [UUID: Double] = [:]) -> DottieDocument {
         guard hasInstances else { return self }
         var copy = self
         var budget = Symbol.maxElements
-        copy.elements = Self.expand(elements, in: self, at: t, symbols: symbolIndex, stack: [], posing: posing, budget: &budget)
+        copy.elements = Self.expand(elements, in: self, at: t, symbols: symbolIndex, stack: [], posing: posing, times: times,
+                                    budget: &budget)
         return copy
     }
 
     /// `elements` (of `page`) with their instances expanded. Connectors attached to an instance are pinned
     /// where they meet it, since the instance itself is gone.
     private static func expand(_ elements: [Element], in page: DottieDocument, at t: Double, symbols: [UUID: Symbol],
-                               stack: [UUID], posing: Bool, budget: inout Int) -> [Element] {
+                               stack: [UUID], posing: Bool, times: [UUID: Double] = [:], budget: inout Int) -> [Element] {
         let instances = Set(elements.filter { $0.kind == .symbol }.map(\.id))
         guard !instances.isEmpty else { budget -= elements.count; return elements }
         let index = page.elementIndex
@@ -116,7 +150,8 @@ extension DottieDocument {
             // An instance costs one of the budget even when it draws nothing, so deep nests of empty ones stop too.
             budget -= 1
             guard let id = e.symbol, let symbol = symbols[id], !stack.contains(id), stack.count < Symbol.maxDepth else { continue }
-            let u = symbol.localTime(t, playback: e.playback, offset: e.offset)
+            let u = (stack.isEmpty ? times[e.id].map { min(max($0, 0), Timeline.clampTime(symbol.timeline?.duration ?? 0)) } : nil)
+                ?? symbol.localTime(t, playback: e.playback, offset: e.offset)
             let inner = posing ? symbol.page.posed(at: u) : symbol.page
             let visible = Set(inner.layers.filter(\.visible).map(\.id))
             var drawn = inner
@@ -198,8 +233,10 @@ extension DottieDocument {
     /// look, same animation. Their keys move into the symbol's timeline, which runs as long as the page's, so the
     /// loop keeps time with it. Connectors between them go too; ones from outside attach to the instance instead,
     /// as do links to them. Returns the symbol and the instance, or nil when nothing drawable was chosen.
+    ///
+    /// As a `button`, the page's scenes named up, over, down and hit move into the symbol too, as its states.
     @discardableResult
-    public mutating func makeSymbol(of ids: Set<UUID>, name: String) -> (symbol: Symbol, instance: Element)? {
+    public mutating func makeSymbol(of ids: Set<UUID>, name: String, button: Bool = false) -> (symbol: Symbol, instance: Element)? {
         let chosen = Set(elements.filter { ids.contains($0.id) && $0.kind != .connector }.map(\.id))
         guard !chosen.isEmpty else { return nil }
         // Connectors go in when both ends are chosen or loose (a loose one only if it was chosen itself).
@@ -238,16 +275,21 @@ extension DottieDocument {
                 t.follow = t.follow?.filter { moving.contains($0.path) }
                 return t
             }
-            if !moved.isEmpty {
+            let states = button ? (tl.markers ?? []).filter { m in
+                Symbol.ButtonState.allCases.contains { $0.rawValue.caseInsensitiveCompare(m.name) == .orderedSame }
+            } : []
+            if !moved.isEmpty || !states.isEmpty {
                 var own = Timeline(fps: tl.fps, duration: tl.duration, boil: tl.boil, settle: tl.settle, tracks: moved)
                 own.poster = tl.poster
+                if !states.isEmpty { own.markers = states; tl.markers = tl.markers?.filter { !states.contains($0) } }
+                if tl.markers?.isEmpty == true { tl.markers = nil }
                 symbolTimeline = own
             }
             tl.tracks.removeAll { moving.contains($0.element) }
             timeline = tl
         }
         let symbol = Symbol(name: name, width: box.width, height: box.height, layers: [layer], elements: inner,
-                            timeline: symbolTimeline)
+                            timeline: symbolTimeline, button: button ? true : nil)
         var instance = Element(kind: .symbol, frame: box, layerID: parts[0].layerID)
         instance.symbol = symbol.id
         instance.style.roughness = 0
@@ -386,6 +428,21 @@ extension DottieDocument {
         p.symbols = symbols
         p.theme = theme
         return p
+    }
+
+    /// Makes symbol `id` a button, giving it up, over and down scenes half a second apart where it has none, for
+    /// posing each state in Edit Symbol.
+    public mutating func makeButton(_ id: UUID) {
+        guard let i = symbols?.firstIndex(where: { $0.id == id }) else { return }
+        var s = symbols![i]
+        s.button = true
+        var tl = s.timeline ?? Timeline(fps: 12, duration: 1)
+        for (k, state) in [Symbol.ButtonState.up, .over, .down].enumerated() where s.sceneTime(state) == nil {
+            tl.addMarker(at: 0.5 * Double(k), name: state.rawValue)
+            s.timeline = tl
+        }
+        s.timeline = tl
+        symbols![i] = s
     }
 
     /// Renames symbol `id`.

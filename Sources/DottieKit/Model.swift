@@ -89,6 +89,8 @@ public enum SymbolPlayback: String, Codable, Sendable, CaseIterable {
     case once
     /// Stands still on the symbol's poster frame.
     case still
+    /// Rests at the start; in `<dottie-player>` a click plays it through once. Other exports show the start.
+    case click
 
     public init(from decoder: Decoder) throws {
         self = SymbolPlayback(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .loop

@@ -52,9 +52,10 @@ The same drawing, still and clean, three seconds in:
 
 Shapes the drawing makes clickable work with the mouse and the keyboard (Tab, then Enter or Space): a click
 plays a scene on to the next one, opens a link in a new tab, or shows the page a shape's link points at, and the
-shape takes its hover color under the pointer. Only `http`, `https` and `mailto` links are ever followed, and
+shape takes its hover color under the pointer. Button symbols show their over and down looks, and take clicks on
+their hit area; a symbol's copy set to play when clicked plays its animation through. Only `http`, `https` and `mailto` links are ever followed, and
 nothing in a drawing runs as code, so a drawing from anyone is safe to play. Each click first fires a cancelable
-`action` event whose `detail` is `{element, scene | url | page}`; call `preventDefault()` to handle it yourself.
+`action` event whose `detail` is `{element, scene | url | page, replay?}`; call `preventDefault()` to handle it yourself.
 
 From script, the element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(elementId)`,
 `currentTime`, `duration` and `paused`, and fires `load`, `frame`, `action` and `error` events.

@@ -12,13 +12,14 @@
 // that page, by mouse or keyboard. Each click first fires a cancelable `action` event with the element and what it
 // does, so a page can handle it itself.
 
-import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered } from "./clicks.ts";
-import { type DottieFile, type Page, type RGBA, luminance, parseDottie } from "./model.ts";
-import { fmt } from "./path.ts";
+import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, partsOf } from "./clicks.ts";
+import { type DottieFile, type Page, type RGBA, clampTime, luminance, parseDottie } from "./model.ts";
+import { Path, fmt, rotate } from "./path.ts";
+import { buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
 import { type Plan, plan, svgParts } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { themeNamed } from "./theme.ts";
-import { posterTime, resolved } from "./timeline.ts";
+import { posed, posterTime } from "./timeline.ts";
 
 const WHITE: RGBA = { r: 1, g: 1, b: 1, a: 1 };
 
@@ -63,8 +64,20 @@ export class Playback {
   readonly ink: RGBA;
   /** What clicking each clickable element does, by element id. */
   readonly clicks: Map<string, Click>;
+  /** Copies of symbols that play through once when clicked (playback "click"), by id, with their clip's length. */
+  readonly replays = new Map<string, number>();
+  /** When each replaying copy was clicked (performance.now() milliseconds). */
+  private replayStarts = new Map<string, number>();
   private hoverIDs: Set<string>;
   private labels = new Map<string, string>();
+  /** Each drawn part of a clickable copy, to that copy's id; and each copy's parts in drawing order. */
+  private owner = new Map<string, string>();
+  private partsOfOwner = new Map<string, string[]>();
+  /** The moments of the button copies' over, down and hit states. */
+  private overTimes = new Map<string, number>();
+  private downTimes = new Map<string, number>();
+  private hitTimes = new Map<string, number>();
+  private last: { t: number; i: number } = { t: 0, i: 0 };
   private svg: SVGSVGElement;
   private groups = new Map<string, { g: SVGGElement; markup: string }>();
   private order: string[] = [];
@@ -76,8 +89,29 @@ export class Playback {
     this.page = options.clean ? withRoughness(page, 0) : page;
     this.plan = plan(this.page);
     this.clicks = clickTargets(page, options.file);
-    this.hoverIDs = new Set(this.page.elements.filter((e) => this.clicks.has(e.id) && hasHover(e)).map((e) => e.id));
-    for (const e of this.page.elements) if (this.clicks.has(e.id)) this.labels.set(e.id, buttonLabel(e));
+    const table = symbolTable(this.page);
+    for (const e of this.page.elements) {
+      const s = e.kind === "symbol" && e.symbol !== null ? table.get(e.symbol) : undefined;
+      if (!s) continue;
+      if (s.button === true) {
+        for (const [state, times] of [["over", this.overTimes], ["down", this.downTimes], ["hit", this.hitTimes]] as const) {
+          const at = buttonTime(s, state);
+          if (at !== null) times.set(e.id, at);
+        }
+      } else if (e.playback === "click" && (s.timeline?.duration ?? 0) > 0) {
+        this.replays.set(e.id, s.timeline!.duration);
+      }
+    }
+    const clickable = new Set([...this.clicks.keys(), ...this.replays.keys()]);
+    this.hoverIDs = new Set(this.page.elements.filter((e) => clickable.has(e.id) && e.kind !== "symbol" && hasHover(e)).map((e) => e.id));
+    const instances = new Set(this.page.elements.filter((e) => clickable.has(e.id) && e.kind === "symbol").map((e) => e.id));
+    for (const e of this.page.elements) {
+      if (!clickable.has(e.id)) continue;
+      this.labels.set(e.id, buttonLabel(e, e.symbol !== null ? table.get(e.symbol)?.name : undefined));
+      if (e.kind !== "symbol") this.owner.set(e.id, e.id);
+    }
+    for (const [part, id] of partsOf(this.page, instances)) this.owner.set(part, id);
+    for (const [part, id] of this.owner) this.partsOfOwner.set(id, [...(this.partsOfOwner.get(id) ?? []), part]);
     const near = (t: number): number => {
       let best = 0;
       this.plan.times.forEach((x, i) => { if (Math.abs(x - t) < Math.abs(this.plan.times[best] - t)) best = i; });
@@ -114,30 +148,67 @@ export class Playback {
     this.onFrame?.(i);
   }
 
+  /** Starts copy `id` replaying from `at` (performance.now() milliseconds; earlier to start partway). */
+  replay(id: string, at: number): void { if (this.replays.has(id)) this.replayStarts.set(id, at); }
+
+  /** Whether a copy is still playing through after a click. */
+  replaying(now = performance.now()): boolean {
+    for (const [id, start] of this.replayStarts) if (now - start < (this.replays.get(id) ?? 0) * 1000) return true;
+    return false;
+  }
+
+  /** Draws the last moment drawn again, for copies replaying while the page stands still. */
+  redraw(): void { this.drawAt(this.last.t, this.last.i); }
+
   /** Draws the moment `t` (seconds) in the frame-`i` view. */
   drawAt(t: number, i = 0): void {
+    this.last = { t, i };
     const r = this.plan.rects[Math.min(i, this.plan.rects.length - 1)];
-    const frame = resolved(this.page, t);
+    const now = typeof performance === "undefined" ? 0 : performance.now();
+    const times = new Map<string, number>();
+    for (const [id, start] of this.replayStarts) times.set(id, Math.min((now - start) / 1000, this.replays.get(id) ?? 0));
+    const tc = clampTime(t);
+    const pose = posed(this.page, tc);
+    const frame = expandingSymbols(pose, tc, true, times);
     const { parts } = svgParts(frame, this.background, r);
-    // A clickable element with a hover look holds both, and the stylesheet shows one.
-    const hover = this.hoverIDs.size === 0 ? null
-      : new Map(svgParts(hovered(frame, this.hoverIDs), this.background, r).parts.filter((p) => this.hoverIDs.has(p.key)).map((p) => [p.key, p.markup]));
+    const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
+      for (const p of parts) if (this.owner.has(p.key)) m.set(p.key, p.markup);
+      return m;
+    };
+    // A state is drawn only for the copies that have it.
+    const state = (st: Map<string, number>) => st.size === 0 ? new Map<string, string>()
+      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st])), this.background, r).parts
+        .filter((p) => st.has(this.owner.get(p.key) ?? "")));
+    // A clickable shape with a hover look holds both, a button its over and down states, and the stylesheet shows one.
+    const hover = this.hoverIDs.size === 0 ? new Map<string, string>()
+      : owned(new Map(), svgParts(hovered(frame, this.hoverIDs), this.background, r).parts.filter((p) => this.hoverIDs.has(p.key)));
+    const over = state(this.overTimes), down = state(this.downTimes), hit = state(this.hitTimes);
+    const normal = owned(new Map(), parts);
+    // Each clickable owner becomes one part, where its first piece is drawn.
+    const merged: { key: string; markup: string; button?: boolean }[] = [];
+    const done = new Set<string>();
+    for (const p of parts) {
+      const o = this.owner.get(p.key);
+      if (o === undefined) { merged.push(p); continue; }
+      if (done.has(o)) continue;
+      done.add(o);
+      merged.push(this.buttonPart(o, normal, hover, over, down, hit, pose));
+    }
     this.svg.setAttribute("viewBox", `${fmt(r.x)} ${fmt(r.y)} ${fmt(r.width)} ${fmt(r.height)}`);
     const ns = "http://www.w3.org/2000/svg";
-    const keys = parts.map((p) => p.key);
-    for (const p of parts) {
-      let markup = p.markup;
-      const h = hover?.get(p.key);
-      if (h !== undefined && h !== markup) markup = `<g class="dottie-n">\n${markup}</g>\n<g class="dottie-h">\n${h}</g>\n`;
+    const keys = merged.map((p) => p.key);
+    for (const p of merged) {
+      const markup = p.markup;
       const have = this.groups.get(p.key);
       if (have) {
         if (have.markup !== markup) { have.g.innerHTML = markup; have.markup = markup; }
+        if (p.button !== undefined) have.g.classList.toggle("dottie-b", p.button);
       } else {
         const g = document.createElementNS(ns, "g") as SVGGElement;
         g.innerHTML = markup;
         // The group stays from frame to frame, so keyboard focus on it does too.
-        if (this.clicks.has(p.key)) {
-          g.setAttribute("class", "dottie-a");
+        if (p.button !== undefined) {
+          g.setAttribute("class", p.button ? "dottie-a dottie-b" : "dottie-a");
           g.setAttribute("data-a", p.key);
           g.setAttribute("tabindex", "0");
           g.setAttribute("role", "button");
@@ -159,6 +230,38 @@ export class Playback {
       while (at) { const next: ChildNode | null = at.nextSibling; at.remove(); at = next; }
       this.order = keys;
     }
+  }
+
+  /** What a clickable owner draws as: its normal look, and its hover, over and down looks where they differ. A
+   * symbol's copy keeps its drawing out of the pointer's way and takes clicks on a layer above: its hit state drawn
+   * invisibly, or its frame. `button` is whether it has a down look (the stylesheet nudges the others). */
+  private buttonPart(o: string, normal: Map<string, string>, hover: Map<string, string>, over: Map<string, string>,
+    down: Map<string, string>, hit: Map<string, string>, pose: Page): { key: string; markup: string; button: boolean } {
+    const keys = this.partsOfOwner.get(o) ?? [o];
+    const join = (m: Map<string, string>): string | null => { const s = keys.map((k) => m.get(k) ?? "").join(""); return s === "" ? null : s; };
+    const base = join(normal) ?? "";
+    const instance = pose.elements.find((e) => e.id === o && e.kind === "symbol");
+    const overLook = instance ? join(over) : join(hover);
+    const downLook = instance ? join(down) : null;
+    const shownOver = overLook !== null && overLook !== base ? overLook : null;
+    const shownDown = downLook !== null && downLook !== (overLook ?? base) ? downLook : null;
+    if (!instance && shownOver === null) return { key: o, markup: base, button: false };
+    const still = instance ? ` pointer-events="none"` : "";
+    let m = `<g class="dottie-n"${still}>\n${base}</g>\n`;
+    if (shownOver !== null) m += `<g class="dottie-h"${still}>\n${shownOver}</g>\n`;
+    if (shownDown !== null) m += `<g class="dottie-d"${still}>\n${shownDown}</g>\n`;
+    if (instance) {
+      const h = join(hit);
+      if (h !== null) m += `<g class="dottie-hit" opacity="0" pointer-events="all">\n${h}</g>\n`;
+      else {
+        const c = { x: instance.x + instance.width / 2, y: instance.y + instance.height / 2 }, a = instance.rotation ?? 0;
+        const corners = [[instance.x, instance.y], [instance.x + instance.width, instance.y], [instance.x + instance.width, instance.y + instance.height],
+          [instance.x, instance.y + instance.height]].map(([x, y]) => rotate({ x, y }, c, a));
+        const path = new Path().moveTo(corners[0]).lineTo(corners[1]).lineTo(corners[2]).lineTo(corners[3]).close();
+        m += `<path class="dottie-hit" d="${path.data()}" fill="none" stroke="none" pointer-events="all"/>\n`;
+      }
+    }
+    return { key: o, markup: m, button: shownDown !== null };
   }
 
   /** The scene frame `i` is in, or -1 before the first. */
@@ -190,6 +293,7 @@ export class DottiePlayer extends ElementBase {
   private last = 0;
   private acc = 0;
   private raf = 0;
+  private replayRaf = 0;
   private loadToken = 0;
   private visible = true;
   private observer: IntersectionObserver | null = null;
@@ -354,14 +458,24 @@ export class DottiePlayer extends ElementBase {
   activate(id: string): void {
     const p = this.playback;
     const click = p?.clicks.get(id);
-    if (!p || !click) return;
-    if (!this.dispatchEvent(new CustomEvent("action", { detail: { element: id, ...click }, cancelable: true }))) return;
+    const replay = p?.replays.has(id) ?? false;
+    if (!p || (!click && !replay)) return;
+    const detail = { element: id, ...(click ?? {}), ...(replay ? { replay: true } : {}) };
+    if (!this.dispatchEvent(new CustomEvent("action", { detail, cancelable: true }))) return;
+    const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (replay) {
+      // With reduced motion the clip jumps to its end.
+      const now = performance.now();
+      p.replay(id, reduced ? now - p.replays.get(id)! * 1000 : now);
+      p.redraw();
+      this.scheduleReplay();
+    }
+    if (!click) return;
     if ("url" in click) {
       if (/^(https?:|mailto:)/i.test(click.url)) window.open(click.url, "_blank", "noopener");
     } else if ("page" in click) {
       this.setAttribute("page", String(click.page + 1));
     } else if (click.scene >= 0 && click.scene < p.scenes.length) {
-      const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reduced || this.hasAttribute("at") || p.frameCount < 2) {
         this.setPlaying(false);
         p.show(click.scene + 1 < p.scenes.length ? p.scenes[click.scene + 1] : p.frameCount - 1);
@@ -370,6 +484,20 @@ export class DottiePlayer extends ElementBase {
         this.setPlaying(true);
       }
     }
+  }
+
+  /** Redraws, while the page itself stands still, as long as a clicked copy is playing through. */
+  private scheduleReplay(): void {
+    if (this.replayRaf) return;
+    const step = () => {
+      this.replayRaf = 0;
+      const p = this.playback;
+      if (!p || !this.isConnected) return;
+      if (!this.playing) p.redraw();
+      if (p.replaying()) this.replayRaf = requestAnimationFrame(step);
+      else if (!this.playing) p.redraw();
+    };
+    this.replayRaf = requestAnimationFrame(step);
   }
 
   private setPlaying(on: boolean): void {

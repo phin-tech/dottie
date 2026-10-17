@@ -18,13 +18,24 @@ struct SymbolSection: View {
                     next.renameSymbol(symbol.id, to: name)
                     document.commit(next, actionName: "Rename Symbol", undoManager: undoManager)
                 }
-                Picker("Plays", selection: playback) {
-                    Text("Over and over").tag(SymbolPlayback.loop)
-                    Text("Once").tag(SymbolPlayback.once)
-                    Text("Stands still").tag(SymbolPlayback.still)
+                Toggle("Button", isOn: isButton)
+                    .help("A Flash-style button: copies show its up scene; on the web, its over scene under the pointer, "
+                          + "its down scene while pressed, and its hit scene's shapes take clicks. Edit Symbol to pose them")
+                if symbol.isButton {
+                    Text("Edit Symbol to draw its up, over and down scenes\(symbol.sceneTime(.hit) == nil ? ", and a hit scene to limit where it takes clicks" : "").")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Picker("Plays", selection: playback) {
+                        Text("Over and over").tag(SymbolPlayback.loop)
+                        Text("Once").tag(SymbolPlayback.once)
+                        Text("Stands still").tag(SymbolPlayback.still)
+                        Text("When clicked (web player)").tag(SymbolPlayback.click)
+                    }
+                    .disabled((symbol.timeline?.duration ?? 0) == 0)
+                    .help("When clicked: rests at the start, and plays through once when clicked in <dottie-player>. "
+                          + "Other exports show the start")
                 }
-                .disabled((symbol.timeline?.duration ?? 0) == 0)
-                if (symbol.timeline?.duration ?? 0) > 0, playback.wrappedValue != .still {
+                if !symbol.isButton, (symbol.timeline?.duration ?? 0) > 0, playback.wrappedValue != .still {
                     Stepper(value: offset, in: 0...max(symbol.timeline?.duration ?? 0, 0.1), step: 0.1) {
                         LabeledContent("Starts", value: String(format: "%.1f s in", offset.wrappedValue))
                     }
@@ -58,6 +69,17 @@ struct SymbolSection: View {
     private var playback: Binding<SymbolPlayback> {
         Binding(get: { instance.playback ?? .loop },
                 set: { p in set("Change Playback") { $0.playback = p == .loop ? nil : p } })
+    }
+
+    private var isButton: Binding<Bool> {
+        Binding(get: { symbol?.isButton ?? false },
+                set: { on in
+                    guard let id = symbol?.id else { return }
+                    var next = document.model
+                    if on { next.makeButton(id) }
+                    else if let i = next.symbols?.firstIndex(where: { $0.id == id }) { next.symbols![i].button = nil }
+                    document.commit(next, actionName: on ? "Make Button" : "Make Plain Symbol", undoManager: undoManager)
+                })
     }
 
     private var offset: Binding<Double> {
