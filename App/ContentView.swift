@@ -17,7 +17,11 @@ struct ContentView: View {
     @State private var activeLayer: UUID?
     @State private var placeRequest: PlaceRequest?
     @State private var jumpRequest: JumpRequest?
-    @State private var sidebarTab: SidebarTab = .inspector
+    @SceneStorage("sidebarTab") private var sidebarTab: SidebarTab = .style
+    /// The posed frame, kept between renders and shared by the context bar and the inspector: every control's
+    /// binding reads it, so resolving it each time would cost a full resolve per control.
+    @State private var frameCache = FrameCache()
+    @Environment(\.colorScheme) private var colorScheme
     @State var showScriptConsole = false
     @State var scriptOutput = ""
     @State var scriptRunning = false
@@ -38,6 +42,8 @@ struct ContentView: View {
                 }
                 Divider()
             }
+            ContextBar(document: document, style: selectionStyle, tool: tool, undoManager: undoManager)
+            Divider()
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
@@ -79,14 +85,17 @@ struct ContentView: View {
             .inspector(isPresented: $showInspector) {
                 VStack(spacing: 0) {
                     Picker("Sidebar", selection: $sidebarTab) {
-                        ForEach(SidebarTab.allCases) { Text($0.rawValue).tag($0) }
+                        ForEach(SidebarTab.allCases) { t in
+                            Image(systemName: t.symbol).accessibilityLabel(t.rawValue).help(t.help).tag(t)
+                        }
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
                     .padding([.horizontal, .top], 12)
                     switch sidebarTab {
-                    case .inspector:
-                        Inspector(document: document, selection: selection, tool: tool, newStyle: $newStyle, newRouting: $newRouting, activeLayer: $activeLayer, undoManager: undoManager, pose: poseTime,
+                    case .style, .behavior, .layers, .page:
+                        Inspector(document: document, tab: sidebarTab, selection: selection, tool: tool, style: selectionStyle,
+                                  activeLayer: $activeLayer, undoManager: undoManager,
                                   onSelect: { selection = $0 }, onJump: { jumpRequest = JumpRequest(target: $0) })
                     case .library:
                         LibraryPanel(document: document, selection: selection) { item, keep in
@@ -149,6 +158,12 @@ extension ContentView {
     /// The animation time being posed: paused on an animated page's timeline. Edits there become keys.
     var poseTime: Double? { document.model.timeline == nil || playing ? nil : playhead }
 
+    /// Style editing for the selection, shared by the context bar and the Style tab.
+    var selectionStyle: SelectionStyle {
+        SelectionStyle(document: document, selection: selection, newStyle: $newStyle, newRouting: $newRouting,
+                       undoManager: undoManager, pose: poseTime, frameCache: frameCache, colorScheme: colorScheme)
+    }
+
     /// Applies `change` to the page's timeline as one undo step.
     @MainActor
     func editTimeline(_ name: String, _ change: (inout Timeline) -> Void) {
@@ -175,24 +190,173 @@ extension ContentView {
 }
 
 enum SidebarTab: String, CaseIterable, Identifiable {
-    case inspector = "Inspector", library = "Library"
+    case style = "Style", behavior = "Behavior", layers = "Layers", page = "Page", library = "Library"
     var id: String { rawValue }
+
+    var symbol: String {
+        switch self {
+        case .style: "paintbrush"
+        case .behavior: "cursorarrow.click.2"
+        case .layers: "square.3.layers.3d"
+        case .page: "doc"
+        case .library: "books.vertical"
+        }
+    }
+
+    var help: String {
+        switch self {
+        case .style: "Style: how the selection looks"
+        case .behavior: "Behavior: links, clicks on the web, and how a symbol's copy plays"
+        case .layers: "Layers"
+        case .page: "Page: theme, rulers and guides"
+        case .library: "Library: stencils to place"
+        }
+    }
 }
 
 struct Inspector: View {
     @ObservedObject var document: DrawingDocument
+    var tab: SidebarTab
     var selection: Set<UUID>
     var tool: Tool
-    @Binding var newStyle: Style
-    @Binding var newRouting: Routing
+    var style: SelectionStyle
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
-    /// While posing an animation, the inspector shows that frame's values and its edits become keys there.
-    var pose: Double?
     var onSelect: (Set<UUID>) -> Void = { _ in }
     var onJump: (UUID) -> Void = { _ in }
-    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(Pref.showRulers) private var showRulers = false
+
+    private var selected: [Element] { style.selected }
+
+    var body: some View {
+        Form {
+            switch tab {
+            case .style: styleTab
+            case .behavior: behaviorTab
+            case .layers:
+                LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager,
+                              onSelect: onSelect)
+            case .page: pageTab
+            case .library: EmptyView()
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    // MARK: Style
+
+    @ViewBuilder private var styleTab: some View {
+        Section(selected.isEmpty ? "Style for New Shapes" : "Style") {
+            Picker("Look", selection: style.look) {
+                Text("Sketchy").tag(true)
+                Text("Clean").tag(false)
+            }
+            .pickerStyle(.segmented)
+            ColorPicker("Stroke", selection: style.color(\.stroke, "Change Stroke Color"))
+            if style.hasFill {
+                ColorPicker("Fill", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true)
+                Picker("Fill pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {
+                    ForEach(StyleChoices.fills, id: \.0) { Text($0.1).tag($0.0) }
+                }
+                if style.binding(\.fillStyle, "").wrappedValue == .grid {
+                    let cell = style.binding(\.cellSize, "Change Grid Size")
+                    Stepper(value: cell, in: 10...200, step: 5) {
+                        LabeledContent("Grid cell", value: "\(Int(cell.wrappedValue)) pt")
+                    }
+                }
+            }
+            ValueSlider(title: "Width", value: style.binding(\.strokeWidth, "Change Stroke Width"), range: 1...12, format: Self.points)
+            ValueSlider(title: "Opacity", value: style.binding(\.opacityLevel, "Change Opacity"), range: 0...1, format: Self.percent)
+            Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
+                ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
+            }
+        }
+        // Roughness and bowing mean nothing to a clean drawing, so they only show while it is sketchy.
+        if style.isSketchy {
+            Section("Sketchiness") {
+                ValueSlider(title: "Roughness", value: style.binding(\.roughness, "Change Roughness"), range: 0.2...3, format: Self.decimal)
+                ValueSlider(title: "Bowing", value: style.binding(\.bowing, "Change Bowing"), range: 0...3, format: Self.decimal)
+            }
+        }
+        if tool == .note || (!selected.isEmpty && selected.allSatisfy { $0.kind == .note }) {
+            Section("Note") { NoteSwatches(fill: style.binding(\.fill, "Change Note Color")) }
+        }
+        if tool == .connector || !style.selectedConnectors.isEmpty {
+            Section("Connector") {
+                Picker("Routing", selection: style.routing) {
+                    ForEach(StyleChoices.routings, id: \.0) { Text($0.1).tag($0.0) }
+                }
+                .pickerStyle(.segmented)
+                Picker("Start", selection: style.head(\.startHead, "Change Start Arrowhead")) {
+                    ForEach(StyleChoices.heads, id: \.0) { Text($0.1).tag($0.0) }
+                }
+                Picker("End", selection: style.head(\.endHead, "Change End Arrowhead")) {
+                    ForEach(StyleChoices.heads, id: \.0) { Text($0.1).tag($0.0) }
+                }
+            }
+        }
+    }
+
+    static func points(_ v: Double) -> String { decimal(v) + " pt" }
+    static func percent(_ v: Double) -> String { "\(Int((v * 100).rounded()))%" }
+    static func decimal(_ v: Double) -> String {
+        let r = (v * 10).rounded() / 10
+        return r == r.rounded() ? String(Int(r)) : String(format: "%.1f", r)
+    }
+
+    // MARK: Behavior
+
+    @ViewBuilder private var behaviorTab: some View {
+        if selected.isEmpty {
+            Section {
+                Text("Select something to link it to another shape, choose what clicking it does on the web, or, for a symbol's copy, how it plays.")
+                    .foregroundStyle(.secondary)
+            }
+        } else {
+            if selected.count == 1, let e = selected.first, e.kind == .symbol {
+                SymbolSection(document: document, instance: e, undoManager: undoManager, onBreakApart: onSelect)
+            }
+            Section("Link") {
+                let targets = linkTargets   // every titled shape in the file: worked out once per update
+                Picker("Jumps to", selection: linkBinding) {
+                    Text("None").tag(UUID?.none)
+                    if let id = selectedLink, !targets.contains(where: { $0.id == id }) {
+                        Text(linkTitle(id) ?? "Missing element").tag(UUID?.some(id))
+                    }
+                    ForEach(targets) { t in Text(t.title).tag(UUID?.some(t.id)) }
+                }
+                .help("Click the badge beside the shape, or ⌘-click the shape, to go there")
+                if let id = selectedLink {
+                    Button("Go") { onJump(id) }
+                }
+                if selected.count == 1, let e = selected.first {
+                    AnchorField(element: e) { anchor in
+                        var next = document.model
+                        guard let i = next.elements.firstIndex(where: { $0.id == e.id }) else { return }
+                        next.elements[i].anchor = anchor.isEmpty ? nil : anchor
+                        document.commit(next, actionName: "Set Anchor", undoManager: undoManager)
+                    }
+                }
+            }
+            // Shapes inside a symbol can't be clicked on the web: give the click to its copy instead.
+            if document.editingSymbol == nil {
+                ClickSection(document: document, selection: selection, undoManager: undoManager)
+            }
+        }
+    }
+
+    // MARK: Page
+
+    @ViewBuilder private var pageTab: some View {
+        Section("Page") {
+            Picker("Theme", selection: themeBinding) {
+                Text("Automatic").tag("")
+                ForEach(Theme.all) { t in Text(t.name).tag(t.id) }
+            }
+            Toggle("Rulers and guides", isOn: $showRulers)
+            if showRulers { GuidesEditor(document: document, undoManager: undoManager) }
+        }
+    }
 
     private var themeBinding: Binding<String> {
         Binding(get: { document.model.theme ?? "" },
@@ -202,142 +366,6 @@ struct Inspector: View {
                     document.commit(next, actionName: "Change Theme", undoManager: undoManager)
                 })
     }
-
-    /// The posed frame, kept between renders: every control's binding reads it, so resolving it each time
-    /// would cost a full resolve per control.
-    @State private var frameCache = FrameCache()
-
-    /// The page as the canvas shows it: the posed frame while posing, else the page itself.
-    private var shown: DottieDocument {
-        guard let t = pose else { return document.model }
-        return frameCache.frame(of: document.model, at: t)
-    }
-    private var selected: [Element] { shown.elements.filter { selection.contains($0.id) } }
-
-    /// Edits the shown page as one undo step; while posing, animatable changes become keys (see `applyingPose`).
-    private func edit(_ name: String, _ change: (inout DottieDocument) -> Void) {
-        var next = shown
-        change(&next)
-        let page = pose.map { document.model.applyingPose(next, at: $0) } ?? next
-        document.commit(page, actionName: name, undoManager: undoManager)
-    }
-
-    /// Edits the selection when there is one, otherwise the style used for new shapes.
-    private func binding<T>(_ kp: WritableKeyPath<Style, T>, _ name: String) -> Binding<T> {
-        Binding(
-            get: { selected.first?.style[keyPath: kp] ?? newStyle[keyPath: kp] },
-            set: { value in
-                newStyle[keyPath: kp] = value
-                guard !selection.isEmpty else { return }
-                edit(name) { next in
-                    for i in next.elements.indices where selection.contains(next.elements[i].id) {
-                        next.elements[i].style[keyPath: kp] = value
-                    }
-                }
-            })
-    }
-
-    var body: some View {
-        Form {
-            LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager,
-                          onSelect: onSelect)
-            Section("Canvas") {
-                Picker("Theme", selection: themeBinding) {
-                    Text("Automatic").tag("")
-                    ForEach(Theme.all) { t in Text(t.name).tag(t.id) }
-                }
-                Toggle("Rulers and guides", isOn: $showRulers)
-                if showRulers { GuidesEditor(document: document, undoManager: undoManager) }
-            }
-            Section("Style") {
-                Picker("Look", selection: lookBinding) {
-                    Text("Sketchy").tag(true)
-                    Text("Clean").tag(false)
-                }
-                .pickerStyle(.segmented)
-                Slider(value: binding(\.roughness, "Change Roughness"), in: 0...3) { Text("Roughness") }
-                    .disabled(binding(\.roughness, "").wrappedValue == 0)
-                Slider(value: binding(\.strokeWidth, "Change Stroke Width"), in: 1...12) { Text("Width") }
-                Slider(value: binding(\.opacityLevel, "Change Opacity"), in: 0...1) { Text("Opacity") }
-                ColorPicker("Stroke", selection: colorBinding(\.stroke, "Change Stroke Color"))
-                if selected.isEmpty || !selected.allSatisfy({ $0.kind == .image }) { // a picture has no fill
-                    ColorPicker("Fill", selection: colorBinding(\.fill, "Change Fill Color"), supportsOpacity: true)
-                    Picker("Fill pattern", selection: binding(\.fillStyle, "Change Fill Pattern")) {
-                        Text("Solid").tag(FillStyle.solid)
-                        Text("Hachure").tag(FillStyle.hachure)
-                        Text("Cross").tag(FillStyle.crossHatch)
-                        Text("Grid").tag(FillStyle.grid)
-                    }
-                    .pickerStyle(.segmented)
-                    if binding(\.fillStyle, "").wrappedValue == .grid {
-                        let cell = binding(\.cellSize, "Change Grid Size")
-                        Stepper(value: cell, in: 10...200, step: 5) {
-                            LabeledContent("Grid cell", value: "\(Int(cell.wrappedValue)) pt")
-                        }
-                    }
-                }
-                Picker("Line", selection: binding(\.dash, "Change Line Style")) {
-                    Text("Solid").tag(DashStyle.solid)
-                    Text("Dashed").tag(DashStyle.dashed)
-                    Text("Dotted").tag(DashStyle.dotted)
-                }
-                .pickerStyle(.segmented)
-                Slider(value: binding(\.bowing, "Change Bowing"), in: 0...3) { Text("Bowing") }
-                    .disabled(binding(\.roughness, "").wrappedValue == 0)
-            }
-            if tool == .note || (!selected.isEmpty && selected.allSatisfy { $0.kind == .note }) {
-                Section("Note") { NoteSwatches(fill: binding(\.fill, "Change Note Color")) }
-            }
-            if selected.count == 1, let e = selected.first {
-                Section("Element") {
-                    AnchorField(element: e) { anchor in
-                        var next = document.model
-                        guard let i = next.elements.firstIndex(where: { $0.id == e.id }) else { return }
-                        next.elements[i].anchor = anchor.isEmpty ? nil : anchor
-                        document.commit(next, actionName: "Set Anchor", undoManager: undoManager)
-                    }
-                }
-            }
-            if !selected.isEmpty {
-                Section("Link") {
-                    let targets = linkTargets   // every titled shape in the file: worked out once per update
-                    Picker("Jumps to", selection: linkBinding) {
-                        Text("None").tag(UUID?.none)
-                        if let id = selectedLink, !targets.contains(where: { $0.id == id }) {
-                            Text(linkTitle(id) ?? "Missing element").tag(UUID?.some(id))
-                        }
-                        ForEach(targets) { t in Text(t.title).tag(UUID?.some(t.id)) }
-                    }
-                    .help("Click the badge beside the shape, or ⌘-click the shape, to go there")
-                    if let id = selectedLink {
-                        Button("Go") { onJump(id) }
-                    }
-                }
-            }
-            if selected.count == 1, let e = selected.first, e.kind == .symbol {
-                SymbolSection(document: document, instance: e, undoManager: undoManager, onBreakApart: onSelect)
-            }
-            // Shapes inside a symbol can't be clicked on the web: give the click to its copy instead.
-            if !selected.isEmpty, document.editingSymbol == nil {
-                ClickSection(document: document, selection: selection, undoManager: undoManager)
-            }
-            if tool == .connector || !selectedConnectors.isEmpty {
-                Section("Connector") {
-                    Picker("Routing", selection: routingBinding) {
-                        Text("Straight").tag(Routing.straight)
-                        Text("Curved").tag(Routing.curved)
-                        Text("Elbow").tag(Routing.elbow)
-                    }
-                    .pickerStyle(.segmented)
-                    Picker("Start", selection: headBinding(\.startHead, "Change Start Arrowhead")) { headItems }
-                    Picker("End", selection: headBinding(\.endHead, "Change End Arrowhead")) { headItems }
-                }
-            }
-        }
-        .formStyle(.grouped)
-    }
-
-    private var selectedConnectors: [Element] { selected.filter { $0.kind == .connector } }
 
     private static let linkTargetLimit = 200
 
@@ -382,51 +410,6 @@ struct Inspector: View {
                     guard (try? next.setLink(selection, to: target, otherPages: document.file.pages)) != nil else { return }
                     document.commit(next, actionName: target == nil ? "Remove Link" : "Link", undoManager: undoManager)
                 })
-    }
-
-    private func editConnectors(_ name: String, _ change: (inout ConnectorData) -> Void) {
-        edit(name) { next in
-            for i in next.elements.indices where selection.contains(next.elements[i].id) {
-                if var c = next.elements[i].connector { change(&c); next.elements[i].connector = c }
-            }
-        }
-    }
-
-    private var routingBinding: Binding<Routing> {
-        Binding(get: { selectedConnectors.first?.connector?.routing ?? newRouting },
-                set: { r in newRouting = r; if !selectedConnectors.isEmpty { editConnectors("Change Routing") { $0.routing = r } } })
-    }
-
-    @ViewBuilder private var headItems: some View {
-        Text("None").tag(Arrowhead.none)
-        Text("Arrow").tag(Arrowhead.arrow)
-        Text("Triangle").tag(Arrowhead.triangle)
-        Text("Dot").tag(Arrowhead.dot)
-        Text("Bar").tag(Arrowhead.bar)
-    }
-
-    private func headBinding(_ kp: WritableKeyPath<ConnectorData, Arrowhead>, _ name: String) -> Binding<Arrowhead> {
-        let fallback: Arrowhead = kp == \ConnectorData.endHead ? .arrow : .none
-        return Binding(get: { selectedConnectors.first?.connector?[keyPath: kp] ?? fallback },
-                       set: { v in editConnectors(name) { $0[keyPath: kp] = v } })
-    }
-
-    /// Sketchy (roughness 1) vs clean (0); the slider fine-tunes sketchy.
-    private var lookBinding: Binding<Bool> {
-        let r = binding(\.roughness, "Change Look")
-        return Binding(get: { r.wrappedValue > 0 }, set: { r.wrappedValue = $0 ? 1 : 0 })
-    }
-
-    private func colorBinding(_ kp: WritableKeyPath<Style, RGBA>, _ name: String) -> Binding<Color> {
-        let raw = binding(kp, name)
-        return Binding(
-            get: { var c = raw.wrappedValue
-                if c.isAutomaticInk { c = colorScheme == .dark ? .inkOnDark : .black }
-                return Color(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: c.a) },
-            set: { color in
-                let ns = NSColor(color).usingColorSpace(.sRGB) ?? .black
-                raw.wrappedValue = RGBA(r: ns.redComponent, g: ns.greenComponent, b: ns.blueComponent, a: ns.alphaComponent)
-            })
     }
 }
 
