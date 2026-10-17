@@ -72,8 +72,9 @@ extension Exporter {
             return svgParts(frame, background: nil, bounds: plan.rects[i])
         }
         let labels = Dictionary(doc.elements.map { ($0.id.uuidString, $0.buttonLabel.attributeEscaped) }, uniquingKeysWith: { a, _ in a })
-        // Back to front: the order every frame draws in (a frame only ever leaves things out).
-        let order = ["rock"] + doc.orderedElements.map(\.id.uuidString)
+        // Back to front: the order every frame draws in (a frame only ever leaves things out). Symbols' elements are
+        // in it, even ones hidden at first.
+        let order = ["rock"] + doc.expandingSymbols(at: 0, posing: false).orderedElements.map(\.id.uuidString)
         let byKey = drawn.map { Dictionary($0.1.map { ($0.key, $0.markup) }, uniquingKeysWith: { a, _ in a }) }
         let unchanging = Set(order.filter { key in
             guard clickable[key] == nil, let first = byKey.first?[key] else { return false }

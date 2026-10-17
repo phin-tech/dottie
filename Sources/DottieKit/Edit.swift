@@ -21,7 +21,22 @@ extension DottieDocument {
             if let id = c.end.elementID, !ids.contains(id) { c.end = .free(e) }
             picked[i].connector = c
         }
-        return try? JSONEncoder().encode(picked)
+        // Instances bring the symbols they show; plain shapes stay a bare list, as older copies were.
+        let needed = symbolsUsed(by: picked)
+        if needed.isEmpty { return try? JSONEncoder().encode(picked) }
+        return try? JSONEncoder().encode(Clip(elements: picked, symbols: needed))
+    }
+
+    /// Copied elements with the symbols their instances show.
+    struct Clip: Codable {
+        var elements: [Element]
+        var symbols: [Symbol]
+    }
+
+    /// What `clipboardData` wrote: a bare list of elements, or elements with symbols.
+    static func clip(_ data: Data) -> Clip? {
+        if let items = try? JSONDecoder().decode([Element].self, from: data) { return Clip(elements: items, symbols: []) }
+        return try? JSONDecoder().decode(Clip.self, from: data)
     }
 
     /// Adds clipboard contents with fresh ids, offset by `offset`. Returns the new element ids.
@@ -30,7 +45,8 @@ extension DottieDocument {
     @discardableResult
     public mutating func paste(_ data: Data, offset: CGPoint = CGPoint(x: 16, y: 16),
                                keepsLink: (UUID) -> Bool = { _ in false }) -> Set<UUID> {
-        guard let items = try? JSONDecoder().decode([Element].self, from: data), !items.isEmpty else { return [] }
+        guard let clip = Self.clip(data), !clip.elements.isEmpty else { return [] }
+        let items = clip.elements
         var idMap: [UUID: UUID] = [:]
         var groupMap: [UUID: UUID] = [:]
         for e in items { idMap[e.id] = UUID() }
@@ -58,16 +74,18 @@ extension DottieDocument {
             added.append(e)
         }
         elements.append(contentsOf: added)
+        adoptSymbols(clip.symbols)
         return Set(added.map(\.id))
     }
 
     /// Adds artwork positioned with its top-left at the origin (an import, a stencil), centered on
     /// `center`, on `layerID`, with fresh ids and group ids. Returns the new element ids.
     @discardableResult
-    public mutating func insert(_ art: [Element], size: CGSize, center: CGPoint, layerID: UUID) -> Set<UUID> {
+    public mutating func insert(_ art: [Element], size: CGSize, center: CGPoint, layerID: UUID, symbols: [Symbol] = []) -> Set<UUID> {
         var items = art
         for i in items.indices { items[i].layerID = layerID }
         guard let data = try? JSONEncoder().encode(items) else { return [] }
+        defer { adoptSymbols(symbols) }
         return paste(data, offset: CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2))
     }
 

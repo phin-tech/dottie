@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import DottieKit
 
 private struct ToolKey: FocusedValueKey { typealias Value = Binding<Tool> }
@@ -101,6 +102,18 @@ struct DottieCommands: Commands {
             Button("Ungroup") { editor?.ungroup() }
                 .keyboardShortcut("g", modifiers: [.command, .option, .shift])
                 .disabled(n < 1)
+            Divider()
+            Button("Convert to Symbol") { editor?.makeSymbol() }
+                .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF8FunctionKey)!)), modifiers: [])
+                .disabled(n < 1)
+            Button("Edit Symbol") { editor?.editSymbol() }
+                .keyboardShortcut("e", modifiers: [.command, .option])
+                .disabled(editor?.instanceSelected != true)
+            Button("Break Apart") { editor?.breakApart() }
+                .keyboardShortcut("b", modifiers: [.command])
+                .disabled(editor?.instanceSelected != true)
+            Button("Done Editing Symbol") { editor?.doneEditingSymbol() }
+                .disabled(editor?.editingSymbol != true)
             Divider()
             Button("Bring to Front") { editor?.reorder(.toFront) }
                 .keyboardShortcut("f", modifiers: [.command, .option])

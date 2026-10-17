@@ -310,3 +310,33 @@ test("the HTML export with reduced motion jumps straight to the stop", async () 
   assert.equal(await frame(), 20);
   await close();
 });
+
+test("symbols play, and a hostile nest of them doesn't hang the player", async () => {
+  const { page, errors, close } = await open(`<dottie-player id="a" src="/fixtures/edge/symbols.dottie"></dottie-player>
+    <dottie-player id="b" src="/fixtures/js-only/hostile-symbols.dottie"></dottie-player>`);
+  await ready(page, "#a");
+  await ready(page, "#b");
+  await page.waitForFunction(() => document.querySelector("#a").playback.frame > 3);
+  assert.ok((await state(page, "#a")).paths > 10);
+  assert.deepEqual(errors, []);
+  await close();
+});
+
+test("the HTML export draws symbols", async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await serve(page);
+  await page.goto("http://dottie.test/fixtures/goldens/html/symbols.html");
+  // Frame 15 (1.5 s): every placed copy of Gear shows its labelled box.
+  const labels = await page.evaluate(() => {
+    const f = document.querySelectorAll(".f")[15];
+    const own = [...f.querySelectorAll("tspan")].map((t) => t.textContent);
+    const shared = [...f.querySelectorAll("use")].flatMap((u) => [...document.querySelectorAll(u.getAttribute("href") + " tspan")].map((t) => t.textContent));
+    return [...own, ...shared].filter((t) => t === "g").length;
+  });
+  assert.ok(labels >= 4, `${labels} copies of the symbol's label`);
+  assert.deepEqual(errors, []);
+  await context.close();
+});

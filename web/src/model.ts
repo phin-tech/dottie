@@ -5,7 +5,8 @@
 export interface RGBA { r: number; g: number; b: number; a: number }
 export type FillStyle = "solid" | "hachure" | "crossHatch" | "grid";
 export type DashStyle = "solid" | "dashed" | "dotted";
-export type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connector" | "freehand" | "path" | "note" | "image";
+export type ElementKind = "rectangle" | "ellipse" | "diamond" | "text" | "connector" | "freehand" | "path" | "note" | "image" | "symbol";
+export type SymbolPlayback = "loop" | "once" | "still";
 export type Port = "top" | "right" | "bottom" | "left";
 export type Routing = "straight" | "curved" | "elbow";
 export type Arrowhead = "none" | "arrow" | "triangle" | "dot" | "bar";
@@ -64,6 +65,10 @@ export interface Element {
   anchor: string | null;
   click: ClickAction | null;
   hover: HoverLook | null;
+  /** For a `symbol` element: the page's symbol it shows, how it plays it, and from how far in. */
+  symbol: string | null;
+  playback: SymbolPlayback | null;
+  offset: number | null;
   /** Base64 bytes; an empty `data` is a picture that couldn't be found (drawn crossed out). */
   image: EmbeddedImage | null;
   reveal: number | null;
@@ -125,6 +130,18 @@ export interface Page {
   elements: Element[];
   theme: string | null;
   timeline: Timeline | null;
+  symbols: Symbol[] | null;
+}
+
+/** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
+export interface Symbol {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  layers: Layer[];
+  elements: Element[];
+  timeline: Timeline | null;
 }
 
 export interface DottieFile {
@@ -136,19 +153,20 @@ export interface DottieFile {
 
 /** The newest file version this library was written for. Newer files still load, with a warning. */
 export const SUPPORTED_VERSION = 2;
-export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image"];
+export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image", "symbol"];
 const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"];
 
 /** The fields dottie.js reads, per object; the schema test checks they're exactly the schema's. Anything else
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline"],
+  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols"],
+  symbol: ["id", "name", "width", "height", "layers", "elements", "timeline"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "image", "reveal"],
+    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "symbol", "playback", "offset", "image", "reveal"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
   inlineImage: ["data", "format"],
@@ -317,6 +335,9 @@ class Reader {
       anchor: str(v.anchor) ?? null,
       click: this.click(v.click),
       hover: this.hover(v.hover),
+      symbol: uuid(v.symbol) ?? null,
+      playback: this.playback(v.playback),
+      offset: num(v.offset) ?? null,
       image: this.image(v.image, images),
       reveal: num(v.reveal) ?? null,
     };
@@ -329,6 +350,30 @@ class Reader {
     const safe = url === undefined ? null : allowedURL(url);
     if (url !== undefined && safe === null) this.warn("Skipped a click link that isn't http, https or mailto");
     return { scene: str(v.scene) ?? null, url: safe };
+  }
+
+  playback(v: unknown): SymbolPlayback | null {
+    const s = str(v);
+    if (s === undefined) return null;
+    return (["loop", "once", "still"].includes(s) ? s : "loop") as SymbolPlayback;
+  }
+
+  symbol(v: unknown, images: Record<string, EmbeddedImage>): Symbol | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "symbol");
+    const id = uuid(v.id);
+    if (!id) { this.warn("Skipped a symbol without an id"); return null; }
+    const size = (x: unknown): number => { const n = num(x); return Math.max(1, n ?? 100); };
+    const layers = (Array.isArray(v.layers) ? v.layers : []).filter(isObj).flatMap((l): Layer[] => {
+      const lid = uuid(l.id);
+      return lid ? [{ id: lid, name: str(l.name) ?? "", visible: bool(l.visible) ?? true, locked: bool(l.locked) ?? false }] : [];
+    });
+    if (layers.length === 0) layers.push({ id: `${id}-LAYER`, name: "Layer 1", visible: true, locked: false });
+    return {
+      id, name: str(v.name) ?? "Symbol", width: size(v.width), height: size(v.height), layers,
+      elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
+      timeline: this.timeline(v.timeline),
+    };
   }
 
   hover(v: unknown): HoverLook | null {
@@ -437,6 +482,7 @@ class Reader {
       elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
       theme: str(v.theme) ?? null,
       timeline: this.timeline(v.timeline),
+      symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
     };
   }
 }

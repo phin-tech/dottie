@@ -102,7 +102,7 @@ public enum Renderer {
         case .ellipse:
             if rough <= 0 { return CGPath(ellipseIn: r, transform: nil) }
             return Rough.ellipse(in: r, rng: &rng, roughness: rough)
-        case .text, .connector:
+        case .text, .connector, .symbol:
             return CGPath(rect: r, transform: nil)
         case .freehand:
             return freehandPath(for: e)
@@ -387,9 +387,18 @@ public enum Renderer {
     /// `clip` (model units) skips elements entirely outside it, so a zoomed-in view of a big drawing
     /// only pays for what is on screen. Pass a `spatial` index built from `doc` to find those elements
     /// without visiting the rest. `zoom` enables level of detail; `ink` resolves automatic ink per drawn
-    /// element instead of copying the whole document.
+    /// element instead of copying the whole document. Symbol instances still in `doc` (the editor draws the page
+    /// itself) are expanded as they are at `symbolTime`; those in `skipping` draw nothing.
     public static func draw(_ doc: DottieDocument, in ctx: CGContext, background: CGColor? = nil, clip: CGRect? = nil,
-                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil, skipping: Set<UUID> = []) {
+                            zoom: Double? = nil, ink: RGBA? = nil, spatial: SpatialIndex? = nil, skipping: Set<UUID> = [],
+                            symbolTime: Double = 0) {
+        if doc.hasInstances {
+            var shown = doc
+            shown.elements.removeAll { $0.kind == .symbol && skipping.contains($0.id) }
+            draw(shown.expandingSymbols(at: symbolTime), in: ctx, background: background, clip: clip, zoom: zoom, ink: ink,
+                 skipping: skipping)
+            return
+        }
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         let lod = zoom.map(DetailLevel.init)
         let index = spatial?.byID ?? doc.elementIndex
@@ -433,6 +442,15 @@ public enum Renderer {
 
     public static func draw(_ e: Element, in ctx: CGContext, document: DottieDocument? = nil, background: CGColor? = nil,
                             index: [UUID: Element]? = nil, lod: DetailLevel? = nil) {
+        if e.kind == .symbol {   // drawn alone (being dragged, say): what it shows, if its page is known
+            guard let document else { return }
+            var alone = DottieDocument(id: document.id, layers: [Layer(id: e.layerID, name: "")], elements: [e])
+            alone.symbols = document.symbols
+            for part in alone.expandingSymbols(at: 0).orderedElements {
+                draw(part, in: ctx, document: alone, background: background, lod: lod)
+            }
+            return
+        }
         var e = e
         if let lod, !lod.sketchy, e.style.roughness > 0 { e.style.roughness = 0 } // clean geometry is cheaper and unseen far out
         let alpha = min(max(e.style.opacity ?? 1, 0), 1)

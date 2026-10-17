@@ -96,6 +96,7 @@ class Page:
 
     def json(self):
         d = {"id": self.id, "name": self.name, "layers": self.layers, "elements": self.elements}
+        d.update(getattr(self, "extra", {}))
         if self.theme:
             d["theme"] = self.theme
         if self.timeline is not None:
@@ -541,6 +542,75 @@ def clicks():
     write(JS_ONLY / "hostile-clicks.dottie", [h])
 
 
+def symbols():
+    """Symbols: instances scaled, turned unevenly, offset, played once or held still, nested, faded, keyed on the
+    page, boiled with it, and one naming a symbol that isn't there (it draws nothing); connectors inside a symbol
+    and from the page to an instance."""
+    p = Page()
+    p.animate(3, fps=10, boil=2)
+
+    def symbol(name, w, h, build, duration=None, **tl):
+        sp = Page(name)
+        build(sp)
+        d = {"id": sp.id, "name": name, "width": w, "height": h, "layers": sp.layers, "elements": sp.elements}
+        if sp.timeline is not None:
+            d["timeline"] = sp.timeline
+        return d
+
+    def gear(sp):
+        sp.animate(1.2, fps=10)
+        a = sp.add("rectangle", 10, 10, 30, 20, style=style(fill=rgba(0.55, 0.75, 1)), text="g")
+        b = sp.add("ellipse", 70, 30, 20, 20, style=style(roughness=0))
+        sp.connect(a, b, routing="elbow", start_port="right", end_port="left")
+        sp.track(a, [{"t": 0, "x": 10, "rotation": 0}, {"t": 1.2, "x": 50, "rotation": 1.5, "ease": "easeInOut"}])
+        sp.track(b, [{"t": 0, "visible": False}, {"t": 0.6, "visible": True}])
+    g = symbol("Gear", 100, 60, gear)
+
+    def light(sp):
+        sp.animate(0.8, fps=10)
+        bulb = sp.add("ellipse", 0, 0, 40, 40, style=style(fill=rgba(1, 0.85, 0.2)))
+        sp.track(bulb, [{"t": 0, "opacity": 1}, {"t": 0.4, "opacity": 0.2}, {"t": 0.8, "opacity": 1}])
+        sp.add("symbol", 50, 0, 50, 30, symbol=g["id"], offset=0.3, style=style(roughness=0))
+    l = symbol("Light", 100, 40, light)
+    p.extra = {"symbols": [g, l]}
+
+    base = p.add("rectangle", 20, 200, 80, 50, text="src")
+    a = p.add("symbol", 40, 40, 100, 60, symbol=g["id"], style=style(roughness=0))
+    p.add("symbol", 200, 40, 160, 40, symbol=g["id"], rotation=0.5, offset=0.5, style=style(roughness=0, opacity=0.6))
+    p.add("symbol", 400, 40, 50, 30, symbol=g["id"], playback="once", style=style(roughness=0))
+    p.add("symbol", 500, 40, 100, 60, symbol=g["id"], playback="still", style=style(roughness=0))
+    moving = p.add("symbol", 40, 300, 200, 80, symbol=l["id"], style=style(roughness=0))
+    p.add("symbol", 300, 300, 50, 50, symbol=uid(), style=style(roughness=0))
+    p.connect(base, a)
+    p.track(moving, [{"t": 0, "x": 40}, {"t": 3, "x": 300}])
+    write(EDGE / "symbols.dottie", [p])
+
+    # A symbol that contains itself, and ten levels of ten instances each: readers cut both short.
+    h = Page()
+    me = uid()
+    loop = {"id": me, "name": "Loop", "width": 10, "height": 10, "layers": h.layers,
+            "elements": [{"id": uid(), "kind": "rectangle", "x": 0, "y": 0, "width": 10, "height": 10, "style": style(),
+                          "seed": 1, "layerID": h.layer},
+                         {"id": uid(), "kind": "symbol", "symbol": me, "x": 0, "y": 0, "width": 10, "height": 10,
+                          "style": style(), "seed": 2, "layerID": h.layer}]}
+    chain, nxt = [], None
+    for i in range(10):
+        els = []
+        for k in range(10):
+            e = {"id": uid(), "kind": "symbol" if nxt else "rectangle", "x": k, "y": 0, "width": 1, "height": 1,
+                 "style": style(), "seed": k + 1, "layerID": h.layer}
+            if nxt:
+                e["symbol"] = nxt
+            els.append(e)
+        s = {"id": uid(), "name": f"S{i}", "width": 10, "height": 10, "layers": h.layers, "elements": els}
+        chain.append(s)
+        nxt = s["id"]
+    h.add("symbol", 0, 0, 10, 10, symbol=me)
+    h.add("symbol", 50, 0, 100, 100, symbol=nxt)
+    h.extra = {"symbols": [loop] + chain}
+    write(JS_ONLY / "hostile-symbols.dottie", [h])
+
+
 def js_only():
     p = Page()
     p.add("rectangle", 40, 40, 120, 60, text="known")
@@ -574,6 +644,7 @@ def main():
     eases()
     march()
     clicks()
+    symbols()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

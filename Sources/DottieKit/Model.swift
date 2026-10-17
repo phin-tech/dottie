@@ -76,6 +76,23 @@ public enum ElementKind: String, Codable, Sendable {
     case note
     /// A picture (`image`), drawn in its frame; outlined only when it has a visible stroke.
     case image
+    /// An instance of one of the page's symbols (`symbol`), its box scaled into the frame and played on its own
+    /// clock (see `Symbol`).
+    case symbol
+}
+
+/// How an instance plays its symbol's timeline.
+public enum SymbolPlayback: String, Codable, Sendable, CaseIterable {
+    /// Over and over, from the start of the page's animation. The default.
+    case loop
+    /// Once, then holds the end.
+    case once
+    /// Stands still on the symbol's poster frame.
+    case still
+
+    public init(from decoder: Decoder) throws {
+        self = SymbolPlayback(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .loop
+    }
 }
 
 /// One contour of a `.path` element: cubic Béziers as flat `x, y` pairs normalized to the element's
@@ -139,6 +156,13 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var click: ClickAction?
     /// How the element looks under the pointer, or with keyboard focus, when it is clickable on the web.
     public var hover: HoverLook?
+    /// Only set for `.symbol`: the id of the page's symbol it shows.
+    public var symbol: UUID?
+    /// Only for `.symbol`: how it plays the symbol's timeline; nil loops.
+    public var playback: SymbolPlayback?
+    /// Only for `.symbol`: seconds into the symbol's timeline it is at when the page's starts, so copies needn't
+    /// move in step. nil is 0.
+    public var offset: Double?
     /// Only set for `.image`: the picture's bytes.
     public var image: EmbeddedImage?
     /// How much of the stroke is drawn, 0...1, in an animation frame (see `Keyframe.reveal`). Fill and label
@@ -281,6 +305,8 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var guidesLocked: Bool?
     /// Keyframe animation over this page's elements (see `resolved(at:)`); nil is a still page.
     public var timeline: Timeline?
+    /// Drawings defined once and placed by `.symbol` elements, each with its own animation (see `Symbol`).
+    public var symbols: [Symbol]?
 
     public init(id: UUID = UUID(), name: String = "Page 1", layers: [Layer]? = nil, elements: [Element] = []) {
         self.id = id

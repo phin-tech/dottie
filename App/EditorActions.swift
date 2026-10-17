@@ -79,6 +79,13 @@ struct EditorActions {
     var selectionCount: Int
     var group: () -> Void
     var ungroup: () -> Void
+    // Symbols
+    var instanceSelected: Bool
+    var editingSymbol: Bool
+    var makeSymbol: () -> Void
+    var breakApart: () -> Void
+    var editSymbol: () -> Void
+    var doneEditingSymbol: () -> Void
     var align: (AlignEdge) -> Void
     var distribute: (DistributeAxis) -> Void
     var reorder: (DottieDocument.ZMove) -> Void
@@ -164,6 +171,25 @@ extension ContentView {
             selectionCount: ids.count,
             group: { edit("Group") { $0.group(ids) } },
             ungroup: { edit("Ungroup") { $0.ungroup(ids) } },
+            instanceSelected: ids.count == 1 && document.model.elements.contains { ids.contains($0.id) && $0.kind == .symbol },
+            editingSymbol: document.editingSymbol != nil,
+            makeSymbol: {
+                var next = document.model
+                let n = (next.symbols?.count ?? 0) + 1
+                guard let made = next.makeSymbol(of: ids, name: "Symbol \(n)") else { NSSound.beep(); return }
+                document.commit(next, actionName: "Convert to Symbol", undoManager: undoManager)
+                selection = [made.instance.id]
+            },
+            breakApart: {
+                var next = document.model
+                var parts = Set<UUID>()
+                for id in ids { parts.formUnion(next.breakApart(id)) }
+                guard !parts.isEmpty else { NSSound.beep(); return }
+                document.commit(next, actionName: "Break Apart", undoManager: undoManager)
+                selection = parts
+            },
+            editSymbol: { if let id = ids.first { document.editSymbol(of: id) } },
+            doneEditingSymbol: { document.editingSymbol = nil },
             align: { edge in edit("Align") { $0.align(ids, to: edge) } },
             distribute: { axis in edit("Distribute") { $0.distribute(ids, along: axis) } },
             reorder: { move in edit("Arrange") { $0.reorder(ids, move) } },
@@ -236,7 +262,7 @@ extension ContentView {
             } },
             frameCamera: { animate("Frame Camera") { doc in
                 let index = doc.elementIndex
-                let boxes = doc.resolved(at: playhead ?? 0).elements.filter { ids.contains($0.id) }
+                let boxes = doc.posed(at: playhead ?? 0).elements.filter { ids.contains($0.id) }
                     .map { $0.kind == .connector ? Connector.bounds(of: $0, in: doc, index: index) : $0.rotatedBounds }
                 guard !boxes.isEmpty else { return false }
                 doc.startAnimation()

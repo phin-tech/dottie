@@ -31,6 +31,13 @@ struct ContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let id = document.editingSymbol, let symbol = document.page.symbolIndex[id] {
+                SymbolBar(pageName: document.page.name, symbolName: symbol.name,
+                          instances: document.page.elements.filter { $0.symbol == id }.count) {
+                    document.editingSymbol = nil
+                }
+                Divider()
+            }
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
@@ -52,6 +59,14 @@ struct ContentView: View {
             .onChange(of: document.currentPageID) { _, _ in
                 // Keep only what is on the new page: a link picked on another page brings its sources back selected.
                 selection = selection.intersection(document.model.elements.map(\.id))
+                activeLayer = nil
+                playing = false
+                playhead = nil
+                selectedKey = nil
+            }
+            .onChange(of: document.editingSymbol) { old, _ in
+                // Into a symbol, or back out of one: nothing selected carries over, except the instance just left.
+                selection = old.map { s in Set(document.model.elements.filter { $0.symbol == s }.prefix(1).map(\.id)) } ?? []
                 activeLayer = nil
                 playing = false
                 playhead = nil
@@ -299,7 +314,11 @@ struct Inspector: View {
                     }
                 }
             }
-            if !selected.isEmpty {
+            if selected.count == 1, let e = selected.first, e.kind == .symbol {
+                SymbolSection(document: document, instance: e, undoManager: undoManager, onBreakApart: onSelect)
+            }
+            // Instances, and shapes inside a symbol, can't be clicked on the web yet.
+            if !selected.isEmpty, document.editingSymbol == nil, !selected.contains(where: { $0.kind == .symbol }) {
                 ClickSection(document: document, selection: selection, undoManager: undoManager)
             }
             if tool == .connector || !selectedConnectors.isEmpty {
@@ -605,6 +624,7 @@ private struct ElementRow: View {
         case .freehand: "scribble"
         case .path: "scribble.variable"
         case .image: "photo"
+        case .symbol: "square.on.square.dashed"
         }
     }
 
@@ -667,7 +687,7 @@ extension Style {
     }
 }
 
-/// The last resolved frame and what it was resolved from.
+/// The last posed frame and what it was posed from.
 final class FrameCache {
     private var page: DottieDocument?
     private var time = 0.0
@@ -675,7 +695,7 @@ final class FrameCache {
 
     func frame(of page: DottieDocument, at t: Double) -> DottieDocument {
         if let frame, t == time, page == self.page { return frame }
-        let f = page.resolved(at: t)
+        let f = page.posed(at: t)
         self.page = page; time = t; frame = f
         return f
     }

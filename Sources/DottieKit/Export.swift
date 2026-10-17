@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 
 public enum Exporter {
     public static func bounds(of doc: DottieDocument, padding: Double = 24) -> CGRect {
+        if doc.hasInstances { return bounds(of: doc.expandingSymbols(at: 0), padding: padding) }
         let index = doc.elementIndex
         func frame(_ e: Element) -> CGRect {
             if e.kind == .connector { return Connector.bounds(of: e, in: doc, index: index) }

@@ -505,9 +505,16 @@ extension Track {
 }
 
 extension DottieDocument {
-    /// The page as a still drawing at time `t` seconds. Every renderer and exporter draws the result
-    /// unchanged; a page without a timeline is returned as is.
+    /// The page as a still drawing at time `t` seconds, with every symbol instance expanded into what it shows
+    /// then (see `expandingSymbols(at:)`). Every renderer and exporter draws the result unchanged; a page with
+    /// no timeline and no instances is returned as is.
     public func resolved(at t: Double) -> DottieDocument {
+        posed(at: t).expandingSymbols(at: Timeline.clampTime(t))
+    }
+
+    /// The page posed at time `t` seconds: its keys applied, symbol instances kept as instances. What the editor
+    /// shows and edits while stopped on the timeline; a page without a timeline is returned as is.
+    public func posed(at t: Double) -> DottieDocument {
         guard let timeline else { return self }
         let t = Timeline.clampTime(t)
         var copy = self
@@ -571,7 +578,7 @@ extension DottieDocument {
     /// The page as a still picture: its poster frame when it is animated, the end unless set otherwise.
     /// The editor works on the page itself; exports, previews and thumbnails show this.
     public var still: DottieDocument {
-        guard let timeline else { return self }
+        guard let timeline else { return expandingSymbols(at: 0) }
         return resolved(at: timeline.poster ?? timeline.duration)
     }
 

@@ -901,3 +901,38 @@ final class PageUndoTests: XCTestCase {
     }
 
 }
+
+@MainActor
+final class SymbolEditingTests: XCTestCase {
+    func testEditingASymbolChangesItInPlaceAndUndoes() throws {
+        let doc = DrawingDocument()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        func step(_ action: () -> Void) { undo.beginUndoGrouping(); action(); undo.endUndoGrouping() }
+        var page = doc.model
+        let box = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 40, height: 20), layerID: page.layers[0].id)
+        page.elements = [box]
+        let made = try XCTUnwrap(page.makeSymbol(of: [box.id], name: "Box"))
+        step { doc.commit(page, actionName: "Convert to Symbol", undoManager: undo) }
+
+        doc.editSymbol(of: made.instance.id)
+        XCTAssertEqual(doc.editingSymbol, made.symbol.id)
+        XCTAssertEqual(doc.model.id, made.symbol.id, "the canvas edits the symbol as a page")
+        var edited = doc.model
+        edited.elements[0].width = 80
+        step { doc.commit(edited, actionName: "Resize", undoManager: undo) }
+        XCTAssertEqual(doc.page.symbols?.first?.elements.first?.width, 80, "stored back into the page's symbol")
+        XCTAssertEqual(doc.page.elements.count, 1, "the page itself is untouched")
+        undo.undo()
+        XCTAssertEqual(doc.model.elements.first?.width, 40)
+        XCTAssertEqual(doc.editingSymbol, made.symbol.id, "still editing it")
+        undo.undo()
+        XCTAssertNil(doc.page.symbols)
+        XCTAssertEqual(doc.model.id, doc.currentPageID, "with the symbol gone, the page shows")
+
+        doc.editingSymbol = made.symbol.id
+        doc.currentPageID = doc.file.pages[0].id
+        step { doc.addPage(undoManager: undo) }
+        XCTAssertNil(doc.editingSymbol, "changing pages leaves the symbol")
+    }
+}

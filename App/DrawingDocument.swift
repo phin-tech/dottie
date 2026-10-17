@@ -17,11 +17,22 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     /// Bumped on every change to `file`, so views can tell cheaply that something changed.
     private(set) var revision = 0
     private var targetPages: [UUID: UUID]?
-    /// The tab on screen. Window state, not saved.
-    @Published var currentPageID: UUID
+    /// The tab on screen. Window state, not saved. Changing it leaves a symbol being edited.
+    @Published var currentPageID: UUID {
+        didSet { if currentPageID != oldValue { editingSymbol = nil } }
+    }
+    /// The symbol of the page on screen being edited in its own right (Edit Symbol), if any. Window state.
+    @Published var editingSymbol: UUID?
 
-    /// The page on screen.
-    var model: DottieDocument { file.page(currentPageID) ?? file.pages[0] }
+    /// The page on screen, or the symbol being edited as a page of its own.
+    var model: DottieDocument {
+        let page = file.page(currentPageID) ?? file.pages[0]
+        guard let id = editingSymbol, let p = page.editingPage(of: id) else { return page }
+        return p
+    }
+
+    /// The page on screen, even while one of its symbols is being edited.
+    var page: DottieDocument { file.page(currentPageID) ?? file.pages[0] }
 
     /// The page holding each followable link target, across the file.
     var linkTargetPages: [UUID: UUID] {
@@ -54,7 +65,7 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     @MainActor
     func commit(_ page: DottieDocument, actionName: String, undoManager: UndoManager?) {
         var next = file
-        guard next.replace(page) else { return }
+        guard next.replacing(page, editing: editingSymbol, on: currentPageID) else { return }
         commitFile(next, actionName: actionName, undoManager: undoManager)
     }
 
@@ -89,7 +100,7 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     @MainActor
     func preview(_ page: DottieDocument) {
         var next = file
-        if next.replace(page) { file = next }
+        if next.replacing(page, editing: editingSymbol, on: currentPageID) { file = next }
     }
 }
 
@@ -137,5 +148,26 @@ extension DrawingDocument {
         guard let i = file.index(of: currentPageID) else { return }
         let n = file.pages.count
         currentPageID = file.pages[((i + offset) % n + n) % n].id
+    }
+}
+
+extension DottieFile {
+    /// Replaces the page `page` (matched by id), or, when it is symbol `symbol` being edited on page `host`, stores it
+    /// back into that symbol.
+    mutating func replacing(_ page: DottieDocument, editing symbol: UUID?, on host: UUID) -> Bool {
+        guard let symbol, page.id == symbol, var owner = self.page(host) else { return replace(page) }
+        owner.storeSymbol(page)
+        return replace(owner)
+    }
+}
+
+// MARK: Symbols
+
+extension DrawingDocument {
+    /// Edits the symbol instance `id` shows, in its own right.
+    @MainActor
+    func editSymbol(of id: UUID) {
+        guard let symbol = model.elements.first(where: { $0.id == id })?.symbol, page.symbolIndex[symbol] != nil else { return }
+        editingSymbol = symbol
     }
 }

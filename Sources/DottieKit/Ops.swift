@@ -164,7 +164,8 @@ public enum DiagramOps {
         let size = CGSize(width: item.width * k, height: item.height * k)
         let layer = doc.layers.first { !$0.locked && $0.visible }?.id ?? doc.layers[0].id
         let art = item.placed(keepOriginalColors: keepOriginalColors, roughness: roughness ?? Style().roughness, scale: k)
-        let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer)
+        let ids = doc.insert(art, size: size, center: CGPoint(x: x + size.width / 2, y: y + size.height / 2), layerID: layer,
+                             symbols: item.symbols ?? [])
         return (ids, size)
     }
 
@@ -175,6 +176,9 @@ public enum DiagramOps {
                               otherPages: [DottieDocument] = []) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
         if let anchor { doc.elements[i].anchor = anchor.flatMap { $0.isEmpty ? nil : $0 } }
+        if doc.elements[i].kind == .symbol, (click ?? nil) != nil || (hover ?? nil) != nil {
+            throw OpsError.invalid("A symbol instance can't be clicked on the web yet; give the click to a shape beside it")
+        }
         if let click { doc.elements[i].click = click.flatMap { $0.isEmpty ? nil : $0 } }
         if let hover { doc.elements[i].hover = hover.flatMap { $0.isEmpty ? nil : $0 } }
         if let link { try doc.setLink([id], to: link, otherPages: otherPages) }
@@ -303,6 +307,9 @@ public enum DiagramOps {
         /// The scene a click plays, or the link it opens, in the web players.
         public var clickScene: String?
         public var clickURL: String?
+        /// For a symbol instance: its symbol's name, and how it plays.
+        public var symbol: String?
+        public var playback: String?
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
@@ -319,7 +326,9 @@ public enum DiagramOps {
                                   fillStyle: e.style.fillStyle == .solid ? nil : e.style.fillStyle.rawValue,
                                   dash: e.style.dash == .solid ? nil : e.style.dash.rawValue,
                                   link: e.link?.uuidString, anchor: e.anchor,
-                                  clickScene: e.click?.scene, clickURL: e.click?.url)
+                                  clickScene: e.click?.scene, clickURL: e.click?.url,
+                                  symbol: e.symbol.map { id in doc.symbolIndex[id]?.name ?? id.uuidString },
+                                  playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil)
         }
     }
 }

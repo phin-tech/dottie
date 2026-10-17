@@ -300,6 +300,11 @@ public enum DottieScript {
                 if let u = c.url { o["url"] = u }
                 d["click"] = o
             }
+            if let id = e.symbol {
+                d["symbol"] = id.uuidString
+                if let p = e.playback { d["playback"] = p.rawValue }
+                if let o = e.offset { d["offset"] = o }
+            }
             if let h = e.hover {
                 var o: [String: Any] = [:]
                 if let c = h.stroke { o["stroke"] = hex(c) }
@@ -314,6 +319,14 @@ public enum DottieScript {
                 if let t = c.end.elementID { d["to"] = t.uuidString }
             }
             return d
+        }
+
+        /// A symbol on this page by id or name.
+        private func symbolID(_ spec: String?) throws -> UUID {
+            guard let spec, !spec.isEmpty else { throw OpsError.invalid("Missing required argument 'symbol'") }
+            if let id = UUID(uuidString: spec), doc.symbolIndex[id] != nil { return id }
+            if let s = doc.symbols?.first(where: { $0.name.caseInsensitiveCompare(spec) == .orderedSame }) { return s.id }
+            throw OpsError.invalid("No symbol '\(spec)' on this page (see dottie.symbols())")
         }
 
         /// The file's other pages, as they were when the script started.
@@ -375,6 +388,10 @@ public enum DottieScript {
                     } else {
                         hover = .some(nil)
                     }
+                }
+                if a.has("playback") || a.has("offset"), let i = doc.elements.firstIndex(where: { $0.id == id }), doc.elements[i].kind == .symbol {
+                    if a.has("playback") { let p = try a.enumValue("playback", as: SymbolPlayback.self); doc.elements[i].playback = p == .loop ? nil : p }
+                    if let o = a.double("offset") { doc.elements[i].offset = o == 0 || !o.isFinite ? nil : o }
                 }
                 try DiagramOps.update(&doc, id: id, text: text, x: a.double("x"), y: a.double("y"),
                                       width: a.double("width"), height: a.double("height"),
@@ -593,6 +610,39 @@ public enum DottieScript {
                 doc.timeline = tl
                 return nil
 
+            case "symbol":
+                var ids: [UUID] = []
+                for v in a.raw["ids"] as? [Any] ?? [] {
+                    guard let str = v as? String, let id = UUID(uuidString: str) else { throw OpsError.invalid("symbol: 'ids' must be element ids") }
+                    ids.append(id)
+                }
+                guard let made = doc.makeSymbol(of: Set(ids), name: a.string("name") ?? "Symbol \((doc.symbols?.count ?? 0) + 1)") else {
+                    throw OpsError.invalid("symbol: give the ids of shapes on this page")
+                }
+                return ["symbol": made.symbol.id.uuidString, "instance": describe(made.instance)]
+
+            case "place":
+                let id = try symbolID(a.string("symbol"))
+                let size: CGSize? = a.double("width").flatMap { w in a.double("height").map { CGSize(width: w, height: $0) } }
+                    ?? a.double("width").map { w in let s = doc.symbolIndex[id]!; return CGSize(width: w, height: w * s.height / s.width) }
+                    ?? a.double("height").map { h in let s = doc.symbolIndex[id]!; return CGSize(width: h * s.width / s.height, height: h) }
+                guard let e = doc.placeSymbol(id, at: CGPoint(x: a.double("x") ?? 0, y: a.double("y") ?? 0), size: size,
+                                              playback: try a.enumValue("playback", as: SymbolPlayback.self), offset: a.double("offset")) else {
+                    throw OpsError.invalid("place: no symbol \(id.uuidString)")
+                }
+                return describe(e)
+
+            case "symbols":
+                return (doc.symbols ?? []).map { s -> [String: Any] in
+                    ["id": s.id.uuidString, "name": s.name, "width": s.width, "height": s.height,
+                     "duration": s.timeline?.duration ?? 0, "instances": doc.elements.filter { $0.symbol == s.id }.count]
+                }
+
+            case "breakApart":
+                let id = try a.uuid("id")
+                guard try element(id).kind == .symbol else { throw OpsError.invalid("breakApart: \(id.uuidString) isn't a symbol") }
+                return doc.breakApart(id).map(\.uuidString).sorted()
+
             case "magicMove":
                 guard let file else { throw OpsError.invalid("magicMove needs the drawing's other pages") }
                 let spec = (a.raw["page"] as? NSNumber).map { String($0.intValue) } ?? (a.raw["page"] as? String) ?? ""
@@ -665,6 +715,15 @@ public enum DottieScript {
           call("transition", merge(o, { id: idOf(id), name: name, t: t }));
         },
         boil: function (id, on) { call("boil", { id: idOf(id), boil: on }); },
+        symbol: function (ids, o) {
+          return call("symbol", merge(o, { ids: (Array.isArray(ids) ? ids : [ids]).map(idOf) }));
+        },
+        place: function (symbol, o) {
+          var s = symbol && typeof symbol === "object" ? (symbol.symbol || symbol.id) : symbol;
+          return call("place", merge(o, { symbol: s }));
+        },
+        symbols: function () { return call("symbols"); },
+        breakApart: function (id) { return call("breakApart", { id: idOf(id) }); },
         magicMove: function (page, o) {
           var p = page && typeof page === "object" ? page.id : page;
           return call("magicMove", merge(o, { page: p }));
@@ -768,6 +827,17 @@ public enum DottieScript {
     jumps to that scene (see dottie.scene) and plays on to the next, or opens an http(s) or mailto link; null removes it
       hover: {stroke?, fill?, opacity?}: how a clickable element looks under the pointer; null removes it
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
+
+    Symbols (drawings defined once and placed many times, each copy playing the symbol's own animation on its own clock)
+      dottie.symbol([ids], {name?})    turns those shapes, with the arrows between them and their keys, into a symbol, \
+    put back as one instance where they were; arrows and links from outside attach to the instance. Its animation is \
+    the page timeline's length when made: set dottie.timeline({duration}) first to choose the loop. Returns {symbol, instance}
+      dottie.place(symbol, {x, y, width?, height?, playback?, offset?})  another instance (symbol: its id or name); \
+    playback: loop (default) | once | still; offset: seconds into the symbol's animation at the page's start, so copies \
+    don't move in step. An animated symbol gives a still page a timeline. Returns the element
+      dottie.symbols()                 [{id, name, width, height, duration, instances}]
+      dottie.update(instance, {playback?, offset?, ...})  instances move, resize, turn and fade like shapes, and take keys
+      dottie.breakApart(instance)      replaces it with plain copies of what it shows at rest; returns their ids
       dottie.layout({direction?})      re-arranges all shapes into ranks along their connectors
 
     Animation (the current page's timeline; export it with `dottie render page.dottie -o out.gif`)

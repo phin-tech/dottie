@@ -124,6 +124,12 @@ The Animate menu does the common things in one go:
   diagram can pan and zoom from one part to the next. While stopped on the timeline, drag the dashed camera
   frame's edge to move the view, or a corner to resize it. **Add Scene Marker** names a stop: the web page export
   then pauses at each scene and steps through them with its next and back buttons, like slides.
+- **Symbols**, like Flash's movie clips: select some shapes and choose Arrange ▸ Convert to Symbol (F8). They
+  become one drawing, defined once with its own animation, which you can place again and again. Every copy plays
+  that animation on its own clock: over and over, once, or standing still, and from any point in it, so a row of
+  status lights can blink out of step. Double-click a copy (or Arrange ▸ Edit Symbol) to change the symbol itself,
+  and every copy follows; Break Apart (⌘B) turns a copy back into plain shapes. A symbol added to a library plays
+  wherever it is placed.
 - **When Clicked on the Web**, in the inspector, makes a shape a button in the web page export and in
   `<dottie-player>`: a click plays a scene on to the next one, or opens a link. Give it a hover color too.
   A diagram can then wait for the reader to pick which request to follow.
@@ -144,8 +150,9 @@ as scenes"*, then *"export it as a GIF"*.
 diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /orders`, `order.created`),
 [traffic that never stops](Design/demos/live.gif), a sprint board whose notes
 [pop in one after another](Design/demos/stagger.gif), the same board two days on by
-[Magic Move](Design/demos/board.gif), an event stream whose arrows [march](Design/demos/stream.gif), and a diagram that plays
-[the request you click](Design/demos/flows.dottie). Each is made by a short script in
+[Magic Move](Design/demos/board.gif), an event stream whose arrows [march](Design/demos/stream.gif), a diagram that plays
+[the request you click](Design/demos/flows.dottie), and heartbeat lights and cogs placed as
+[symbols](Design/demos/symbols.gif), each on its own clock. Each is made by a short script in
 [scripts/demos](scripts/demos).
 
 ## Extras for power users
