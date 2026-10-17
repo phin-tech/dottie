@@ -16,6 +16,8 @@ struct TimelinePanel: View {
     @Binding var playhead: Double?
     @Binding var playing: Bool
     @Binding var selectedKey: KeyRef?
+    /// The timing popover (length and frame rate) is open, from the header's time or Animate ▸ Timing….
+    @Binding var editingTiming: Bool
     var onSelect: (UUID) -> Void
     /// Applies a change to the page's timeline as one undo step, named for the Edit menu.
     var onEdit: (String, (inout Timeline) -> Void) -> Void
@@ -79,9 +81,19 @@ struct TimelinePanel: View {
                 if playhead == nil { playhead = 0 }
                 playing.toggle()
             }
-            Text(timeText)
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
+            Button { editingTiming = true } label: {
+                Text(timeText)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Change the animation's length and frame rate")
+            .popover(isPresented: $editingTiming, arrowEdge: .bottom) {
+                TimingPopover(timeline: timeline) { duration, fps in
+                    onEdit("Change Timing") { $0.duration = duration; $0.fps = fps }
+                    if let p = playhead, p > duration { scrub(to: duration) }
+                }
+            }
             if collapsed {
                 Slider(value: Binding(get: { playhead ?? 0 }, set: { scrub(to: $0) }),
                        in: 0...max(timeline.duration, 0.01))

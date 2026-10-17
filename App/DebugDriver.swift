@@ -31,12 +31,12 @@ final class DebugDriver {
     state                        what the front window shows (page, tool, selection, timeline)
     open <file.dottie>           open a document (give it a moment, then `state`)
     size <width> <height>        resize the front window's content
-    snapshot <out.png> [canvas]  render the window (or just the canvas) to a PNG
+    snapshot <out.png> [canvas|popover]   render the window (or just the canvas, or an open popover) to a PNG
     playhead <seconds|none>      move the playhead (paused there, the canvas poses that frame)
     play | pause | done          play, pause, or stop previewing
     select all|none|<text>       select shapes whose text contains <text>
     action <name> [arg]          newAnimation, removeAnimation, transition <popIn|...>, packet,
-                                 build <popIn|drawIn|packets>, boil, settle, clearKeys, scene, camera
+                                 build <popIn|drawIn|packets>, boil, settle, clearKeys, scene [t], timing, camera
                                  (frame the selection), removeCamera, repeat, makeSymbol, editSymbol,
                                  doneSymbol, breakApart, undo, redo
     drag <x1> <y1> <x2> <y2>     drag on the canvas, in canvas points (top-left origin)
@@ -75,8 +75,22 @@ final class DebugDriver {
                 return ok("resized to \(Int(w))x\(Int(h))")
             case "snapshot":
                 let url = URL(fileURLWithPath: try arg(rest, 0, "output path"))
-                let view: NSView = rest.count > 1 && rest[1] == "canvas" ? try canvas() : try window().contentView!.superview!
-                return ok(try snapshot(view, to: url))
+                let view: NSView
+                switch rest.count > 1 ? rest[1] : "" {
+                case "canvas": view = try canvas()
+                case "popover":
+                    guard let w = NSApp.windows.first(where: { $0.isVisible && String(describing: type(of: $0)).contains("Popover") }),
+                          let v = w.contentView else { throw DebugError("no popover open") }
+                    view = v
+                default: view = try window().contentView!.superview!
+                }
+                // Some controls don't draw into a cached bitmap; name them so a blank spot can be told from a missing one.
+                func controls(_ v: NSView) -> [String] {
+                    (v is NSControl ? [String(describing: type(of: v)) + ((v as? NSControl)?.isEnabled == false ? " (disabled)" : "")] : [])
+                        + v.subviews.flatMap(controls)
+                }
+                let note = rest.count > 1 && rest[1] == "popover" ? "\ncontrols: " + controls(view).joined(separator: ", ") : ""
+                return ok(try snapshot(view, to: url) + note)
             case "playhead":
                 let h = try hooks()
                 let v = try arg(rest, 0, "seconds")
@@ -232,6 +246,7 @@ final class DebugDriver {
         case "settle": e.toggleSettle()
         case "clearKeys": e.clearKeys()
         case "scene": e.addScene(a.count > 1 ? Double(a[1]) : nil)
+        case "timing": e.editTiming()
         case "camera": e.frameCamera()
         case "removeCamera": e.removeCamera()
         case "repeat": e.repeatSelection()

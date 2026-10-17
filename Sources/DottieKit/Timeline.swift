@@ -292,6 +292,13 @@ public struct Timeline: Codable, Equatable, Sendable {
         duration = max(duration, t)
     }
 
+    /// What a timeline `duration` long would leave out: the keys (camera keys too) and scenes after its end.
+    public func cutOff(by duration: Double) -> (keys: Int, scenes: Int) {
+        let end = duration + 1e-6
+        let keys = tracks.reduce(0) { $0 + $1.keys.filter { $0.t > end }.count } + (camera ?? []).filter { $0.t > end }.count
+        return (keys, (markers ?? []).filter { $0.t > end }.count)
+    }
+
     /// Adds a scene called `nextSceneName` at `t`, unless one is there already (replacing it would rename it out
     /// from under the clicks that play it). Returns whether it added one.
     @discardableResult
