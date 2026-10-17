@@ -480,6 +480,8 @@ struct LayersSection: View {
     var undoManager: UndoManager?
     var onSelect: (Set<UUID>) -> Void
     @State private var expanded: Set<UUID> = []
+    /// The layer whose name field Rename… in its context menu focuses.
+    @State private var renaming: UUID?
 
     private static let dragPrefix = "dottie-elements:"
     private static let rowLimit = 300
@@ -507,6 +509,25 @@ struct LayersSection: View {
         return Self.dragPrefix + ids.map(\.uuidString).joined(separator: ",")
     }
 
+    /// The same commands as the buttons under the list, for the layer right-clicked rather than the active one.
+    @ViewBuilder private func layerMenu(_ layer: Layer) -> some View {
+        let i = layers.firstIndex { $0.id == layer.id } ?? 0
+        Button("Rename…") { renaming = layer.id }
+        Button(layer.visible ? "Hide" : "Show") { edit("Toggle Layer Visibility") { $0.editLayer(layer.id) { $0.visible.toggle() } } }
+        Button(layer.locked ? "Unlock" : "Lock") { edit("Toggle Layer Lock") { $0.editLayer(layer.id) { $0.locked.toggle() } } }
+        Divider()
+        Button("Move Up") { edit("Move Layer Up") { $0.moveLayer(layer.id, by: 1) } }
+            .disabled(i == layers.count - 1)
+        Button("Move Down") { edit("Move Layer Down") { $0.moveLayer(layer.id, by: -1) } }
+            .disabled(i == 0)
+        Button("Move Selection Here") { edit("Move to Layer") { $0.move(selection, toLayer: layer.id) } }
+            .disabled(selection.isEmpty)
+        Divider()
+        Button("New Layer") { edit("Add Layer") { activeLayer = $0.addLayer(above: layer.id) } }
+        Button("Delete Layer") { edit("Delete Layer") { if $0.removeLayer(layer.id), activeLayer == layer.id { activeLayer = nil } } }
+            .disabled(layers.count < 2)
+    }
+
     var body: some View {
         let byLayer = Dictionary(grouping: document.model.elements, by: \.layerID)
         Section("Layers") {
@@ -519,7 +540,9 @@ struct LayersSection: View {
                          select: { activeLayer = layer.id },
                          rename: { n in edit("Rename Layer") { $0.editLayer(layer.id) { $0.name = n } } },
                          toggleVisible: { edit("Toggle Layer Visibility") { $0.editLayer(layer.id) { $0.visible.toggle() } } },
-                         toggleLocked: { edit("Toggle Layer Lock") { $0.editLayer(layer.id) { $0.locked.toggle() } } })
+                         toggleLocked: { edit("Toggle Layer Lock") { $0.editLayer(layer.id) { $0.locked.toggle() } } },
+                         renameRequested: renaming == layer.id, didStartRename: { renaming = nil })
+                    .contextMenu { layerMenu(layer) }
                     .dropDestination(for: String.self) { items, _ in
                         let ids = dropped(items)
                         guard !ids.isEmpty else { return false }
@@ -643,7 +666,11 @@ private struct LayerRow: View {
     var rename: (String) -> Void
     var toggleVisible: () -> Void
     var toggleLocked: () -> Void
+    /// The context menu's Rename… asked for the name field; `didStartRename` says it has focus.
+    var renameRequested = false
+    var didStartRename: () -> Void = {}
     @State private var name = ""
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
@@ -654,6 +681,7 @@ private struct LayerRow: View {
                 .help(layer.locked ? "Unlock layer" : "Lock layer")
             TextField("Layer", text: $name)
                 .textFieldStyle(.plain)
+                .focused($nameFocused)
                 .onSubmit { if name != layer.name, !name.isEmpty { rename(name) } else { name = layer.name } }
             Text("\(count)").font(.caption).foregroundStyle(.secondary).monospacedDigit()
         }
@@ -665,6 +693,7 @@ private struct LayerRow: View {
         .onTapGesture(perform: select)
         .onAppear { name = layer.name }
         .onChange(of: layer.name) { _, n in name = n }
+        .onChange(of: renameRequested) { _, now in if now { nameFocused = true; didStartRename() } }
         .opacity(layer.visible ? 1 : 0.55)
     }
 }
