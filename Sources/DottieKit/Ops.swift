@@ -171,9 +171,12 @@ public enum DiagramOps {
     public static func update(_ doc: inout DottieDocument, id: UUID, text: String?? = nil, x: Double? = nil, y: Double? = nil,
                               width: Double? = nil, height: Double? = nil, fill: RGBA? = nil, stroke: RGBA? = nil,
                               roughness: Double? = nil, routing: Routing? = nil, look: Look = Look(),
-                              link: UUID?? = nil, anchor: String?? = nil, otherPages: [DottieDocument] = []) throws {
+                              link: UUID?? = nil, anchor: String?? = nil, click: ClickAction?? = nil, hover: HoverLook?? = nil,
+                              otherPages: [DottieDocument] = []) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
         if let anchor { doc.elements[i].anchor = anchor.flatMap { $0.isEmpty ? nil : $0 } }
+        if let click { doc.elements[i].click = click.flatMap { $0.isEmpty ? nil : $0 } }
+        if let hover { doc.elements[i].hover = hover.flatMap { $0.isEmpty ? nil : $0 } }
         if let link { try doc.setLink([id], to: link, otherPages: otherPages) }
         if let text { doc.elements[i].text = text }
         if doc.elements[i].kind != .connector {
@@ -297,6 +300,9 @@ public enum DiagramOps {
         public var dash: String?
         public var link: String?
         public var anchor: String?
+        /// The scene a click plays, or the link it opens, in the web players.
+        public var clickScene: String?
+        public var clickURL: String?
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
@@ -312,7 +318,8 @@ public enum DiagramOps {
                                   rotation: e.rotation.map { ($0 * 180 / .pi * 10).rounded() / 10 },
                                   fillStyle: e.style.fillStyle == .solid ? nil : e.style.fillStyle.rawValue,
                                   dash: e.style.dash == .solid ? nil : e.style.dash.rawValue,
-                                  link: e.link?.uuidString, anchor: e.anchor)
+                                  link: e.link?.uuidString, anchor: e.anchor,
+                                  clickScene: e.click?.scene, clickURL: e.click?.url)
         }
     }
 }

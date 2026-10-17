@@ -299,6 +299,9 @@ struct Inspector: View {
                     }
                 }
             }
+            if !selected.isEmpty {
+                ClickSection(document: document, selection: selection, undoManager: undoManager)
+            }
             if tool == .connector || !selectedConnectors.isEmpty {
                 Section("Connector") {
                     Picker("Routing", selection: routingBinding) {

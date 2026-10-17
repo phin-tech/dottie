@@ -5,6 +5,8 @@
 2. `dottie inspect` on every fixture -> fixtures/goldens/<group>/<name>.json (the geometry contract).
 3. `dottie render -f svg` of every page at a few moments, clean and as drawn ->
    fixtures/goldens/svg/<group>/<name>-p<page>-t<time>-<clean|sketchy>.svg (the visual reference).
+4. `dottie render -f html` of a few edge fixtures -> fixtures/goldens/html/<name>.html (the exported player, for
+   the browser tests).
 
 Run with `just goldens`, which builds the dottie tool first. Pass --check to fail instead of writing when
 anything would change (what CI runs on a Mac).
@@ -61,6 +63,12 @@ def generate(out, dottie):
                         if look == "clean":
                             cmd.append("--clean")
                         subprocess.run(cmd, check=True, capture_output=True)
+    # The HTML export's own player, for the browser tests of clicking (they run where Dottie can't).
+    html = out / "goldens" / "html"
+    html.mkdir(parents=True, exist_ok=True)
+    for name in ["clicks"]:
+        subprocess.run([dottie, "render", out / "edge" / f"{name}.dottie", "-f", "html", "-o", html / f"{name}.html"],
+                       check=True, capture_output=True)
 
 
 def main():

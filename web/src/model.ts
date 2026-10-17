@@ -39,6 +39,10 @@ export interface ConnectorData {
 export interface PathSubpath { closed: boolean; coords: number[] }
 export interface StrokePoint { x: number; y: number }
 export interface EmbeddedImage { data: string; format: string }
+/** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link. */
+export interface ClickAction { scene: string | null; url: string | null }
+/** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
+export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
 
 export interface Element {
   id: string;
@@ -58,6 +62,8 @@ export interface Element {
   rotation: number | null;
   link: string | null;
   anchor: string | null;
+  click: ClickAction | null;
+  hover: HoverLook | null;
   /** Base64 bytes; an empty `data` is a picture that couldn't be found (drawn crossed out). */
   image: EmbeddedImage | null;
   reveal: number | null;
@@ -142,7 +148,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "image", "reveal"],
+    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "image", "reveal"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
   inlineImage: ["data", "format"],
@@ -155,6 +161,8 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   repeat: ["start", "end", "count"],
   cameraKey: ["t", "x", "y", "width", "height", "ease"],
   marker: ["t", "name"],
+  click: ["scene", "url"],
+  hover: ["stroke", "fill", "opacity"],
 };
 
 export const MAX_DURATION = 3600;
@@ -185,6 +193,15 @@ export function clampTime(t: number): number {
 
 export function clampFPS(f: number): number {
   return Number.isFinite(f) ? Math.min(Math.max(f, 1), 60) : 12;
+}
+
+/** `url` trimmed, if it is a link a page may open: http, https or mailto, as ClickAction.allowed. A drawing can
+ * play on someone else's site, so nothing else (javascript:, data:) is ever followed. */
+export function allowedURL(url: string): string | null {
+  const u = url.trim();
+  // eslint-disable-next-line no-control-regex
+  if (!/^(https?:\/\/|mailto:)/i.test(u) || [...u].length <= 7 || /[\u0000-\u001f\u007f-\u009f]/.test(u)) return null;
+  return u;
 }
 
 function rgba(v: unknown): RGBA | undefined {
@@ -298,9 +315,26 @@ class Reader {
       rotation: num(v.rotation) ?? null,
       link: uuid(v.link) ?? null,
       anchor: str(v.anchor) ?? null,
+      click: this.click(v.click),
+      hover: this.hover(v.hover),
       image: this.image(v.image, images),
       reveal: num(v.reveal) ?? null,
     };
+  }
+
+  click(v: unknown): ClickAction | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "click");
+    const url = str(v.url);
+    const safe = url === undefined ? null : allowedURL(url);
+    if (url !== undefined && safe === null) this.warn("Skipped a click link that isn't http, https or mailto");
+    return { scene: str(v.scene) ?? null, url: safe };
+  }
+
+  hover(v: unknown): HoverLook | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "hover");
+    return { stroke: rgba(v.stroke) ?? null, fill: rgba(v.fill) ?? null, opacity: num(v.opacity) ?? null };
   }
 
   ease(v: unknown): Ease | null {

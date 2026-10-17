@@ -512,6 +512,35 @@ def notes():
     write(EDGE / "notes.dottie", [p])
 
 
+def clicks():
+    """Clickable elements for the web players: scenes by name (any case), links, hover looks, a link to another page,
+    and clicks that must do nothing (a scene that isn't there, a javascript: link)."""
+    p = Page("Overview")
+    q = Page("Details")
+    p.animate(3, fps=10)
+    p.timeline["markers"] = [{"t": 0, "name": "Overview"}, {"t": 1, "name": "Login flow"}, {"t": 2, "name": "Done"}]
+    auth = p.add("rectangle", 40, 40, 140, 60, text="Auth", click={"scene": "login FLOW"},
+                 hover={"stroke": rgba(0.2, 0.4, 1), "fill": rgba(0.85, 0.9, 1)})
+    docs = p.add("rectangle", 220, 40, 140, 60, text="Docs", click={"url": "https://example.com/docs"},
+                 hover={"opacity": 0.6})
+    p.add("ellipse", 400, 40, 80, 60, text="Back", anchor="back", click={"scene": "Overview"})
+    p.add("rectangle", 40, 140, 140, 60, text="Nowhere", click={"scene": "No such scene"})
+    p.add("rectangle", 220, 140, 140, 60, text="Script", click={"url": "javascript:alert(1)"})
+    more = q.add("rectangle", 40, 40, 140, 60, text="More")
+    p.add("diamond", 400, 140, 80, 60, text="Details", link=more)
+    packet = p.add("ellipse", 60, 110, 16, 16, style=style(fill=rgba(1, 0.5, 0.2)))
+    p.track(packet, [{"t": 0, "visible": False}, {"t": 1, "visible": True, "x": 60}, {"t": 2, "x": 300}])
+    p.track(auth, [{"t": 1, "strokeWidth": 2}, {"t": 1.5, "strokeWidth": 4}, {"t": 2, "strokeWidth": 2}])
+    write(EDGE / "clicks.dottie", [p, q])
+
+    # Clicks that must never run script: as hostile.dottie, for the browser tests.
+    h = Page()
+    h.add("rectangle", 40, 40, 160, 60, text='" onfocus="window.__pwned=1', click={"url": "javascript:window.__pwned=1"})
+    h.add("rectangle", 240, 40, 160, 60, text="mixed case", click={"url": " JavaScript:window.__pwned=1"})
+    h.add("rectangle", 440, 40, 160, 60, text="data", click={"url": "data:text/html,<script>window.__pwned=1</script>"})
+    write(JS_ONLY / "hostile-clicks.dottie", [h])
+
+
 def js_only():
     p = Page()
     p.add("rectangle", 40, 40, 120, 60, text="known")
@@ -544,6 +573,7 @@ def main():
     js_only()
     eases()
     march()
+    clicks()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

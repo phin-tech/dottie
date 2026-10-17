@@ -55,13 +55,28 @@ extension Exporter {
     /// to those with `<use>`, in place, so the stacking order and the pixels are exactly what drawing each
     /// frame whole gives (`defs` goes once, before the frames). Size then grows with what changes, not with
     /// the size of the drawing.
-    static func playerFrames(_ doc: DottieDocument, plan: Plan) -> (defs: String, frames: [String]) {
-        let drawn = plan.times.indices.map { i in svgParts(doc.resolved(at: plan.times[i]), background: nil, bounds: plan.rects[i]) }
+    ///
+    /// A clickable element (`clickable`: its id and the index of its action) is drawn in place in every frame,
+    /// never shared: a click inside a `<use>` is reported on the `<use>`, and the page's styles can't reach what
+    /// a `<use>` draws. It is a focusable group holding its normal look and, if it has one, its hover look.
+    static func playerFrames(_ doc: DottieDocument, plan: Plan, clickable: [String: Int] = [:]) -> (defs: String, frames: [String]) {
+        let hoverIDs = Set(doc.elements.filter { clickable[$0.id.uuidString] != nil && !($0.hover?.isEmpty ?? true) }.map(\.id))
+        var hoverByKey: [[String: String]] = []
+        let drawn = plan.times.indices.map { i in
+            let frame = doc.resolved(at: plan.times[i])
+            if !hoverIDs.isEmpty {
+                let hovered = svgParts(frame.hovered(hoverIDs), background: nil, bounds: plan.rects[i]).1
+                hoverByKey.append(Dictionary(hovered.filter { clickable[$0.key] != nil }.map { ($0.key, $0.markup) },
+                                             uniquingKeysWith: { a, _ in a }))
+            }
+            return svgParts(frame, background: nil, bounds: plan.rects[i])
+        }
+        let labels = Dictionary(doc.elements.map { ($0.id.uuidString, $0.buttonLabel.attributeEscaped) }, uniquingKeysWith: { a, _ in a })
         // Back to front: the order every frame draws in (a frame only ever leaves things out).
         let order = ["rock"] + doc.orderedElements.map(\.id.uuidString)
         let byKey = drawn.map { Dictionary($0.1.map { ($0.key, $0.markup) }, uniquingKeysWith: { a, _ in a }) }
         let unchanging = Set(order.filter { key in
-            guard let first = byKey.first?[key] else { return false }
+            guard clickable[key] == nil, let first = byKey.first?[key] else { return false }
             return byKey.allSatisfy { $0[key] == first }
         })
         var defs = "", runOf: [String: Int] = [:], runCount = 0
@@ -75,9 +90,14 @@ extension Exporter {
         }
         // The other pieces worth sharing: markup that more than one frame uses.
         var uses: [String: Int] = [:]
-        for frame in byKey { for (key, markup) in frame where !unchanging.contains(key) { uses[markup, default: 0] += 1 } }
+        for frame in byKey { for (key, markup) in frame where !unchanging.contains(key) && clickable[key] == nil { uses[markup, default: 0] += 1 } }
+        // Numbered in drawing order, so the same drawing always exports the same page.
         var shared: [String: Int] = [:]
-        for (markup, n) in uses where n > 1 { shared[markup] = shared.count }
+        for frame in byKey {
+            for key in order where !unchanging.contains(key) && clickable[key] == nil {
+                if let markup = frame[key], uses[markup, default: 0] > 1, shared[markup] == nil { shared[markup] = shared.count }
+            }
+        }
         for (markup, id) in shared.sorted(by: { $0.value < $1.value }) { defs += "<g id=\"dp\(id)\">\n\(markup)</g>\n" }
 
         let frames = drawn.enumerated().map { (f, part) -> String in
@@ -87,7 +107,17 @@ extension Exporter {
                 if let run = runOf[key] {
                     if run != lastRun { out += "<use href=\"#ds\(run)\"/>\n"; lastRun = run }
                 } else if let markup = byKey[f][key] {
-                    out += shared[markup].map { "<use href=\"#dp\($0)\"/>\n" } ?? markup
+                    if let a = clickable[key] {
+                        out += "<g class=\"dottie-a\" data-a=\"\(a)\" tabindex=\"0\" role=\"button\" aria-label=\"\(labels[key] ?? "")\">\n"
+                        if let hover = hoverByKey.isEmpty ? nil : hoverByKey[f][key], hover != markup {
+                            out += "<g class=\"dottie-n\">\n\(markup)</g>\n<g class=\"dottie-h\">\n\(hover)</g>\n"
+                        } else {
+                            out += markup
+                        }
+                        out += "</g>\n"
+                    } else {
+                        out += shared[markup].map { "<use href=\"#dp\($0)\"/>\n" } ?? markup
+                    }
                 }
             }
             return out + "</svg>\n"
@@ -158,10 +188,22 @@ extension Exporter {
         return try? Data(contentsOf: url)
     }
 
+    /// How clickable elements look in the web players: a pointer, their hover look under it or with keyboard
+    /// focus (a soft glow when they have none), and a small nudge while pressed.
+    static let clickStyle = """
+    .dottie-a { cursor: pointer; outline: none; }
+    .dottie-a .dottie-h { display: none; }
+    .dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
+    .dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
+    .dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
+    .dottie-a:active { transform: translate(1px, 1px); }
+    """
+
     /// A self-contained web page that plays the page's timeline: every frame as inline SVG, with play/pause,
     /// a scrubber, and the space and arrow keys. It loops, and stays sharp at any size. With scene markers it
     /// becomes a click-through presentation: playing stops at each scene, and next/back (or the arrow keys)
-    /// move between scenes. nil when the animation is too long to export (see `maxAnimationFrames`).
+    /// move between scenes. Clickable elements (`Element.click`) jump to their scene or open their link, by
+    /// mouse or keyboard. nil when the animation is too long to export (see `maxAnimationFrames`).
     public static func player(_ doc: DottieDocument, title: String = "Dottie animation") -> String? {
         guard let plan = animation(doc) else { return nil }
         let timeline = plan.timeline, times = plan.times
@@ -183,7 +225,19 @@ extension Exporter {
         }
         let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
             .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
-        let (defs, frames) = playerFrames(doc, plan: plan)
+        // Clickable elements, back to front, and what each does: a scene's index, or a link.
+        let targets = doc.clickTargets
+        var clickable: [String: Int] = [:]
+        var actions: [[String: String]] = []
+        for e in doc.orderedElements {
+            guard let target = targets[e.id] else { continue }
+            clickable[e.id.uuidString] = actions.count
+            switch target {
+            case .scene(let i): actions.append(["s": String(i)])
+            case .url(let u): actions.append(["u": u])
+            }
+        }
+        let (defs, frames) = playerFrames(doc, plan: plan, clickable: clickable)
         var body = ""
         for (i, frame) in frames.enumerated() {
             body += "<div class=\"f\(i == 0 ? " on" : "")\">\(frame)</div>\n"
@@ -215,6 +269,7 @@ extension Exporter {
         input[type=range] { flex: 1; accent-color: var(--ink); }
         output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
         #scene { min-width: 0; text-align: center; font-weight: 600; white-space: nowrap; }
+        \(clickable.isEmpty ? "" : clickStyle)
         </style>
         </head>
         <body>
@@ -231,11 +286,15 @@ extension Exporter {
           var times = \(js(times)), scenes = \(js(scenes.map(\.frame))), names = \(js(scenes.map(\.name)));
           var frames = document.querySelectorAll(".f"), n = frames.length, step = 1000 / \(timeline.fps);
           var play = document.getElementById("play"), scrub = document.getElementById("scrub"), time = document.getElementById("time");
-          var sceneLabel = document.getElementById("scene");
+          var sceneLabel = document.getElementById("scene"), acts = \(js(actions));
+          var reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
           var i = 0, playing = n > 1, last = 0, acc = 0;
           function sceneAt(k) { var s = -1; for (var j = 0; j < scenes.length; j++) if (scenes[j] <= k) s = j; return s; }
           function show(k) {
+            // Keyboard focus on a clickable element moves to its copy in the frame shown next.
+            var a = document.activeElement, held = a && a.getAttribute && frames[i].contains(a) ? a.getAttribute("data-a") : null;
             frames[i].classList.remove("on"); i = (k + n) % n; frames[i].classList.add("on");
+            if (held !== null) { var same = frames[i].querySelector('[data-a="' + held + '"]'); if (same) same.focus({ preventScroll: true }); }
             scrub.value = i; time.textContent = times[i].toFixed(1) + "s";
             if (sceneLabel) { var s = sceneAt(i); sceneLabel.textContent = s < 0 ? "" : names[s]; }
           }
@@ -265,6 +324,22 @@ extension Exporter {
             if (s >= 0 && scenes[s] === i) s -= 1;
             setPlaying(false); show(s >= 0 ? scenes[s] : 0);
           }
+          // A clickable element jumps to its scene and plays on to the next (with reduced motion, straight to
+          // where that stops), or opens its link.
+          function act(k) {
+            var x = acts[k];
+            if (!x) return;
+            if (x.u) { if (/^(https?:|mailto:)/i.test(x.u)) window.open(x.u, "_blank", "noopener"); return; }
+            var s = +x.s;
+            if (!(s >= 0 && s < scenes.length)) return;
+            if (reduced || n < 2) { setPlaying(false); show(s + 1 < scenes.length ? scenes[s + 1] : n - 1); return; }
+            show(scenes[s]); setPlaying(true);
+          }
+          function button(t) { return t && t.closest ? t.closest(".dottie-a") : null; }
+          document.querySelector(".stage").addEventListener("click", function (e) {
+            var b = button(e.target);
+            if (b) act(+b.getAttribute("data-a"));
+          });
           play.onclick = function () { if (!playing && scenes.length && i >= n - 1) show(0); setPlaying(!playing); };
           scrub.oninput = function () { setPlaying(false); show(+scrub.value); };
           if (scenes.length) {
@@ -272,6 +347,8 @@ extension Exporter {
             document.getElementById("prev").onclick = prevScene;
           }
           document.addEventListener("keydown", function (e) {
+            var b = button(e.target);
+            if (b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); act(+b.getAttribute("data-a")); return; }
             if (e.target === scrub && e.key !== " ") return;
             if (e.key === " ") { e.preventDefault(); scenes.length ? (playing ? setPlaying(false) : nextScene()) : setPlaying(!playing); }
             else if (e.key === "ArrowRight") { scenes.length ? nextScene() : (setPlaying(false), show(i + 1)); }
@@ -281,7 +358,7 @@ extension Exporter {
           });
           show(0);
           if (scenes.indexOf(0) >= 0) playing = false;
-          if (matchMedia("(prefers-reduced-motion: reduce)").matches) { playing = false; show(\(posterIndex)); }
+          if (reduced) { playing = false; show(\(posterIndex)); }
           setPlaying(playing);
           requestAnimationFrame(tick);
         })();

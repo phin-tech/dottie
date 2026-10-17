@@ -29,8 +29,13 @@ prefer reduced motion. A still page is just the drawing.
 | `no-controls`, `no-autoplay`, `no-loop` | |
 | `label` | The accessible name; the page name by default |
 
-The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `currentTime` (settable), `duration`,
-`paused`, and fires `load`, `frame` and `error` events. Its page color comes from the drawing's theme; set
+Elements the drawing makes clickable work with the mouse and the keyboard (Tab, then Enter or Space). A click plays
+a named scene on to the next one, opens a link in a new tab (only `http`, `https` and `mailto`), or shows the page a
+shape's link points at. Each shows its hover look under the pointer. Every click first fires a cancelable `action`
+event whose `detail` is `{element, scene | url | page}`; call `preventDefault()` to handle it yourself.
+
+The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(elementId)`, `currentTime`
+(settable), `duration`, `paused`, and fires `load`, `frame`, `action` and `error` events. Its page color comes from the drawing's theme; set
 `--dottie-radius` to round it, and style its parts with `::part(stage)` and `::part(controls)`.
 
 Without modules, `dist/dottie-player.min.js` is a classic script that registers the element and sets

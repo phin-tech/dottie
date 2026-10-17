@@ -7,7 +7,12 @@
 // Attributes: src (a .dottie URL), page (name or 1-based number, default the first), at (seconds: show that
 // moment as a still), clean (draw without the sketchy look), no-controls, no-autoplay, no-loop, label (the
 // accessible name). The file can also be inline: <dottie-player><script type="application/json">{…}</script>.
+//
+// Clickable elements (`click` in the file, or a `link` to another page) play their scene, open their link or show
+// that page, by mouse or keyboard. Each click first fires a cancelable `action` event with the element and what it
+// does, so a page can handle it itself.
 
+import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered } from "./clicks.ts";
 import { type DottieFile, type Page, type RGBA, luminance, parseDottie } from "./model.ts";
 import { fmt } from "./path.ts";
 import { type Plan, plan, svgParts } from "./svg.ts";
@@ -46,7 +51,7 @@ input[type=range] { flex: 1; min-width: 60px; accent-color: currentColor; }
 output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right; }
 .scene { min-width: 0; flex: 0 1 auto; text-align: center; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .error { padding: 16px; font-family: ui-monospace, Menlo, monospace; white-space: pre-wrap; }
-`;
+${CLICK_STYLE}`;
 
 /** Plays one page of a Dottie file into an element: the engine behind <dottie-player>, usable on its own. */
 export class Playback {
@@ -56,15 +61,23 @@ export class Playback {
   readonly sceneNames: string[];
   readonly background: RGBA;
   readonly ink: RGBA;
+  /** What clicking each clickable element does, by element id. */
+  readonly clicks: Map<string, Click>;
+  private hoverIDs: Set<string>;
+  private labels = new Map<string, string>();
   private svg: SVGSVGElement;
   private groups = new Map<string, { g: SVGGElement; markup: string }>();
   private order: string[] = [];
   frame = -1;
   onFrame: ((frame: number) => void) | null = null;
 
-  constructor(page: Page, into: Element, options: { clean?: boolean } = {}) {
+  /** `file` is the drawing `page` belongs to, so links to its other pages are clickable. */
+  constructor(page: Page, into: Element, options: { clean?: boolean; file?: DottieFile } = {}) {
     this.page = options.clean ? withRoughness(page, 0) : page;
     this.plan = plan(this.page);
+    this.clicks = clickTargets(page, options.file);
+    this.hoverIDs = new Set(this.page.elements.filter((e) => this.clicks.has(e.id) && hasHover(e)).map((e) => e.id));
+    for (const e of this.page.elements) if (this.clicks.has(e.id)) this.labels.set(e.id, buttonLabel(e));
     const near = (t: number): number => {
       let best = 0;
       this.plan.times.forEach((x, i) => { if (Math.abs(x - t) < Math.abs(this.plan.times[best] - t)) best = i; });
@@ -104,24 +117,46 @@ export class Playback {
   /** Draws the moment `t` (seconds) in the frame-`i` view. */
   drawAt(t: number, i = 0): void {
     const r = this.plan.rects[Math.min(i, this.plan.rects.length - 1)];
-    const { parts } = svgParts(resolved(this.page, t), this.background, r);
+    const frame = resolved(this.page, t);
+    const { parts } = svgParts(frame, this.background, r);
+    // A clickable element with a hover look holds both, and the stylesheet shows one.
+    const hover = this.hoverIDs.size === 0 ? null
+      : new Map(svgParts(hovered(frame, this.hoverIDs), this.background, r).parts.filter((p) => this.hoverIDs.has(p.key)).map((p) => [p.key, p.markup]));
     this.svg.setAttribute("viewBox", `${fmt(r.x)} ${fmt(r.y)} ${fmt(r.width)} ${fmt(r.height)}`);
     const ns = "http://www.w3.org/2000/svg";
     const keys = parts.map((p) => p.key);
     for (const p of parts) {
+      let markup = p.markup;
+      const h = hover?.get(p.key);
+      if (h !== undefined && h !== markup) markup = `<g class="dottie-n">\n${markup}</g>\n<g class="dottie-h">\n${h}</g>\n`;
       const have = this.groups.get(p.key);
       if (have) {
-        if (have.markup !== p.markup) { have.g.innerHTML = p.markup; have.markup = p.markup; }
+        if (have.markup !== markup) { have.g.innerHTML = markup; have.markup = markup; }
       } else {
         const g = document.createElementNS(ns, "g") as SVGGElement;
-        g.innerHTML = p.markup;
-        this.groups.set(p.key, { g, markup: p.markup });
+        g.innerHTML = markup;
+        // The group stays from frame to frame, so keyboard focus on it does too.
+        if (this.clicks.has(p.key)) {
+          g.setAttribute("class", "dottie-a");
+          g.setAttribute("data-a", p.key);
+          g.setAttribute("tabindex", "0");
+          g.setAttribute("role", "button");
+          g.setAttribute("aria-label", this.labels.get(p.key) ?? "");
+        }
+        this.groups.set(p.key, { g, markup });
       }
     }
     const live = new Set(keys);
     for (const [k, v] of this.groups) if (!live.has(k)) { v.g.remove(); this.groups.delete(k); }
     if (keys.length !== this.order.length || keys.some((k, j) => k !== this.order[j])) {
-      this.svg.replaceChildren(...keys.map((k) => this.groups.get(k)!.g));
+      // Only what is new or out of place moves, so a group with keyboard focus keeps it while others come and go.
+      let at: ChildNode | null = this.svg.firstChild;
+      for (const k of keys) {
+        const g = this.groups.get(k)!.g;
+        if (g === at) at = at.nextSibling;
+        else this.svg.insertBefore(g, at);
+      }
+      while (at) { const next: ChildNode | null = at.nextSibling; at.remove(); at = next; }
       this.order = keys;
     }
   }
@@ -188,6 +223,10 @@ export class DottiePlayer extends ElementBase {
     this.scrub.oninput = () => { this.setPlaying(false); this.playback?.show(Number(this.scrub.value)); };
     this.next.onclick = () => this.nextScene();
     this.prev.onclick = () => this.prevScene();
+    this.stage.addEventListener("click", (e) => {
+      const b = clickable(e.target);
+      if (b) this.activate(b.getAttribute("data-a") ?? "");
+    });
     this.addEventListener("keydown", (e) => this.key(e));
   }
 
@@ -252,7 +291,7 @@ export class DottiePlayer extends ElementBase {
   private mount(): void {
     const file = this.file!;
     const page = file.pages[pageIndex(file, this.getAttribute("page"))];
-    const p = new Playback(page, this.stage, { clean: this.hasAttribute("clean") });
+    const p = new Playback(page, this.stage, { clean: this.hasAttribute("clean"), file });
     this.playback = p;
     this.style.setProperty("--dottie-page", color(p.background));
     this.style.setProperty("--dottie-ink", color(p.ink));
@@ -310,6 +349,29 @@ export class DottiePlayer extends ElementBase {
     p.show(s >= 0 ? p.scenes[s] : 0);
   }
 
+  /** Does what clicking element `id` does: jumps to its scene and plays on to the next (with reduced motion, or in a
+   * still, straight to where that stops), opens its link in a new tab, or shows its page. */
+  activate(id: string): void {
+    const p = this.playback;
+    const click = p?.clicks.get(id);
+    if (!p || !click) return;
+    if (!this.dispatchEvent(new CustomEvent("action", { detail: { element: id, ...click }, cancelable: true }))) return;
+    if ("url" in click) {
+      if (/^(https?:|mailto:)/i.test(click.url)) window.open(click.url, "_blank", "noopener");
+    } else if ("page" in click) {
+      this.setAttribute("page", String(click.page + 1));
+    } else if (click.scene >= 0 && click.scene < p.scenes.length) {
+      const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced || this.hasAttribute("at") || p.frameCount < 2) {
+        this.setPlaying(false);
+        p.show(click.scene + 1 < p.scenes.length ? p.scenes[click.scene + 1] : p.frameCount - 1);
+      } else {
+        p.show(p.scenes[click.scene]);
+        this.setPlaying(true);
+      }
+    }
+  }
+
   private setPlaying(on: boolean): void {
     const p = this.playback;
     this.playing = on && !!p && p.frameCount > 1 && p.page.timeline !== null;
@@ -348,8 +410,12 @@ export class DottiePlayer extends ElementBase {
 
   private key(e: KeyboardEvent): void {
     const p = this.playback;
+    // From inside the shadow root the event's target is this element; the path has what really has focus.
+    const target = e.composedPath()[0];
+    const b = clickable(target);
+    if (p && b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); this.activate(b.getAttribute("data-a") ?? ""); return; }
     if (!p || p.page.timeline === null || p.frameCount <= 1 || this.hasAttribute("at")) return;
-    if (e.target === this.scrub && e.key !== " ") return;
+    if (target === this.scrub && e.key !== " ") return;
     const scenes = p.scenes.length > 0;
     let handled = true;
     if (e.key === " ") scenes ? (this.playing ? this.setPlaying(false) : this.nextScene()) : this.setPlaying(!this.playing);
@@ -360,6 +426,12 @@ export class DottiePlayer extends ElementBase {
     else handled = false;
     if (handled) e.preventDefault();
   }
+}
+
+/** The clickable element an event happened in, if any. */
+function clickable(target: EventTarget | null): globalThis.Element | null {
+  const el = target as globalThis.Element | null;
+  return el && typeof el.closest === "function" ? el.closest(".dottie-a") : null;
 }
 
 function nearest(p: Playback, t: number): number {
