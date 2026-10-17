@@ -97,9 +97,9 @@ struct SymbolSection: View {
                             CommitField(label: name, value: params[name] ?? "", allowsEmpty: true) { v in
                                 changeParams("Change Default") { $0[name] = v }
                             }
-                            Button { changeParams("Remove Parameter") { $0[name] = nil } } label: { Image(systemName: "minus.circle") }
-                                .buttonStyle(.borderless)
-                                .help("Stop \(name) being a parameter; {{\(name)}} then shows as written")
+                            IconButton("minus.circle", help: "Stop \(name) being a parameter; {{\(name)}} then shows as written") {
+                                changeParams("Remove Parameter") { $0[name] = nil }
+                            }
                         }
                     }
                 }

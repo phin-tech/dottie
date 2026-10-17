@@ -442,11 +442,9 @@ struct GuidesEditor: View {
             }), format: .number.precision(.fractionLength(0...2)))
             .textFieldStyle(.roundedBorder)
             .disabled(document.model.guidesLocked == true)
-            Button { edit("Remove Guide") { if vertical { _ = $0.guidesX?.remove(at: index) } else { _ = $0.guidesY?.remove(at: index) } } } label: {
-                Image(systemName: "xmark.circle")
+            IconButton("xmark.circle", help: "Remove guide") {
+                edit("Remove Guide") { if vertical { _ = $0.guidesX?.remove(at: index) } else { _ = $0.guidesY?.remove(at: index) } }
             }
-            .buttonStyle(.borderless)
-            .help("Remove guide")
         }
     }
 

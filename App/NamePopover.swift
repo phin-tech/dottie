@@ -2,7 +2,8 @@ import SwiftUI
 
 /// A name in a field, in a popover by the thing it names: Return commits, Esc (or clicking away) leaves it as it
 /// was. `problem` explains why a name can't be used, or returns nil when it can; while there is one, the reason
-/// shows in red in place of `hint` and the commit button is off. The name reaches `onCommit` trimmed.
+/// shows in red in place of `hint` and the commit button is off. The name reaches `onCommit` trimmed, even when
+/// it is unchanged (so a suggested name can be accepted as it is).
 ///
 ///     .popover(item: $renaming) { m in
 ///         NamePopover(title: "Rename Scene", systemImage: "flag.fill", tint: .orange, name: m.name,
@@ -62,6 +63,6 @@ struct NamePopover: View {
     private func commit() {
         guard reason == nil else { return }
         dismiss()
-        if trimmed != name { onCommit(trimmed) }
+        onCommit(trimmed)
     }
 }

@@ -17,6 +17,17 @@ struct LibraryPanel: View {
     @AppStorage("library.keepColors") private var keepColors = false
     @State private var query = ""
     @State private var message: String?
+    /// The name being asked for, in a popover by what it names.
+    @State private var naming: Naming?
+
+    private enum Naming: Equatable {
+        case library, newItem, item(UUID), tags(UUID)
+    }
+
+    /// Whether the popover asking for `n` is showing; closing it stops asking.
+    private func asking(_ n: Naming) -> Binding<Bool> {
+        Binding(get: { naming == n }, set: { if !$0, naming == n { naming = nil } })
+    }
 
     private var entry: LibraryStore.Entry? { store.entry(selectedID) }
 
@@ -35,13 +46,9 @@ struct LibraryPanel: View {
                 }
                 .labelsHidden()
                 Menu {
-                    Button("Rename Library…") {
-                        if let e = entry, !e.isBuiltIn, let n = prompt("Rename library", value: e.library.name) {
-                            change(e.id) { $0.name = n }
-                        }
-                    }
-                    .disabled(entry?.isBuiltIn != false)
-                    Button("Add Selection to Library…", action: addSelection)
+                    Button("Rename Library…") { naming = .library }
+                        .disabled(entry?.isBuiltIn != false)
+                    Button("Add Selection to Library…") { naming = .newItem }
                         .disabled(selection.isEmpty || entry?.isBuiltIn != false)
                     Divider()
                     Button("New Library from SVGs…", action: importSVGs)
@@ -62,6 +69,19 @@ struct LibraryPanel: View {
                 .menuStyle(.borderlessButton)
                 .fixedSize()
             }
+            .popover(isPresented: asking(.library), arrowEdge: .bottom) {
+                if let e = entry {
+                    NamePopover(title: "Rename Library", systemImage: "books.vertical", name: e.library.name) { n in
+                        change(e.id) { $0.name = n }
+                    }
+                }
+            }
+            .popover(isPresented: asking(.newItem), arrowEdge: .bottom) {
+                if let e = entry {
+                    NamePopover(title: "Add to “\(e.library.name)”", systemImage: "plus.square.on.square", name: "Untitled",
+                                hint: "The selection becomes a new item in this library.", commitTitle: "Add") { addSelection(named: $0) }
+                }
+            }
             TextField("Search", text: $query).textFieldStyle(.roundedBorder)
             Toggle("Keep original colors", isOn: $keepColors)
                 .help("Place items with their own colors and exact shapes instead of this drawing's look")
@@ -74,20 +94,28 @@ struct LibraryPanel: View {
                         Tile(item: item, keepColors: keepColors)
                             .onTapGesture { place(item, keepColors) }
                             .onDrag { dragProvider(for: item) }
+                            .popover(isPresented: asking(.item(item.id)), arrowEdge: .bottom) {
+                                if let e = entry {
+                                    NamePopover(title: "Rename Item", systemImage: "square.on.square", name: item.name) { n in
+                                        change(e.id) { $0.renameItem(item.id, to: n) }
+                                    }
+                                }
+                            }
+                            .popover(isPresented: asking(.tags(item.id)), arrowEdge: .bottom) {
+                                if let e = entry {
+                                    NamePopover(title: "Edit Tags", systemImage: "tag", name: item.tags.joined(separator: ", "),
+                                                placeholder: "Tags", hint: "Separate tags with commas. Search finds items by them.",
+                                                commitTitle: "Save", problem: { _ in nil }) { t in
+                                        change(e.id) { $0.setTags(item.id, t.split(separator: ",").map(String.init)) }
+                                    }
+                                }
+                            }
                             .contextMenu {
                                 Button("Place on Canvas") { place(item, keepColors) }
                                 if let e = entry, !e.isBuiltIn {
                                     Divider()
-                                    Button("Rename…") {
-                                        if let n = prompt("Rename item", value: item.name) {
-                                            change(e.id) { $0.renameItem(item.id, to: n) }
-                                        }
-                                    }
-                                    Button("Edit Tags…") {
-                                        if let t = prompt("Tags, separated by commas", value: item.tags.joined(separator: ", ")) {
-                                            change(e.id) { $0.setTags(item.id, t.split(separator: ",").map(String.init)) }
-                                        }
-                                    }
+                                    Button("Rename…") { naming = .item(item.id) }
+                                    Button("Edit Tags…") { naming = .tags(item.id) }
                                     Button("Duplicate") { change(e.id) { $0.duplicateItem(item.id) } }
                                     Button("Move to Start") { change(e.id) { $0.moveItem(item.id, to: 0) } }
                                     Button("Move to End") { change(e.id) { $0.moveItem(item.id, to: .max) } }
@@ -120,18 +148,9 @@ struct LibraryPanel: View {
         return provider
     }
 
-    private func addSelection() {
-        guard let e = entry, !e.isBuiltIn else { return }
-        let alert = NSAlert()
-        alert.messageText = "Add to “\(e.library.name)”"
-        alert.informativeText = "Name for the new item"
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.stringValue = "Untitled"
-        alert.accessoryView = field
-        alert.addButton(withTitle: "Add"); alert.addButton(withTitle: "Cancel")
-        guard alert.runModal() == .alertFirstButtonReturn,
-              let item = StencilLibrary.item(from: document.model, ids: selection, name: field.stringValue)
-        else { return }
+    private func addSelection(named name: String) {
+        guard let e = entry, !e.isBuiltIn,
+              let item = StencilLibrary.item(from: document.model, ids: selection, name: name) else { return }
         do { try store.append(item, to: e.id); message = "Added “\(item.name)”." } catch { NSAlert(error: error).runModal() }
     }
 
@@ -188,20 +207,6 @@ struct LibraryPanel: View {
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do { selectedID = try store.importLibrary(file: url) } catch { NSAlert(error: error).runModal() }
-    }
-
-    /// A one-field text prompt; nil when cancelled or left blank.
-    private func prompt(_ title: String, value: String) -> String? {
-        let alert = NSAlert()
-        alert.messageText = title
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-        field.stringValue = value
-        alert.accessoryView = field
-        alert.addButton(withTitle: "OK"); alert.addButton(withTitle: "Cancel")
-        alert.window.initialFirstResponder = field
-        guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-        let text = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty && !value.isEmpty && title.hasPrefix("Tags") ? "" : (text.isEmpty ? nil : text)
     }
 
     private func change(_ id: String, _ edit: (inout StencilLibrary) -> Void) {

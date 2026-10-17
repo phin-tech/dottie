@@ -77,14 +77,10 @@ struct TimelinePanel: View {
             }
             .buttonStyle(.borderless)
             .help(collapsed ? "Show Timeline" : "Hide Timeline")
-            Button {
+            IconButton(playing ? "pause.fill" : "play.fill", help: playing ? "Pause" : "Play") {
                 if playhead == nil { playhead = 0 }
                 playing.toggle()
-            } label: {
-                Image(systemName: playing ? "pause.fill" : "play.fill").frame(width: 16)
             }
-            .buttonStyle(.borderless)
-            .help(playing ? "Pause" : "Play")
             Text(timeText)
                 .monospacedDigit()
                 .foregroundStyle(.secondary)
@@ -95,10 +91,8 @@ struct TimelinePanel: View {
             } else {
                 Spacer()
             }
-            Divider().frame(height: 16)
-            Button { addScene(at: playhead ?? 0) } label: { Image(systemName: "flag") }
-                .buttonStyle(.borderless)
-                .help("Add Scene Marker at the Playhead")
+            BarDivider()
+            IconButton("flag", help: "Add Scene Marker at the Playhead") { addScene(at: playhead ?? 0) }
             if let markers = timeline.markers, !markers.isEmpty {
                 sceneControls(markers)
             }
@@ -121,19 +115,17 @@ struct TimelinePanel: View {
     private func sceneControls(_ markers: [Marker]) -> some View {
         let t = playhead ?? 0
         let current = markers.last { $0.t <= t + 1e-6 }
-        Button { scrub(to: markers.last { $0.t < t - 1e-6 }?.t ?? 0) } label: { Image(systemName: "backward.end.fill") }
-            .buttonStyle(.borderless)
-            .help("Previous Scene")
+        IconButton("backward.end.fill", help: "Previous Scene") { scrub(to: markers.last { $0.t < t - 1e-6 }?.t ?? 0) }
         Text(current?.name ?? "Start").lineLimit(1).frame(maxWidth: 140)
-        Button { if let next = markers.first(where: { $0.t > t + 1e-6 }) { scrub(to: next.t) } } label: { Image(systemName: "forward.end.fill") }
-            .buttonStyle(.borderless)
-            .help("Next Scene")
+        IconButton("forward.end.fill", help: "Next Scene") {
+            if let next = markers.first(where: { $0.t > t + 1e-6 }) { scrub(to: next.t) }
+        }
     }
 
     /// The selected key's ease and a delete button.
     @ViewBuilder
     private func keyControls(_ k: KeyRef, _ key: Keyframe) -> some View {
-        Divider().frame(height: 16)
+        BarDivider()
         Image(systemName: "diamond.fill").font(.system(size: 9)).foregroundStyle(Color.accentColor)
         Text("\(key.t.formatted(.number.precision(.fractionLength(1))))s").monospacedDigit().foregroundStyle(.secondary)
         Picker("Ease", selection: Binding(get: { key.ease ?? .linear }, set: { e in
@@ -145,9 +137,7 @@ struct TimelinePanel: View {
         .controlSize(.small)
         .fixedSize()
         .help("How it moves from this key to the next")
-        Button { deleteSelectedKey() } label: { Image(systemName: "trash") }
-            .buttonStyle(.borderless)
-            .help("Delete Key")
+        IconButton("trash", help: "Delete Key") { deleteSelectedKey() }
     }
 
     private func deleteSelectedKey() {

@@ -23,10 +23,8 @@ struct PageBar: View {
                 }
                 .onChange(of: document.currentPageID) { _, id in withAnimation { scroller.scrollTo(id) } }
             }
-            Divider().frame(height: 16)
-            Button { document.addPage(undoManager: undoManager) } label: { Image(systemName: "plus") }
-                .buttonStyle(.borderless)
-                .help("New Page (⌥⌘N)")
+            BarDivider()
+            IconButton("plus", help: "New Page (⌥⌘N)") { document.addPage(undoManager: undoManager) }
                 .padding(.horizontal, 10)
         }
         .frame(height: 30)

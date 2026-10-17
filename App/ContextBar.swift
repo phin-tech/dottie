@@ -38,7 +38,7 @@ struct ContextBar: View {
 
     @ViewBuilder private var bar: some View {
         if let copy, let symbol = copy.symbol.flatMap({ document.model.symbolIndex[$0] }) {
-            separator
+            BarDivider()
             if !symbol.isButton, (symbol.timeline?.duration ?? 0) > 0 {
                 Picker("Plays", selection: playback(copy)) {
                     Text("Over and over").tag(SymbolPlayback.loop)
@@ -52,10 +52,10 @@ struct ContextBar: View {
                 .help("Edit the symbol itself; every copy changes")
         }
         if onlyCopies {
-            separator
+            BarDivider()
             opacity
         } else {
-            separator
+            BarDivider()
             Picker("Look", selection: style.look) {
                 Text("Sketchy").tag(true)
                 Text("Clean").tag(false)
@@ -87,7 +87,7 @@ struct ContextBar: View {
             opacity
         }
         if showsConnector {
-            separator
+            BarDivider()
             Picker("Routing", selection: style.routing) {
                 ForEach(StyleChoices.routings, id: \.0) { Text($0.1).tag($0.0) }
             }
@@ -109,7 +109,6 @@ struct ContextBar: View {
         }
     }
 
-    private var separator: some View { Divider().frame(height: 16) }
 
     private func labeled<Content: View>(_ title: String, @ViewBuilder _ content: () -> Content) -> some View {
         HStack(spacing: 4) {
