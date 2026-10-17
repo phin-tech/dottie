@@ -595,6 +595,24 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// Called while `model` still holds the page being left.
     private func leavePage() {
         if editor != nil { endEditing(deferCommit: true) }
+        if let base = nudgeBase { // keep a nudge still under way, on the page it was made on
+            nudgeBase = nil
+            let final = model
+            if final != base {
+                DispatchQueue.main.async { [weak self] in
+                    self?.onPreview?(base)
+                    self?.onCommit?(final, "Nudge")
+                }
+            }
+        }
+        if let d = flowDraft { // keep a row still being grown, on the page it was grown on
+            flowDraft = nil
+            let final = model
+            DispatchQueue.main.async { [weak self] in
+                self?.onPreview?(d.base)
+                self?.onCommit?(final, Self.flowActionName(d.nodes))
+            }
+        }
         stopJumpAnimation()
         pageViewports[model.id] = Viewport(pan: pan, zoom: zoom)
     }
@@ -1453,6 +1471,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func keyUp(with event: NSEvent) {
+        if Self.flowDirection(event.keyCode) != nil { finishNudge() } // the arrow is up: the nudge is one undo step
         if event.keyCode == 49 { spaceDown = false } else { super.keyUp(with: event) }
     }
 
@@ -1500,6 +1519,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func mouseDown(with event: NSEvent) {
+        finishFlowchart() // ⌘ was let go somewhere the canvas didn't hear it
+        finishNudge()
         pressPoint = convert(event.locationInWindow, from: nil)
         dragging = false
         endEditing()
@@ -1907,6 +1928,21 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if !event.isARepeat { spaceDown = true }
             return
         }
+        if flowDraft != nil, !event.modifierFlags.contains(.command) { finishFlowchart() } // ⌘ let go unseen
+        if event.keyCode == 53, flowDraft != nil { cancelFlowchart(); return } // escape drops the nodes being grown
+        let mods = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        let arrow = Self.flowDirection(event.keyCode)
+        if nudgeBase != nil, arrow == nil || !(mods.isEmpty || mods == [.shift]) { finishNudge() }
+        if let direction = arrow {
+            if mods.isEmpty || mods == [.shift], !selection.isEmpty { return nudge(direction, by: mods.isEmpty ? 1 : 10) }
+            if mods == [.command] { // a held arrow repeats; only presses add nodes
+                if !event.isARepeat { growFlowchart(direction) }
+                return
+            }
+            if mods == [.option] { return walkFlowchart(direction) }
+        }
+        if event.keyCode == 48, mods.isEmpty, cycleNodeKinds() { return } // tab: rectangle, diamond, ellipse
+        if event.keyCode == 18, mods == [.shift], Pref.bool(Pref.singleKeyShortcuts, default: true) { return zoomToFit(nil) } // ⇧1
         if event.keyCode == 53, linkSources != nil { linkSources = nil; return } // escape cancels Link to Element…
         if event.keyCode == 53 { // escape: back to the arrow; a second press clears the selection
             if tool != .select { switchTool(.select) } else { selection = [] }
@@ -1925,6 +1961,151 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    override func flagsChanged(with event: NSEvent) {
+        if flowDraft != nil, !event.modifierFlags.contains(.command) { finishFlowchart() }
+        super.flagsChanged(with: event)
+    }
+
+    // MARK: Nudging
+
+    /// The page before the arrow keys started moving the selection; the moves so far become one undo step when
+    /// the key comes up.
+    private var nudgeBase: DottieDocument?
+
+    /// An arrow key moves the selected shapes on unlocked layers a point that way (⇧: ten). Bound connector
+    /// ends follow their shapes; free ends of selected connectors move with them.
+    private func nudge(_ direction: Flowchart.Direction, by step: Double) {
+        let d = switch direction {
+        case .left: CGPoint(x: -step, y: 0)
+        case .right: CGPoint(x: step, y: 0)
+        case .up: CGPoint(x: 0, y: -step)
+        case .down: CGPoint(x: 0, y: step)
+        }
+        let editable = Set(model.layers.filter { !$0.locked }.map(\.id))
+        var next = model
+        var moved = false
+        for i in next.elements.indices where selection.contains(next.elements[i].id) && editable.contains(next.elements[i].layerID) {
+            if var c = next.elements[i].connector {
+                if c.start.elementID == nil { c.start.x += d.x; c.start.y += d.y }
+                if c.end.elementID == nil { c.end.x += d.x; c.end.y += d.y }
+                next.elements[i].connector = c
+            } else {
+                next.elements[i].x += d.x; next.elements[i].y += d.y
+            }
+            moved = true
+        }
+        guard moved else { return }
+        if nudgeBase == nil { nudgeBase = model }
+        model = next
+        onPreview?(next)
+    }
+
+    private func finishNudge() {
+        guard let base = nudgeBase else { return }
+        nudgeBase = nil
+        if model != base { commit(base, "Nudge") }
+    }
+
+    // MARK: Flowcharts from the keyboard
+
+    /// Nodes being grown with ⌘-arrow, shown until ⌘ is let go: the page before, the shape they grow from, which
+    /// way, and the row so far (each press the same way adds one more to it).
+    private var flowDraft: (base: DottieDocument, source: UUID, direction: Flowchart.Direction, crossStart: Double,
+                            nodes: [UUID])?
+    private var flowNavigator = Flowchart.Navigator()
+
+    private static func flowDirection(_ keyCode: UInt16) -> Flowchart.Direction? {
+        switch keyCode {
+        case 123: .left
+        case 124: .right
+        case 125: .down
+        case 126: .up
+        default: nil
+        }
+    }
+
+    /// ⌘-arrow on a rectangle, ellipse or diamond: shows a copy of it joined to it in that direction, or one more
+    /// beside those already shown. Another direction starts the row over that way.
+    private func growFlowchart(_ direction: Flowchart.Direction) {
+        let base: DottieDocument, source: UUID
+        if let d = flowDraft {
+            (base, source) = (d.base, d.source)
+        } else {
+            guard poseTime == nil, let id = singleSelectionID, let e = model.elementIndex[id], Flowchart.isNode(e.kind)
+            else { return NSSound.beep() }
+            (base, source) = (model, id)
+        }
+        let row = flowDraft.flatMap { $0.direction == direction ? $0 : nil }
+        var next = base
+        guard let (nodes, start) = try? Flowchart.addNodes(&next, from: source, direction: direction,
+                                                           count: (row?.nodes.count ?? 0) + 1, crossStart: row?.crossStart)
+        else { return NSSound.beep() }
+        flowDraft = (base, source, direction, start, nodes)
+        model = next
+        onPreview?(next)
+    }
+
+    /// Keeps the nodes being grown as one undo step and selects the last, ready for Return to name it.
+    private func finishFlowchart() {
+        guard let d = flowDraft else { return }
+        flowDraft = nil
+        guard let last = d.nodes.last, model.elementIndex[last] != nil else { return } // the page changed under it
+        selection = [last]
+        commit(d.base, Self.flowActionName(d.nodes))
+    }
+
+    private static func flowActionName(_ nodes: [UUID]) -> String { nodes.count == 1 ? "Add Node" : "Add Nodes" }
+
+    private func cancelFlowchart() {
+        guard let d = flowDraft else { return }
+        flowDraft = nil
+        model = d.base
+        onPreview?(d.base)
+    }
+
+    /// ⌥-arrow: selects the node joined to the selected one in that direction, bringing it into view.
+    private func walkFlowchart(_ direction: Flowchart.Direction) {
+        guard let id = singleSelectionID, let next = flowNavigator.step(from: id, toward: direction, in: model)
+        else { return NSSound.beep() }
+        selection = [next]
+        if let f = model.elementIndex[next]?.frame, !visibleModelRect.contains(f) {
+            let a = canvasArea
+            show(Viewport(pan: CGPoint(x: a.midX - f.midX * zoom, y: a.midY - f.midY * zoom), zoom: zoom), animated: true)
+        }
+    }
+
+    /// Tab: turns the selected rectangles, diamonds and ellipses into the next kind along. False when the
+    /// selection has none, so Tab does what it otherwise would.
+    private func cycleNodeKinds() -> Bool {
+        guard poseTime == nil, !selection.isEmpty else { return false }
+        var next = model
+        var changed = false
+        for i in next.elements.indices where selection.contains(next.elements[i].id) {
+            guard let kind = Flowchart.nextKind(after: next.elements[i].kind) else { continue }
+            next.elements[i].kind = kind
+            changed = true
+        }
+        guard changed else { return false }
+        onCommit?(next, "Change Shape")
+        return true
+    }
+
+    /// The part of the drawing the view shows, in model coordinates.
+    private var visibleModelRect: CGRect {
+        let a = canvasArea
+        return CGRect(x: (a.minX - pan.x) / zoom, y: (a.minY - pan.y) / zoom, width: a.width / zoom, height: a.height / zoom)
+    }
+
+    /// Zooms and pans so the whole page fits the view (⇧1), at no more than 100%.
+    @objc func zoomToFit(_ sender: Any?) {
+        guard !model.elements.isEmpty else { return zoomActualSize(sender) }
+        let b = Exporter.bounds(of: model, padding: 0)
+        let area = canvasArea, margin: CGFloat = 40
+        let fit = min((area.width - 2 * margin) / max(b.width, 1), (area.height - 2 * margin) / max(b.height, 1))
+        let z = min(max(min(fit, 1), zoomRange.lowerBound), zoomRange.upperBound)
+        show(Viewport(pan: CGPoint(x: area.midX - b.midX * z, y: area.midY - b.midY * z), zoom: z), animated: true)
     }
 
     /// Resets the document to the pre-gesture baseline, then commits so undo lands there.

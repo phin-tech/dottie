@@ -656,6 +656,68 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertTrue(commits.isEmpty)
     }
 
+    // MARK: Flowcharts
+
+    func key(_ code: UInt16, _ mods: NSEvent.ModifierFlags = [], repeating: Bool = false) {
+        let arrow = (123...126).contains(code)
+        let chars = [48: "\t", 53: "\u{1b}", 123: "\u{F702}", 124: "\u{F703}", 125: "\u{F701}", 126: "\u{F700}"][code] ?? ""
+        view.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: arrow ? mods.union([.function, .numericPad]) : mods,
+                                            timestamp: 0, windowNumber: window.windowNumber, context: nil, characters: chars,
+                                            charactersIgnoringModifiers: chars, isARepeat: repeating, keyCode: code)!)
+    }
+
+    func releaseCommand() {
+        view.flagsChanged(with: NSEvent.keyEvent(with: .flagsChanged, location: .zero, modifierFlags: [], timestamp: 0,
+                                                 windowNumber: window.windowNumber, context: nil, characters: "",
+                                                 charactersIgnoringModifiers: "", isARepeat: false, keyCode: 55)!)
+    }
+
+    func testCommandArrowGrowsARowThatLettingGoKeepsAsOneStep() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Start")
+        view.selection = [a.id]
+        key(125, .command)
+        key(125, .command, repeating: true) // a held key repeats; it adds nothing
+        XCTAssertEqual(view.model.elements.count, 3)
+        key(125, .command)
+        XCTAssertEqual(view.model.elements.count, 5)
+        XCTAssertTrue(commits.isEmpty)       // only shown while ⌘ is down
+        releaseCommand()
+        XCTAssertEqual(commits.map(\.name), ["Add Nodes"])
+        let nodes = view.model.elements.filter { $0.kind == .rectangle && $0.id != a.id }
+        XCTAssertEqual(nodes.count, 2)
+        XCTAssertEqual(view.model.elements.filter { $0.kind == .connector }.count, 2)
+        XCTAssertEqual(view.selection.count, 1)
+        XCTAssertTrue(nodes.map(\.id).contains(view.selection.first!))
+    }
+
+    func testEscapeBeforeLettingGoDropsTheRowAndAClickKeepsIt() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        let before = view.model
+        view.selection = [a.id]
+        key(124, .command)
+        key(53, .command)
+        XCTAssertEqual(view.model, before)
+        releaseCommand()
+        XCTAssertTrue(commits.isEmpty)
+        key(124, .command)
+        click(CGPoint(x: 800, y: 600))       // ⌘ let go out of the window: the next click keeps the row
+        XCTAssertEqual(commits.map(\.name), ["Add Node"])
+    }
+
+    func testOptionArrowWalksAndTabChangesTheShape() {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        view.selection = [a.id]
+        key(124, .command); releaseCommand()
+        let b = view.selection.first!
+        key(123, .option)
+        XCTAssertEqual(view.selection, [a.id])
+        key(124, .option)
+        XCTAssertEqual(view.selection, [b])
+        key(48)
+        XCTAssertEqual(element(b).kind, .diamond)
+        XCTAssertEqual(commits.last?.name, "Change Shape")
+    }
+
     // MARK: Pages
 
     /// Pages not on screen, by id, standing in for the document's file.

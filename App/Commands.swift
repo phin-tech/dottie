@@ -56,6 +56,8 @@ struct DottieCommands: Commands {
                 .keyboardShortcut("-")
             Button("Actual Size") { send(#selector(CanvasNSView.zoomActualSize(_:))) }
                 .keyboardShortcut("0")
+            Button("Zoom to Fit") { send(#selector(CanvasNSView.zoomToFit(_:))) }
+                .help("Fit the whole page in the window (⇧1 on the canvas)")
             Toggle("Show Rulers", isOn: $showRulers)
                 .keyboardShortcut("r", modifiers: [.command, .shift])
             Toggle("Onion Skin", isOn: $onionSkin)

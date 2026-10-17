@@ -66,7 +66,15 @@ Pick a tool from the toolbar or press its letter:
 | D | Diamond | | E | Eraser |
 | N | Note | | | |
 
-Double-click a shape to give it a label. Connectors stay attached when you move shapes around.
+Double-click a shape to give it a label. Connectors stay attached when you move shapes around. The arrow keys
+nudge the selection a point at a time (⇧ for ten); holding one down is a single undo step.
+
+- **Flowcharts from the keyboard.** Select a rectangle, ellipse or diamond and hold ⌘ while you press an arrow
+  key: a copy appears that way, joined to it by an arrow. Press the arrow again (still holding ⌘) for another
+  beside it, and let go of ⌘ to keep them (Escape, before you let go, drops them). The newest is selected, so
+  Return names it. ⌥-arrow walks from shape to shape along the arrows (press it again to step through a
+  decision's branches), Tab turns the selected shapes into the next kind (rectangle, diamond, ellipse), and ⇧1
+  zooms to fit the whole page.
 
 - **Sticky notes.** Click with the Note tool (or drag out a size) and type GitHub Flavored Markdown:
   headings, bullet, numbered and `- [ ]` task lists, tables, quotes, code, links, and **bold**, *italic*,
