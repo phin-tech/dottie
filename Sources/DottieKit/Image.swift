@@ -97,19 +97,30 @@ public enum ImageImport {
         public var description: String { "Not an image Dottie can read" }
     }
 
-    /// Longest side kept, in pixels. Bigger pictures are scaled down so drawings stay a sensible size.
+    /// Longest side kept for photos (JPEG, HEIC), in pixels. Bigger ones are scaled down so drawings stay a
+    /// sensible size.
     public static let maxPixels = 2048
+    /// Longest side kept for lossless pictures (PNG, TIFF, GIF, BMP), which are mostly screenshots: enough for a
+    /// 6K display, so small interface text stays sharp to mark up.
+    public static let maxLosslessPixels = 8192
+
+    /// Whether `src` holds a lossless picture, kept larger and as PNG.
+    static func isLossless(_ src: CGImageSource) -> Bool {
+        guard let id = CGImageSourceGetType(src) as String?, let type = UTType(id) else { return false }
+        return [UTType.png, .tiff, .gif, .bmp].contains { type.conforms(to: $0) }
+    }
 
     public static func normalize(_ data: Data) throws -> (image: EmbeddedImage, size: CGSize) {
         guard let src = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(src) > 0 else {
             throw Failure.unreadable
         }
         let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any] ?? [:]
+        let lossless = isLossless(src)
         // Applying the EXIF orientation and capping the size in one pass; the result is always a fresh bitmap.
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixels,
+            kCGImageSourceThumbnailMaxPixelSize: lossless ? maxLosslessPixels : maxPixels,
             kCGImageSourceShouldCacheImmediately: true,
         ]
         guard let img = CGImageSourceCreateThumbnailAtIndex(src, 0, options as CFDictionary) else { throw Failure.unreadable }
@@ -124,10 +135,10 @@ public enum ImageImport {
         let longest = max(size.width, size.height)
         if longest > 640 { size = CGSize(width: size.width * 640 / longest, height: size.height * 640 / longest) }
 
-        // Photos without transparency are much smaller as JPEG; everything else stays PNG.
+        // Photos without transparency are much smaller as JPEG; screenshots and everything else stay PNG, since
+        // JPEG smears the edges of text.
         let opaque = [CGImageAlphaInfo.none, .noneSkipFirst, .noneSkipLast].contains(img.alphaInfo)
-        let wasJPEG = (CGImageSourceGetType(src) as String?) == UTType.jpeg.identifier
-        let jpeg = opaque && (wasJPEG || img.width * img.height > 1_000_000)
+        let jpeg = opaque && !lossless
         guard let out = encode(img, as: jpeg ? .jpeg : .png) else { throw Failure.unreadable }
         return (EmbeddedImage(data: out, format: jpeg ? "jpeg" : "png"), size)
     }

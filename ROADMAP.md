@@ -47,6 +47,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Clicks in the web players: a shape plays a scene or opens a link when clicked, with a hover look and keyboard access, in the HTML export and `<dottie-player>` (which also follows links to other pages)
 - [x] Symbol parameters, like Flash component parameters: a symbol declares names with defaults, `{{name}}` in its text, and each copy fills them in (`args`); over MCP and scripts, and in dottie.js
 - [x] Flowcharts from the keyboard: ⌘-arrow grows joined nodes (held ⌘ previews a row, letting go keeps it), ⌥-arrow walks along connectors, Tab cycles rectangle/diamond/ellipse, ⇧1 zooms to fit
+- [x] Screenshot markup: lossless pictures keep up to 8192 px as PNG; Highlighter (H); Redact (X) pixelates a picture's own pixels under a dragged box
 
 ## Next
 - Custom themes and a color palette per theme

@@ -51,11 +51,23 @@ final class ImageTests: XCTestCase {
         XCTAssertEqual(e.frame.size, CGSize(width: 100, height: 50))
     }
 
-    func testHugeImagesAreCapped() throws {
-        let (image, size) = try ImageImport.normalize(redOverBlue(width: 4000, height: 1000))
+    func testHugePhotosAreCapped() throws {
+        let (image, size) = try ImageImport.normalize(redOverBlue(width: 4000, height: 1000, type: .jpeg))
         XCTAssertEqual(size, CGSize(width: 640, height: 160))
         let img = try XCTUnwrap(image.cgImage)
         XCTAssertEqual(max(img.width, img.height), ImageImport.maxPixels)
+        XCTAssertEqual(image.format, "jpeg")
+    }
+
+    func testScreenshotsKeepTheirPixelsAsPNG() throws {
+        // A 5K Retina screenshot: lossless and opaque, which a photo-sized cap and JPEG would blur.
+        let (image, size) = try ImageImport.normalize(redOverBlue(width: 5120, height: 2880, dpi: 144))
+        XCTAssertEqual(size, CGSize(width: 640, height: 360))
+        let img = try XCTUnwrap(image.cgImage)
+        XCTAssertEqual(img.width, 5120)
+        XCTAssertEqual(image.format, "png")
+        let (huge, _) = try ImageImport.normalize(redOverBlue(width: 10000, height: 100))
+        XCTAssertEqual(huge.cgImage?.width, ImageImport.maxLosslessPixels)
     }
 
     func testExifRotationIsApplied() throws {
