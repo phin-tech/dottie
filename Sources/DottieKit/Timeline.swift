@@ -315,6 +315,19 @@ public struct Timeline: Codable, Equatable, Sendable {
         if markers?.isEmpty == true { markers = nil }
     }
 
+    /// Moves the scene marker at `from` to `to` (clamped), growing the timeline to fit. Refuses when there's no
+    /// marker at `from` or another one at `to` already. Returns whether it moved.
+    @discardableResult
+    public mutating func moveMarker(from: Double, to: Double) -> Bool {
+        let to = Self.clampTime(to)
+        guard var list = markers, let i = list.firstIndex(where: { abs($0.t - from) < 1e-6 }),
+              !list.indices.contains(where: { $0 != i && abs(list[$0].t - to) < 1e-6 }) else { return false }
+        list[i].t = to
+        markers = list.sorted { $0.t < $1.t }
+        duration = max(duration, to)
+        return true
+    }
+
     /// "Scene N" for the first N no marker is called yet, so a deleted scene's name isn't handed out twice.
     public var nextSceneName: String {
         let names = Set((markers ?? []).map { $0.name.lowercased() })

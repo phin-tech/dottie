@@ -471,6 +471,12 @@ extension DottieScript {
             camera(t: null): void;
             /** A scene marker: the HTML player stops at each. */
             scene(t: number, name?: string): void;
+            /** Renames a scene (named by its name or its time); clicks that play it follow the new name. */
+            renameScene(scene: string | number, name: string): void;
+            /** Moves a scene (named by its name or its time) to t seconds. */
+            moveScene(scene: string | number, t: number): void;
+            /** Removes a scene (named by its name or its time). */
+            removeScene(scene: string | number): void;
             /** The element's center travels along path (a connector's route or a shape's outline) from t. */
             follow(id: Ref, path: Ref, t: number, options?: { duration?: number; ease?: Ease; reverse?: boolean; orient?: boolean; laps?: number }): void;
             /** A dot, or a pill with a label, that runs along the connector; returns it. */
