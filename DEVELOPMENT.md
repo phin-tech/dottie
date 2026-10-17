@@ -114,13 +114,13 @@ just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm r
 ## Releasing
 
 **One command:** `just ship patch` (or `minor`, `major`). It bumps the version (`just bump`), commits and pushes
-to `main`, publishes dottie.js to npm (`SKIP_NPM=1` skips that), builds the app headless, signs it with the
+to `main`, stages dottie.js on npm (`SKIP_NPM=1` skips that; the version goes live when you approve it with 2FA), builds the app headless, signs it with the
 Developer ID Application certificate, notarizes it with Apple and staples the ticket (`just notarize`), then
 publishes the GitHub release and updates the Homebrew cask (`just release`). Write `release-notes/<next version>.md`
 first for curated notes. It must run on a Mac with the certificate in its keychain, from a clean, pushed `main`.
 
-Notarization credentials come from 1Password (`op://Development/Developer Password for signing`: the Apple ID, team
-ID and an app-specific password), so a Mac needs only two things to release: the 1Password CLI signed in
+Notarization credentials come from 1Password (`op://Development/Mac App Release`: the Apple ID, team
+ID and an app-specific password, plus the Developer ID certificate as a `.p12` and the npm token; its notes cover setting up a new Mac), so a Mac needs only two things to release: the 1Password CLI signed in
 (`op signin`), and the Developer ID Application certificate with its private key in the login keychain (export it
 from Keychain Access as a `.p12` and import it on the new Mac). Without `op`, `notarize.sh` falls back to a
 notarytool keychain profile: `xcrun notarytool store-credentials dottie-notary --apple-id <apple id> --team-id

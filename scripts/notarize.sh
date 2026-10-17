@@ -5,7 +5,7 @@
 #
 # Notarization credentials come from 1Password, so any Mac signed in to `op` (and holding the Developer ID
 # certificate) can release: the Apple ID, team and app-specific password in the item
-# op://Development/Developer Password for signing (fields username, team_id, password). Override the item with
+# op://Development/Mac App Release (fields apple_id, team_id, app_specific_password; its notes explain it all). Override the item with
 # NOTARY_OP_ITEM (an op:// prefix, without the field name). Without `op`, it falls back to a notarytool keychain
 # profile (NOTARY_PROFILE, default dottie-notary), made with:
 #   xcrun notarytool store-credentials dottie-notary --apple-id <you> --team-id J35P7AJDN7
@@ -23,9 +23,9 @@ build=$(sed -n 's/^ *CURRENT_PROJECT_VERSION: "\(.*\)"$/\1/p' project.yml)
 
 security find-identity -v -p codesigning | grep -q "Developer ID Application.*($team)" \
     || die "no Developer ID Application certificate for team $team in the keychain"
-item="${NOTARY_OP_ITEM:-op://Development/Developer Password for signing}"
-if command -v op >/dev/null && apple_id=$(op read "$item/username" 2>/dev/null) \
-    && password=$(op read "$item/password" 2>/dev/null); then
+item="${NOTARY_OP_ITEM:-op://Development/Mac App Release}"
+if command -v op >/dev/null && apple_id=$(op read "$item/apple_id" 2>/dev/null) \
+    && password=$(op read "$item/app_specific_password" 2>/dev/null); then
     team="$(op read "$item/team_id" 2>/dev/null || echo "$team")"
     auth=(--apple-id "$apple_id" --team-id "$team" --password "$password")  # notarytool does not expand @env:, so this shows in ps while it runs
     echo "Notarizing as $apple_id (credentials from 1Password)."
