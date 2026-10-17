@@ -2002,6 +2002,9 @@ struct CanvasView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> CanvasNSView {
         let v = CanvasNSView()
+        // Since macOS 14 views don't clip by default, and draw(_:) fills its whole dirty rect: unclipped, the canvas
+        // paints over the bars stacked above it (the context bar, the symbol bar).
+        v.clipsToBounds = true
         v.onToolChange = { t in DispatchQueue.main.async { tool = t } }
         v.onSelectionChange = { sel in DispatchQueue.main.async { selection = sel } }
         v.onShowPage = { [document, weak v] page in
