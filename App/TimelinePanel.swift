@@ -21,6 +21,10 @@ struct TimelinePanel: View {
     @State private var keyDrag: KeyDrag?
     @State private var scrubbing = false
     @AppStorage("timelineCollapsed") private var collapsed = false
+    /// The most the rows may take, set by dragging the panel's top edge; fewer rows take less.
+    @AppStorage("timelineHeight") private var rowsHeight = 200.0
+    /// The rows' height when a resize began.
+    @State private var resizeFrom: CGFloat?
     @State private var collapsedLayers: Set<UUID> = []
 
     private let labelWidth: CGFloat = 170
@@ -38,6 +42,7 @@ struct TimelinePanel: View {
             }
         }
         .background(.bar)
+        .overlay(alignment: .top) { if !collapsed { resizeHandle } }
         .onExitCommand { if playhead != nil { stop() } }
         .task(id: playing) {
             guard playing else { return }
@@ -186,8 +191,34 @@ struct TimelinePanel: View {
                 }
             }
             .scrollIndicators(.never)   // keeps every row exactly as wide as the ruler they scrub against
-            .frame(height: min(CGFloat(count + (rows.camera.isEmpty ? 0 : 1)) * rowHeight, 200))
+            .frame(height: shownHeight(rows: count + (rows.camera.isEmpty ? 0 : 1)))
         }
+    }
+
+    private static func clamp(_ h: Double) -> Double { min(max(h, 44), 800) }
+
+    /// The rows' height: all of them, up to the height dragged to.
+    private func shownHeight(rows: Int) -> CGFloat {
+        min(CGFloat(rows) * rowHeight, CGFloat(Self.clamp(rowsHeight)))
+    }
+
+    /// The panel's top edge: drag it up or down to give the rows more or less room.
+    private var resizeHandle: some View {
+        let count = rows.groups.reduce(0) { $0 + 1 + (collapsedLayers.contains($1.layer) ? 0 : $1.rows.count) }
+            + (rows.camera.isEmpty ? 0 : 1)
+        return Color.clear
+            .frame(height: 6)
+            .contentShape(Rectangle())
+            .onHover { inside in if inside { NSCursor.resizeUpDown.push() } else { NSCursor.pop() } }
+            .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { g in
+                    // Start from what is shown, so a cap above the rows' own height doesn't make the drag lag.
+                    let from = resizeFrom ?? shownHeight(rows: count)
+                    resizeFrom = from
+                    rowsHeight = Self.clamp(Double(from - g.translation.height))
+                }
+                .onEnded { _ in resizeFrom = nil })
+            .help("Drag to resize the timeline")
     }
 
     /// The camera's keys, with bars where it moves between them.
