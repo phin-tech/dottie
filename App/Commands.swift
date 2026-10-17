@@ -66,7 +66,6 @@ struct DottieCommands: Commands {
                 .keyboardShortcut("[")
             Button("Forward") { send(#selector(CanvasNSView.jumpForward(_:))) }
                 .keyboardShortcut("]")
-            Divider()
         }
         InspectorCommands()
         CommandGroup(after: .pasteboard) {

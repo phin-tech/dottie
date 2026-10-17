@@ -292,6 +292,16 @@ public struct Timeline: Codable, Equatable, Sendable {
         duration = max(duration, t)
     }
 
+    /// Adds a scene called `nextSceneName` at `t`, unless one is there already (replacing it would rename it out
+    /// from under the clicks that play it). Returns whether it added one.
+    @discardableResult
+    public mutating func addScene(at t: Double) -> Bool {
+        let t = Self.clampTime(t)
+        guard !(markers ?? []).contains(where: { abs($0.t - t) < 1e-6 }) else { return false }
+        addMarker(at: t, name: nextSceneName)
+        return true
+    }
+
     /// Removes the scene marker at `t`, if there is one.
     public mutating func removeMarker(at t: Double) {
         markers = markers?.filter { abs($0.t - t) >= 1e-6 }

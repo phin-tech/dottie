@@ -33,6 +33,9 @@ struct TimelinePanel: View {
     /// What the pointer is over in the ruler or a track, for their context menus, which aren't told where the
     /// right-click was.
     @State private var pointer = Pointer()
+    /// The time under the pointer. A reference, not state: it changes every few points, and redrawing the
+    /// panel that often would be wasted, since only the menus' actions read it.
+    @State private var pointerTime = PointerTime()
 
     private let labelWidth: CGFloat = 170
     private let rowHeight: CGFloat = 22
@@ -155,8 +158,11 @@ struct TimelinePanel: View {
         if selectedKey == k { selectedKey = nil }
     }
 
+    /// Adds a scene at `t`; beeps if there is one there already.
     private func addScene(at t: Double) {
-        onEdit("Add Scene") { $0.addMarker(at: t, name: $0.nextSceneName) }
+        var probe = timeline
+        guard probe.addScene(at: t) else { NSSound.beep(); return }
+        onEdit("Add Scene") { $0.addScene(at: t) }
     }
 
     private func renameScene(_ m: Marker) {
@@ -169,6 +175,14 @@ struct TimelinePanel: View {
         alert.addButton(withTitle: "Rename"); alert.addButton(withTitle: "Cancel")
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
+        var probe = page
+        guard probe.renameScene(at: m.t, to: field.stringValue) else {
+            let refusal = NSAlert()
+            refusal.messageText = "“\(field.stringValue)” can't be used"
+            refusal.informativeText = "Each scene needs a name of its own, so clicks know which one to play."
+            refusal.runModal()
+            return
+        }
         onRenameScene(m.t, field.stringValue)
     }
 
@@ -331,7 +345,7 @@ struct TimelinePanel: View {
             Divider()
             Button("Delete Scene") { onEdit("Delete Scene") { $0.removeMarker(at: m.t) } }
         } else {
-            Button("Add Scene Marker Here") { addScene(at: pointer.t) }
+            Button("Add Scene Marker Here") { addScene(at: pointerTime.t) }
         }
     }
 
@@ -394,7 +408,7 @@ struct TimelinePanel: View {
             Divider()
         }
         Button("Select \(row.label)") { onSelect(row.element) }
-        Button("Add Scene Marker Here") { addScene(at: pointer.t) }
+        Button("Add Scene Marker Here") { addScene(at: pointerTime.t) }
         Divider()
         Button("Clear Keys") {
             if selectedKey?.element == row.element { selectedKey = nil }
@@ -405,7 +419,8 @@ struct TimelinePanel: View {
     /// Notes what is under the pointer at `px` in the ruler (no row), a row's track or the camera's, changing state
     /// only when that changes so hovering doesn't redraw the panel at every pixel.
     private func point(at px: CGFloat, row: TimelineRows.Row? = nil, camera: Bool = false) {
-        var p = Pointer(t: time(atX: px), element: row?.element)
+        pointerTime.t = time(atX: px)
+        var p = Pointer(element: row?.element)
         if let row { p.key = nearestKey(in: row, x: px)?.t }
         else if camera { p.key = rows.camera.first { abs(x($0, trackWidth) - px) <= 7 } }
         else { p.marker = rows.markers.min { abs(x($0.t, trackWidth) - px) < abs(x($1.t, trackWidth) - px) }
@@ -578,12 +593,16 @@ struct KeyRef: Equatable {
     var t: Double
 }
 
-/// What the pointer is over in the timeline: a time, and in a track the key there, or on the ruler the scene.
+/// What the pointer is over in the timeline: in a track the key there, or on the ruler the scene.
 private struct Pointer: Equatable {
-    var t = 0.0
     var element: UUID?
     var key: Double?
     var marker: Double?
+}
+
+/// The time under the pointer in the timeline.
+private final class PointerTime {
+    var t = 0.0
 }
 
 /// A key being dragged in the timeline.

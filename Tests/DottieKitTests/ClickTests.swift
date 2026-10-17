@@ -54,9 +54,11 @@ final class ClickTests: XCTestCase {
         XCTAssertEqual(doc.elements.first { $0.id == back.id }?.click?.scene, "Overview", "other scenes' clicks stay")
         XCTAssertEqual(doc.clickTargets[auth.id], .scene(1))
         let before = doc
-        doc.renameScene(at: 1, to: "   ")
-        doc.renameScene(at: 0.5, to: "Nowhere")
-        XCTAssertEqual(doc, before, "a blank name or a time with no marker changes nothing")
+        XCTAssertFalse(doc.renameScene(at: 1, to: "   "))
+        XCTAssertFalse(doc.renameScene(at: 0.5, to: "Nowhere"))
+        XCTAssertFalse(doc.renameScene(at: 1, to: "OVERVIEW"), "another scene's name, in any case, would steal its clicks")
+        XCTAssertEqual(doc, before, "a blank name, a taken one or a time with no marker changes nothing")
+        XCTAssertTrue(doc.renameScene(at: 1, to: "sign in"), "a change of case is fine")
     }
 
     func testRemovingScenesAndNamingNewOnes() {
@@ -71,6 +73,9 @@ final class ClickTests: XCTestCase {
         tl.removeMarker(at: 0)
         tl.removeMarker(at: 2)
         XCTAssertNil(tl.markers, "the last one gone leaves no list")
+        XCTAssertTrue(tl.addScene(at: 1))
+        XCTAssertFalse(tl.addScene(at: 1), "a second at the same time would rename the first")
+        XCTAssertEqual(tl.markers?.map(\.name), ["Scene 1"])
     }
 
     func testStillExportsIgnoreClicks() throws {

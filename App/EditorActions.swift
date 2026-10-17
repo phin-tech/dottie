@@ -285,9 +285,9 @@ extension ContentView {
             clearKeys: { edit("Clear Keys") { $0.clearAnimation(of: ids) } },
             hasCamera: !(document.model.timeline?.camera ?? []).isEmpty,
             scenes: document.model.timeline?.markers ?? [],
-            addScene: { at in edit("Add Scene") { doc in
+            addScene: { at in animate("Add Scene") { doc in
                 doc.startAnimation()
-                doc.timeline!.addMarker(at: at ?? playhead ?? 0, name: doc.timeline!.nextSceneName)
+                return doc.timeline!.addScene(at: at ?? playhead ?? 0)
             } },
             showScene: { offset in
                 let markers = document.model.timeline?.markers ?? [], t = playhead ?? 0
