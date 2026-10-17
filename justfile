@@ -101,3 +101,11 @@ tap version="":
 # Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or `app`, as a GitHub release
 release app="":
     scripts/release.sh "{{app}}"
+
+# Build, sign with Developer ID, notarize and staple Dottie.app headless (one-time: xcrun notarytool store-credentials dottie-notary)
+notarize:
+    scripts/notarize.sh
+
+# The whole release in one command: bump, commit, push, npm publish, notarize, GitHub release, Homebrew cask
+ship part:
+    scripts/ship.sh "{{part}}"

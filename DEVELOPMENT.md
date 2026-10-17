@@ -113,18 +113,30 @@ just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm r
 
 ## Releasing
 
-1. `just bump patch` (or `minor`, `major`): sets `MARKETING_VERSION` in `project.yml`, `DottieVersion` (the
-   version the tool and the MCP server report) and dottie.js's version, rebuilds the player embedded for
-   `dottie render -f js`, and adds one to the build number.
-2. Commit and push, then publish dottie.js: `cd web && npm publish`.
-3. In Xcode: Product ▸ Archive, then Distribute App ▸ Direct Distribution, and wait for "Ready to distribute".
-   This needs a Developer ID Application certificate.
-4. `just release`: finds the newest notarized `Dottie.app` Xcode kept in the archive's `Submissions` folder,
-   checks it is a stapled, notarized Developer ID build of the version in `project.yml` and that `main` is clean
-   and pushed, then publishes `Dottie-<version>.zip` as a GitHub release tagged `v<version>`. Its notes are
-   `release-notes/<version>.md` when that exists (write it before archiving), and generated from the commits
-   otherwise. Last, it points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at
-   the new zip; `just tap` does that step alone if it failed.
+**One command:** `just ship patch` (or `minor`, `major`). It bumps the version (`just bump`), commits and pushes
+to `main`, publishes dottie.js to npm (`SKIP_NPM=1` skips that), builds the app headless, signs it with the
+Developer ID Application certificate, notarizes it with Apple and staples the ticket (`just notarize`), then
+publishes the GitHub release and updates the Homebrew cask (`just release`). Write `release-notes/<next version>.md`
+first for curated notes. It must run on a Mac with the certificate in its keychain, from a clean, pushed `main`.
+
+Notarization credentials come from 1Password (`op://Development/Developer Password for signing`: the Apple ID, team
+ID and an app-specific password), so a Mac needs only two things to release: the 1Password CLI signed in
+(`op signin`), and the Developer ID Application certificate with its private key in the login keychain (export it
+from Keychain Access as a `.p12` and import it on the new Mac). Without `op`, `notarize.sh` falls back to a
+notarytool keychain profile: `xcrun notarytool store-credentials dottie-notary --apple-id <apple id> --team-id
+J35P7AJDN7`.
+
+The steps by hand, if one fails halfway:
+
+1. `just bump patch`, commit and push, then `cd web && npm publish`.
+2. `just notarize` (or in Xcode: Product ▸ Archive, then Distribute App ▸ Direct Distribution). It leaves the
+   app in `build/release/<version>/export/Dottie.app`.
+3. `just release build/release/<version>/export/Dottie.app` (with no argument it takes the newest app Xcode
+   notarized): checks it is a stapled, notarized Developer ID build of the version in `project.yml` and that
+   `main` is clean and pushed, then publishes `Dottie-<version>.zip` as a GitHub release tagged `v<version>`. Its
+   notes are `release-notes/<version>.md` when that exists, and generated from the commits otherwise. Last, it
+   points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at the new zip;
+   `just tap` does that step alone if it failed.
 
 The app's update check (`UpdateChecker`) reads GitHub's latest release, which skips drafts and pre-releases. It
 only tells people: Homebrew installs get the `brew upgrade` command, others the release page.

@@ -9,3 +9,4 @@ Signing.local.xcconfig
 # mkdocs output
 website/site/
 _site/
+build/
