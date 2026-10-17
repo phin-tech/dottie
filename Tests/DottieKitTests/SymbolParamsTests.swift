@@ -45,6 +45,11 @@ final class SymbolParamsTests: XCTestCase {
         XCTAssertTrue(texts.contains("by Sam"))
     }
 
+    func testPlaceholdersAreTheNamesItsTextWrites() throws {
+        let page = try fixture()
+        XCTAssertEqual(page.symbols?.first?.placeholders, ["message", "count", "missing", "author"])
+    }
+
     func testFilesKeepParamsAndArgs() throws {
         let page = try fixture()
         XCTAssertEqual(page.symbols?.first?.params, ["message": "Saved", "count": "1", "author": "me"])

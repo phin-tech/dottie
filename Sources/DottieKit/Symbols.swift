@@ -90,6 +90,21 @@ public struct Symbol: Codable, Equatable, Identifiable, Sendable {
         return out
     }
 
+    /// The names its elements' text (and the args of copies inside it) write as `{{name}}`, in order, once each:
+    /// the parameters it could have.
+    public var placeholders: [String] {
+        var seen = Set<String>(), out: [String] = []
+        for e in elements {
+            for s in [e.text].compactMap({ $0 }) + (e.args?.keys.sorted().compactMap { e.args?[$0] } ?? []) where s.contains("{{") {
+                for m in s.matches(of: /\{\{\s*([^{}]*?)\s*\}\}/) {
+                    let name = String(m.1)
+                    if !name.isEmpty, seen.insert(name).inserted { out.append(name) }
+                }
+            }
+        }
+        return out
+    }
+
     /// The box its elements are drawn in.
     public var box: CGRect { CGRect(x: 0, y: 0, width: width, height: height) }
 

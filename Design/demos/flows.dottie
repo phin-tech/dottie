@@ -4,10 +4,10 @@
       "elements" : [
         {
           "height" : 60,
-          "id" : "C6715DEB-EF08-455B-A74B-BC162E4CD9F2",
+          "id" : "492525FD-84E1-40AE-90DD-2AABEEA70245",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 4275909502,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1511513702,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -35,10 +35,10 @@
         },
         {
           "height" : 60,
-          "id" : "74C8FD71-87A5-4182-9294-E8553DA88BA3",
+          "id" : "45A97EE1-AF3E-49C0-87E4-31C22847DB3F",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3877191105,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 68839479,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -83,10 +83,10 @@
               "r" : 0.10980392156862745
             }
           },
-          "id" : "B9EB333F-3632-4BED-B32C-0DFD6D07E216",
+          "id" : "E1B02B53-AD76-4F0B-9EA9-B3FED09001AB",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3686721429,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1270397505,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -131,10 +131,10 @@
               "r" : 0.10980392156862745
             }
           },
-          "id" : "715006BF-63A9-48A7-9120-29CC22C3EB4C",
+          "id" : "1088A7A6-1C47-4930-801B-DF1A665C3788",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3418958197,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 3466597643,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -162,10 +162,10 @@
         },
         {
           "height" : 60,
-          "id" : "31E450D0-484B-4AA5-B49E-70B6A9C3410E",
+          "id" : "DD425FB6-E321-4954-B3DA-F88BEBB6BD5B",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3257841730,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1189112149,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -193,10 +193,10 @@
         },
         {
           "height" : 60,
-          "id" : "85E395C7-BCA0-4C72-8551-CAA635CC4F12",
+          "id" : "177C0F9F-5915-4B35-9385-6727914D90CD",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1751682238,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1343966513,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -224,10 +224,10 @@
         },
         {
           "height" : 60,
-          "id" : "BEE812D0-C5E6-4B35-B921-3101BF23448D",
+          "id" : "C4294B69-1159-4CF7-84F4-0A549B943098",
           "kind" : "rectangle",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1361705418,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 110300520,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -256,7 +256,7 @@
         {
           "connector" : {
             "end" : {
-              "elementID" : "74C8FD71-87A5-4182-9294-E8553DA88BA3",
+              "elementID" : "45A97EE1-AF3E-49C0-87E4-31C22847DB3F",
               "port" : "left",
               "x" : 0,
               "y" : 0
@@ -264,7 +264,7 @@
             "endHead" : "arrow",
             "routing" : "elbow",
             "start" : {
-              "elementID" : "C6715DEB-EF08-455B-A74B-BC162E4CD9F2",
+              "elementID" : "492525FD-84E1-40AE-90DD-2AABEEA70245",
               "port" : "right",
               "x" : 0,
               "y" : 0
@@ -272,10 +272,10 @@
             "startHead" : "none"
           },
           "height" : 0,
-          "id" : "704127CC-39D6-454E-96B8-90DA182B25C1",
+          "id" : "3B7670E1-E96D-4C46-B6D1-FCE6B8D2BD90",
           "kind" : "connector",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 2305509910,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 2066457843,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -303,7 +303,7 @@
         {
           "connector" : {
             "end" : {
-              "elementID" : "B9EB333F-3632-4BED-B32C-0DFD6D07E216",
+              "elementID" : "E1B02B53-AD76-4F0B-9EA9-B3FED09001AB",
               "port" : "left",
               "x" : 0,
               "y" : 0
@@ -311,7 +311,7 @@
             "endHead" : "arrow",
             "routing" : "elbow",
             "start" : {
-              "elementID" : "74C8FD71-87A5-4182-9294-E8553DA88BA3",
+              "elementID" : "45A97EE1-AF3E-49C0-87E4-31C22847DB3F",
               "port" : "right",
               "x" : 0,
               "y" : 0
@@ -319,10 +319,10 @@
             "startHead" : "none"
           },
           "height" : 0,
-          "id" : "4D3D7755-A51B-48C7-A3AA-8E80E413157A",
+          "id" : "EB507D37-5B4F-477A-867C-50973C706512",
           "kind" : "connector",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 503596158,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 2485523495,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -350,7 +350,7 @@
         {
           "connector" : {
             "end" : {
-              "elementID" : "715006BF-63A9-48A7-9120-29CC22C3EB4C",
+              "elementID" : "1088A7A6-1C47-4930-801B-DF1A665C3788",
               "port" : "left",
               "x" : 0,
               "y" : 0
@@ -358,7 +358,7 @@
             "endHead" : "arrow",
             "routing" : "elbow",
             "start" : {
-              "elementID" : "74C8FD71-87A5-4182-9294-E8553DA88BA3",
+              "elementID" : "45A97EE1-AF3E-49C0-87E4-31C22847DB3F",
               "port" : "right",
               "x" : 0,
               "y" : 0
@@ -366,10 +366,10 @@
             "startHead" : "none"
           },
           "height" : 0,
-          "id" : "CCA6A279-059B-4B7F-B2A6-9B75C6A6C284",
+          "id" : "CC8877E7-1413-4E52-8F41-BE951EB00ADB",
           "kind" : "connector",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1963248937,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1670013934,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -397,7 +397,7 @@
         {
           "connector" : {
             "end" : {
-              "elementID" : "31E450D0-484B-4AA5-B49E-70B6A9C3410E",
+              "elementID" : "DD425FB6-E321-4954-B3DA-F88BEBB6BD5B",
               "port" : "left",
               "x" : 0,
               "y" : 0
@@ -405,7 +405,7 @@
             "endHead" : "arrow",
             "routing" : "elbow",
             "start" : {
-              "elementID" : "715006BF-63A9-48A7-9120-29CC22C3EB4C",
+              "elementID" : "1088A7A6-1C47-4930-801B-DF1A665C3788",
               "port" : "right",
               "x" : 0,
               "y" : 0
@@ -413,10 +413,10 @@
             "startHead" : "none"
           },
           "height" : 0,
-          "id" : "80455082-EF41-47D3-BC0D-CC5271A6A85D",
+          "id" : "675AF956-373E-479B-8D67-3DAEB2FE0353",
           "kind" : "connector",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 2536373958,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 4150609999,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -444,7 +444,7 @@
         {
           "connector" : {
             "end" : {
-              "elementID" : "85E395C7-BCA0-4C72-8551-CAA635CC4F12",
+              "elementID" : "177C0F9F-5915-4B35-9385-6727914D90CD",
               "port" : "left",
               "x" : 0,
               "y" : 0
@@ -452,7 +452,7 @@
             "endHead" : "arrow",
             "routing" : "elbow",
             "start" : {
-              "elementID" : "715006BF-63A9-48A7-9120-29CC22C3EB4C",
+              "elementID" : "1088A7A6-1C47-4930-801B-DF1A665C3788",
               "port" : "right",
               "x" : 0,
               "y" : 0
@@ -460,10 +460,10 @@
             "startHead" : "none"
           },
           "height" : 0,
-          "id" : "0A3B74D8-4E8C-43C4-8A6E-31FA6A6AF599",
+          "id" : "44AA2B20-961F-49B1-859E-98D7740C0E14",
           "kind" : "connector",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3370655762,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 101761505,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -491,7 +491,7 @@
         {
           "connector" : {
             "end" : {
-              "elementID" : "BEE812D0-C5E6-4B35-B921-3101BF23448D",
+              "elementID" : "C4294B69-1159-4CF7-84F4-0A549B943098",
               "port" : "left",
               "x" : 0,
               "y" : 0
@@ -499,7 +499,7 @@
             "endHead" : "arrow",
             "routing" : "elbow",
             "start" : {
-              "elementID" : "85E395C7-BCA0-4C72-8551-CAA635CC4F12",
+              "elementID" : "177C0F9F-5915-4B35-9385-6727914D90CD",
               "port" : "right",
               "x" : 0,
               "y" : 0
@@ -507,10 +507,10 @@
             "startHead" : "none"
           },
           "height" : 0,
-          "id" : "726A547A-B6AC-461E-AF82-04D64E6759C3",
+          "id" : "3198BCDD-8911-4B1B-84AD-87000CB31B7A",
           "kind" : "connector",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1402130272,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 2475747223,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -540,10 +540,10 @@
             "scene" : "Overview"
           },
           "height" : 40,
-          "id" : "3BDC3D0B-7D84-422B-A175-5F3A227FC292",
+          "id" : "6ED5A9AA-3E05-4DC0-815C-D9E227FFF3A6",
           "kind" : "symbol",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3007658519,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1179108799,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -564,7 +564,7 @@
             },
             "strokeWidth" : 2
           },
-          "symbol" : "4B342F90-8890-479A-BFE5-138945139051",
+          "symbol" : "43BDCA58-A23F-4259-96DA-F020DB87AC75",
           "width" : 90,
           "x" : 941.5,
           "y" : 224
@@ -574,12 +574,12 @@
             "message" : "Sign in: Browser → API gateway → Auth"
           },
           "height" : 44,
-          "id" : "5CCDD16A-664D-4B2B-BB0C-4830CA25C036",
+          "id" : "BDAAE7B7-C943-403D-84EA-8CCE4508F261",
           "kind" : "symbol",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
           "offset" : -0.5,
           "playback" : "once",
-          "seed" : 3662169505,
+          "seed" : 2583526077,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -600,17 +600,17 @@
             },
             "strokeWidth" : 2
           },
-          "symbol" : "97BE6A5A-413F-4002-BD27-5683C64766D7",
+          "symbol" : "69B6DC97-C6B3-46EC-9206-A09E4B014AC8",
           "width" : 400,
           "x" : 335.75,
           "y" : -24
         },
         {
           "height" : 14,
-          "id" : "A94468EA-6613-49A1-85FD-0C7DE9A853A4",
+          "id" : "22B44452-813B-43C1-8219-CA00D321FD5E",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 3748673798,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 3676382560,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -637,10 +637,10 @@
         },
         {
           "height" : 14,
-          "id" : "EB9B6E28-80DB-4F06-B398-2CC2B6DCF26A",
+          "id" : "8057D4FA-419E-4619-A835-E554534EC751",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1629403564,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 3927023869,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -670,12 +670,12 @@
             "message" : "Order: Orders → Postgres, Queue → Worker"
           },
           "height" : 44,
-          "id" : "7224B73B-2597-4039-95E9-78937B8E5609",
+          "id" : "74D03AF6-F532-4DF3-9A13-149A3D8005D0",
           "kind" : "symbol",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
           "offset" : -2.6,
           "playback" : "once",
-          "seed" : 1932472864,
+          "seed" : 2032574962,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -696,17 +696,17 @@
             },
             "strokeWidth" : 2
           },
-          "symbol" : "97BE6A5A-413F-4002-BD27-5683C64766D7",
+          "symbol" : "69B6DC97-C6B3-46EC-9206-A09E4B014AC8",
           "width" : 400,
           "x" : 335.75,
           "y" : -24
         },
         {
           "height" : 14,
-          "id" : "15859C05-9873-424A-91D2-36D033F9CA02",
+          "id" : "3E6B6025-E288-484F-868A-88838307BC29",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1941946873,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 939139236,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -733,10 +733,10 @@
         },
         {
           "height" : 14,
-          "id" : "71776FBD-BEBA-4902-B353-CF87227AEB12",
+          "id" : "8B0C93C8-9B9C-4E38-82F0-9190AF0E0F09",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1161381921,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 333601477,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -763,10 +763,10 @@
         },
         {
           "height" : 14,
-          "id" : "A42A256F-637F-49EB-BE59-C9E7133E7FC3",
+          "id" : "8BF784E8-E4EB-4AF2-858E-8F29A7A136B0",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 2840339777,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 2152420961,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -793,10 +793,10 @@
         },
         {
           "height" : 14,
-          "id" : "92CD512A-AF81-4D80-AE98-EAD03937E8B2",
+          "id" : "8BBF182B-A3EE-4F89-AF49-BAEB3BA3FB59",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1923110211,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 1941439829,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -823,10 +823,10 @@
         },
         {
           "height" : 14,
-          "id" : "A8EA3769-8FCD-4FDB-9036-A131B88D9010",
+          "id" : "D346C2A9-5F64-4C45-97BF-E8AFF4AC0718",
           "kind" : "ellipse",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 1326042490,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 2115319929,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -853,10 +853,10 @@
         },
         {
           "height" : 30,
-          "id" : "EEBD9708-80D2-4466-A477-F8D473AC2E7F",
+          "id" : "71E8A397-0131-46AC-9F50-DBD0377DA537",
           "kind" : "text",
-          "layerID" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
-          "seed" : 958898765,
+          "layerID" : "2566303D-5977-4653-A225-49BC3F325DEF",
+          "seed" : 2839470985,
           "style" : {
             "bowing" : 1,
             "dash" : "solid",
@@ -883,10 +883,10 @@
           "y" : 230
         }
       ],
-      "id" : "3C7CA902-677B-4191-8792-386483F480BB",
+      "id" : "1ECC0C73-4EBF-49EB-9CF6-A106425D41E2",
       "layers" : [
         {
-          "id" : "2DD55490-8F19-4F52-98E0-B94B63CE4E4F",
+          "id" : "2566303D-5977-4653-A225-49BC3F325DEF",
           "locked" : false,
           "name" : "Layer 1",
           "visible" : true
@@ -899,10 +899,10 @@
           "elements" : [
             {
               "height" : 40,
-              "id" : "F8A83442-2B9E-4E7B-906E-0CE94D95D675",
+              "id" : "98CDE263-38AA-442B-9CF8-B1965FDC946A",
               "kind" : "rectangle",
-              "layerID" : "5B2796AE-D541-4565-998F-7A227639EDB3",
-              "seed" : 446803946,
+              "layerID" : "F6018BD2-0FA9-4A5B-9584-9DA7FFFEE69B",
+              "seed" : 104311234,
               "style" : {
                 "bowing" : 1,
                 "dash" : "solid",
@@ -930,10 +930,10 @@
             }
           ],
           "height" : 40,
-          "id" : "4B342F90-8890-479A-BFE5-138945139051",
+          "id" : "43BDCA58-A23F-4259-96DA-F020DB87AC75",
           "layers" : [
             {
-              "id" : "5B2796AE-D541-4565-998F-7A227639EDB3",
+              "id" : "F6018BD2-0FA9-4A5B-9584-9DA7FFFEE69B",
               "locked" : false,
               "name" : "Layer 1",
               "visible" : true
@@ -957,7 +957,7 @@
             "settle" : true,
             "tracks" : [
               {
-                "element" : "F8A83442-2B9E-4E7B-906E-0CE94D95D675",
+                "element" : "98CDE263-38AA-442B-9CF8-B1965FDC946A",
                 "keys" : [
                   {
                     "ease" : "hold",
@@ -999,10 +999,10 @@
           "elements" : [
             {
               "height" : 44,
-              "id" : "AC5BA906-E434-40B7-A6E2-9023C9268E7C",
+              "id" : "2CCBB0B4-0531-4E65-8F3B-B45FB6544ADD",
               "kind" : "rectangle",
-              "layerID" : "014AA179-1E9A-49EF-AE0A-EB0F23C2B6ED",
-              "seed" : 690303990,
+              "layerID" : "A6B0C782-D77B-4D61-8D15-498A1895AAD5",
+              "seed" : 2865084127,
               "style" : {
                 "bowing" : 1,
                 "dash" : "solid",
@@ -1030,10 +1030,10 @@
             }
           ],
           "height" : 44,
-          "id" : "97BE6A5A-413F-4002-BD27-5683C64766D7",
+          "id" : "69B6DC97-C6B3-46EC-9206-A09E4B014AC8",
           "layers" : [
             {
-              "id" : "014AA179-1E9A-49EF-AE0A-EB0F23C2B6ED",
+              "id" : "A6B0C782-D77B-4D61-8D15-498A1895AAD5",
               "locked" : false,
               "name" : "Layer 1",
               "visible" : true
@@ -1050,7 +1050,7 @@
             "settle" : true,
             "tracks" : [
               {
-                "element" : "AC5BA906-E434-40B7-A6E2-9023C9268E7C",
+                "element" : "2CCBB0B4-0531-4E65-8F3B-B45FB6544ADD",
                 "keys" : [
                   {
                     "t" : 0,
@@ -1119,11 +1119,11 @@
         "settle" : true,
         "tracks" : [
           {
-            "element" : "A94468EA-6613-49A1-85FD-0C7DE9A853A4",
+            "element" : "22B44452-813B-43C1-8219-CA00D321FD5E",
             "follow" : [
               {
                 "end" : 1.1,
-                "path" : "704127CC-39D6-454E-96B8-90DA182B25C1",
+                "path" : "3B7670E1-E96D-4C46-B6D1-FCE6B8D2BD90",
                 "start" : 0.6
               }
             ],
@@ -1139,11 +1139,11 @@
             ]
           },
           {
-            "element" : "EB9B6E28-80DB-4F06-B398-2CC2B6DCF26A",
+            "element" : "8057D4FA-419E-4619-A835-E554534EC751",
             "follow" : [
               {
                 "end" : 1.6,
-                "path" : "4D3D7755-A51B-48C7-A3AA-8E80E413157A",
+                "path" : "EB507D37-5B4F-477A-867C-50973C706512",
                 "start" : 1.1
               }
             ],
@@ -1159,7 +1159,7 @@
             ]
           },
           {
-            "element" : "B9EB333F-3632-4BED-B32C-0DFD6D07E216",
+            "element" : "E1B02B53-AD76-4F0B-9EA9-B3FED09001AB",
             "keys" : [
               {
                 "ease" : "easeInOut",
@@ -1187,11 +1187,11 @@
             ]
           },
           {
-            "element" : "15859C05-9873-424A-91D2-36D033F9CA02",
+            "element" : "3E6B6025-E288-484F-868A-88838307BC29",
             "follow" : [
               {
                 "end" : 3.2,
-                "path" : "704127CC-39D6-454E-96B8-90DA182B25C1",
+                "path" : "3B7670E1-E96D-4C46-B6D1-FCE6B8D2BD90",
                 "start" : 2.7
               }
             ],
@@ -1207,11 +1207,11 @@
             ]
           },
           {
-            "element" : "71776FBD-BEBA-4902-B353-CF87227AEB12",
+            "element" : "8B0C93C8-9B9C-4E38-82F0-9190AF0E0F09",
             "follow" : [
               {
                 "end" : 3.7,
-                "path" : "CCA6A279-059B-4B7F-B2A6-9B75C6A6C284",
+                "path" : "CC8877E7-1413-4E52-8F41-BE951EB00ADB",
                 "start" : 3.2
               }
             ],
@@ -1227,11 +1227,11 @@
             ]
           },
           {
-            "element" : "A42A256F-637F-49EB-BE59-C9E7133E7FC3",
+            "element" : "8BF784E8-E4EB-4AF2-858E-8F29A7A136B0",
             "follow" : [
               {
                 "end" : 4.2,
-                "path" : "80455082-EF41-47D3-BC0D-CC5271A6A85D",
+                "path" : "675AF956-373E-479B-8D67-3DAEB2FE0353",
                 "start" : 3.7
               }
             ],
@@ -1247,11 +1247,11 @@
             ]
           },
           {
-            "element" : "92CD512A-AF81-4D80-AE98-EAD03937E8B2",
+            "element" : "8BBF182B-A3EE-4F89-AF49-BAEB3BA3FB59",
             "follow" : [
               {
                 "end" : 4.7,
-                "path" : "0A3B74D8-4E8C-43C4-8A6E-31FA6A6AF599",
+                "path" : "44AA2B20-961F-49B1-859E-98D7740C0E14",
                 "start" : 4.2
               }
             ],
@@ -1267,11 +1267,11 @@
             ]
           },
           {
-            "element" : "A8EA3769-8FCD-4FDB-9036-A131B88D9010",
+            "element" : "D346C2A9-5F64-4C45-97BF-E8AFF4AC0718",
             "follow" : [
               {
                 "end" : 5.2,
-                "path" : "726A547A-B6AC-461E-AF82-04D64E6759C3",
+                "path" : "3198BCDD-8911-4B1B-84AD-87000CB31B7A",
                 "start" : 4.7
               }
             ],
@@ -1287,7 +1287,7 @@
             ]
           },
           {
-            "element" : "BEE812D0-C5E6-4B35-B921-3101BF23448D",
+            "element" : "C4294B69-1159-4CF7-84F4-0A549B943098",
             "keys" : [
               {
                 "ease" : "easeInOut",
