@@ -450,3 +450,22 @@ test("a press held across frames while playing still clicks, in both players; En
   await p2.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 20; }, null, { timeout: 5000 });
   await close();
 });
+
+test("the HTML export keeps a hovered button's look steady while it plays", async () => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await serve(page);
+  await page.goto("http://dottie.test/fixtures/goldens/html/clicks.html");
+  const box = await page.locator('.f.on .dottie-a[aria-label="Auth"]').boundingBox();
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);   // plays on, the pointer still over it
+  const seen = [];
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(40);
+    seen.push(await page.evaluate(() => {
+      const h = document.querySelector('.f.on .dottie-a[aria-label="Auth"] > .dottie-h');
+      return h && getComputedStyle(h).display !== "none" ? "H" : "n";
+    }));
+  }
+  assert.equal(seen.join(""), "H".repeat(20));
+  await context.close();
+});

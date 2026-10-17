@@ -266,17 +266,19 @@ extension Exporter {
     }
 
     /// How clickable elements look in the web players: a pointer, their hover look under it or with keyboard
-    /// focus (a soft glow when they have none), and a small nudge while pressed.
+    /// focus (a soft glow when they have none), and a small nudge (or a button's down look) while pressed. The
+    /// classes `dottie-hover` and `dottie-press` stand in for `:hover` and `:active` on a button the web page export
+    /// has just swapped in, which the browser doesn't count as under the pointer until it moves.
     static let clickStyle = """
     .dottie-a { cursor: pointer; outline: none; }
     .dottie-a .dottie-h { display: none; }
-    .dottie-a:hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
-    .dottie-a:hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
+    .dottie-a:hover .dottie-h, .dottie-a.dottie-hover .dottie-h, .dottie-a:focus-visible .dottie-h { display: inline; }
+    .dottie-a:hover .dottie-n, .dottie-a.dottie-hover .dottie-n, .dottie-a:focus-visible .dottie-n { display: none; }
     .dottie-a:focus-visible { filter: drop-shadow(0 0 3px var(--dottie-focus, #3b82f6)); }
-    .dottie-a:not(.dottie-b):active { transform: translate(1px, 1px); }
+    .dottie-a:not(.dottie-b):active, .dottie-a.dottie-press:not(.dottie-b) { transform: translate(1px, 1px); }
     .dottie-a .dottie-d { display: none; }
-    .dottie-b:active .dottie-n, .dottie-b:active .dottie-h { display: none; }
-    .dottie-b:active .dottie-d { display: inline; }
+    .dottie-b:active .dottie-n, .dottie-b:active .dottie-h, .dottie-b.dottie-press .dottie-n, .dottie-b.dottie-press .dottie-h { display: none; }
+    .dottie-b:active .dottie-d, .dottie-b.dottie-press .dottie-d { display: inline; }
     """
 
     /// A self-contained web page that plays the page's timeline: every frame as inline SVG, with play/pause,
@@ -375,6 +377,7 @@ extension Exporter {
             var a = document.activeElement, held = a && a.getAttribute && frames[i].contains(a) ? a.getAttribute("data-a") : null;
             frames[i].classList.remove("on"); i = (k + n) % n; frames[i].classList.add("on");
             if (held !== null) { var same = frames[i].querySelector('[data-a="' + held + '"]'); if (same) same.focus({ preventScroll: true }); }
+            if (hovered !== null || holding !== null) mark();
             scrub.value = i; time.textContent = times[i].toFixed(1) + "s";
             if (sceneLabel) { var s = sceneAt(i); sceneLabel.textContent = s < 0 ? "" : names[s]; }
           }
@@ -418,12 +421,29 @@ extension Exporter {
           function button(t) { return t && t.closest ? t.closest(".dottie-a") : null; }
           // Frames are swapped while playing, so a press and its release can land on different copies of a button,
           // and the click then reaches only the stage: the button pressed still counts if it is under the release.
-          var pressed = null;
-          document.querySelector(".stage").addEventListener("pointerdown", function (e) {
+          // The button under the pointer, and the one held down, are marked in each frame shown, since the browser
+          // only counts a newly shown copy as hovered once the pointer moves.
+          var stage = document.querySelector(".stage"), pressed = null, hovered = null, holding = null;
+          function mark() {
+            var old = document.querySelectorAll(".dottie-hover, .dottie-press");
+            for (var j = 0; j < old.length; j++) old[j].classList.remove("dottie-hover", "dottie-press");
+            if (hovered !== null) { var h = frames[i].querySelector('[data-a="' + hovered + '"]'); if (h) h.classList.add("dottie-hover"); }
+            if (holding !== null) { var p = frames[i].querySelector('[data-a="' + holding + '"]'); if (p) p.classList.add("dottie-press"); }
+          }
+          stage.addEventListener("pointermove", function (e) {
+            var b = button(e.target), a = b ? b.getAttribute("data-a") : null;
+            if (a !== hovered) { hovered = a; mark(); }
+          });
+          stage.addEventListener("pointerleave", function () { hovered = null; holding = null; mark(); });
+          document.addEventListener("pointerup", function () { if (holding !== null) { holding = null; mark(); } });
+          document.addEventListener("pointercancel", function () { holding = null; mark(); });
+          stage.addEventListener("pointerdown", function (e) {
             var b = button(e.target);
             pressed = b ? b.getAttribute("data-a") : null;
+            holding = pressed;
+            mark();
           });
-          document.querySelector(".stage").addEventListener("click", function (e) {
+          stage.addEventListener("click", function (e) {
             var b = button(e.target), held = pressed;
             pressed = null;
             if (!b && held !== null) {
