@@ -2302,6 +2302,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 }
 
+#if DEBUG
+/// The canvas SwiftUI last updated for each document, for the debug driver. Searching a window's views for one could
+/// find a canvas SwiftUI had replaced (after a resize, say), whose edits reach no document.
+@MainActor
+enum LiveCanvases {
+    private struct Weak { weak var view: CanvasNSView? }
+    private static var views: [ObjectIdentifier: Weak] = [:]
+
+    static func register(_ canvas: CanvasNSView, for document: DrawingDocument) {
+        views[ObjectIdentifier(document)] = Weak(view: canvas)
+    }
+
+    static func canvas(for document: DrawingDocument) -> CanvasNSView? { views[ObjectIdentifier(document)]?.view }
+}
+#endif
+
 struct CanvasView: NSViewRepresentable {
     @ObservedObject var document: DrawingDocument
     @Binding var tool: Tool
@@ -2341,7 +2357,7 @@ struct CanvasView: NSViewRepresentable {
 
     func updateNSView(_ v: CanvasNSView, context: Context) {
         #if DEBUG
-        DebugDriver.shared.register(v, for: document)
+        LiveCanvases.register(v, for: document)
         #endif
         if let t = pose {
             // Posing: the canvas edits the frame at `t`; only the finished edit reaches the page, as keys.

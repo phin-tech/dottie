@@ -171,19 +171,9 @@ final class DebugDriver {
         return front
     }
 
-    /// The canvas SwiftUI last updated for each document, registered by `CanvasView.updateNSView`. Searching the
-    /// window's views for one could find a canvas SwiftUI had replaced (after a resize, say), whose edits reach no
-    /// document.
-    private var canvases: [ObjectIdentifier: WeakCanvas] = [:]
-    private struct WeakCanvas { weak var view: CanvasNSView? }
-
-    func register(_ canvas: CanvasNSView, for document: DrawingDocument) {
-        canvases[ObjectIdentifier(document)] = WeakCanvas(view: canvas)
-    }
-
     /// The front document's canvas, in a window.
     private func canvas() throws -> CanvasNSView {
-        guard let c = canvases[ObjectIdentifier(try hooks().document)]?.view, c.window != nil else { throw DebugError("no canvas") }
+        guard let c = LiveCanvases.canvas(for: try hooks().document), c.window != nil else { throw DebugError("no canvas") }
         return c
     }
 
