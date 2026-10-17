@@ -418,3 +418,35 @@ test("a button symbol in the HTML export: up, over, down, hit area, click; no pl
   assert.deepEqual(errors, []);
   await context.close();
 });
+
+test("a press held across frames while playing still clicks, in both players; Enter works on a button", async () => {
+  // The export swaps whole frames, so the press and the release land on different copies of the button.
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await serve(page);
+  await page.goto("http://dottie.test/fixtures/goldens/html/buttons.html");
+  await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
+  await page.click("#play");
+  const docs = await page.locator('.f.on .dottie-a[aria-label="Docs button"]').boundingBox();
+  await page.mouse.move(docs.x + docs.width / 2, docs.y + docs.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  assert.equal((await page.evaluate(() => window.__opened)).length, 1, "the export");
+  await context.close();
+
+  const { page: p2, close } = await open(`<dottie-player src="/fixtures/edge/buttons.dottie"></dottie-player>`);
+  await ready(p2);
+  await p2.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; document.querySelector("dottie-player").play(); });
+  const box = await p2.locator('dottie-player .dottie-a[aria-label="Docs button"]').boundingBox();
+  await p2.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await p2.mouse.down();
+  await p2.waitForTimeout(250);
+  await p2.mouse.up();
+  assert.equal((await p2.evaluate(() => window.__opened)).length, 1, "<dottie-player>");
+  await p2.evaluate(() => document.querySelector("dottie-player").pause());
+  await p2.focus('dottie-player .dottie-a[aria-label="Go"]');
+  await p2.keyboard.press("Enter");
+  await p2.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 20; }, null, { timeout: 5000 });
+  await close();
+});

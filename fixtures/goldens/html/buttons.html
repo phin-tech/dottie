@@ -1022,8 +1022,20 @@ output { font-variant-numeric: tabular-nums; min-width: 4.5em; text-align: right
     show(scenes[s]); setPlaying(true);
   }
   function button(t) { return t && t.closest ? t.closest(".dottie-a") : null; }
-  document.querySelector(".stage").addEventListener("click", function (e) {
+  // Frames are swapped while playing, so a press and its release can land on different copies of a button,
+  // and the click then reaches only the stage: the button pressed still counts if it is under the release.
+  var pressed = null;
+  document.querySelector(".stage").addEventListener("pointerdown", function (e) {
     var b = button(e.target);
+    pressed = b ? b.getAttribute("data-a") : null;
+  });
+  document.querySelector(".stage").addEventListener("click", function (e) {
+    var b = button(e.target), held = pressed;
+    pressed = null;
+    if (!b && held !== null) {
+      var under = button(document.elementFromPoint(e.clientX, e.clientY));
+      if (under && under.getAttribute("data-a") === held) b = under;
+    }
     if (b) act(+b.getAttribute("data-a"));
   });
   play.onclick = function () { if (!playing && scenes.length && i >= n - 1) show(0); setPlaying(!playing); };
