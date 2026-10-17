@@ -114,6 +114,15 @@ extension AnimationExportTests {
         XCTAssertLessThan(holder.utf8.count + frames.map(\.utf8.count).reduce(0, +), wholeSize / 2, "shared, it's much smaller")
     }
 
+    func testSymbolsStayExact() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../fixtures/edge/symbols.dottie")
+        let doc = try DottieFile.decode(Data(contentsOf: url)).pages[0]
+        let frames = try expandedFrames(doc)
+        XCTAssertGreaterThan(frames.count, 20)
+        for (slim, whole) in frames { XCTAssertEqual(slim, whole) }
+        XCTAssertTrue(frames[15].slim.contains(">g</tspan>"), "the symbols' own elements are drawn")
+    }
+
     func testTheTourDemoStaysExact() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../Design/demos/tour.dottie")
         let doc = try DottieFile.decode(Data(contentsOf: url)).pages[0]

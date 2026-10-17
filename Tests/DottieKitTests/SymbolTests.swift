@@ -242,3 +242,23 @@ extension SymbolTests {
         XCTAssertEqual(StencilLibrary(name: "L", items: [back]).sheet().symbols?.count, 1)
     }
 }
+
+extension SymbolTests {
+    func testInstancesRefuseClicksForNow() throws {
+        var (page, symbol, _, _) = gear()
+        let inst = try XCTUnwrap(page.placeSymbol(symbol.id, at: .zero))
+        XCTAssertThrowsError(try DiagramOps.update(&page, id: inst.id, click: .some(ClickAction(url: "https://example.com"))))
+        XCTAssertNoThrow(try DiagramOps.update(&page, id: inst.id, click: .some(nil)), "removing one is fine")
+    }
+
+    func testLottieDrawsWhatInstancesShow() throws {
+        var (page, symbol, _, _) = gear()
+        page.placeSymbol(symbol.id, at: CGPoint(x: 20, y: 20))
+        for mode in Exporter.LottieMode.allCases {
+            let data = try XCTUnwrap(Exporter.lottie(page, mode: mode))
+            let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+            let shapes = (json["layers"] as? [[String: Any]] ?? []).filter { $0["ty"] as? Int == 4 }
+            XCTAssertGreaterThanOrEqual(shapes.count, 2, "\(mode): the box and the dot that appears later")
+        }
+    }
+}
