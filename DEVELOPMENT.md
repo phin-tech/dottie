@@ -143,6 +143,17 @@ picture inline, and copies share one buffer. A reference with no table entry ope
 is normalized on the way in by `ImageImport` (EXIF rotation applied, longest side capped at 2048 px, re-encoded
 as PNG, or JPEG for large opaque photos) so SVG and HTML exports can embed the bytes as a `data:` URI. Decoded
 images are cached by that digest, always recomputed from the bytes. Versions before pictures cannot open a file containing one.
+A page's `symbols` are drawings placed by `symbol` elements (instances), each with its own layers, elements and
+timeline in a box at the origin. `resolved(at:)` is `posed(at:)` (the page's keys applied, instances kept: what
+the editor poses, hit-tests and edits) followed by `expandingSymbols(at:)`, which replaces each instance with its
+symbol resolved at the instance's own time, scaled into its frame and turned with it. Expanded elements get ids
+hashed from the instance's and their own (`derivedID`, SplitMix64, ported exactly to dottie.js), so they are stable
+from frame to frame. Anything that iterates a page's elements to draw or export must start from the expansion,
+not the page: Lottie and the web page export take their element order from `expandingSymbols(at: 0, posing:
+false)`. Cycles are cut, and depth and the number of expanded elements are capped (`Symbol.maxDepth`,
+`.maxElements`), the same in dottie.js. Dottie 0.5 and earlier cannot open a file containing a symbol.
+An element's `click` (a scene name or an `http`, `https` or `mailto` link) and `hover` look are only used by the
+web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read.
 
 ## Mermaid
 
@@ -165,11 +176,12 @@ Tools: `build_diagram` (nodes + edges, auto-laid-out), `import_mermaid` (a Merma
 way), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `add_image`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
 work, plus each element's id and pixel box), `export_svg`, `export_mermaid`, `create_diagram`, `open_document`, `list_stencils`,
-`add_stencil`, `list_pages`, `add_page`, `rename_page`, `run_script` and `script_api`. Tools that draw, list or
+`add_stencil`, `list_pages`, `add_page`, `rename_page`, `make_symbol`, `place_symbol`, `run_script` and `script_api`. Tools that draw, list or
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element
 id find its page themselves. `add_shape` and `build_diagram` take kind `note` for a sticky note
 whose text is Markdown. Connectors take a `label`; shapes and connectors take `fill_style`, `dash`,
-`stroke_width`, `bowing`, `rotation` and `start_head` / `end_head`.
+`stroke_width`, `bowing`, `rotation` and `start_head` / `end_head`. `update_element` also sets what a click does
+on the web (`click_scene`, `click_url`, `hover_*`) and how a symbol instance plays (`playback`, `offset`).
 
 **Live mode.** The app listens on `~/Library/Application Support/Dottie/live.sock`. When it has the file open,
 tool calls edit that window (one undo step each, shown as "Agent: <tool>") instead of the file on disk. When it

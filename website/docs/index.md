@@ -23,7 +23,10 @@ arrow keys.
   diagram and watch it appear in the window, one undoable change at a time.
 - **Make it move.** Build a diagram up shape by shape, send requests along its arrows, set them marching, pan
   and zoom a camera around it, step through it scene by scene, or draw two pages and Magic Move from one to the
-  other. Export a GIF, an animated PNG, an MP4, Lottie, or a web page like the ones here.
+  other. Turn a piece into a symbol, like a Flash movie clip, and place it again and again, each copy playing its
+  own animation. Export a GIF, an animated PNG, an MP4, Lottie, or a web page like the ones here.
+- **Make it clickable.** On the web, a shape can play a scene when clicked, or open a link, so a diagram can
+  wait for the reader to pick which request to follow.
 - **Bring diagrams in and send them out:** Mermaid, Excalidraw, draw.io and SVG in; PNG, SVG, PDF, Mermaid
   and HTML out.
 

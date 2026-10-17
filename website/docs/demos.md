@@ -47,6 +47,22 @@ March Selected Lines sets the dashes of a line travelling along it, for anything
 
 <dottie-player class="player" src="../drawings/stream.dottie" label="Marching ants"></dottie-player>
 
+## Click to follow a request
+
+The diagram waits: click Auth or Orders (or Tab to one and press Enter) to watch that request go through, and
+Back to return. In the inspector, **When Clicked on the Web** makes a shape play a scene or open a link, here and
+in the web page export, with a color for when the pointer is over it.
+
+<dottie-player class="player" src="../drawings/flows.dottie" label="Click to follow a request"></dottie-player>
+
+## Symbols
+
+A heartbeat light and a turning cog, each drawn and animated once as a symbol, Flash's movie clip: Arrange ▸
+Convert to Symbol. The light is placed beside every service, each copy starting at a different point so they
+blink out of step, and the cog at two sizes. Edit a symbol and every copy changes.
+
+<dottie-player class="player" src="../drawings/symbols.dottie" label="Symbols"></dottie-player>
+
 ## One after another
 
 Shapes that enter, and wiggle, in turn.
