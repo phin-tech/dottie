@@ -66,7 +66,8 @@ Pick a tool from the toolbar or press its letter:
 | D | Diamond | | E | Eraser |
 | N | Note | | | |
 
-Double-click a shape to give it a label. Connectors stay attached when you move shapes around.
+Double-click a shape to give it a label. Connectors stay attached when you move shapes around. The arrow keys
+nudge the selection a point at a time (⇧ for ten); holding one down is a single undo step.
 
 - **Flowcharts from the keyboard.** Select a rectangle, ellipse or diamond and hold ⌘ while you press an arrow
   key: a copy appears that way, joined to it by an arrow. Press the arrow again (still holding ⌘) for another

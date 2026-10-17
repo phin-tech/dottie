@@ -595,6 +595,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// Called while `model` still holds the page being left.
     private func leavePage() {
         if editor != nil { endEditing(deferCommit: true) }
+        if let base = nudgeBase { // keep a nudge still under way, on the page it was made on
+            nudgeBase = nil
+            let final = model
+            if final != base {
+                DispatchQueue.main.async { [weak self] in
+                    self?.onPreview?(base)
+                    self?.onCommit?(final, "Nudge")
+                }
+            }
+        }
         if let d = flowDraft { // keep a row still being grown, on the page it was grown on
             flowDraft = nil
             let final = model
@@ -1461,6 +1471,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func keyUp(with event: NSEvent) {
+        if Self.flowDirection(event.keyCode) != nil { finishNudge() } // the arrow is up: the nudge is one undo step
         if event.keyCode == 49 { spaceDown = false } else { super.keyUp(with: event) }
     }
 
@@ -1509,6 +1520,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     override func mouseDown(with event: NSEvent) {
         finishFlowchart() // ⌘ was let go somewhere the canvas didn't hear it
+        finishNudge()
         pressPoint = convert(event.locationInWindow, from: nil)
         dragging = false
         endEditing()
@@ -1919,7 +1931,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if flowDraft != nil, !event.modifierFlags.contains(.command) { finishFlowchart() } // ⌘ let go unseen
         if event.keyCode == 53, flowDraft != nil { cancelFlowchart(); return } // escape drops the nodes being grown
         let mods = event.modifierFlags.intersection([.command, .control, .option, .shift])
-        if let direction = Self.flowDirection(event.keyCode) {
+        let arrow = Self.flowDirection(event.keyCode)
+        if nudgeBase != nil, arrow == nil || !(mods.isEmpty || mods == [.shift]) { finishNudge() }
+        if let direction = arrow {
+            if mods.isEmpty || mods == [.shift], !selection.isEmpty { return nudge(direction, by: mods.isEmpty ? 1 : 10) }
             if mods == [.command] { // a held arrow repeats; only presses add nodes
                 if !event.isARepeat { growFlowchart(direction) }
                 return
@@ -1951,6 +1966,46 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     override func flagsChanged(with event: NSEvent) {
         if flowDraft != nil, !event.modifierFlags.contains(.command) { finishFlowchart() }
         super.flagsChanged(with: event)
+    }
+
+    // MARK: Nudging
+
+    /// The page before the arrow keys started moving the selection; the moves so far become one undo step when
+    /// the key comes up.
+    private var nudgeBase: DottieDocument?
+
+    /// An arrow key moves the selected shapes on unlocked layers a point that way (⇧: ten). Bound connector
+    /// ends follow their shapes; free ends of selected connectors move with them.
+    private func nudge(_ direction: Flowchart.Direction, by step: Double) {
+        let d = switch direction {
+        case .left: CGPoint(x: -step, y: 0)
+        case .right: CGPoint(x: step, y: 0)
+        case .up: CGPoint(x: 0, y: -step)
+        case .down: CGPoint(x: 0, y: step)
+        }
+        let editable = Set(model.layers.filter { !$0.locked }.map(\.id))
+        var next = model
+        var moved = false
+        for i in next.elements.indices where selection.contains(next.elements[i].id) && editable.contains(next.elements[i].layerID) {
+            if var c = next.elements[i].connector {
+                if c.start.elementID == nil { c.start.x += d.x; c.start.y += d.y }
+                if c.end.elementID == nil { c.end.x += d.x; c.end.y += d.y }
+                next.elements[i].connector = c
+            } else {
+                next.elements[i].x += d.x; next.elements[i].y += d.y
+            }
+            moved = true
+        }
+        guard moved else { return }
+        if nudgeBase == nil { nudgeBase = model }
+        model = next
+        onPreview?(next)
+    }
+
+    private func finishNudge() {
+        guard let base = nudgeBase else { return }
+        nudgeBase = nil
+        if model != base { commit(base, "Nudge") }
     }
 
     // MARK: Flowcharts from the keyboard

@@ -357,6 +357,10 @@ final class DebugDriver {
                                      windowNumber: w.windowNumber, context: nil, characters: chars,
                                      charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code)!
         c.keyDown(with: event)
+        c.keyUp(with: NSEvent.keyEvent(with: .keyUp, location: .zero, modifierFlags: flags,
+                                       timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: w.windowNumber,
+                                       context: nil, characters: chars, charactersIgnoringModifiers: chars,
+                                       isARepeat: false, keyCode: code)!)
         return "pressed \(k)"
     }
 
