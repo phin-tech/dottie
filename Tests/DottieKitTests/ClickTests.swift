@@ -46,6 +46,33 @@ final class ClickTests: XCTestCase {
         XCTAssertEqual(doc.clickTargets[docs.id], .url("https://example.com"))
     }
 
+    func testRenamingASceneKeepsItsClicksPlayingIt() throws {
+        var (doc, auth, _, back) = try tour()
+        doc.renameScene(at: 1, to: "  Sign in  ")
+        XCTAssertEqual(doc.timeline?.markers?.map(\.name), ["Overview", "Sign in"])
+        XCTAssertEqual(doc.elements.first { $0.id == auth.id }?.click?.scene, "Sign in", "\"login flow\" played it, in any case")
+        XCTAssertEqual(doc.elements.first { $0.id == back.id }?.click?.scene, "Overview", "other scenes' clicks stay")
+        XCTAssertEqual(doc.clickTargets[auth.id], .scene(1))
+        let before = doc
+        doc.renameScene(at: 1, to: "   ")
+        doc.renameScene(at: 0.5, to: "Nowhere")
+        XCTAssertEqual(doc, before, "a blank name or a time with no marker changes nothing")
+    }
+
+    func testRemovingScenesAndNamingNewOnes() {
+        var tl = Timeline(duration: 3)
+        XCTAssertEqual(tl.nextSceneName, "Scene 1")
+        tl.addMarker(at: 0, name: tl.nextSceneName)
+        tl.addMarker(at: 1, name: tl.nextSceneName)
+        tl.addMarker(at: 2, name: tl.nextSceneName)
+        tl.removeMarker(at: 1)
+        XCTAssertEqual(tl.markers?.map(\.name), ["Scene 1", "Scene 3"])
+        XCTAssertEqual(tl.nextSceneName, "Scene 4", "not a second Scene 3")
+        tl.removeMarker(at: 0)
+        tl.removeMarker(at: 2)
+        XCTAssertNil(tl.markers, "the last one gone leaves no list")
+    }
+
     func testStillExportsIgnoreClicks() throws {
         let (doc, _, _, _) = try tour()
         var plain = doc

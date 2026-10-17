@@ -48,7 +48,8 @@ struct ContentView: View {
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
                        pose: poseTime,
-                       onExitPreview: { playing = false; playhead = nil })
+                       onExitPreview: { playing = false; playhead = nil },
+                       editorActions: { editorActions(for: $0) })
             if document.model.timeline != nil {
                 Divider()
                 TimelinePanel(page: document.model, playhead: $playhead, playing: $playing, selectedKey: $selectedKey,
@@ -56,7 +57,13 @@ struct ContentView: View {
                                   playing = false
                                   selection = [id]
                               },
-                              onEdit: { name, change in editTimeline(name, change) })
+                              onEdit: { name, change in editTimeline(name, change) },
+                              onRenameScene: { t, name in
+                                  var next = document.model
+                                  next.renameScene(at: t, to: name)
+                                  guard next != document.model else { return }
+                                  document.commit(next, actionName: "Rename Scene", undoManager: undoManager)
+                              })
             }
             Divider()
             PageBar(document: document, undoManager: undoManager)

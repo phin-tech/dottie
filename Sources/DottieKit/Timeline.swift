@@ -292,6 +292,20 @@ public struct Timeline: Codable, Equatable, Sendable {
         duration = max(duration, t)
     }
 
+    /// Removes the scene marker at `t`, if there is one.
+    public mutating func removeMarker(at t: Double) {
+        markers = markers?.filter { abs($0.t - t) >= 1e-6 }
+        if markers?.isEmpty == true { markers = nil }
+    }
+
+    /// "Scene N" for the first N no marker is called yet, so a deleted scene's name isn't handed out twice.
+    public var nextSceneName: String {
+        let names = Set((markers ?? []).map { $0.name.lowercased() })
+        var n = (markers?.count ?? 0) + 1
+        while names.contains("scene \(n)") { n += 1 }
+        return "Scene \(n)"
+    }
+
     /// Makes the element's keys from `start` to `end` play again, `count` times in all (nil forever).
     public mutating func addRepeat(for id: UUID, from start: Double, to end: Double, count: Int? = nil) {
         let r = Repeat(start: Self.clampTime(start), end: Self.clampTime(end), count: count.map { min(max($0, 1), 10_000) })
