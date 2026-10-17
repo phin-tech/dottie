@@ -7,3 +7,6 @@
   display: block;
   margin: 0.5rem 0 1.5rem;
 }
+
+/* A web page export, shown as it is: its own page, with its controls under the drawing. */
+iframe.player.export { height: 420px; background: #fff; }
