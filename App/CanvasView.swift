@@ -18,7 +18,7 @@ struct PlaceRequest: Equatable {
 }
 
 enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text, note, connector, pencil, eraser
+    case select, rectangle, ellipse, diamond, text, note, connector, pencil, highlighter, eraser, redact
     var id: String { rawValue }
     var symbol: String {
         switch self {
@@ -30,7 +30,9 @@ enum Tool: String, CaseIterable, Identifiable {
         case .note: "note.text"
         case .connector: "arrow.up.right"
         case .pencil: "pencil.tip"
+        case .highlighter: "highlighter"
         case .eraser: "eraser"
+        case .redact: "eye.slash"
         }
     }
     var label: String {
@@ -43,7 +45,9 @@ enum Tool: String, CaseIterable, Identifiable {
         case .note: "Note"
         case .connector: "Connector"
         case .pencil: "Pencil"
+        case .highlighter: "Highlighter"
         case .eraser: "Eraser"
+        case .redact: "Redact"
         }
     }
     /// Single-key tool switch, Photoshop-style.
@@ -57,7 +61,9 @@ enum Tool: String, CaseIterable, Identifiable {
         case .note: "n"
         case .connector: "c"
         case .pencil: "p"
+        case .highlighter: "h"
         case .eraser: "e"
+        case .redact: "x"
         }
     }
     var kind: ElementKind? {
@@ -69,8 +75,8 @@ enum Tool: String, CaseIterable, Identifiable {
         case .text: .text
         case .note: .note
         case .connector: nil
-        case .pencil: .freehand
-        case .eraser: nil
+        case .pencil, .highlighter: .freehand
+        case .eraser, .redact: nil
         }
     }
 }
@@ -109,6 +115,8 @@ private enum Gesture {
     case panning
     case drawing(id: UUID)
     case erasing
+    /// Dragging a box over pictures to pixelate what it covers (`marqueeRect`).
+    case redacting
     case editingPoint(id: UUID, index: Int)
     case rotating(id: UUID)
     case rotatingGroup(center: CGPoint, start: Double)
@@ -1532,7 +1540,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             }
         }
         var p = point(event)
-        if tool.kind != nil, tool != .text, tool != .pencil { p = snapped(p, event) }
+        if tool.kind != nil, tool != .text, tool != .pencil, tool != .highlighter { p = snapped(p, event) }
         dragStart = p
         if tool == .select, event.clickCount == 1, let target = badgeHit(p) { // a link badge: go there
             jump(to: target)
@@ -1567,6 +1575,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
 
+        if tool == .redact {
+            if poseTime != nil { gesture = nil; return NSSound.beep() } // a pose keys motion, not pictures
+            gesture = .redacting
+            return
+        }
         if tool == .eraser {
             gesture = .erasing
             eraseStep(at: p)
@@ -1589,8 +1602,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             onPreview?(model)
         } else if tool == .select, let (id, isStart) = connectorEndpointHit(p) {
             gesture = .endpoint(id: id, isStart: isStart)
-        } else if tool == .pencil {
-            var st = style
+        } else if tool == .pencil || tool == .highlighter {
+            var st = tool == .highlighter ? Self.highlighterStyle : style
             st.fill = .clear
             st.roughness = 0
             let e = Element(kind: .freehand, frame: CGRect(x: p.x, y: p.y, width: 1, height: 1), style: st, layerID: layer.id,
@@ -1657,7 +1670,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let raw = convert(event.locationInWindow, from: nil)
             if hypot(raw.x - pressPoint.x, raw.y - pressPoint.y) < Self.dragThreshold {
                 switch gesture {
-                case .moving?, .marquee?, .resizing?, .rotating?, .rotatingGroup?, .endpoint?, .editingPoint?: return
+                case .moving?, .marquee?, .redacting?, .resizing?, .rotating?, .rotatingGroup?, .endpoint?, .editingPoint?: return
                 default: break
                 }
             }
@@ -1791,6 +1804,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 e.points = strokePoints.map { StrokePoint(x: ($0.x - frame.minX) / frame.width, y: ($0.y - frame.minY) / frame.height) }
                 next.elements.append(e)
             }
+        case .redacting:
+            marqueeRect = CGRect(x: min(dragStart.x, p.x), y: min(dragStart.y, p.y), width: abs(d.x), height: abs(d.y))
+            needsDisplay = true
+            return
         case .marquee:
             let r = CGRect(x: min(dragStart.x, p.x), y: min(dragStart.y, p.y), width: abs(d.x), height: abs(d.y))
             marqueeRect = r
@@ -1860,6 +1877,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 commit(base, after > before ? "Add Guide" : after < before ? "Remove Guide" : "Move Guide")
             }
         case .erasing where model != base: commit(base, "Erase")
+        case .redacting: if let r = marqueeRect { redact(r) }
         case .editingPoint where model != base: commit(base, "Edit Stroke")
         case .rotating where model != base: commit(base, "Rotate")
         case .rotatingGroup where model != base: commit(base, "Rotate")
@@ -1925,6 +1943,26 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         } else {
             super.keyDown(with: event)
         }
+    }
+
+    // MARK: Markup
+
+    /// What the highlighter draws with: a wide, translucent yellow stroke. Selected afterwards, its color, width
+    /// and opacity change in the inspector like any stroke's.
+    static let highlighterStyle: Style = {
+        var st = Style()
+        st.stroke = RGBA(r: 1, g: 0.86, b: 0.1)
+        st.strokeWidth = 18
+        st.opacity = 0.4
+        return st
+    }()
+
+    /// Pixelates the part of each picture under `rect` on the visible, unlocked layers, as one undo step.
+    private func redact(_ rect: CGRect) {
+        var next = model
+        let layers = Set(model.layers.filter { !$0.locked && $0.visible }.map(\.id))
+        guard !Redaction.pixelate(&next, in: rect, layers: layers).isEmpty else { return NSSound.beep() }
+        onCommit?(next, "Redact")
     }
 
     /// Resets the document to the pre-gesture baseline, then commits so undo lands there.

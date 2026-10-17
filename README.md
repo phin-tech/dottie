@@ -64,7 +64,8 @@ Pick a tool from the toolbar or press its letter:
 | R | Rectangle | | C | Connector |
 | O | Ellipse | | P | Pencil |
 | D | Diamond | | E | Eraser |
-| N | Note | | | |
+| N | Note | | H | Highlighter |
+| | | | X | Redact |
 
 Double-click a shape to give it a label. Connectors stay attached when you move shapes around.
 
@@ -87,7 +88,12 @@ Double-click a shape to give it a label. Connectors stay attached when you move 
   links to the details.
 - **Pictures.** Paste a screenshot or a copied image (⌘V), drop image files on the canvas, or use
   File ▸ Insert Image… (⌥⌘I). Pictures are saved inside the drawing; give one a stroke color in the inspector
-  for a sketchy border.
+  for a sketchy border. Screenshots (PNG and other lossless pictures) keep their full resolution, up to 8192
+  pixels across, so small text stays sharp when you zoom in; photos are trimmed to 2048.
+- **Mark up screenshots.** The Highlighter (H) draws a wide, see-through yellow stroke; change its color or
+  width or opacity in the inspector afterwards. Redact (X): drag a box over a picture and the part it covers is pixelated
+  in the picture itself, so the original pixels are gone from the file and every export. Only the copy you
+  drag over changes, and ⌘Z brings it back while the drawing is open.
 - **Shape library.** The Library tab has flowchart symbols and common shapes ready to drag in. Add your own
   from SVG files or from shapes you've drawn.
 - **Layers, rulers and guides** for when things need to line up exactly (⇧⌘R shows the rulers).
