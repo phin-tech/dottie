@@ -217,6 +217,8 @@ actor DottieTools {
                 "hover_stroke": prop("string", "Hex stroke color while the pointer is over a clickable element; empty string clears it"),
                 "hover_fill": prop("string", "Hex fill color while the pointer is over a clickable element; empty string clears it"),
                 "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
+                "playback": prop("string", "For a symbol instance: loop, once or still", enum: SymbolPlayback.allCases.map(\.rawValue)),
+                "offset": prop("number", "For a symbol instance: seconds into its symbol's animation at the page's start"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
         Tool(name: "run_script",
              description: "Code mode: run a JavaScript program that edits the diagram through a `dottie` object, in one call "
@@ -255,6 +257,30 @@ actor DottieTools {
                 "keep_original_colors": prop("boolean", "Keep the item's own colors and exact geometry (default false: drawn in the diagram's look)"),
                 "sketchy": prop("boolean", "Hand-drawn look when restyling (default true)"),
              ], required: ["path", "name", "x", "y"])),
+        Tool(name: "make_symbol",
+             description: "Turn shapes into a symbol (a Flash-style movie clip): a drawing defined once, with its own animation, "
+                + "that any number of instances show, each playing it on its own clock. The shapes, the arrows between them and "
+                + "their keyframes move into the symbol, put back as one instance where they were; arrows and links from outside "
+                + "attach to the instance. The symbol's animation is as long as the page timeline when it is made, so set the "
+                + "timeline's duration to the loop you want first. Returns the symbol id and the instance id.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "ids": .object(["type": "array", "items": .object(["type": "string"]), "description": "Element ids to turn into the symbol"]),
+                "name": prop("string", "The symbol's name"),
+             ], required: ["path", "ids"])),
+        Tool(name: "place_symbol",
+             description: "Place another instance of a symbol (see make_symbol) with its top-left corner at x, y. Instances move, "
+                + "resize, turn, fade and take keys like shapes. An animated symbol gives a still page a timeline, so it plays when "
+                + "exported. Returns the instance id.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "symbol": prop("string", "The symbol's id or name"),
+                "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
+                "width": prop("number", "Width (default the symbol's; give one of width or height to keep its shape)"),
+                "height": prop("number", "Height"),
+                "playback": prop("string", "loop (default), once, or still (its poster frame)", enum: SymbolPlayback.allCases.map(\.rawValue)),
+                "offset": prop("number", "Seconds into the symbol's animation at the page's start, so copies don't move in step"),
+             ], required: ["path", "symbol", "x", "y"])),
         Tool(name: "open_document",
              description: "Open a .dottie file in the Dottie app (launching it if needed) so edits show live and are undoable. "
                 + "Set create=true to make the file first if it does not exist. Reports whether live editing is available.",
@@ -636,6 +662,13 @@ actor DottieTools {
                     hover = .some(try DiagramOps.hover(base, stroke: a.string("hover_stroke"), fill: a.string("hover_fill"),
                                                        opacity: a.double("hover_opacity")))
                 }
+                if let i = file.pages[p].elements.firstIndex(where: { $0.id == id }), file.pages[p].elements[i].kind == .symbol {
+                    if let s = a.string("playback") {
+                        guard let v = SymbolPlayback(rawValue: s) else { throw ToolFailure(message: "'playback' must be loop, once or still") }
+                        file.pages[p].elements[i].playback = v == .loop ? nil : v
+                    }
+                    if let o = a.double("offset") { file.pages[p].elements[i].offset = o == 0 || !o.isFinite ? nil : o }
+                }
                 try DiagramOps.update(&file.pages[p], id: id, text: a.string("text").map { Optional($0) },
                                       x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
@@ -710,6 +743,46 @@ actor DottieTools {
             try save(file, to: url)
             return text("Placed '\(item.name)' (\(ids.count) elements) at x=\(x) y=\(y)\(on(file, p)), \(Int(size.width))x\(Int(size.height)).\n"
                 + (try json(ids.map(\.uuidString).sorted())))
+
+        case "make_symbol":
+            let url = try fileURL(a)
+            var file = try load(url)
+            guard let ids = try a.uuids("ids"), let first = ids.first else { throw ToolFailure(message: "'ids' is required") }
+            let p = try pageIndex(file, a, element: first)
+            let name = a.string("name") ?? "Symbol \((file.pages[p].symbols?.count ?? 0) + 1)"
+            guard let made = file.pages[p].makeSymbol(of: Set(ids), name: name) else {
+                throw ToolFailure(message: "None of those ids is a shape on this page.")
+            }
+            try save(file, to: url)
+            return text("symbol: \(made.symbol.id.uuidString)\ninstance: \(made.instance.id.uuidString)")
+
+        case "place_symbol":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            guard let x = a.double("x"), let y = a.double("y") else { throw ToolFailure(message: "'x' and 'y' are required") }
+            let spec = try a.require("symbol")
+            let page = file.pages[p]
+            guard let symbol = UUID(uuidString: spec).flatMap({ page.symbolIndex[$0] })
+                    ?? page.symbols?.first(where: { $0.name.caseInsensitiveCompare(spec) == .orderedSame }) else {
+                throw ToolFailure(message: "No symbol '\(spec)' on this page. Make one with make_symbol.")
+            }
+            var size: CGSize?
+            switch (a.double("width"), a.double("height")) {
+            case let (w?, h?): size = CGSize(width: w, height: h)
+            case let (w?, nil): size = CGSize(width: w, height: w * symbol.height / symbol.width)
+            case let (nil, h?): size = CGSize(width: h * symbol.width / symbol.height, height: h)
+            default: break
+            }
+            var playback: SymbolPlayback?
+            if let s = a.string("playback") {
+                guard let v = SymbolPlayback(rawValue: s) else { throw ToolFailure(message: "'playback' must be loop, once or still") }
+                playback = v
+            }
+            guard let e = file.pages[p].placeSymbol(symbol.id, at: CGPoint(x: x, y: y), size: size, playback: playback,
+                                                    offset: a.double("offset")) else { throw ToolFailure(message: "Couldn't place it") }
+            try save(file, to: url)
+            return text("id: \(e.id.uuidString)")
 
         case "open_document":
             let url = try fileURL(a)

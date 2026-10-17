@@ -178,3 +178,39 @@ final class SymbolTests: XCTestCase {
         XCTAssertEqual(back.resolved(at: 1.2).elements.map(\.id), page.resolved(at: 1.2).elements.map(\.id))
     }
 }
+
+extension SymbolTests {
+    func testMagicMoveBringsTheSymbolsItCopiesIn() throws {
+        var (there, symbol, _, _) = gear()
+        there.placeSymbol(symbol.id, at: CGPoint(x: 10, y: 10))
+        var here = DottieDocument()
+        _ = try DiagramOps.addShape(&here, kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 10, height: 10), at: .zero,
+                                    text: "x", fill: nil, stroke: nil, roughness: 0)
+        _ = try here.magicMove(to: there, at: 0, duration: 1, ease: .linear)
+        XCTAssertEqual(here.symbols?.map(\.id), [symbol.id])
+        XCTAssertTrue(here.resolved(at: 1).elements.contains { $0.kind == .rectangle && $0.width == 20 })
+    }
+
+    func testScriptsMakeAndPlaceSymbols() throws {
+        var doc = DottieDocument()
+        let r = DottieScript.run("""
+            dottie.timeline({duration: 1, fps: 10});
+            const g = dottie.rect({x: 0, y: 0, width: 40, height: 20, text: "g"});
+            dottie.key(g, 0, {rotation: 0}); dottie.key(g, 1, {rotation: 6.28});
+            const made = dottie.symbol([g], {name: "Gear"});
+            dottie.timeline({duration: 4});
+            const copy = dottie.place("Gear", {x: 100, y: 0, width: 80, offset: 0.5, playback: "once"});
+            dottie.update(made.instance, {playback: "still"});
+            return {symbols: dottie.symbols(), copy, broken: dottie.breakApart(made.instance).length};
+            """, on: &doc, selection: [], libraries: [.starter], timeLimit: 5)
+        XCTAssertNil(r.error)
+        let v = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(try XCTUnwrap(r.value).utf8)) as? [String: Any])
+        let symbols = try XCTUnwrap(v["symbols"] as? [[String: Any]])
+        XCTAssertEqual(symbols.first?["name"] as? String, "Gear")
+        XCTAssertEqual(symbols.first?["duration"] as? Double, 1)
+        XCTAssertEqual((v["copy"] as? [String: Any])?["playback"] as? String, "once")
+        XCTAssertEqual((v["copy"] as? [String: Any])?["height"] as? Double, 40, "keeps the symbol's shape")
+        XCTAssertEqual(v["broken"] as? Int, 1)
+        XCTAssertEqual(doc.elements.filter { $0.kind == .symbol }.count, 1)
+    }
+}

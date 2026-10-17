@@ -122,6 +122,7 @@ extension DottieDocument {
             entering.append(e)
         }
         elements += entering
+        adoptSymbols(from: target)
         for id in leaving { try addTransition(.fadeOut, to: id, at: t, duration: d) }
         for e in entering { try addTransition(.fadeIn, to: e.id, at: t, duration: d) }
         summary.entering = entering.count

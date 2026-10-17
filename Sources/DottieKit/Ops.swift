@@ -303,6 +303,9 @@ public enum DiagramOps {
         /// The scene a click plays, or the link it opens, in the web players.
         public var clickScene: String?
         public var clickURL: String?
+        /// For a symbol instance: its symbol's name, and how it plays.
+        public var symbol: String?
+        public var playback: String?
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
@@ -319,7 +322,9 @@ public enum DiagramOps {
                                   fillStyle: e.style.fillStyle == .solid ? nil : e.style.fillStyle.rawValue,
                                   dash: e.style.dash == .solid ? nil : e.style.dash.rawValue,
                                   link: e.link?.uuidString, anchor: e.anchor,
-                                  clickScene: e.click?.scene, clickURL: e.click?.url)
+                                  clickScene: e.click?.scene, clickURL: e.click?.url,
+                                  symbol: e.symbol.map { id in doc.symbolIndex[id]?.name ?? id.uuidString },
+                                  playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil)
         }
     }
 }

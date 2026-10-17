@@ -332,6 +332,23 @@ extension DottieDocument {
         return Set(parts.map(\.id))
     }
 
+    /// Copies in the symbols `other` defines that instances here use, directly or nested, and this page lacks, so
+    /// instances brought over from another page (pasted, Magic Moved) still show something.
+    public mutating func adoptSymbols(from other: DottieDocument) {
+        let theirs = other.symbolIndex
+        guard !theirs.isEmpty else { return }
+        var have = Set((symbols ?? []).map(\.id))
+        var queue = elements.compactMap(\.symbol)
+        var added: [Symbol] = []
+        while let id = queue.popLast() {
+            guard !have.contains(id), let s = theirs[id] else { continue }
+            have.insert(id)
+            added.append(s)
+            queue += s.elements.compactMap(\.symbol)
+        }
+        if !added.isEmpty { symbols = (symbols ?? []) + added }
+    }
+
     /// Drops symbols no instance on the page uses, directly or inside another symbol it uses.
     public mutating func pruneSymbols() {
         guard let all = symbols, !all.isEmpty else { return }
