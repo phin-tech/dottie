@@ -11,6 +11,10 @@ op_item = "op://Development/lc6wrq7lltjd47uue26cdxttzu"
 notary_profile = "dottie-notary"
 hooks = "scripts/release/hooks.py"
 
+[notes]
+# `just notes patch` drafts release-notes/<version>.md with this model on OpenRouter.
+api_key = "op://Private/OpenRouter API Key - pepper/credential"
+
 [homebrew]
 tap = "phin-tech/homebrew-tap"
 token = "dottie"
