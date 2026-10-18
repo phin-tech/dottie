@@ -77,7 +77,7 @@ targets:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         # Sparkle: the appcast is an asset of the newest GitHub release (`just appcast` uploads it), and
-        # updates must be signed by the private key in the Mac App Release 1Password item.
+        # updates must be signed by the private key in the Mac App Release 1Password item (lc6wrq7lltjd47uue26cdxttzu).
         SUFeedURL: https://github.com/phin-tech/dottie/releases/latest/download/appcast.xml
         SUPublicEDKey: 2mirghhdXOaz0RtSlgkR5MOzQxF+QkubzK9tgq8eO8U=
         SUEnableAutomaticChecks: true

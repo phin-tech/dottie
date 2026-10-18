@@ -5,7 +5,9 @@ bundle_id = "tech.phin.dottie"
 repo = "phin-tech/dottie"
 description = "Hand-drawn style diagrams that AI agents can draw over MCP"
 team_id = "J35P7AJDN7"
-op_item = "op://Development/Mac App Release"
+# The "Mac App Release" item in the Development vault, by ID, so renaming it (or another item of the same name)
+# can't break a release.
+op_item = "op://Development/lc6wrq7lltjd47uue26cdxttzu"
 notary_profile = "dottie-notary"
 hooks = "scripts/release/hooks.py"
 

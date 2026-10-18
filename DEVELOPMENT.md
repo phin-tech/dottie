@@ -140,7 +140,7 @@ files), and the appcast by Sparkle's own `generate_appcast`. Settings come from 
 `DEVELOPMENT_TEAM`, `NOTARY_PROFILE`, `SKIP_NPM`), so a build machine can run it unattended; `op` works there with a
 1Password service account (`OP_SERVICE_ACCOUNT_TOKEN`).
 
-Notarization credentials come from 1Password (`op://Development/Mac App Release`: the Apple ID, team
+Notarization credentials come from 1Password (the Mac App Release item, `op://Development/lc6wrq7lltjd47uue26cdxttzu`: the Apple ID, team
 ID and an app-specific password, plus the Developer ID certificate as a `.p12` and the npm token; its notes cover setting up a new Mac), so a Mac needs only two things to release: the 1Password CLI signed in
 (`op signin`), and the Developer ID Application certificate with its private key in the login keychain (export it
 from Keychain Access as a `.p12` and import it on the new Mac). Without `op`, `just notarize` falls back to a
