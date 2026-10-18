@@ -1,6 +1,7 @@
 # The release tool, app-release (https://git.phin.tech/sam/app-release), pinned to a tag; what it knows about Dottie
 # is in release.toml, and Dottie's own steps (dottie.js on npm) are in hooks.py. To move to a newer app-release,
 # change the tag, then `uv lock --upgrade-package app-release --project scripts/release`.
+# app-release is private, so uv's git clone needs a credential for https://git.phin.tech.
 [project]
 name = "dottie-release"
 version = "0"
@@ -11,4 +12,4 @@ dependencies = ["app-release"]
 package = false
 
 [tool.uv.sources]
-app-release = { git = "https://git.phin.tech/sam/app-release", tag = "v1.4.0" }
+app-release = { git = "https://git.phin.tech/sam/app-release", tag = "v1.6.1" }

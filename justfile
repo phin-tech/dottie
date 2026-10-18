@@ -90,55 +90,6 @@ cli-install: cli
 clean:
     rm -rf .build DerivedData Dottie.xcodeproj
 
-# Release tooling: app-release (https://git.phin.tech/sam/app-release), pinned in scripts/release and run with uv;
-# release.toml says what it needs to know, scripts/release/hooks.py adds dottie.js's steps. Each recipe takes
-# --dry-run, which checks and reads but only prints what it would change. `just release-tool --help` lists it all.
-release_tool := "uv run --quiet --project scripts/release app-release"
-
-# Run app-release directly
-[positional-arguments]
-release-tool *args:
-    {{release_tool}} "$@"
-
-# Check everything a release needs outside the repo: tools, GitHub, the tap, 1Password, certificates
-doctor:
-    {{release_tool}} doctor
-
-# Draft release-notes/<version>.md with a cheap model, from the commits since the last release (patch, minor, major, beta [--of patch], or a version)
-[positional-arguments]
-notes *args:
-    {{release_tool}} notes "$@"
-
-# Bump the version (major, minor, patch, or beta: 0.6.1 -> 0.7.0-beta.1 -> -beta.2; beta --of patch: 0.6.2-beta.1) everywhere, and the build number
-[positional-arguments]
-bump part *args:
-    {{release_tool}} bump "$@"
-
-# Point the Homebrew cask in phin-tech/homebrew-tap at a published release (default: the current version; never a beta)
-[positional-arguments]
-tap *args:
-    {{release_tool}} tap "$@"
-
-# Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or a given app, as a GitHub release
-[positional-arguments]
-release *args:
-    {{release_tool}} release "$@"
-
-# Build, sign with Developer ID, notarize and staple Dottie.app headless (one-time: xcrun notarytool store-credentials dottie-notary)
-[positional-arguments]
-notarize *args:
-    {{release_tool}} notarize "$@"
-
-# The whole release: bump, commit, push, npm, notarize, GitHub release, appcast, cask (`ship beta [--of patch|major]`: a pre-release, no cask)
-[positional-arguments]
-ship part *args:
-    {{release_tool}} ship "$@"
-
-# Make and upload the Sparkle appcast for a published release (default: the current version); `just release` does this
-[positional-arguments]
-appcast *args:
-    {{release_tool}} appcast "$@"
-
-# Check release.toml, the hooks and the version files (no network, changes nothing)
-release-check:
-    {{release_tool}} check
+# The release recipes (ship, notarize, release, doctor, …) are in release.just, which apple-template keeps up to date
+# (`uvx copier update`); scripts/release/hooks.py adds dottie.js's steps to them.
+import 'release.just'
