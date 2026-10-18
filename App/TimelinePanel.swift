@@ -10,7 +10,8 @@ import DottieKit
 /// Keys are edited here too: click a diamond to select it (the playhead jumps there), drag it to retime it
 /// (Option-drag copies it), and change its ease or delete it from the header or by right-clicking it.
 /// Right-clicking the ruler adds a scene marker there, or renames (in a popover under its flag) or deletes the one
-/// under the pointer; the flag in the header adds one at the playhead.
+/// under the pointer; the flag in the header adds one at the playhead. Dragging a flag moves its scene. The ruler's
+/// menu also sets the poster frame (the still exports and thumbnails show), drawn as a small frame on the ruler.
 struct TimelinePanel: View {
     let page: DottieDocument
     @Binding var playhead: Double?
@@ -25,6 +26,8 @@ struct TimelinePanel: View {
     var onRenameScene: (Double, String) -> Void
     /// A key being dragged: drawn at `to` until the drag ends, then moved (or copied) there in one step.
     @State private var keyDrag: KeyDrag?
+    /// A scene flag being dragged on the ruler: drawn at `to` until the drag ends, then moved there in one step.
+    @State private var sceneDrag: SceneDrag?
     @State private var scrubbing = false
     @AppStorage("timelineCollapsed") private var collapsed = false
     /// The most the rows may take, set by dragging the panel's top edge; fewer rows take less.
@@ -316,9 +319,15 @@ struct TimelinePanel: View {
                 }
                 t += step
             }
-            // Scene markers: a small flag at each, under the ticks' labels.
+            // The poster frame: a small picture frame at the bottom.
+            if let p = timeline.poster {
+                let frame = CGRect(x: x(p, size.width) - 4, y: size.height - 8, width: 8, height: 6)
+                ctx.fill(Path(frame), with: .color(.purple.opacity(0.35)))
+                ctx.stroke(Path(frame), with: .color(.purple), lineWidth: 1)
+            }
+            // Scene markers: a small flag at each, under the ticks' labels; a dragged one where it is going.
             for m in rows.markers {
-                let mx = x(m.t, size.width)
+                let mx = x(sceneDrag.flatMap { $0.from == m.t ? $0.to : nil } ?? m.t, size.width)
                 var flag = Path()
                 flag.move(to: CGPoint(x: mx, y: size.height)); flag.addLine(to: CGPoint(x: mx, y: 3))
                 flag.addLine(to: CGPoint(x: mx + 7, y: 6)); flag.addLine(to: CGPoint(x: mx, y: 9))
@@ -327,7 +336,7 @@ struct TimelinePanel: View {
             if let p = playhead { drawPlayhead(&ctx, size: size, at: p, head: true) }
         }
         .contentShape(Rectangle())
-        .gesture(scrubGesture)
+        .gesture(rulerGesture)
         .onContinuousHover { if case .active(let p) = $0 { point(at: p.x) } }
         .contextMenu { rulerMenu }
         .popover(isPresented: Binding(get: { renamingScene != nil }, set: { if !$0 { renamingScene = nil } }),
@@ -344,6 +353,12 @@ struct TimelinePanel: View {
             Button("Delete Scene") { onEdit("Delete Scene") { $0.removeMarker(at: m.t) } }
         } else {
             Button("Add Scene Marker Here") { addScene(at: pointerTime.t) }
+        }
+        Divider()
+        Button("Set Poster Frame Here") { let t = pointerTime.t; onEdit("Set Poster Frame") { $0.poster = t } }
+        if let p = timeline.poster {
+            Button("Go to Poster Frame") { scrub(to: p) }
+            Button("Clear Poster Frame") { onEdit("Clear Poster Frame") { $0.poster = nil } }
         }
     }
 
@@ -542,6 +557,33 @@ struct TimelinePanel: View {
         return (t * timeline.fps).rounded() / timeline.fps
     }
 
+    /// Starting within 6 points of a scene's flag drags the flag (snapping to frames); anywhere else scrubs.
+    private var rulerGesture: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .local)
+            .onChanged { v in
+                if sceneDrag == nil, !scrubbing {
+                    let px = v.startLocation.x
+                    if let m = rows.markers.min(by: { abs(x($0.t, trackWidth) - px) < abs(x($1.t, trackWidth) - px) }),
+                       abs(x(m.t, trackWidth) - px) <= 6 {
+                        sceneDrag = SceneDrag(from: m.t, to: m.t)
+                    } else {
+                        scrubbing = true
+                    }
+                }
+                if var d = sceneDrag { d.to = time(atX: v.location.x); sceneDrag = d } else { scrub(toX: v.location.x) }
+            }
+            .onEnded { _ in
+                defer { sceneDrag = nil; scrubbing = false }
+                guard let d = sceneDrag else { return }
+                // A click on a flag (no move) goes to its scene, as a click there scrubbed before flags could move.
+                guard abs(d.to - d.from) >= 0.5 / timeline.fps else { scrub(to: d.from); return }
+                var probe = timeline
+                guard probe.moveMarker(from: d.from, to: d.to) else { NSSound.beep(); return }   // another scene is there
+                onEdit("Move Scene") { $0.moveMarker(from: d.from, to: d.to) }
+                scrub(to: d.to)
+            }
+    }
+
     private var scrubGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { v in
@@ -603,6 +645,11 @@ private final class PointerTime {
 }
 
 /// A key being dragged in the timeline.
+private struct SceneDrag: Equatable {
+    var from: Double
+    var to: Double
+}
+
 private struct KeyDrag: Equatable {
     var element: UUID
     var from: Double

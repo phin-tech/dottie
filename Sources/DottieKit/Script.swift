@@ -614,6 +614,11 @@ public enum DottieScript {
                 doc.timeline = tl
                 return nil
 
+            case "editScene":
+                try DiagramOps.editScene(&doc, scene: a.string("scene") ?? "", rename: a.string("name"), moveTo: a.double("to"),
+                                         remove: a.bool("remove") ?? false)
+                return nil
+
             case "follow":
                 try doc.addFollow(try a.uuid("id"), along: try a.uuid("path"), at: max(0, a.double("t") ?? 0),
                                   duration: a.double("duration") ?? 1, ease: try a.enumValue("ease", as: Ease.self),
@@ -781,6 +786,9 @@ public enum DottieScript {
           return call("camera", merge(merge(o, target), { t: t }));
         },
         scene: function (t, name) { call("scene", { t: t, name: name }); },
+        renameScene: function (scene, name) { call("editScene", { scene: String(scene), name: name }); },
+        moveScene: function (scene, t) { call("editScene", { scene: String(scene), to: t }); },
+        removeScene: function (scene) { call("editScene", { scene: String(scene), remove: true }); },
         follow: function (id, path, t, o) { call("follow", merge(o, { id: idOf(id), path: idOf(path), t: t })); },
         packet: function (connector, t, o) { return call("packet", merge(o, { id: idOf(connector), t: t })); },
         animateBuild: function (o) { call("animateBuild", o); },
@@ -951,6 +959,8 @@ public enum DottieScript {
     element, or a list of elements to frame (padding default 40). Views ease between keys; the first key's shape \
     sets the export's. dottie.camera(null) removes the camera
       dottie.scene(t, name?)  a scene marker: the HTML player stops at each, and next/back step through them
+      dottie.renameScene(scene, name), dottie.moveScene(scene, t), dottie.removeScene(scene)  change a scene, named \
+    by its name or its time; a rename keeps the clicks that play it
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
     path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
     face along the path; laps > 1 goes round a closed outline more than once

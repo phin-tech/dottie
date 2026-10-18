@@ -49,6 +49,14 @@ extension DottieDocument {
         return true
     }
 
+    /// The time of the scene `ref` names: its name (any case), or the time it is at as a number ("2.5").
+    public func sceneTime(_ ref: String) -> Double? {
+        let markers = timeline?.markers ?? []
+        if let i = Self.scene(named: ref, in: markers) { return markers[i].t }
+        guard let t = Double(ref.trimmingCharacters(in: .whitespaces)) else { return nil }
+        return markers.first { abs($0.t - t) < 1e-6 }?.t
+    }
+
     /// `self` with `ids` drawn as they look hovered.
     func hovered(_ ids: Set<UUID>) -> DottieDocument {
         var copy = self
@@ -60,6 +68,40 @@ extension DottieDocument {
 }
 
 extension DiagramOps {
+    /// Renames, moves or removes the scene `scene` names (see `sceneTime`), for scripts and the MCP tool. A rename
+    /// keeps the clicks that play it; removing it leaves them pointing nowhere, as the timeline's Delete Scene does.
+    /// Returns what it did, for a reply.
+    @discardableResult
+    public static func editScene(_ doc: inout DottieDocument, scene: String, rename: String? = nil, moveTo: Double? = nil,
+                                 remove: Bool = false) throws -> String {
+        guard let t = doc.sceneTime(scene), let name = doc.timeline?.markers?.first(where: { $0.t == t })?.name else {
+            let names = (doc.timeline?.markers ?? []).map { "'\($0.name)'" }
+            throw OpsError.notFound("No scene '\(scene)'" + (names.isEmpty ? " (the page has none)" : "; scenes: \(names.joined(separator: ", "))"))
+        }
+        if remove {
+            doc.timeline!.removeMarker(at: t)
+            return "Removed scene '\(name)'"
+        }
+        guard rename != nil || moveTo != nil else { throw OpsError.invalid("Give a new name, a new time, or remove") }
+        var next = doc
+        var done: [String] = []
+        if let rename {
+            guard next.renameScene(at: t, to: rename) else {
+                throw OpsError.invalid("Can't call scene '\(name)' '\(rename)': a name must not be blank or another scene's")
+            }
+            done.append("renamed '\(name)' to '\(rename.trimmingCharacters(in: .whitespacesAndNewlines))'")
+        }
+        if let moveTo {
+            guard moveTo.isFinite, moveTo >= 0 else { throw OpsError.invalid("A scene's time must be 0 or more seconds") }
+            guard next.timeline!.moveMarker(from: t, to: moveTo) else {
+                throw OpsError.invalid("There's another scene at \(moveTo)s already")
+            }
+            done.append("moved to \(moveTo)s")
+        }
+        doc = next
+        return "Scene " + done.joined(separator: ", ")
+    }
+
     /// A click from tool or script arguments: a scene name or a link, "" for neither (which removes it).
     public static func click(scene: String?, url: String?) throws -> ClickAction? {
         if let scene, !scene.isEmpty { return ClickAction(scene: scene) }

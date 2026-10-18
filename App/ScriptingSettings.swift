@@ -217,12 +217,52 @@ final class ScriptLibraryInstaller: ObservableObject {
     }
 }
 
+/// The TypeScript compiler scripts are checked with: which one is found, and downloading or removing Dottie's own
+/// (`TypeScriptDownload`).
+@MainActor
+final class TypeScriptInstaller: ObservableObject {
+    enum Status: Equatable { case looking, none, found(version: String, path: String, downloaded: Bool), working, failed(String) }
+    @Published private(set) var status: Status = .looking
+
+    func refresh() {
+        status = .looking
+        Task {
+            let found = await Task.detached { DottieScript.findTypeScript() }.value
+            let mine = TypeScriptDownload.compiler().path
+            status = found.map { .found(version: $0.version.replacingOccurrences(of: "Version ", with: ""), path: $0.url.path,
+                                        downloaded: $0.url.path == mine) } ?? .none
+        }
+    }
+
+    func download() {
+        guard status != .working else { return }
+        status = .working
+        Task {
+            do {
+                let (data, response) = try await URLSession.shared.data(from: TypeScriptDownload.tarballURL)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                    throw TypeScriptDownload.InstallError(errorDescription: "Could not download TypeScript.")
+                }
+                try await Task.detached { try TypeScriptDownload.install(data) }.value
+                refresh()
+            } catch {
+                status = .failed(error.localizedDescription)
+            }
+        }
+    }
+
+    func remove() {
+        do { try TypeScriptDownload.remove(); refresh() } catch { status = .failed(error.localizedDescription) }
+    }
+}
+
 extension ScriptLibraryInstaller.AddStatus {
     var isWorking: Bool { if case .working = self { true } else { false } }
 }
 
 struct ScriptingSettings: View {
     @StateObject private var installer = ScriptLibraryInstaller()
+    @StateObject private var typeScript = TypeScriptInstaller()
     @State private var newLibrary = ""
 
     private func binding(_ lib: OptionalLibrary) -> Binding<Bool> {
@@ -291,6 +331,43 @@ struct ScriptingSettings: View {
                 Text("Built in")
             }
             Section {
+                switch typeScript.status {
+                case .looking:
+                    HStack { ProgressView().controlSize(.small); Text("Looking for TypeScript…").foregroundStyle(.secondary) }
+                case .working:
+                    HStack { ProgressView().controlSize(.small); Text("Downloading TypeScript \(TypeScriptDownload.version)…").foregroundStyle(.secondary) }
+                case .none, .failed:
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("No TypeScript compiler found")
+                            if case .failed(let m) = typeScript.status { Text(m).font(.caption).foregroundStyle(.red) }
+                        }
+                        Spacer()
+                        Button("Download TypeScript \(TypeScriptDownload.version)") { typeScript.download() }
+                    }
+                case .found(let version, let path, let downloaded):
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("TypeScript \(version)")
+                            Text(downloaded ? "Downloaded by Dottie" : path).font(.caption).foregroundStyle(.secondary)
+                                .lineLimit(1).truncationMode(.middle)
+                        }
+                        Spacer()
+                        if downloaded {
+                            Button("Remove") { typeScript.remove() }
+                        } else if !TypeScriptDownload.isInstalled() {
+                            Button("Download \(TypeScriptDownload.version)") { typeScript.download() }
+                                .help("Use Dottie's own copy instead of this one")
+                        }
+                    }
+                }
+            } header: {
+                Text("Type checking")
+            } footer: {
+                Text("With a TypeScript compiler, run_script and the script console check scripts against dottie.d.ts, catching misspelled options and values. The download is TypeScript's native compiler for this Mac (about 26 MB), checked against npm's published checksum.")
+                    .foregroundStyle(.secondary)
+            }
+            Section {
                 Button("Show Modules Folder") {
                     try? FileManager.default.createDirectory(at: DottieScript.modulesDirectory, withIntermediateDirectories: true)
                     NSWorkspace.shared.open(DottieScript.modulesDirectory)
@@ -302,6 +379,6 @@ struct ScriptingSettings: View {
             }
         }
         .formStyle(.grouped)
-        .onAppear { installer.refresh() }
+        .onAppear { installer.refresh(); typeScript.refresh() }
     }
 }

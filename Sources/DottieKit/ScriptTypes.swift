@@ -19,11 +19,12 @@ public struct TypeCheck: Sendable, Equatable {
 
 /// Types for scripts: `dottie.d.ts` and a `tsconfig.json` that checks plain `.js` scripts against it, for an
 /// editor or `tsc -p .`, and a check of one script with the user's own TypeScript compiler. Dottie doesn't
-/// ship TypeScript; with none installed, scripts run unchecked.
+/// ship TypeScript (Settings ▸ Scripting can download it); with none, scripts run unchecked.
 extension DottieScript {
     /// Suggested when a script fails and no compiler was found.
-    public static let typeScriptHint = "Install TypeScript (npm install -g typescript, or brew install typescript) "
-        + "and run_script also checks scripts against dottie.d.ts, catching misspelled options and values."
+    public static let typeScriptHint = "Download TypeScript in Dottie's Settings ▸ Scripting (or install it: npm install -g "
+        + "typescript, or brew install typescript) and run_script also checks scripts against dottie.d.ts, catching "
+        + "misspelled options and values."
 
     /// For a folder of scripts: each `.js` file is its own module (so two scripts can both declare `const a`),
     /// checked with no DOM. modules/ is left out: libraries are `any`. ES2023 is what JavaScriptCore has on
@@ -76,12 +77,13 @@ extension DottieScript {
     }
 
     /// A `tsc` that is TypeScript's (its `--version` says "Version …"), with that line. DOTTIE_TSC names one
-    /// explicitly; otherwise PATH is searched, then the places npm, Homebrew and bun install to, since an app
-    /// launched from the Finder has a short PATH.
-    public static func findTypeScript(environment: [String: String] = ProcessInfo.processInfo.environment)
-        -> (url: URL, version: String)? {
+    /// explicitly; then comes the one Settings ▸ Scripting downloads (`TypeScriptDownload`), then PATH, then the
+    /// places npm, Homebrew and bun install to, since an app launched from the Finder has a short PATH.
+    public static func findTypeScript(environment: [String: String] = ProcessInfo.processInfo.environment,
+                                      downloaded: URL = TypeScriptDownload.compiler()) -> (url: URL, version: String)? {
         var candidates: [URL] = []
         if let explicit = environment["DOTTIE_TSC"], !explicit.isEmpty { candidates.append(URL(fileURLWithPath: explicit)) }
+        candidates.append(downloaded)
         for dir in searchPath(environment) { candidates.append(URL(fileURLWithPath: dir).appendingPathComponent("tsc")) }
         var seen = Set<String>()
         for url in candidates where seen.insert(url.path).inserted && FileManager.default.isExecutableFile(atPath: url.path) {
@@ -479,6 +481,12 @@ extension DottieScript {
             camera(t: null): void;
             /** A scene marker: the HTML player stops at each. */
             scene(t: number, name?: string): void;
+            /** Renames a scene (named by its name or its time); clicks that play it follow the new name. */
+            renameScene(scene: string | number, name: string): void;
+            /** Moves a scene (named by its name or its time) to t seconds. */
+            moveScene(scene: string | number, t: number): void;
+            /** Removes a scene (named by its name or its time). */
+            removeScene(scene: string | number): void;
             /** The element's center travels along path (a connector's route or a shape's outline) from t. */
             follow(id: Ref, path: Ref, t: number, options?: { duration?: number; ease?: Ease; reverse?: boolean; orient?: boolean; laps?: number }): void;
             /** A dot, or a pill with a label, that runs along the connector; returns it. */

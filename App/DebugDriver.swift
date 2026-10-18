@@ -41,6 +41,7 @@ final class DebugDriver {
                                  doneSymbol, breakApart, undo, redo
     drag <x1> <y1> <x2> <y2>     drag on the canvas, in canvas points (top-left origin)
     click <x> <y>                click on the canvas
+    move <x> <y>                 move the pointer over the canvas without pressing (the rulers mark where it is)
     rightclick <x> <y> [Item/Sub]   right-click the canvas and list its context menu, or choose an item in it
     key [mods+]<key>|release    send a key to the canvas (cmd+right, opt+down, tab, shift+1, esc); release lets go of modifiers
     keys <text>                  list the keys of the element whose text contains <text>
@@ -48,7 +49,7 @@ final class DebugDriver {
     keymove <text> <from> <to> [copy]   retime (or copy) a key, as dragging a diamond does
     keyease <text> <t> <ease>    set a key's ease: linear, easeIn, easeOut, easeInOut, hold, spring, bounce, elastic
     keydel <text> <t>            delete a key
-    menu [Top/Sub/...]           list the menu bar (or a menu); items read as disabled while the app is in
+    menu [Top/Sub/...]           list the menu bar (or a menu), or choose the item a path ends at; items read as disabled while the app is in
                                  the background, since commands follow the focused window
     onion on|off                 onion skinning while posing (the Animate menu's toggle)
     exportanim <format> <path>   write the page's animation as File > Export Animation does, without the
@@ -114,6 +115,11 @@ final class DebugDriver {
                 guard let x = Double(try arg(rest, 0, "x")), let y = Double(try arg(rest, 1, "y")) else { throw DebugError("click takes two numbers") }
                 try drag(CGPoint(x: x, y: y), CGPoint(x: x, y: y), steps: 0)
                 return ok("clicked")
+            case "move":
+                guard let x = Double(try arg(rest, 0, "x")), let y = Double(try arg(rest, 1, "y")) else { throw DebugError("move takes two numbers") }
+                let c = try canvas()
+                c.mouseMoved(with: mouse(.mouseMoved, CGPoint(x: x, y: y), in: c, window: try window()))
+                return ok("moved")
             case "rightclick":
                 guard let x = Double(try arg(rest, 0, "x")), let y = Double(try arg(rest, 1, "y")) else { throw DebugError("rightclick takes two numbers") }
                 let c = try canvas()
@@ -165,23 +171,16 @@ final class DebugDriver {
         return front
     }
 
-    private func findCanvas(in view: NSView) -> CanvasNSView? {
-        if let c = view as? CanvasNSView { return c }
-        for sub in view.subviews { if let c = findCanvas(in: sub) { return c } }
-        return nil
-    }
-
-    /// The document window in front (by window order, so it works while the app is in the background).
-    private func window() throws -> NSWindow {
-        guard let w = NSApp.orderedWindows.first(where: { $0.isVisible && $0.contentView.map(findCanvas) != nil }) else {
-            throw DebugError("no document window")
-        }
-        return w
-    }
-
+    /// The front document's canvas, in a window.
     private func canvas() throws -> CanvasNSView {
-        guard let c = try window().contentView.flatMap(findCanvas) else { throw DebugError("no canvas") }
+        guard let c = LiveCanvases.canvas(for: try hooks().document), c.window != nil else { throw DebugError("no canvas") }
         return c
+    }
+
+    /// The front document's window.
+    private func window() throws -> NSWindow {
+        guard let w = try canvas().window else { throw DebugError("no document window") }
+        return w
     }
 
     // MARK: Commands
@@ -192,7 +191,11 @@ final class DebugDriver {
             "window \(Int(w.frame.width))x\(Int(w.frame.height)) \"\(w.title)\"",
             "page \"\(doc.name)\" (\(h.document.file.pages.count) pages), \(doc.elements.count) elements, \(h.selection().count) selected",
         ]
-        if let c = try? canvas() { lines.append("tool \(c.tool.rawValue)") }
+        if let c = try? canvas() {
+            lines.append("tool \(c.tool.rawValue)")
+            // The canvas edits a copy of the page; when they differ outside a gesture, its edits aren't arriving.
+            if h.playhead() == nil, c.model != doc { lines.append("canvas out of step with the page (\(c.model.elements.count) elements there)") }
+        }
         if let tl = doc.timeline {
             lines.append("timeline \(tl.duration)s at \(tl.fps) fps, \(tl.tracks.count) tracks, boil \(tl.boil.map(String.init) ?? "off"), settle \(tl.settle == true)")
         } else {
@@ -367,6 +370,13 @@ final class DebugDriver {
     private func menu(_ path: String?) throws -> String {
         guard var menu = NSApp.mainMenu else { throw DebugError("no menu bar") }
         for title in (path ?? "").split(separator: "/").map(String.init) {
+            if let item = menu.items.first(where: { $0.title == title }), item.submenu == nil {   // an item: choose it
+                menu.update()
+                guard item.isEnabled, let action = item.action, NSApp.sendAction(action, to: item.target, from: item) else {
+                    throw DebugError("'\(title)' did nothing")
+                }
+                return "chose \(title)"
+            }
             guard let item = menu.items.first(where: { $0.title == title }), let sub = item.submenu else {
                 throw DebugError("no menu '\(title)' in \(menu.items.map(\.title).filter { !$0.isEmpty })")
             }

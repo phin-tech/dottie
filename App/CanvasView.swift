@@ -161,7 +161,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         spatialStale = false
         return s
     }
-    var showRulers = false { didSet { needsDisplay = true } }
+    var showRulers = false { didSet { needsDisplay = true; placeRulerMarks() } }
     /// Seconds into the page's animation while previewing it; nil while editing. A preview draws that frame and
     /// takes no edits, since shapes are not where the frame shows them.
     var playhead: Double? {
@@ -173,6 +173,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
     }
     private let rulerSize: CGFloat = 20
+    /// Where the pointer is, in view coordinates, for the marks on the rulers; nil when it is outside the view.
+    private var rulerCursor: CGPoint? { didSet { if rulerCursor != oldValue { placeRulerMarks() } } }
+    /// The pointer's marks across the top and left rulers: views of their own, so following the pointer moves them
+    /// without redrawing the canvas.
+    private let rulerMarkX = RulerMark(), rulerMarkY = RulerMark()
     var tool: Tool = .select
     var onToolChange: ((Tool) -> Void)?
     var selection: Set<UUID> = [] { didSet { needsDisplay = true; onSelectionChange?(selection) } }
@@ -594,6 +599,28 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         ticks(origin: pan.y, length: bounds.height, horizontal: false)
         ctx.restoreGState()
     }
+
+    private func placeRulerMarks() {
+        for m in [rulerMarkX, rulerMarkY] where m.superview !== self { addSubview(m) }
+        let c = showRulers ? rulerCursor : nil
+        rulerMarkX.isHidden = (c?.x ?? 0) < rulerSize
+        rulerMarkY.isHidden = (c?.y ?? 0) < rulerSize
+        if let c {
+            rulerMarkX.frame = CGRect(x: c.x.rounded(), y: 0, width: 1, height: rulerSize)
+            rulerMarkY.frame = CGRect(x: 0, y: c.y.rounded(), width: rulerSize, height: 1)
+        }
+    }
+
+    private lazy var pointerTracking = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect],
+                                                      owner: self)
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if !trackingAreas.contains(pointerTracking) { addTrackingArea(pointerTracking) }
+    }
+
+    override func mouseMoved(with event: NSEvent) { rulerCursor = convert(event.locationInWindow, from: nil) }
+    override func mouseExited(with event: NSEvent) { rulerCursor = nil }
 
     /// The guide under a model-space point (within a few screen pixels), if any.
     private func guideHit(_ p: CGPoint) -> (vertical: Bool, index: Int)? {
@@ -1738,6 +1765,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        rulerCursor = convert(event.locationInWindow, from: nil)
         if case .panning? = gesture {
             let raw = convert(event.locationInWindow, from: nil)
             pan = CGPoint(x: panAnchor.pan.x + raw.x - panAnchor.raw.x, y: panAnchor.pan.y + raw.y - panAnchor.raw.y)
@@ -2364,6 +2392,28 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 }
 
+/// A hairline in the accent color: the pointer's mark on a ruler. Clicks go through it to the canvas.
+final class RulerMark: NSView {
+    override func draw(_ dirtyRect: NSRect) { NSColor.controlAccentColor.setFill(); bounds.fill() }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+}
+
+#if DEBUG
+/// The canvas SwiftUI last updated for each document, for the debug driver. Searching a window's views for one could
+/// find a canvas SwiftUI had replaced (after a resize, say), whose edits reach no document.
+@MainActor
+enum LiveCanvases {
+    private struct Weak { weak var view: CanvasNSView? }
+    private static var views: [ObjectIdentifier: Weak] = [:]
+
+    static func register(_ canvas: CanvasNSView, for document: DrawingDocument) {
+        views[ObjectIdentifier(document)] = Weak(view: canvas)
+    }
+
+    static func canvas(for document: DrawingDocument) -> CanvasNSView? { views[ObjectIdentifier(document)]?.view }
+}
+#endif
+
 struct CanvasView: NSViewRepresentable {
     @ObservedObject var document: DrawingDocument
     @Binding var tool: Tool
@@ -2402,6 +2452,9 @@ struct CanvasView: NSViewRepresentable {
     }
 
     func updateNSView(_ v: CanvasNSView, context: Context) {
+        #if DEBUG
+        LiveCanvases.register(v, for: document)
+        #endif
         if let t = pose {
             // Posing: the canvas edits the frame at `t`; only the finished edit reaches the page, as keys.
             v.onPreview = { _ in }

@@ -398,7 +398,7 @@ actor DottieTools {
              description: "Animate a page, or adjust its animation: frame rate, length, hand-drawn line boil and more. "
                 + "With only path (and page), reports the page's animation: length, each animated element's keys, "
                 + "camera keys and scenes. Animation tools: animate_build, add_transition, add_keyframe, send_packet, "
-                + "set_camera, add_scene, clear_animation; check with export_animation's preview or export_png's at.",
+                + "set_camera, add_scene, update_scene, clear_animation; check with export_animation's preview or export_png's at.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "fps": prop("number", "Frames per second, 1-60 (default 15 for a new animation)"),
@@ -485,6 +485,16 @@ actor DottieTools {
                 "t": prop("number", "Second of the scene"),
                 "name": prop("string", "What the scene shows; default Scene n"),
              ], required: ["path", "t"])),
+        Tool(name: "update_scene",
+             description: "Rename, move or remove one of the page's scenes (see add_scene). Renaming keeps the clicks that "
+                + "play it (click_scene) pointing at it; removing it leaves them doing nothing.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "scene": prop("string", "The scene: its name, or the second it is at"),
+                "name": prop("string", "Its new name"),
+                "t": prop("number", "The second to move it to"),
+                "remove": prop("boolean", "Remove the scene instead"),
+             ], required: ["path", "scene"])),
         Tool(name: "clear_animation",
              description: "Remove the animation from the given elements (their keys, paths and repeats), or with no ids remove "
                 + "the page's whole timeline. The drawing itself is unchanged.",
@@ -1098,7 +1108,7 @@ actor DottieTools {
             return text("Exported \(doc.elements.count) elements to \(out.path)")
 
         case "set_timeline", "animate_build", "add_transition", "add_keyframe", "send_packet", "set_camera", "add_scene",
-             "clear_animation":
+             "update_scene", "clear_animation":
             return try animation(name, a)
 
         case "export_animation":
@@ -1268,6 +1278,9 @@ extension DottieTools {
                 let label = a.string("name").flatMap { $0.isEmpty ? nil : $0 } ?? "Scene \((doc.timeline!.markers?.count ?? 0) + 1)"
                 doc.timeline!.addMarker(at: t, name: label)
                 reply = "Scene \"\(label)\" at \(Self.secs(t))"
+            case "update_scene":
+                reply = try DiagramOps.editScene(&doc, scene: try a.require("scene"), rename: a.string("name"),
+                                                 moveTo: a.raw["t"] == nil ? nil : try a.time("t"), remove: a.bool("remove") ?? false)
             default:  // clear_animation
                 if let ids = try a.uuids("ids"), !ids.isEmpty {
                     doc.clearAnimation(of: Set(ids))

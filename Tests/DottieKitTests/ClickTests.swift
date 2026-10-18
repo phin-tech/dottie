@@ -78,6 +78,52 @@ final class ClickTests: XCTestCase {
         XCTAssertEqual(tl.markers?.map(\.name), ["Scene 1"])
     }
 
+    func testMovingASceneMarker() {
+        var tl = Timeline(duration: 3)
+        tl.addMarker(at: 0, name: "A")
+        tl.addMarker(at: 1, name: "B")
+        XCTAssertTrue(tl.moveMarker(from: 0, to: 2))
+        XCTAssertEqual(tl.markers, [Marker(t: 1, name: "B"), Marker(t: 2, name: "A")], "kept in time order")
+        XCTAssertFalse(tl.moveMarker(from: 2, to: 1), "B is there already")
+        XCTAssertFalse(tl.moveMarker(from: 0.5, to: 1.5), "no marker at 0.5")
+        XCTAssertTrue(tl.moveMarker(from: 2, to: 5))
+        XCTAssertEqual(tl.duration, 5, "the timeline grows to fit")
+        XCTAssertTrue(tl.moveMarker(from: 5, to: -1))
+        XCTAssertEqual(tl.markers?.first, Marker(t: 0, name: "A"), "clamped to the start")
+    }
+
+    func testEditingScenesByNameOrTime() throws {
+        var (doc, auth, _, _) = try tour()
+        XCTAssertEqual(doc.sceneTime("LOGIN FLOW"), 1)
+        XCTAssertEqual(doc.sceneTime("1"), 1)
+        XCTAssertNil(doc.sceneTime("0.5"))
+        try DiagramOps.editScene(&doc, scene: "login flow", rename: "Sign in", moveTo: 1.5)
+        XCTAssertEqual(doc.timeline?.markers?.last, Marker(t: 1.5, name: "Sign in"))
+        XCTAssertEqual(doc.elements.first { $0.id == auth.id }?.click?.scene, "Sign in")
+        let before = doc
+        XCTAssertThrowsError(try DiagramOps.editScene(&doc, scene: "Sign in", rename: "Better", moveTo: 0),
+                             "Overview is at 0")
+        XCTAssertEqual(doc, before, "a refused move doesn't keep the rename either")
+        XCTAssertThrowsError(try DiagramOps.editScene(&doc, scene: "Nowhere", remove: true))
+        XCTAssertThrowsError(try DiagramOps.editScene(&doc, scene: "Overview"), "nothing to do")
+        try DiagramOps.editScene(&doc, scene: "0", remove: true)
+        XCTAssertEqual(doc.timeline?.markers?.map(\.name), ["Sign in"])
+    }
+
+    func testScriptsRenameMoveAndRemoveScenes() throws {
+        var (doc, auth, _, _) = try tour()
+        let r = DottieScript.run("""
+        dottie.renameScene("Login flow", "Sign in");
+        dottie.moveScene("Sign in", 1.75);
+        dottie.removeScene(0);
+        """, on: &doc, libraries: [.starter], timeLimit: 5)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(doc.timeline?.markers, [Marker(t: 1.75, name: "Sign in")])
+        XCTAssertEqual(doc.elements.first { $0.id == auth.id }?.click?.scene, "Sign in")
+        let bad = DottieScript.run(#"dottie.removeScene("Nowhere")"#, on: &doc, libraries: [.starter], timeLimit: 5)
+        XCTAssertNotNil(bad.error)
+    }
+
     func testStillExportsIgnoreClicks() throws {
         let (doc, _, _, _) = try tour()
         var plain = doc
