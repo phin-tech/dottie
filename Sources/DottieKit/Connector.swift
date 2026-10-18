@@ -10,6 +10,8 @@ public struct Endpoint: Codable, Equatable, Sendable {
     public var port: Port?          // nil = edge-following
     public var x: Double = 0        // used only when unbound
     public var y: Double = 0
+    /// Pins the end to one of the bound extension shape's `ports` (its index there). Wins over `port`.
+    public var portIndex: Int? = nil
 
     public static func free(_ p: CGPoint) -> Endpoint { Endpoint(elementID: nil, port: nil, x: p.x, y: p.y) }
     public static func bound(_ id: UUID, port: Port? = nil) -> Endpoint { Endpoint(elementID: id, port: port) }
@@ -53,13 +55,24 @@ public enum Connector {
         return shape.rotated(p)
     }
 
-    /// Where the line from the shape's center toward `target` crosses its outline.
+    /// A port of an extension shape: its normalized `ports[index]`, on the canvas.
+    public static func portPoint(_ shape: Element, index: Int) -> CGPoint? {
+        guard let p = shape.ports, p.indices.contains(index) else { return nil }
+        let r = shape.frame
+        return shape.rotated(CGPoint(x: r.minX + p[index].x * r.width, y: r.minY + p[index].y * r.height))
+    }
+
+    /// Where the line from the shape's center toward `target` crosses its outline. A `.path` uses its actual
+    /// contours (see `Element.outlineCrossing`), so a stencil's connectors meet its drawing, not its bounding box.
     public static func edgePoint(_ shape: Element, toward target: CGPoint) -> CGPoint {
         let r = shape.frame
         let c = CGPoint(x: r.midX, y: r.midY)
         let target = shape.unrotated(target) // work in the shape's own frame, then rotate the answer back
         let dx = target.x - c.x, dy = target.y - c.y
         guard (dx != 0 || dy != 0), r.width > 0, r.height > 0 else { return c }
+        if shape.kind == .path, let hit = shape.outlineCrossing(from: c, along: CGPoint(x: dx, y: dy)) {
+            return shape.rotated(hit)
+        }
         let hw = r.width / 2, hh = r.height / 2
         let t: CGFloat
         switch shape.kind {
@@ -99,6 +112,7 @@ public enum Connector {
         guard let id = ep.elementID, let s = shape(id, in: doc, index) else {
             return CGPoint(x: ep.x, y: ep.y)
         }
+        if let i = ep.portIndex, let p = portPoint(s, index: i) { return p }
         if let port = ep.port { return portPoint(s, port) }
         return edgePoint(s, toward: other)
     }

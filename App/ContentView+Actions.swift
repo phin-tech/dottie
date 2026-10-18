@@ -152,7 +152,10 @@ extension ContentView {
                 }
                 doc.timeline = tl
                 return any
-            } })
+            } },
+            runExtensionCommand: { rt, command in startCommand(rt, command, selection: ids) },
+            repeatLastCommand: { repeatLastExtensionCommand() },
+            updateExtensionShapes: { updateExtensionShapes() })
     }
 
     /// An animation edit that can fail or do nothing: beeps instead of committing in either case.

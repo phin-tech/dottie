@@ -173,6 +173,13 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// How much of the stroke is drawn, 0...1, in an animation frame (see `Keyframe.reveal`). Fill and label
     /// wait for the whole stroke; text types out. nil is fully drawn.
     public var reveal: Double?
+    /// Only for a `.path` made by an extension: which extension and shape generated `subpaths`, at what version, and
+    /// with which parameters. Editing the shape regenerates `subpaths` from these; nothing runs to draw it.
+    public var `extension`: ExtensionRef?
+    /// Only for an extension shape: connection points, normalized to the frame, that connectors attach to.
+    public var ports: [NormalizedPoint]?
+    /// Only for an extension shape: where its label goes, normalized to the frame.
+    public var labelRect: NormalizedRect?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,

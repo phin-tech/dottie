@@ -294,6 +294,13 @@ extension DottieScript {
             endHead?: Arrowhead;
         }
 
+        /** A shape an installed extension generates from parameters. */
+        interface ExtensionShapeOptions extends ShapeOptions {
+            /** The extension's id and the shape it provides. */
+            extension: { id: string; shape: string };
+            /** Values for the shape's parameters; ones left out take their defaults. */
+            params?: Record<string, number | boolean | string>;
+        }
         interface ShapeOptions extends Look {
             x?: number;
             y?: number;
@@ -421,6 +428,7 @@ extension DottieScript {
             stencils(filter?: { query?: string; library?: string }): StencilInfo[];
 
             shape(options: ShapeOptions & { kind: ShapeKind }): Element;
+            shape(options: ExtensionShapeOptions): Element;
             rect(options: ShapeOptions): Element;
             ellipse(options: ShapeOptions): Element;
             diamond(options: ShapeOptions): Element;

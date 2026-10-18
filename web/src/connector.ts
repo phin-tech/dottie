@@ -1,8 +1,8 @@
 // Connector geometry (Connector.swift): endpoints from bindings, routes, arrowhead wings.
 
-import { angle, center, frame, rotated, unrotated } from "./element.ts";
+import { angle, center, frame, rotated, shapeContours, unrotated } from "./element.ts";
 import type { Element, Endpoint, Page, Port } from "./model.ts";
-import { type Point, type Rect, maxX, maxY, midX, midY } from "./path.ts";
+import { type Point, type Rect, bezierPoint, maxX, maxY, midX, midY } from "./path.ts";
 
 export type Index = Map<string, Element>;
 
@@ -15,6 +15,37 @@ export function portPoint(shape: Element, port: Port): Point {
   return rotated(shape, p);
 }
 
+/** A contour's vertices: 16 steps along each cubic segment, then the end point. */
+function flattenContour(cp: Point[]): Point[] {
+  const out: Point[] = [];
+  for (let s = 0; s + 3 < cp.length; s += 3) {
+    const seg = cp.slice(s, s + 4);
+    for (let k = 0; k < 16; k++) out.push(bezierPoint(seg, k / 16));
+  }
+  out.push(cp[cp.length - 1]);
+  return out;
+}
+
+/** Where the ray from `c` along `d` first meets a path's outline, both in the unrotated frame, or null. */
+function outlineCrossing(shape: Element, c: Point, d: Point): Point | null {
+  let best: number | null = null;
+  for (const contour of shapeContours(shape)) {
+    const pts = flattenContour(contour.points);
+    const n = pts.length;
+    const edges = contour.closed ? n : n - 1;
+    for (let i = 0; i < edges; i++) {
+      const a = pts[i], b = pts[(i + 1) % n];
+      const e = { x: b.x - a.x, y: b.y - a.y }, w = { x: a.x - c.x, y: a.y - c.y };
+      const det = e.x * d.y - d.x * e.y;
+      if (det === 0) continue;
+      // Solves c + t·d = a + s·e.
+      const t = (e.x * w.y - e.y * w.x) / det, s = (d.x * w.y - d.y * w.x) / det;
+      if (t > 0 && s >= 0 && s <= 1 && (best === null || t < best)) best = t;
+    }
+  }
+  return best === null ? null : { x: c.x + d.x * best, y: c.y + d.y * best };
+}
+
 /** Where the line from the shape's center toward `target` crosses its outline. */
 export function edgePoint(shape: Element, toward: Point): Point {
   const r = frame(shape);
@@ -22,6 +53,10 @@ export function edgePoint(shape: Element, toward: Point): Point {
   const target = unrotated(shape, toward);
   const dx = target.x - c.x, dy = target.y - c.y;
   if (!((dx !== 0 || dy !== 0) && r.width > 0 && r.height > 0)) return c;
+  if (shape.kind === "path") {
+    const hit = outlineCrossing(shape, c, { x: dx, y: dy });
+    if (hit) return rotated(shape, hit);
+  }
   const hw = r.width / 2, hh = r.height / 2;
   let t: number;
   if (shape.kind === "ellipse") t = 1 / Math.sqrt((dx * dx) / (hw * hw) + (dy * dy) / (hh * hh));
@@ -35,9 +70,17 @@ function reference(ep: Endpoint, index: Index): Point {
   return s ? center(s) : { x: ep.x, y: ep.y };
 }
 
+/** A point given in the element's normalized `ports`, rotated with it. */
+function normalizedPoint(shape: Element, p: { x: number; y: number }): Point {
+  const r = frame(shape);
+  return rotated(shape, { x: r.x + p.x * r.width, y: r.y + p.y * r.height });
+}
+
 function resolve(ep: Endpoint, other: Point, index: Index): Point {
   const s = ep.elementID ? index.get(ep.elementID) : undefined;
   if (!s) return { x: ep.x, y: ep.y };
+  const i = ep.portIndex, ports = s.ports ?? [];
+  if (typeof i === "number" && Number.isInteger(i) && i >= 0 && i < ports.length) return normalizedPoint(s, ports[i]);
   return ep.port ? portPoint(s, ep.port) : edgePoint(s, other);
 }
 

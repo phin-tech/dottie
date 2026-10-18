@@ -135,6 +135,10 @@ struct EditorActions {
     var frameCamera: () -> Void
     var removeCamera: () -> Void
     var repeatSelection: () -> Void
+    // Extensions
+    var runExtensionCommand: (ExtensionRuntime, CommandDefinition) -> Void
+    var repeatLastCommand: () -> Void
+    var updateExtensionShapes: () -> Void
 }
 
 /// The ways Animate ▸ Build Diagram reveals a page.

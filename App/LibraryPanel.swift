@@ -11,8 +11,11 @@ struct LibraryPanel: View {
     @ObservedObject var document: DrawingDocument
     var selection: Set<UUID>
     var place: (StencilItem, Bool) -> Void
+    /// Puts an extension shape on the canvas, by extension id and shape id.
+    var placeExtension: (String, String) -> Void
 
     @ObservedObject private var store = LibraryStore.shared
+    @ObservedObject private var host = ExtensionHost.shared
     @AppStorage("library.selected") private var selectedID = "builtin"
     @AppStorage("library.keepColors") private var keepColors = false
     @State private var query = ""
@@ -30,6 +33,16 @@ struct LibraryPanel: View {
     }
 
     private var entry: LibraryStore.Entry? { store.entry(selectedID) }
+
+    /// Each loaded extension's shapes that match the search, under the extension's name.
+    private var extensionGroups: [(name: String, extensionID: String, shapes: [ShapeDefinition])] {
+        let q = query.trimmingCharacters(in: .whitespaces).lowercased()
+        return host.registry.entries.compactMap { entry -> (name: String, extensionID: String, shapes: [ShapeDefinition])? in
+            guard let rt = entry.runtime else { return nil }
+            let shapes = rt.shapes.filter { q.isEmpty || $0.name.lowercased().contains(q) }
+            return shapes.isEmpty ? nil : (rt.manifest.name, rt.manifest.id, shapes)
+        }
+    }
 
     private var items: [StencilItem] {
         guard let lib = entry?.library else { return [] }
@@ -128,6 +141,21 @@ struct LibraryPanel: View {
                 if items.isEmpty {
                     Text(query.isEmpty ? "This library is empty." : "No matches.")
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.top, 24)
+                }
+                ForEach(Array(extensionGroups.enumerated()), id: \.offset) { _, group in
+                    Text(group.name).font(.caption).foregroundStyle(.secondary).padding(.top, 8)
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
+                        ForEach(Array(group.shapes.enumerated()), id: \.offset) { _, shape in
+                            Button { placeExtension(group.extensionID, shape.id) } label: {
+                                Text(shape.name)
+                                    .font(.caption).multilineTextAlignment(.center)
+                                    .frame(width: 76, height: 56)
+                                    .background(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                            }
+                            .buttonStyle(.plain)
+                            .help("Place \(shape.name) from \(group.name)")
+                        }
+                    }
                 }
             }
         }

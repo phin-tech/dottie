@@ -233,6 +233,8 @@ targets:
       - App/UpdateChecker.swift
       - App/Alerts.swift
       - App/EditorActions.swift
+      - App/ExtensionHost.swift
+      - App/ExtensionViews.swift
     dependencies:
       - package: Dottie
         product: DottieKit

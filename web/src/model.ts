@@ -27,7 +27,10 @@ export interface Style {
   dashOffset: number | null;
 }
 
-export interface Endpoint { elementID: string | null; port: Port | null; x: number; y: number }
+/** `portIndex` pins the end to one of the bound element's `ports`, and wins over `port`. */
+export interface Endpoint { elementID: string | null; port: Port | null; portIndex?: number | null; x: number; y: number }
+/** The shape an extension generated a path with. Read-only here: nothing runs in dottie.js. */
+export interface ExtensionRef { id: string; shape: string; version: string; params: Record<string, number | boolean | string> }
 
 export interface ConnectorData {
   start: Endpoint;
@@ -74,6 +77,10 @@ export interface Element {
   /** Base64 bytes; an empty `data` is a picture that couldn't be found (drawn crossed out). */
   image: EmbeddedImage | null;
   reveal: number | null;
+  /** For an extension shape: connection points and label box, normalized to the frame. */
+  ports?: { x: number; y: number }[] | null;
+  labelRect?: { x: number; y: number; width: number; height: number } | null;
+  extension?: ExtensionRef | null;
 }
 
 export interface Layer { id: string; name: string; visible: boolean; locked: boolean }
@@ -172,11 +179,15 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal"],
+    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal",
+    "ports", "labelRect", "extension"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
   inlineImage: ["data", "format"],
-  endpoint: ["elementID", "port", "x", "y"],
+  endpoint: ["elementID", "port", "portIndex", "x", "y"],
+  extensionRef: ["id", "shape", "version", "params"],
+  normalizedPoint: ["x", "y"],
+  normalizedRect: ["x", "y", "width", "height"],
   connector: ["start", "end", "routing", "startHead", "endHead"],
   timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
   track: ["element", "keys", "boil", "follow", "repeats", "march"],
@@ -276,9 +287,11 @@ class Reader {
   endpoint(v: unknown): Endpoint {
     const e = isObj(v) ? v : {};
     const port = str(e.port);
+    const portIndex = num(e.portIndex);
     return {
       elementID: uuid(e.elementID) ?? null,
       port: port && ["top", "right", "bottom", "left"].includes(port) ? (port as Port) : null,
+      portIndex: portIndex !== undefined && Number.isInteger(portIndex) && portIndex >= 0 ? portIndex : null,
       x: num(e.x) ?? 0,
       y: num(e.y) ?? 0,
     };
@@ -350,7 +363,33 @@ class Reader {
       args: strings(v.args),
       image: this.image(v.image, images),
       reveal: num(v.reveal) ?? null,
+      ports: Array.isArray(v.ports) ? v.ports.map((p) => { const o: Obj = isObj(p) ? p : {}; return { x: num(o.x) ?? 0, y: num(o.y) ?? 0 }; }) : null,
+      labelRect: this.labelRect(v.labelRect),
+      extension: this.extension(v.extension),
     };
+  }
+
+  labelRect(v: unknown): { x: number; y: number; width: number; height: number } | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "normalizedRect");
+    return { x: num(v.x) ?? 0, y: num(v.y) ?? 0, width: num(v.width) ?? 0, height: num(v.height) ?? 0 };
+  }
+
+  extension(v: unknown): ExtensionRef | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "extensionRef");
+    const id = str(v.id), shape = str(v.shape), version = str(v.version);
+    if (id === undefined || shape === undefined || version === undefined) {
+      this.warn("Skipped an extension without an id, shape or version");
+      return null;
+    }
+    const params: ExtensionRef["params"] = {};
+    if (isObj(v.params)) {
+      for (const [k, p] of Object.entries(v.params)) {
+        if (typeof p === "number" || typeof p === "boolean" || typeof p === "string") params[k] = p;
+      }
+    }
+    return { id, shape, version, params };
   }
 
   click(v: unknown): ClickAction | null {

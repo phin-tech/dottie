@@ -12,6 +12,56 @@ extension FocusedValues {
     }
 }
 
+/// The Script and Extensions menus. Nested because a Commands body takes at most ten menus and groups.
+private struct CodeCommands: Commands {
+    var editor: EditorActions?
+
+    /// Each command under its category, categories in name order and uncategorized ones last.
+    @ViewBuilder private func extensionCommandItems() -> some View {
+        let commands = ExtensionHost.shared.commands
+        let groups = Dictionary(grouping: commands) { $0.command.category ?? "" }
+        let names = groups.keys.filter { !$0.isEmpty }.sorted() + (groups[""] == nil ? [] : [""])
+        if commands.isEmpty {
+            Text("No Extension Commands").foregroundStyle(.secondary)
+        }
+        ForEach(Array(names.enumerated()), id: \.offset) { i, name in
+            if i > 0 { Divider() }
+            ForEach(Array((groups[name] ?? []).enumerated()), id: \.offset) { _, item in
+                Button(item.command.name) { editor?.runExtensionCommand(item.extension, item.command) }
+                    .disabled(editor == nil)
+            }
+        }
+    }
+
+    var body: some Commands {
+        CommandMenu("Script") {
+            Button("Script Console…") { editor?.openScriptConsole() }
+                .keyboardShortcut("j", modifiers: [.command, .option])
+                .disabled(editor == nil)
+            Divider()
+            let scripts = ScriptLibrary.list()
+            if scripts.isEmpty {
+                Text("No Saved Scripts").foregroundStyle(.secondary)
+            } else {
+                ForEach(scripts, id: \.self) { url in
+                    Button(url.deletingPathExtension().lastPathComponent) { editor?.runScriptFile(url) }
+                        .disabled(editor == nil)
+                }
+            }
+            Divider()
+            Button("Show Scripts Folder") { ScriptLibrary.reveal() }
+        }
+        CommandMenu("Extensions") {
+            Button("Repeat Last Command") { editor?.repeatLastCommand() }
+                .disabled(editor == nil)
+            Button("Update Shapes from Extensions") { editor?.updateExtensionShapes() }
+                .disabled(editor == nil)
+            Divider()
+            extensionCommandItems()
+        }
+    }
+}
+
 /// Menu bar commands. Single-key tool shortcuts stay in the canvas `keyDown` (a bare-key menu
 /// equivalent would swallow typing in the text editor); the menu lists them in the item titles.
 struct DottieCommands: Commands {
@@ -229,23 +279,7 @@ struct DottieCommands: Commands {
             Button("Remove Animation") { editor?.removeAnimation() }
                 .disabled(!animated)
         }
-        CommandMenu("Script") {
-            Button("Script Console…") { editor?.openScriptConsole() }
-                .keyboardShortcut("j", modifiers: [.command, .option])
-                .disabled(editor == nil)
-            Divider()
-            let scripts = ScriptLibrary.list()
-            if scripts.isEmpty {
-                Text("No Saved Scripts").foregroundStyle(.secondary)
-            } else {
-                ForEach(scripts, id: \.self) { url in
-                    Button(url.deletingPathExtension().lastPathComponent) { editor?.runScriptFile(url) }
-                        .disabled(editor == nil)
-                }
-            }
-            Divider()
-            Button("Show Scripts Folder") { ScriptLibrary.reveal() }
-        }
+        CodeCommands(editor: editor)
         CommandMenu("Tools") {
             Picker("Tool", selection: Binding(get: { tool ?? .select }, set: { tool = $0 })) {
                 ForEach(Tool.allCases) { t in

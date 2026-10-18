@@ -72,6 +72,9 @@ struct SettingsView: View {
             ScriptingSettings()
                 .tabItem { Label("Scripting", systemImage: "curlybraces") }
                 .tag("scripting")
+            ExtensionsSettings()
+                .tabItem { Label("Extensions", systemImage: "puzzlepiece") }
+                .tag("extensions")
             CommandLineSettings()
                 .tabItem { Label("Command Line", systemImage: "terminal") }
                 .tag("commandline")
