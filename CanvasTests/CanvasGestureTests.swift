@@ -160,6 +160,72 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(element(m.id).frame.minX, 107.5, accuracy: 0.001) // 57.5 each side
     }
 
+    // MARK: Tools
+
+    func testEveryToolIsRegisteredOnceWithItsOwnKey() {
+        let tools = Tool.all
+        XCTAssertEqual(tools.first, .select)
+        XCTAssertEqual(tools.count, 11)
+        XCTAssertEqual(Set(tools.map(\.id)).count, tools.count)
+        XCTAssertEqual(Set(tools.map(\.shortcut)).count, tools.count)
+        for t in tools { XCTAssertEqual(t.behavior.tool, t, t.id) }
+    }
+
+    func testShapeToolsDragOutTheirShapeSnappedToTheGrid() {
+        UserDefaults.standard.set(true, forKey: Pref.snapToGrid)
+        UserDefaults.standard.set(20.0, forKey: Pref.gridSize)
+        defer { UserDefaults.standard.set(false, forKey: Pref.snapToGrid); UserDefaults.standard.removeObject(forKey: Pref.gridSize) }
+        for (tool, kind) in [(Tool.rectangle, ElementKind.rectangle), (.ellipse, .ellipse), (.diamond, .diamond)] {
+            view.model.elements = []; commits = []
+            view.tool = tool
+            drag(CGPoint(x: 103, y: 107), CGPoint(x: 300, y: 200))
+            XCTAssertEqual(commits.map(\.name), ["Add Shape"])
+            XCTAssertEqual(view.model.elements.map(\.kind), [kind])
+            XCTAssertEqual(view.model.elements.first?.frame, CGRect(x: 100, y: 100, width: 200, height: 100), "the press snaps too")
+            XCTAssertEqual(view.tool, .select, "back to Select to move it")
+        }
+    }
+
+    func testTextToolClickTypesIntoANewTextBox() {
+        view.tool = .text
+        click(CGPoint(x: 200, y: 200))
+        let e = view.model.elements.first
+        XCTAssertEqual(e?.kind, .text)
+        XCTAssertEqual(e?.frame.origin, CGPoint(x: 200, y: 200))
+        XCTAssertNotNil(view.textEditor)
+        XCTAssertEqual(view.selection, Set([e?.id].compactMap { $0 }))
+    }
+
+    func testConnectorToolBindsBothEnds() throws {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 100, height: 60))
+        let b = add(.rectangle, CGRect(x: 400, y: 100, width: 100, height: 60))
+        view.tool = .connector
+        drag(CGPoint(x: 150, y: 130), CGPoint(x: 450, y: 130))
+        XCTAssertEqual(commits.map(\.name), ["Add Connector"])
+        let c = try XCTUnwrap(view.model.elements.first { $0.kind == .connector }?.connector)
+        XCTAssertEqual(c.start.elementID, a.id)
+        XCTAssertEqual(c.end.elementID, b.id)
+    }
+
+    func testHighlighterDrawsInItsOwnStyleAndKeepsGoing() {
+        view.tool = .highlighter
+        drag(CGPoint(x: 100, y: 300), CGPoint(x: 400, y: 320), steps: 30)
+        XCTAssertEqual(commits.map(\.name), ["Draw"])
+        XCTAssertEqual(view.model.elements.first?.kind, .freehand)
+        XCTAssertEqual(view.model.elements.first?.style.strokeWidth, CanvasNSView.highlighterStyle.strokeWidth)
+        XCTAssertEqual(view.tool, .highlighter)
+    }
+
+    func testToolsDrawNothingWhenEveryLayerIsLocked() {
+        view.model.layers[0].locked = true
+        for tool in [Tool.rectangle, .text, .connector, .pencil] {
+            view.tool = tool
+            drag(CGPoint(x: 100, y: 100), CGPoint(x: 300, y: 200))
+        }
+        XCTAssertTrue(view.model.elements.isEmpty)
+        XCTAssertTrue(commits.isEmpty)
+    }
+
     // MARK: Eraser
 
     func testEraserClickCutsAStrokeInTwoAndSweepRemovesTheRest() {
