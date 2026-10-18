@@ -93,7 +93,10 @@ nudge the selection a point at a time (⇧ for ten); holding one down is a singl
   double-click a tab to rename it, drag tabs to reorder them.
 - **Links.** Make a shape jump to another one, even on another page: select it and choose a target under
   **Jumps to**. Click the little arrow badge to go there, and ⌘[ to come back. Great for a summary page that
-  links to the details.
+  links to the details. A shape can also open a web page, an email, or another drawing: type an address in
+  **Opens**, or click **Choose Drawing…** and pick where in it to land under **At** (one of its anchors, or a
+  page). Give a shape an anchor and it shows up in the **Anchors** tab, a table of contents for the drawing.
+  Exported PDFs and SVGs keep the links clickable.
 - **Pictures.** Paste a screenshot or a copied image (⌘V), drop image files on the canvas, or use
   File ▸ Insert Image… (⌥⌘I). Pictures are saved inside the drawing; give one a stroke color in the inspector
   for a sketchy border. Screenshots (PNG and other lossless pictures) keep their full resolution, up to 8192

@@ -34,6 +34,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Guides by number (type, add, remove) and lock; stencil items rename, tag, duplicate, reorder; library rename
 - [x] Element links: pick a target in the inspector, follow by badge or ⌘-click, Back/Forward (⌘[ ⌘]); `link` over MCP and scripts
 - [x] Canvas context menu (edit, link, arrange); hidden element anchors (`anchor`)
+- [x] Links out of the drawing (`url`): web and mail addresses, and other drawings opened at an anchor or page; an Anchors tab in the sidebar; clickable links in PDF and SVG export
 - [x] `dottie` command-line tool: render to png, svg, pdf and html, library list/install; installed from Settings ▸ Command Line
 - [x] Pictures (`image` kind): paste, drop or File ▸ Insert Image…; embedded as PNG/JPEG (EXIF-rotated, capped at 2048 px), optional sketchy border, in every export; `add_image` over MCP
 - [x] Mermaid flowchart import: File ▸ Import Mermaid…, ⌘V of flowchart text, `.mmd` drop, `import_mermaid` over MCP, `dottie render flow.mmd`
@@ -52,8 +53,6 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 
 ## Next
 - Custom themes and a color palette per theme
-- Visio (`.vsdx`) import
-- Links: a Sections list in the sidebar, URL links, clickable links in PDF and SVG export, links to other drawings
 
 ## Agents (MCP)
 - [x] Live mode (see README); `export_svg`
@@ -61,7 +60,7 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Connector labels (`label` on edges and `add_connector`; `text` on `update_element`)
 - [x] `export_png` returns an element-id -> kind, text and pixel box map
 - [x] Look options on shapes and connectors: `fill_style`, `dash`, `stroke_width`, `bowing`, `rotation`, `start_head`, `end_head`
-- [x] `link` on `update_element` (and in `list_elements`)
+- [x] `link` on `update_element` (and in `list_elements`), and `url` for links out of the drawing
 - [x] `update_scene`: rename, move or remove a scene (and `dottie.renameScene` / `moveScene` / `removeScene` in scripts)
 
 ## Open questions

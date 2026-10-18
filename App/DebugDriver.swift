@@ -25,11 +25,16 @@ struct DebugHooks {
 @MainActor
 final class DebugDriver {
     static let shared = DebugDriver()
-    var front: DebugHooks?
+    var front: DebugHooks? {
+        didSet { if let front { known.removeAll { $0.document === front.document }; known.append(front) } }
+    }
+    /// Every window that has registered, so `window` can make one the front without it becoming key.
+    private var known: [DebugHooks] = []
 
     static let help = """
     state                        what the front window shows (page, tool, selection, timeline)
     open <file.dottie>           open a document (give it a moment, then `state`)
+    window [title]               list the document windows, or drive the one whose title contains <title>
     size <width> <height>        resize the front window's content
     snapshot <out.png> [canvas|popover]   render the window (or just the canvas, or an open popover) to a PNG
     playhead <seconds|none>      move the playhead (paused there, the canvas poses that frame)
@@ -68,6 +73,15 @@ final class DebugDriver {
                 let url = URL(fileURLWithPath: try arg(rest, 0, "path"))
                 NSDocumentController.shared.openDocument(withContentsOf: url, display: true) { _, _, _ in }
                 return ok("opening \(url.path)")
+            case "window":
+                known.removeAll { LiveCanvases.canvas(for: $0.document)?.window == nil } // closed since
+                let titles = known.map { LiveCanvases.canvas(for: $0.document)?.window?.title ?? "" }
+                guard let want = rest.first else { return ok(titles.joined(separator: "\n")) }
+                guard let i = titles.firstIndex(where: { $0.localizedCaseInsensitiveContains(want) }) else {
+                    throw DebugError("no window titled '\(want)'; open: \(titles.joined(separator: ", "))")
+                }
+                front = known[i]
+                return ok("driving \(titles[i])")
             case "size":
                 guard let w = Double(try arg(rest, 0, "width")), let h = Double(try arg(rest, 1, "height")) else {
                     throw DebugError("size takes two numbers")
@@ -193,6 +207,8 @@ final class DebugDriver {
         ]
         if let c = try? canvas() {
             lines.append("tool \(c.tool.rawValue)")
+            let (pan, zoom) = c.viewport, mid = CGPoint(x: c.bounds.midX, y: c.bounds.midY)
+            lines.append(String(format: "view centered on %.0f, %.0f at %.0f%%", (mid.x - pan.x) / zoom, (mid.y - pan.y) / zoom, zoom * 100))
             // The canvas edits a copy of the page; when they differ outside a gesture, its edits aren't arriving.
             if h.playhead() == nil, c.model != doc { lines.append("canvas out of step with the page (\(c.model.elements.count) elements there)") }
         }

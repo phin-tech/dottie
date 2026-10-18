@@ -405,6 +405,49 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertFalse(view.jumpBack(animated: false))
     }
 
+    func testLinksOutOfTheDrawingGoToTheWindow() throws {
+        var opened: [OutsideLink] = []
+        view.onOpenOutsideLink = { opened.append($0) }
+        let site = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Docs")
+        try view.model.setURL([site.id], to: "https://example.com/docs")
+        click(badge(of: site))
+        click(CGPoint(x: 160, y: 130), mods: .command)
+        XCTAssertEqual(opened, [.web("https://example.com/docs"), .web("https://example.com/docs")])
+        XCTAssertTrue(commits.isEmpty, "following a link is not an edit")
+        XCTAssertEqual(view.viewport.pan, .zero)
+        XCTAssertFalse(view.jumpBack(animated: false), "leaving the drawing is not a jump")
+    }
+
+    /// Whether the link badge of `e` is drawn gray, the look of a link that leads nowhere.
+    private func badgeIsGray(_ e: Element) -> Bool {
+        let p = badge(of: e)
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let scale = CGFloat(rep.pixelsWide) / view.bounds.width
+        let c = rep.colorAt(x: Int(p.x * scale), y: Int((p.y + 6) * scale))!.usingColorSpace(.sRGB)! // below the glyph
+        return c.saturationComponent < 0.2 && c.brightnessComponent < 0.9
+    }
+
+    func testADrawingLinkToAMissingFileLooksBroken() throws {
+        view.linkBase = URL(fileURLWithPath: "/tmp/plans/overview.dottie")
+        view.outsideLinkBroken = { OutsideLinks.isBroken($0, from: URL(fileURLWithPath: "/tmp/plans/overview.dottie")) }
+        let gone = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Gone")
+        let web = add(.rectangle, CGRect(x: 100, y: 300, width: 120, height: 60), text: "Web")
+        try view.model.setURL([gone.id], to: "nowhere-\(UUID().uuidString).dottie#Top")
+        try view.model.setURL([web.id], to: "https://example.com")
+        XCTAssertTrue(badgeIsGray(gone))
+        XCTAssertFalse(badgeIsGray(web))
+    }
+
+    func testRemoveLinkClearsAnOutsideLink() throws {
+        let site = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60))
+        try view.model.setURL([site.id], to: "next.dottie")
+        view.selection = [site.id]
+        view.removeLink(nil)
+        XCTAssertNil(element(site.id).url)
+        XCTAssertEqual(commits.map(\.name), ["Remove Link"])
+    }
+
     func testCommandClickFollowsButCommandDragStillMoves() {
         let toc = add(.rectangle, CGRect(x: 100, y: 100, width: 120, height: 60), text: "Contents")
         let far = add(.rectangle, CGRect(x: 3000, y: 2000, width: 200, height: 100), text: "Billing")
