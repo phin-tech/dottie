@@ -238,6 +238,7 @@ targets:
     dependencies:
       - package: Dottie
         product: DottieKit
+      - package: Sparkle
     settings:
       base:
         SWIFT_VERSION: "6.0"
