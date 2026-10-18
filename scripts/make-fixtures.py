@@ -542,6 +542,32 @@ def clicks():
     write(JS_ONLY / "hostile-clicks.dottie", [h])
 
 
+def links():
+    """Links out of the drawing (`url`): web and mail addresses become <a> in SVG and clicks in the web players, faded
+    and turned shapes keep their link around the whole element, a symbol's parts keep theirs, and links that must do
+    nothing on the web (another drawing, a javascript: address) stay plain."""
+    p = Page("Links")
+    p.add("rectangle", 40, 40, 140, 60, text="Docs", url="https://example.com/docs?a=1&b=\"2\"")
+    p.add("ellipse", 220, 40, 120, 60, text="Mail", url="mailto:team@example.com", rotation=0.3,
+          style=style(opacity=0.6))
+    p.add("rectangle", 380, 40, 140, 60, text="Next plan", url="plans/next.dottie#Login")
+    p.add("rectangle", 40, 140, 140, 60, text="Script", url="javascript:alert(1)")
+    p.add("diamond", 220, 140, 120, 60, text="Click wins", url="https://example.com/url",
+          click={"url": "https://example.com/click"})
+    p.add("rectangle", 380, 140, 140, 60, text="Section", anchor="Section")
+    sp = Page("Badge")
+    sp.add("rectangle", 0, 0, 100, 40, text="Help", url="https://example.com/help", style=style(roughness=0))
+    badge = {"id": sp.id, "name": "Badge", "width": 100, "height": 40, "layers": sp.layers, "elements": sp.elements}
+    p.extra = {"symbols": [badge]}
+    p.add("symbol", 40, 240, 100, 40, symbol=badge["id"], style=style(roughness=0))
+    write(EDGE / "links.dottie", [p])
+
+    h = Page()
+    h.add("rectangle", 40, 40, 160, 60, text="url", url="javascript:window.__pwned=1")
+    h.add("rectangle", 240, 40, 160, 60, text="mixed", url=" JavaScript:window.__pwned=1")
+    write(JS_ONLY / "hostile-links.dottie", [h])
+
+
 def symbols():
     """Symbols: instances scaled, turned unevenly, offset, played once or held still, nested, faded, keyed on the
     page, boiled with it, and one naming a symbol that isn't there (it draws nothing); connectors inside a symbol
@@ -779,6 +805,7 @@ def main():
     buttons()
     params()
     extension_shapes()
+    links()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

@@ -4,7 +4,7 @@
 import { type Index, connectorBounds, indexOf, midpoint } from "./connector.ts";
 import { BAND, isFloor, lineColor, rock } from "./dungeon.ts";
 import { angle, frame, resolvingInk, rotatedBounds } from "./element.ts";
-import { type Element, type Page, type RGBA, black, orderedElements } from "./model.ts";
+import { type Element, type Page, type RGBA, allowedURL, black, orderedElements, webLink } from "./model.ts";
 import { noteMarkup } from "./note.ts";
 import { color, escapeXML } from "./svg-util.ts";
 import { Path, type Rect, fmt, inset, midX, midY, union } from "./path.ts";
@@ -74,9 +74,11 @@ export function svgOpen(b: Rect, background: RGBA | null, paint: boolean): strin
 
 export interface Part { key: string; markup: string }
 
-/** The SVG for each thing drawn, back to front, keyed by element id (rock hatching as "rock"). */
-export function svgParts(page: Page, background: RGBA | null, fixed?: Rect): { bounds: Rect; parts: Part[] } {
-  if (hasInstances(page)) return svgParts(expandingSymbols(page, 0), background, fixed);
+/** The SVG for each thing drawn, back to front, keyed by element id (rock hatching as "rock"). With `links`, an
+ * element whose click or `url` is a web address is wrapped in an `<a>` that opens it, the click's first (the players
+ * make their own clickable groups). */
+export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, links = false): { bounds: Rect; parts: Part[] } {
+  if (hasInstances(page)) return svgParts(expandingSymbols(page, 0), background, fixed, links);
   const theme = themeNamed(page.theme);
   const bg = background ? (theme?.background ?? background) : null;
   const ink = theme?.ink ?? black;
@@ -98,14 +100,17 @@ export function svgParts(page: Page, background: RGBA | null, fixed?: Rect): { b
     if (angle(e) !== 0 && e.kind !== "connector") {
       body = `<g transform="rotate(${fmt((angle(e) * 180) / Math.PI)} ${fmt(midX(frame(e)))} ${fmt(midY(frame(e)))})">\n${body}</g>\n`;
     }
-    parts.push({ key: e.id, markup: alpha < 1 ? `<g opacity="${fmt(alpha)}">\n${body}</g>\n` : body });
+    if (alpha < 1) body = `<g opacity="${fmt(alpha)}">\n${body}</g>\n`;
+    const href = links ? ((e.click?.url ? allowedURL(e.click.url) : null) ?? webLink(e.url)) : null;
+    if (href) body = `<a href="${escapeXML(href).replace(/"/g, "&quot;")}" target="_blank">\n${body}</a>\n`;
+    parts.push({ key: e.id, markup: body });
   }
   return { bounds: b, parts };
 }
 
 /** A whole page as an SVG document. Pass `background: null` for a transparent page. */
 export function svg(page: Page, background: RGBA | null = { r: 1, g: 1, b: 1, a: 1 }, fixed?: Rect): string {
-  const { bounds: b, parts } = svgParts(page, background, fixed);
+  const { bounds: b, parts } = svgParts(page, background, fixed, true);
   return svgOpen(b, themeNamed(page.theme)?.background ?? background, background !== null) + parts.map((p) => p.markup).join("") + "</svg>\n";
 }
 

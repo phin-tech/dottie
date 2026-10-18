@@ -118,6 +118,7 @@
         "evenOdd": { "type": "boolean" },
         "rotation": { "type": "number", "description": "Radians, clockwise about the frame's center." },
         "link": { "$ref": "#/$defs/uuid" },
+        "url": { "type": "string", "description": "Where the element links outside the drawing, instead of link: an http, https or mailto address, or another drawing as a path relative to this file with an optional #anchor (or page name)" },
         "anchor": { "type": "string" },
         "click": { "$ref": "#/$defs/click" },
         "hover": { "$ref": "#/$defs/hover" },

@@ -35,3 +35,17 @@ _Avoid_: action, effect
 **Adjustment handle**:
 An on-canvas control an extension shape declares for adjusting one of its parameters by dragging.
 _Avoid_: handle (that also means the resize and rotation handles), knob, adjustment point
+
+### Links
+
+**Anchor**:
+A name given to a shape so links can find it, from this drawing or another one; the Anchors tab lists them.
+_Avoid_: section, bookmark
+
+**Link**:
+What a shape jumps to in the same drawing (`link`): another shape, on this page or another.
+_Avoid_: reference, jump target
+
+**Outside link**:
+Where a shape leads out of the drawing (`url`): a web or mail address, or another drawing with an optional `#anchor` or page.
+_Avoid_: URL link, hyperlink, external link

@@ -10,15 +10,14 @@ public enum ClickTarget: Equatable, Sendable {
 
 extension DottieDocument {
     /// The page's clickable elements and what each click does. A scene named by no marker on the page, or a link
-    /// that isn't allowed, makes nothing clickable.
+    /// that isn't allowed, makes nothing clickable. An element with no `click` opens its `url` when that is a web link.
     public var clickTargets: [UUID: ClickTarget] {
         let markers = timeline?.markers ?? []
         var out: [UUID: ClickTarget] = [:]
         for e in elements {
-            guard let click = e.click else { continue }
-            if let name = click.scene, !name.isEmpty, let i = Self.scene(named: name, in: markers) {
+            if let name = e.click?.scene, !name.isEmpty, let i = Self.scene(named: name, in: markers) {
                 out[e.id] = .scene(i)
-            } else if let url = click.url.flatMap(ClickAction.allowed) {
+            } else if let url = e.click?.url.flatMap(ClickAction.allowed) ?? e.outsideLink?.webAddress {
                 out[e.id] = .url(url)
             }
         }

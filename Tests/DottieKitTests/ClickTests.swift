@@ -127,7 +127,11 @@ final class ClickTests: XCTestCase {
     func testStillExportsIgnoreClicks() throws {
         let (doc, _, _, _) = try tour()
         var plain = doc
-        for i in plain.elements.indices { plain.elements[i].click = nil; plain.elements[i].hover = nil }
+        // A click's web address is still a link in an SVG, as a `url` would be; scenes and hover looks are dropped.
+        for i in plain.elements.indices {
+            plain.elements[i].url = plain.elements[i].click?.url ?? plain.elements[i].url
+            plain.elements[i].click = nil; plain.elements[i].hover = nil
+        }
         XCTAssertEqual(Exporter.svg(doc.still), Exporter.svg(plain.still))
         XCTAssertEqual(Exporter.svg(doc.resolved(at: 1)), Exporter.svg(plain.resolved(at: 1)))
     }

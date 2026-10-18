@@ -198,6 +198,13 @@ from frame to frame. Anything that iterates a page's elements to draw or export 
 not the page: Lottie and the web page export take their element order from `expandingSymbols(at: 0, posing:
 false)`. Cycles are cut, and depth and the number of expanded elements are capped (`Symbol.maxDepth`,
 `.maxElements`), the same in dottie.js. Dottie 0.5.0 and earlier cannot open a file containing a symbol.
+An element's `link` is the id of a shape it jumps to; its `url` leads out of the drawing (`OutsideLink` in
+`Links.swift`): an `http`, `https` or `mailto` address, or a path to another `.dottie` file, relative to the linking
+file or absolute, with an optional `#name` that `DottieFile.destination` finds as an anchor (exact, then ignoring
+case) or else a page name or number. An element has one or the other: setting either clears the other. PDF export
+makes `url` web links clickable and `link`s jump, across pages in a multi-page PDF; SVG export wraps web links in
+`<a>`; the web players open a web `url` when the shape has no `click`. Links to other drawings are followed only in
+the app.
 An element's `click` (a scene name or an `http`, `https` or `mailto` link) and `hover` look are only used by the
 web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read. A symbol with
 `button: true` is a button: its copies always show its `up` scene (else the start), whatever their playback, and

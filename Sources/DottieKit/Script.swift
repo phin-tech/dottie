@@ -318,6 +318,7 @@ public enum DottieScript {
             if let r = e.rotation { d["rotation"] = round1(r * 180 / .pi) }
             if let g = e.groupID { d["group"] = g.uuidString }
             if let l = e.link { d["link"] = l.uuidString }
+            if let u = e.url { d["url"] = u }
             if let n = e.anchor { d["anchor"] = n }
             if let c = e.click {
                 var o: [String: Any] = [:]
@@ -444,7 +445,8 @@ public enum DottieScript {
                                       width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
                                       routing: try a.enumValue("routing", as: Routing.self), look: try a.look(),
-                                      link: link, anchor: a.has("anchor") ? .some(a.string("anchor")) : nil,
+                                      link: link, url: a.has("url") ? .some(a.string("url")) : nil,
+                                      anchor: a.has("anchor") ? .some(a.string("anchor")) : nil,
                                       click: click, hover: hover, otherPages: otherPages)
                 return describe(try element(id))
 
@@ -757,6 +759,7 @@ public enum DottieScript {
         update: function (id, changes) {
           var o = merge(changes, { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
+          if (o.url === null) o.url = "";
           if (o.click === null) o.click = "";
           if (o.hover === null) o.hover = "";
           return call("update", o);
@@ -920,9 +923,13 @@ public enum DottieScript {
     direction?: "TB"|"LR", sketchy?})   laid out below existing content; returns {key: id}
 
     Changing
-      dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, link?, anchor?, ...look})  returns the element
+      dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, link?, url?, anchor?, ...look})  returns the element
       link: another shape (id or element) this one jumps to when its badge is clicked in the app, on this page or \
     another (find it with dottie.pages()); null removes it
+      url: where the badge goes outside the drawing instead: an http(s) or mailto link, or another drawing as a path \
+    relative to this one ("plans/next.dottie#Login" opens it at the shape anchored Login, or the page named Login); \
+    PDF and SVG exports make web links clickable, and the web players open them; null removes it. Setting url clears \
+    link, and the other way round
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
       click: {scene} or {url}: when the drawing plays on the web (HTML export, <dottie-player>), clicking the element \
     jumps to that scene (see dottie.scene) and plays on to the next, or opens an http(s) or mailto link; null removes it

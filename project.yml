@@ -235,6 +235,7 @@ targets:
       - App/EditorActions.swift
       - App/ExtensionHost.swift
       - App/ExtensionViews.swift
+      - App/OutsideLinks.swift
     dependencies:
       - package: Dottie
         product: DottieKit
