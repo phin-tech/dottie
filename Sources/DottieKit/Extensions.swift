@@ -11,6 +11,7 @@ public enum ExtensionError: Error, Equatable, CustomStringConvertible {
     case invalidParameter(String, String)
     case noSuchShape(String)
     case noSuchCommand(String)
+    case noSuchTool(String)
     case failed(String)
     case invalidOutput(String)
 
@@ -22,6 +23,7 @@ public enum ExtensionError: Error, Equatable, CustomStringConvertible {
         case .invalidParameter(let name, let why): return "\(name): \(why)"
         case .noSuchShape(let id): return "no extension shape named \(id)"
         case .noSuchCommand(let id): return "no extension command named \(id)"
+        case .noSuchTool(let id): return "no extension tool named \(id)"
         case .failed(let message): return message
         case .invalidOutput(let why): return "generate returned something other than a path: \(why)"
         }
@@ -156,10 +158,11 @@ public struct CommandDefinition: Codable, Equatable, Sendable {
     public var parameters: [ParameterSpec]
 }
 
-/// What an extension declares: its shapes and commands, in the order `main.js` declared them.
+/// What an extension declares: its shapes, commands and drawing tools, in the order `main.js` declared them.
 struct Described: Decodable {
     var shapes: [ShapeDefinition]
     var commands: [CommandDefinition]
+    var tools: [ToolDefinition]
 }
 
 /// What an extension shape's `generate` returned, normalized to the element's frame (0...1 on each axis).
@@ -204,6 +207,7 @@ public final class ExtensionRuntime {
     public let directory: URL
     public private(set) var shapes: [ShapeDefinition] = []
     public private(set) var commands: [CommandDefinition] = []
+    public private(set) var tools: [ToolDefinition] = []
     private var context: JSContext?
     private let source: String
     /// `console` output from `main.js`, `generate`, `migrate` and handles, until `takeLogs` hands it on.
@@ -262,6 +266,7 @@ public final class ExtensionRuntime {
             let d = try JSONDecoder().decode(Described.self, from: Data(described.utf8))
             shapes = d.shapes
             commands = d.commands
+            tools = d.tools
         } catch {
             throw ExtensionError.failed("shapes and commands: \(error.localizedDescription)")
         }
@@ -362,7 +367,7 @@ public final class ExtensionRuntime {
     }
 
     /// Calls a prelude function by name. Any exception rebuilds the context, since a time-out leaves it unusable.
-    private func call(_ name: String, _ arguments: [Any]) throws -> String? {
+    func call(_ name: String, _ arguments: [Any]) throws -> String? {
         guard let context else { throw ExtensionError.failed("extension is not loaded") }
         let result = context.objectForKeyedSubscript(name).call(withArguments: arguments)
         if let e = context.exception {
@@ -377,10 +382,11 @@ public final class ExtensionRuntime {
 
     /// Declares the `extension` global. Each declaration is kept in order; `__describe` hands the lists to Swift.
     static let prelude = """
-        var __shapes = {}, __commands = {}, __migrate = null;
+        var __shapes = {}, __commands = {}, __tools = {}, __migrate = null;
         var extension = {
           shape: function (def) { __shapes[def.id] = def; },
           command: function (def) { __commands[def.id] = def; },
+          tool: function (def) { __tools[def.id] = def; },
           migrate: function (fn) { __migrate = fn; }
         };
         function __params(def) {
@@ -397,8 +403,19 @@ public final class ExtensionRuntime {
             commands: Object.keys(__commands).map(function (k) {
               var c = __commands[k];
               return { id: c.id, name: c.name, category: c.category || null, when: c.when || null, parameters: __params(c) };
+            }),
+            tools: Object.keys(__tools).map(function (k) {
+              var t = __tools[k];
+              return { id: t.id, name: t.name, icon: t.icon || null };
             })
           });
+        }
+        function __drawTool(id, gesture) {
+          var t = __tools[id];
+          if (!t) throw new Error("no extension tool named " + id);
+          var out = t.draw(gesture);
+          if (out === undefined || out === null) throw new Error(id + " draw returned nothing");
+          return JSON.stringify(out);
         }
         function __generate(id, params, frame) {
           var s = __shapes[id];
@@ -467,8 +484,13 @@ public final class ExtensionRegistry {
         public var enabled: Bool
     }
 
+    /// `~/Library/Application Support/Dottie/Extensions`, or the folder `DOTTIE_EXTENSIONS` names, so a Debug build
+    /// can try extensions without touching the ones an everyday Dottie loads.
     public static var folder: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        if let dir = ProcessInfo.processInfo.environment["DOTTIE_EXTENSIONS"], !dir.isEmpty {
+            return URL(fileURLWithPath: (dir as NSString).expandingTildeInPath, isDirectory: true)
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Dottie/Extensions", isDirectory: true)
     }
 

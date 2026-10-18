@@ -39,8 +39,11 @@ Once it is on npm, point `website/mkdocs.yml` at the exact new version (a range 
 live socket (`DOTTIE_LIVE_SOCKET`), so it doesn't take over the socket your everyday Dottie uses, and
 `just debug <command>` drives it through `scripts/dottie-debug.py`: `snapshot out.png [canvas]` has the window
 render itself to a PNG (no screen-recording permission needed; translucent toolbars and the inspector come out
-blank), and `playhead`, `play`, `action`, `select`, `drag`, `key` and `menu` move it around. `just debug help`
-lists everything. The commands exist only in Debug builds (`App/DebugDriver.swift`).
+blank), and `playhead`, `play`, `action`, `select`, `drag`, `key`, `tool` and `menu` move it around; `window`
+picks which open drawing they act on. `just debug help` lists everything. The commands exist only in Debug builds
+(`App/DebugDriver.swift`). Menus act on the focused window, which a background app doesn't have, so prefer `key`
+and `tool`. To try extensions without installing them where your everyday Dottie loads them, launch with
+`DOTTIE_EXTENSIONS=<folder>` (`open -n -g --env DOTTIE_EXTENSIONS=… --env DOTTIE_LIVE_SOCKET=… Dottie.app`).
 
 **Targets.** `Dottie` (the app) embeds `DottieCLI` and `DottieMCP` in `Contents/Helpers` and two Quick Look
 app extensions in `Contents/PlugIns`, all linking DottieKit:
@@ -266,6 +269,11 @@ checksum-verified, or any npm name or `.js` URL resolved through jsDelivr), and 
 An extension is a folder `<name>.dottieext` in `~/Library/Application Support/Dottie/Extensions/` with a
 `manifest.json` and a `main.js`. Its shapes are paths generated from parameters and stored as ordinary `.path`
 elements, so every renderer draws them without running the extension (see docs/adr/0001-js-extensions.md).
+Its drawing tools (`extension.tool`, `Sources/DottieKit/ExtensionTools.swift`) join the toolbar and Tools menu after
+the built-in ones, with no key: `draw(gesture)` gets every point since the press and `done` on release, and returns
+plain elements (paths in canvas points, rectangles, ellipses, diamonds), which `ExtensionTool` in
+`App/CanvasTools.swift` redraws from the page as it was at the press on every step and adds as one undo step. The
+template's Ribbon tool is the example; `fixtures/edge/extension-tools.dottie` holds what such tools leave behind.
 `extension-template/` is a TypeScript starting point: `dottie-extension.d.ts` types the `extension` global,
 `./build.sh` compiles `src/main.ts` to `main.js`. Check a bundle with `dottie ext check <bundle>`; the MCP server
 has `list_extensions`, `reload_extensions`, `install_extension` and `run_command`. Turning an extension off in

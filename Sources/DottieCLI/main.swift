@@ -397,6 +397,20 @@ func runExtension(_ args: [String]) -> Int32 {
                 print("  ok     command \(command.id)")
             }
         }
+        for tool in runtime.tools {
+            // A short diagonal drag, drawn as each step would be and then let go.
+            let points = (0...10).map { CGPoint(x: 10 + Double($0) * 8, y: 10 + Double($0) * 5) }
+            do {
+                for n in 1...points.count {
+                    let drawn = try runtime.draw(tool: tool.id, ToolGesture(points: Array(points.prefix(n)), done: n == points.count))
+                    _ = try DrawnElement.elements(drawn, style: Style(), layerID: UUID(), seed: 1)
+                }
+                print("  ok     tool \(tool.id)")
+            } catch {
+                failures += 1
+                print("  error  tool \(tool.id): \(error)")
+            }
+        }
         // Advisory: a TypeScript entry (src/main.ts or main.ts) is checked with the TypeScript compiler Dottie finds
         // (DOTTIE_TSC, then PATH). Problems are printed but do not fail the check; plain JavaScript has no check.
         let entry = ["src/main.ts", "main.ts"].map { dir.appendingPathComponent($0) }.first { FileManager.default.fileExists(atPath: $0.path) }

@@ -226,6 +226,82 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertTrue(commits.isEmpty)
     }
 
+    // MARK: Extension tools
+
+    /// Loads one bundle with a Boxer tool (a box from the press to the pointer, and its corner dot once let go) and a
+    /// tool whose `draw` throws, into the app's extensions. Undone by `unloadExtensions`.
+    private func loadToolExtension() throws -> URL {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("canvas-tools-\(UUID().uuidString)", isDirectory: true)
+        let dir = folder.appendingPathComponent("Tools.dottieext", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try #"{"id":"com.example.tools","name":"Tools","version":"1.0.0","dottieApi":1}"#
+            .write(to: dir.appendingPathComponent("manifest.json"), atomically: true, encoding: .utf8)
+        try """
+            extension.tool({ id: "boxer", name: "Boxer", icon: "square.dashed", draw: function (g) {
+              var a = g.points[0], b = g.points[g.points.length - 1];
+              var out = [{ kind: "rectangle", x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) }];
+              if (g.done) out.push({ kind: "ellipse", x: b.x - 3, y: b.y - 3, width: 6, height: 6 });
+              return { elements: out };
+            } });
+            extension.tool({ id: "broken", name: "Broken", draw: function (g) {
+              if (g.points.length > 3) throw new Error("no more");
+              return { elements: [{ kind: "rectangle", x: 0, y: 0, width: 10, height: 10 }] };
+            } });
+            """.write(to: dir.appendingPathComponent("main.js"), atomically: true, encoding: .utf8)
+        ExtensionHost.shared.registry.scan(in: folder, disabled: [])
+        return folder
+    }
+
+    private func unloadExtensions(_ folder: URL) {
+        try? FileManager.default.removeItem(at: folder)
+        ExtensionHost.shared.registry.scan(in: folder, disabled: [])
+    }
+
+    func testExtensionToolsJoinTheToolbarWithoutAKey() throws {
+        let folder = try loadToolExtension()
+        defer { unloadExtensions(folder) }
+        let boxer = Tool(id: "com.example.tools/boxer")
+        XCTAssertEqual(Tool.all.suffix(2), [boxer, Tool(id: "com.example.tools/broken")])
+        XCTAssertEqual(boxer.label, "Boxer")
+        XCTAssertEqual(boxer.symbol, "square.dashed")
+        XCTAssertNil(boxer.shortcut)
+        XCTAssertEqual(Tool(id: "com.example.tools/broken").symbol, "wand.and.stars", "no icon: the default")
+        unloadExtensions(folder)
+        XCTAssertFalse(Tool.all.contains(boxer))
+    }
+
+    func testAnExtensionToolDrawsOneUndoStepFromTheWholeDrag() throws {
+        let folder = try loadToolExtension()
+        defer { unloadExtensions(folder) }
+        let before = add(.rectangle, CGRect(x: 600, y: 500, width: 50, height: 50))
+        view.tool = Tool(id: "com.example.tools/boxer")
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 100, y: 100)))
+        XCTAssertEqual(view.model.elements.count, 2, "the press already shows what it draws")
+        for i in 1...20 {
+            view.mouseDragged(with: event(.leftMouseDragged, CGPoint(x: 100 + Double(i) * 10, y: 100 + Double(i) * 5)))
+        }
+        XCTAssertEqual(view.model.elements.count, 2, "each step redraws from the page as it was, so nothing piles up")
+        XCTAssertTrue(commits.isEmpty)
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 300, y: 200)))
+        XCTAssertEqual(commits.map(\.name), ["Boxer"])
+        let drawn = view.model.elements.filter { $0.id != before.id }
+        XCTAssertEqual(drawn.map(\.kind), [.rectangle, .ellipse])
+        XCTAssertEqual(drawn[0].frame, CGRect(x: 100, y: 100, width: 200, height: 100))
+        XCTAssertEqual(view.selection, Set(drawn.map(\.id)))
+        XCTAssertEqual(drawn[0].seed &+ 1, drawn[1].seed)
+        XCTAssertEqual(view.tool, Tool(id: "com.example.tools/boxer"), "a drawing tool keeps going")
+    }
+
+    func testAFailingExtensionToolLeavesThePageAsItWas() throws {
+        let folder = try loadToolExtension()
+        defer { unloadExtensions(folder) }
+        let page = view.model
+        view.tool = Tool(id: "com.example.tools/broken")
+        drag(CGPoint(x: 100, y: 100), CGPoint(x: 300, y: 200))
+        XCTAssertEqual(view.model, page)
+        XCTAssertTrue(commits.isEmpty)
+    }
+
     // MARK: Eraser
 
     func testEraserClickCutsAStrokeInTwoAndSweepRemovesTheRest() {

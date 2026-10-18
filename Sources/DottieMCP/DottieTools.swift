@@ -602,6 +602,7 @@ actor DottieTools {
                 let lines = ["\(rt.manifest.name) (\(rt.manifest.id)) \(rt.manifest.version): loaded"]
                     + rt.shapes.map { "  shape \($0.id): \($0.name)" }
                     + rt.commands.map { "  command \($0.id): \($0.name)" }
+                    + rt.tools.map { "  tool \($0.id): \($0.name)" }
                 return lines.joined(separator: "\n")
             }
             return entry.enabled ? "\(entry.name): not loaded: \(entry.error ?? "unknown error")" : "\(entry.name): turned off in Settings"
