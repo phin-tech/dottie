@@ -82,3 +82,17 @@ test("extension metadata reads without warnings, and is kept on the element", ()
   const e: Element = f.pages[0].elements[0];
   assert.deepEqual(e.extension, { id: "dev.example.gear", shape: "gear", version: "1.2.0", params: { teeth: 8, round: true, name: "x" } });
 });
+
+/** A closed square with open lines across its inside at 20% and 60% of its height, like a database's rims. */
+const SQUARE = [0, 0, 1 / 3, 0, 2 / 3, 0, 1, 0, 1, 1 / 3, 1, 2 / 3, 1, 1, 2 / 3, 1, 1 / 3, 1, 0, 1, 0, 2 / 3, 0, 1 / 3, 0, 0];
+const RIMS = [0.2, 0.6].map((y) => ({ closed: false, coords: [0, y, 1 / 3, y, 2 / 3, y, 1, y] }));
+
+test("lines inside a path's outline don't catch connectors; a far end inside uses the nearest crossing", () => {
+  const f = drawing([{ id: id(2), kind: "path", layerID: LAYER, x: 0, y: 0, width: 100, height: 100, subpaths: [{ closed: true, coords: SQUARE }, ...RIMS] }]);
+  const shape = f.pages[0].elements[0];
+  // From above, the ray from (50, 50) meets the inside line at y 20 before the top edge: the edge wins.
+  assert.deepEqual(edgePoint(shape, { x: 50, y: -100 }), { x: 50, y: 0 });
+  assert.deepEqual(edgePoint(shape, { x: 50, y: 300 }), { x: 50, y: 100 });
+  // A far end at y 30 is inside: nothing is crossed before it, so the nearest crossing ahead (the line at y 20).
+  assert.deepEqual(edgePoint(shape, { x: 50, y: 30 }), { x: 50, y: 20 });
+});

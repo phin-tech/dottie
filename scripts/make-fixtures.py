@@ -750,6 +750,14 @@ def extension_shapes():
     p.elements[-1]["connector"]["end"]["portIndex"] = 0
     p.connect(hexa, rot, routing="curved", start_head="bar", text="from port 0")
     p.elements[-1]["connector"]["start"]["portIndex"] = 0
+    # A box with open lines across its inside, like a database's rims: connectors stop at the outside edge, not on
+    # the first inside line the ray from its center meets.
+    rims = poly([(0, 0), (1, 0), (1, 1), (0, 1)]) + [
+        {"closed": False, "coords": [0, y, 1 / 3, y, 2 / 3, y, 1, y]} for y in (0.2, 0.6)]
+    drum = p.add("path", 600, 220, 100, 160, subpaths=rims, text="rims")
+    cache = p.add("rectangle", 600, 40, 100, 50, text="above")
+    p.connect(cache, drum)
+    p.connect(drum, box, routing="curved")
     write(EDGE / "extensions.dottie", [p])
 
 

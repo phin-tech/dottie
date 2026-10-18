@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="540.11" height="414.89" viewBox="3.89 -10.89 540.11 414.89">
-<rect x="3.89" y="-10.89" width="540.11" height="414.89" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="720.11" height="414.89" viewBox="3.89 -10.89 720.11 414.89">
+<rect x="3.89" y="-10.89" width="720.11" height="414.89" fill="#ffffff"/>
 <path d="M440 40 C466.67 80 493.33 120 520 160 C466.67 160 413.33 160 360 160 C386.67 120 413.33 80 440 40 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="440" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="440" y="130.48">triangle</tspan></text>
 <g transform="rotate(34.38 100 80)">
@@ -21,4 +21,10 @@
 <path d="M40 320 C40 223.31 105.83 223.31 105.83 126.62 M101.23 135.5 L105.83 126.62 M109.91 135.75 L105.83 126.62 M45 320.14 L35 319.86" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 <rect x="21.91" y="209.81" width="102" height="27" fill="#ffffff"/>
 <text x="72.91" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="72.91" y="229.79">from port 0</tspan></text>
+<path d="M600 220 C633.33 220 666.67 220 700 220 C700 273.33 700 326.67 700 380 C666.67 380 633.33 380 600 380 C600 326.67 600 273.33 600 220 Z M600 252 C633.33 252 666.67 252 700 252 M600 316 C633.33 316 666.67 316 700 316" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="650" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="650" y="306.48">rims</tspan></text>
+<path d="M600 40 L700 40 L700 90 L600 90 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="650" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="650" y="71.48">above</tspan></text>
+<path d="M650 90 L650 220 M654.34 210.99 L650 220 M645.66 210.99 L650 220" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M600 297.83 C540 297.83 540 292.61 480 292.61 M488.99 296.98 L480 292.61 M489.03 288.3 L480 292.61" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

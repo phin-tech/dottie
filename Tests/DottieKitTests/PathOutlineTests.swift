@@ -67,4 +67,58 @@ final class PathOutlineTests: XCTestCase {
         e.labelRect = NormalizedRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
         XCTAssertEqual(e.labelFrame, CGRect(x: 25, y: 25, width: 50, height: 50))
     }
+
+    // MARK: Lines inside the outline, and pinning to connection points
+
+    /// A square with open lines across its inside at 20% and 60% of its height, like a database's rims.
+    private func drum() -> Element {
+        var e = shape([(0, 0), (1, 0), (1, 1), (0, 1)])
+        e.subpaths! += [0.2, 0.6].map { y in PathSubpath(closed: false, coords: [0, y, 1.0 / 3, y, 2.0 / 3, y, 1, y]) }
+        return e
+    }
+
+    func testLinesInsideTheOutlineDoNotCatchConnectors() {
+        // From above, the ray from the center crosses the inside line at y 20 before the top edge; the edge wins.
+        assertPoint(Connector.edgePoint(drum(), toward: CGPoint(x: 50, y: -100)), 50, 0)
+        assertPoint(Connector.edgePoint(drum(), toward: CGPoint(x: 50, y: 300)), 50, 100)
+    }
+
+    func testAFarEndInsideTheShapeUsesTheNearestCrossing() {
+        // The far end sits between the inside line at y 20 and the center, so nothing is crossed before it.
+        assertPoint(Connector.edgePoint(drum(), toward: CGPoint(x: 50, y: 30)), 50, 20)
+    }
+
+    func testDropSnapsToAnExtensionShapesOwnPorts() {
+        var e = shape([(0, 0), (1, 0), (1, 1), (0, 1)])
+        XCTAssertEqual(Connector.connectionPoints(e).count, 4) // no ports declared: the four edge midpoints
+        XCTAssertEqual(Connector.endpoint(near: CGPoint(x: 52, y: 2), on: e).port, .top)
+        e.ports = [NormalizedPoint(x: 0.25, y: 0), NormalizedPoint(x: 0.75, y: 1)]
+        XCTAssertEqual(Connector.connectionPoints(e), [CGPoint(x: 25, y: 0), CGPoint(x: 75, y: 100)])
+        let near = Connector.endpoint(near: CGPoint(x: 72, y: 96), on: e)
+        XCTAssertEqual(near.portIndex, 1)
+        XCTAssertNil(near.port)
+        // Away from every declared port it follows the edge; the edge midpoints aren't offered any more.
+        let away = Connector.endpoint(near: CGPoint(x: 50, y: 2), on: e)
+        XCTAssertNil(away.portIndex)
+        XCTAssertNil(away.port)
+    }
+
+    func testScriptsPinConnectorsToSidesAndConnectionPoints() throws {
+        var doc = DottieDocument()
+        var e = shape([(0, 0), (1, 0), (1, 1), (0, 1)])
+        e.layerID = doc.layers[0].id
+        e.ports = [NormalizedPoint(x: 0.25, y: 0), NormalizedPoint(x: 0.75, y: 1)]
+        doc.elements.append(e)
+        let script = """
+            var b = dottie.rect({ x: 300, y: 0, width: 50, height: 50 });
+            dottie.connect("\(e.id.uuidString)", b, { fromPort: 1, toPort: "left" });
+            """
+        let result = DottieScript.run(script, on: &doc)
+        XCTAssertNil(result.error)
+        let c = try XCTUnwrap(doc.elements.last?.connector)
+        XCTAssertEqual(c.start.portIndex, 1)
+        XCTAssertEqual(c.end.port, .left)
+        let bad = DottieScript.run("dottie.connect(\"\(e.id.uuidString)\", \"\(e.id.uuidString)\", { toPort: 5 })", on: &doc)
+        XCTAssertTrue(bad.error?.contains("out of range") == true, bad.error ?? "no error")
+    }
 }

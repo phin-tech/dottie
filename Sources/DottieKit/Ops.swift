@@ -159,17 +159,30 @@ public enum DiagramOps {
 
     @discardableResult
     public static func addConnector(_ doc: inout DottieDocument, from: UUID, to: UUID, routing: Routing = .straight,
-                                    arrow: Bool = true, port: (Port?, Port?) = (nil, nil), roughness: Double? = nil,
-                                    label: String? = nil, look: Look = Look()) throws -> Element {
+                                    arrow: Bool = true, port: (Port?, Port?) = (nil, nil), portIndex: (Int?, Int?) = (nil, nil),
+                                    roughness: Double? = nil, label: String? = nil, look: Look = Look()) throws -> Element {
         func shape(_ id: UUID) throws -> Element {
             guard let e = doc.elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
             guard e.kind != .connector else { throw OpsError.invalid("Connectors can only attach to shapes") }
             return e
         }
+        /// An end bound to `id`, pinned to its connection point `index` (an extension shape's `ports`) when given.
+        func end(_ id: UUID, _ named: Port?, _ index: Int?) throws -> Endpoint {
+            var ep = Endpoint.bound(id, port: named)
+            guard let index else { return ep }
+            let count = try shape(id).ports?.count ?? 0
+            guard (0..<count).contains(index) else {
+                throw OpsError.invalid(count == 0 ? "That shape has no numbered connection points; use top, right, bottom or left"
+                    : "Connection point \(index) is out of range: that shape has \(count) (0 to \(count - 1))")
+            }
+            ep.portIndex = index
+            return ep
+        }
         _ = try shape(from); _ = try shape(to)
         var style = Style()
         if let roughness { style.roughness = roughness }
-        let data = ConnectorData(start: .bound(from, port: port.0), end: .bound(to, port: port.1), routing: routing, endArrow: arrow)
+        let data = ConnectorData(start: try end(from, port.0, portIndex.0), end: try end(to, port.1, portIndex.1),
+                                 routing: routing, endArrow: arrow)
         var e = Element(kind: .connector, frame: .zero, style: style, layerID: activeLayerID(&doc), text: label, connector: data)
         look.apply(to: &e)
         doc.elements.append(e)

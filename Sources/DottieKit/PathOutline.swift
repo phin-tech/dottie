@@ -8,10 +8,12 @@ extension Element {
     /// Curve segments are flattened into this many straight steps each.
     static let outlineStepsPerCurve = 16
 
-    /// Where the ray from `c` along `d` first crosses the outline, in the element's own (unrotated) frame; nil when
-    /// it misses every contour. Only crossings ahead of `c` count, and of those the nearest one wins.
+    /// Where a line coming in from `c + d` toward the center `c` first meets the drawing, in the element's own
+    /// (unrotated) frame; nil when the ray misses every contour. That is the crossing farthest from `c` that is not
+    /// past `c + d`, so lines inside the shape (a cylinder's rims, a hole) never catch the connector. When the far
+    /// end is inside the shape and no crossing comes before it, the nearest crossing ahead of `c` is used.
     func outlineCrossing(from c: CGPoint, along d: CGPoint) -> CGPoint? {
-        var nearest: CGFloat?
+        var nearest: CGFloat?, farthest: CGFloat?
         func test(_ a: CGPoint, _ b: CGPoint) {
             let e = CGPoint(x: b.x - a.x, y: b.y - a.y)
             let denominator = d.x * e.y - d.y * e.x // cross(d, e): zero when the ray and the segment are parallel
@@ -22,13 +24,14 @@ extension Element {
             let s = (ac.x * d.y - ac.y * d.x) / denominator
             guard t > 0, s >= 0, s <= 1 else { return }
             if nearest == nil || t < nearest! { nearest = t }
+            if t <= 1, farthest == nil || t > farthest! { farthest = t }
         }
         for contour in shapeContours {
             let points = Element.flatten(contour)
             for i in 1..<max(points.count, 1) { test(points[i - 1], points[i]) }
             if contour.closed, let first = points.first, let last = points.last { test(last, first) }
         }
-        guard let t = nearest else { return nil }
+        guard let t = farthest ?? nearest else { return nil }
         return CGPoint(x: c.x + d.x * t, y: c.y + d.y * t)
     }
 

@@ -26,9 +26,13 @@ function flattenContour(cp: Point[]): Point[] {
   return out;
 }
 
-/** Where the ray from `c` along `d` first meets a path's outline, both in the unrotated frame, or null. */
+/**
+ * Where a line coming in from `c + d` toward the center `c` first meets a path's drawing, both in the unrotated frame,
+ * or null: the crossing farthest from `c` that is not past `c + d`, so lines inside the shape (a cylinder's rims, a
+ * hole) never catch the connector. With no crossing before the far end, the nearest one ahead of `c`.
+ */
 function outlineCrossing(shape: Element, c: Point, d: Point): Point | null {
-  let best: number | null = null;
+  let nearest: number | null = null, farthest: number | null = null;
   for (const contour of shapeContours(shape)) {
     const pts = flattenContour(contour.points);
     const n = pts.length;
@@ -40,9 +44,12 @@ function outlineCrossing(shape: Element, c: Point, d: Point): Point | null {
       if (det === 0) continue;
       // Solves c + t·d = a + s·e.
       const t = (e.x * w.y - e.y * w.x) / det, s = (d.x * w.y - d.y * w.x) / det;
-      if (t > 0 && s >= 0 && s <= 1 && (best === null || t < best)) best = t;
+      if (!(t > 0 && s >= 0 && s <= 1)) continue;
+      if (nearest === null || t < nearest) nearest = t;
+      if (t <= 1 && (farthest === null || t > farthest)) farthest = t;
     }
   }
+  const best = farthest ?? nearest;
   return best === null ? null : { x: c.x + d.x * best, y: c.y + d.y * best };
 }
 

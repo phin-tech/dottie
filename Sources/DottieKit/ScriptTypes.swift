@@ -211,6 +211,8 @@ extension DottieScript {
         type Dash = "solid" | "dashed" | "dotted";
         type Arrowhead = "none" | "arrow" | "triangle" | "dot" | "bar";
         type Routing = "straight" | "curved" | "elbow";
+        /** A side of a shape, where a connector can be pinned to its midpoint. */
+        type Port = "top" | "right" | "bottom" | "left";
         type Direction = "TB" | "LR";
         /** Towards the next key. spring, bounce and elastic overshoot and settle; hold jumps at the next key. */
         type Ease = "linear" | "easeIn" | "easeOut" | "easeInOut" | "hold" | "spring" | "bounce" | "elastic";
@@ -325,6 +327,10 @@ extension DottieScript {
             arrow?: boolean;
             label?: string;
             sketchy?: boolean;
+            /** Pins the start: a side, or the index of one of an extension shape's connection points. Default: follows the edge. */
+            fromPort?: Port | number;
+            /** Pins the end, like fromPort. */
+            toPort?: Port | number;
         }
 
         interface Changes extends Look {

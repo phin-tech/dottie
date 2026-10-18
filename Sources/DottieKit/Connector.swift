@@ -86,6 +86,27 @@ public enum Connector {
         return shape.rotated(CGPoint(x: c.x + dx * t, y: c.y + dy * t))
     }
 
+    /// The points a connector can be pinned to on `shape`: an extension shape's own `ports` when it declares any,
+    /// otherwise the four mid-edge ports, on the canvas.
+    public static func connectionPoints(_ shape: Element) -> [CGPoint] {
+        if let ports = shape.ports, !ports.isEmpty {
+            return ports.indices.compactMap { portPoint(shape, index: $0) }
+        }
+        return Port.allCases.map { portPoint(shape, $0) }
+    }
+
+    /// The end of a connector dropped at `p` on `shape`: pinned to the nearest connection point within `radius` (one
+    /// of an extension shape's `ports`, else a mid-edge port), otherwise following the shape's edge.
+    public static func endpoint(near p: CGPoint, on shape: Element, radius: CGFloat = 12) -> Endpoint {
+        guard let ports = shape.ports, !ports.isEmpty else { return .bound(shape.id, port: port(near: p, of: shape, radius: radius)) }
+        var end = Endpoint.bound(shape.id)
+        end.portIndex = ports.indices
+            .compactMap { i in portPoint(shape, index: i).map { (i, hypot($0.x - p.x, $0.y - p.y)) } }
+            .filter { $0.1 <= radius }
+            .min { $0.1 < $1.1 }?.0
+        return end
+    }
+
     /// Nearest port of `shape` within `radius` of `p`, if any (used to snap on drop).
     public static func port(near p: CGPoint, of shape: Element, radius: CGFloat = 12) -> Port? {
         Port.allCases

@@ -52,8 +52,11 @@ document, written back only if the command finishes, as one undo step.
   `dottie.shape()` accept `{ extension, params }`.
 
 **Connectors and labels.** `edgePoint` for every `.path` element changes to intersect the actual outline rather than
-the bounding rectangle, which also fixes the built-in Basics stencils. When an element has `ports` or `labelRect`,
-connectors and the label use them. dottie.js implements the same three behaviours.
+the bounding rectangle, which also fixes the built-in Basics stencils. It takes the crossing an incoming line meets
+first (the farthest from the center that comes before the other end), so lines drawn inside a shape, such as a
+cylinder's rims, never catch a connector. When an element has `ports`, the canvas offers them instead of the four edge
+midpoints and a dropped end pins to one (`portIndex`); scripts and MCP pin with `fromPort`/`toPort`. A `labelRect`
+places the label. dottie.js implements the same behaviours.
 
 **Commands.** A command optionally declares a parameter schema, from which Dottie builds a form sheet. Commands
 appear in an Extensions menu grouped by the manifest's category, in the canvas context menu when they declare

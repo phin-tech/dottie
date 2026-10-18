@@ -205,6 +205,20 @@ public enum DottieScript {
             static func normalize(_ k: String) -> String { k.replacingOccurrences(of: "_", with: "").lowercased() }
 
             func string(_ k: String) -> String? { raw[Args.normalize(k)] as? String }
+
+            /// Where a connector end attaches: a side ("top", "right", "bottom", "left"), or a number for one of an
+            /// extension shape's connection points.
+            func connectionPoint(_ k: String) throws -> (Port?, Int?) {
+                guard let v = raw[Args.normalize(k)] else { return (nil, nil) }
+                if let s = v as? String {
+                    guard let port = Port(rawValue: s) else { throw OpsError.invalid("'\(k)' must be top, right, bottom, left or a number, got '\(s)'") }
+                    return (port, nil)
+                }
+                guard let n = (v as? NSNumber)?.doubleValue, n >= 0, n == n.rounded(), n < Double(Int32.max) else {
+                    throw OpsError.invalid("'\(k)' must be top, right, bottom, left or a whole number from 0")
+                }
+                return (nil, Int(n))
+            }
             func double(_ k: String) -> Double? { (raw[Args.normalize(k)] as? NSNumber).flatMap { $0.doubleValue } }
             func bool(_ k: String) -> Bool? {
                 guard let n = raw[Args.normalize(k)] as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else { return nil }
@@ -396,8 +410,10 @@ public enum DottieScript {
 
             case "connector":
                 let routing = try a.enumValue("routing", as: Routing.self) ?? .straight
+                let start = try a.connectionPoint("fromPort"), end = try a.connectionPoint("toPort")
                 let c = try DiagramOps.addConnector(&doc, from: try a.uuid("from"), to: try a.uuid("to"), routing: routing,
-                                                    arrow: a.bool("arrow") ?? true, roughness: a.roughness,
+                                                    arrow: a.bool("arrow") ?? true, port: (start.0, end.0),
+                                                    portIndex: (start.1, end.1), roughness: a.roughness,
                                                     label: a.string("label"), look: try a.look())
                 return describe(c)
 
@@ -897,7 +913,8 @@ public enum DottieScript {
         (a note is a sticky note: its text is GitHub Flavored Markdown, tables included, drawn from the top left;
          a single newline is a line break; the fill defaults to yellow)
       dottie.shape({kind, ...})        same, with kind as a field
-      dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, ...look})   routing: straight | curved | elbow
+      dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, fromPort?, toPort?, ...look})   routing: straight | curved | elbow; \
+        fromPort/toPort pin an end: top | right | bottom | left, or a number for an extension shape's connection points (0 up, as the shape declares them)
       dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}
       dottie.build({nodes: [{key, text, kind?, fill?, width?, height?}], edges: [{from, to, routing?, arrow?, label?}], \
     direction?: "TB"|"LR", sketchy?})   laid out below existing content; returns {key: id}

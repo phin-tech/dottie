@@ -211,6 +211,9 @@ actor DottieTools {
                 "arrow": prop("boolean", "Arrowhead at the target, default true"),
                 "label": prop("string", "Text shown on the connector"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
+                "from_port": prop("string", "Pins the start: top, right, bottom or left, or the number of one of an extension "
+                    + "shape's connection points (\"0\" up, in the order the shape declares them). Default: follows the edge"),
+                "to_port": prop("string", "Pins the end, like from_port"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "from_id", "to_id"])),
         Tool(name: "update_element",
              description: "Change text (a connector's text is its label), position, size, colors, look or routing of an element, "
@@ -538,6 +541,18 @@ actor DottieTools {
                      isError: result.isError)
     }
 
+    /// A connector end's pin from a tool argument: a side name, or a connection point number (as text or a number).
+    private func connectionPoint(_ a: Args, _ k: String) throws -> (DottieKit.Port?, Int?) {
+        if let s = a.string(k) {
+            if let port = DottieKit.Port(rawValue: s) { return (port, nil) }
+            guard let i = Int(s), i >= 0 else { throw ToolFailure(message: "'\(k)' must be top, right, bottom, left or a number from 0") }
+            return (nil, i)
+        }
+        guard let n = a.double(k) else { return (nil, nil) }
+        guard n >= 0, n == n.rounded(), n < Double(Int32.max) else { throw ToolFailure(message: "'\(k)' must be a whole number from 0") }
+        return (nil, Int(n))
+    }
+
     /// The `console` lines the loaded extensions have logged since the last reply.
     private func extensionLogs() -> [String] {
         guard let registry = extensionCache?.registry else { return [] }
@@ -768,8 +783,10 @@ actor DottieTools {
             }
             let c: Element
             do {
+                let start = try connectionPoint(a, "from_port"), end = try connectionPoint(a, "to_port")
                 c = try DiagramOps.addConnector(&file.pages[p], from: from, to: to,
                                                 routing: try a.routing("routing") ?? .straight, arrow: a.bool("arrow") ?? true,
+                                                port: (start.0, end.0), portIndex: (start.1, end.1),
                                                 roughness: a.roughness, label: a.string("label"), look: try a.look())
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)

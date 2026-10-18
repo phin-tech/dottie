@@ -369,8 +369,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             ctx.setLineWidth(2.5 / zoom)
             ctx.stroke(e.frame.insetBy(dx: -6, dy: -6))
             ctx.setFillColor(accent.cgColor)
-            for port in Port.allCases {
-                let p = Connector.portPoint(e, port)
+            // The points a connector end snaps to: an extension shape's own, otherwise the four edge midpoints.
+            for p in Connector.connectionPoints(e) {
                 ctx.fillEllipse(in: CGRect(x: p.x - 3 / zoom, y: p.y - 3 / zoom, width: 6 / zoom, height: 6 / zoom))
             }
             ctx.setLineWidth(1.5 / zoom)
@@ -1605,10 +1605,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
     }
 
-    /// Binds to the shape under the cursor (snapping to a port when close), otherwise stays free.
+    /// Binds to the shape under the cursor (snapping to a connection point when close), otherwise stays free.
     private func endpoint(at p: CGPoint, in doc: DottieDocument) -> Endpoint {
         guard let s = shape(at: p, in: doc) else { return .free(p) }
-        return .bound(s.id, port: Connector.port(near: p, of: s))
+        return Connector.endpoint(near: p, on: s)
     }
 
     private func connectorEndpointHit(_ p: CGPoint) -> (UUID, Bool)? {
