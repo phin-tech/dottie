@@ -32,7 +32,8 @@ The change is done when these pass, and your report names any you did not run:
 
 - `just test`, `just web-test`, `just goldens-check`, always.
 - `just build` and `just canvas-test` for changes under `App/` or to `project.yml`.
-- `just release-test` for changes under `scripts/release`.
+- `just release-check` for changes to `release.toml` or under `scripts/release` (app-release itself is its own
+  repository, sam/app-release on git.phin.tech).
 
 ## Generated files
 

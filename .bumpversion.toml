@@ -1,4 +1,4 @@
-# Where Dottie's version is written, for bump-my-version. The release tool (scripts/release, `just bump`) works out
+# Where Dottie's version is written, for bump-my-version. The release tool (app-release, `just bump`) works out
 # the next version and runs `bump-my-version replace`, so there is no current_version here: project.yml's
 # MARKETING_VERSION is the one source. dottie.js's package.json and lockfile are npm's to change (`npm version`).
 [tool.bumpversion]
