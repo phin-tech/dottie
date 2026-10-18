@@ -38,7 +38,7 @@ extra_css:
 # @0.5 is cached by the CDN for up to 12 hours and by browsers for a week, so a new release would show late. Bump it
 # after publishing.
 extra_javascript:
-  - https://cdn.jsdelivr.net/npm/@phin-tech/dottie@0.5.1/dist/dottie-player.min.js
+  - https://cdn.jsdelivr.net/npm/@phin-tech/dottie@0.6.0/dist/dottie-player.min.js
 
 markdown_extensions:
   - admonition
