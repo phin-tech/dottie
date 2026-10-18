@@ -48,6 +48,13 @@ Open Dottie, then **Dottie ▸ Settings… ▸ MCP**. Under *Add to an MCP clien
 
 If you move Dottie to a different folder later, copy the snippet again.
 
+To teach your assistant Dottie's tools and command line, and how to write extensions, install the skills too (for
+Claude Code, Codex, Cursor and other assistants that read skills):
+
+```sh
+npx skills add phin-tech/dottie
+```
+
 ### Watch it draw
 
 Keep the drawing open in Dottie while you chat, and every change appears in the window as the assistant makes
@@ -186,7 +193,8 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
   Extensions menu, and drawing tools in the toolbar. Put a `.dottieext` folder in the extensions folder
   (Settings ▸ Extensions ▸ Show in Finder, then Reload), or have your assistant install one over MCP. Extensions
   can't read files or use the network, and the shapes they draw are saved as ordinary paths, so a drawing opens the
-  same without them. Start from [extension-template](extension-template), whose Ribbon pen is a drawing tool.
+  same without them. Start from [extension-template](extension-template), whose Ribbon pen is a drawing tool; its
+  `dottie-extension` skill walks an assistant through writing one.
 - **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
   from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng`,
   `.mp4`, or `.json` for Lottie) for an animated page. Run `dottie --help` for more.

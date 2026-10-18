@@ -51,6 +51,8 @@ Edit the source and regenerate:
 - A script or MCP API change spans three places, kept in step: the dispatcher and the `apiReference` text in
   `Sources/DottieKit/Script.swift`, the TypeScript declarations in `ScriptTypes.swift`, and, for MCP, the tool schema
   in `Sources/DottieMCP/DottieTools.swift`.
+- `skills/dottie/SKILL.md` and `extension-template/SKILL.md` are skills users install with `npx skills add
+  phin-tech/dottie`. A change to the MCP tools, the `dottie` command or the extension API updates the one they name.
 - Extension code runs only when a shape is created or edited; every renderer draws the stored path (ADR 0001). Keep
   JavaScript on the edit path.
 - An agent session's `dottie` MCP server is whatever was installed when the session started, so it can lag this
