@@ -1033,6 +1033,7 @@ extension EditorActions {
             connectorsSelected: 0, newAnimation: {}, editTiming: {}, removeAnimation: {}, addTransition: { _ in },
             sendPacket: {}, buildDiagram: { _ in }, hasNextPage: false, magicMove: {}, marchSelection: {},
             toggleBoil: {}, toggleSettle: {}, clearKeys: {}, hasCamera: false, scenes: [], addScene: { _ in },
-            showScene: { _ in }, playScene: { _ in }, frameCamera: {}, removeCamera: {}, repeatSelection: {})
+            showScene: { _ in }, playScene: { _ in }, frameCamera: {}, removeCamera: {}, repeatSelection: {},
+            runExtensionCommand: { _, _ in }, repeatLastCommand: {}, updateExtensionShapes: {})
     }
 }

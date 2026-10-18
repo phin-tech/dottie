@@ -210,6 +210,16 @@ resource).
 checksum-verified, or any npm name or `.js` URL resolved through jsDelivr), and files in
 `~/Library/Application Support/Dottie/Scripts/modules/`. Timers never fire, so step `d3-force` by hand.
 
+## Extensions
+
+An extension is a folder `<name>.dottieext` in `~/Library/Application Support/Dottie/Extensions/` with a
+`manifest.json` and a `main.js`. Its shapes are paths generated from parameters and stored as ordinary `.path`
+elements, so every renderer draws them without running the extension (see docs/adr/0001-js-extensions.md).
+`extension-template/` is a TypeScript starting point: `dottie-extension.d.ts` types the `extension` global,
+`./build.sh` compiles `src/main.ts` to `main.js`. Check a bundle with `dottie ext check <bundle>`; the MCP server
+has `list_extensions`, `reload_extensions`, `install_extension` and `run_command`. Turning an extension off in
+Settings writes `disabled.json` in the same folder.
+
 ## Command line
 
 ```sh
@@ -220,6 +230,7 @@ dottie render flow.mmd -o flow.svg                # a Mermaid flowchart, laid ou
 dottie render diagram.dottie -f mermaid -o -       # shapes and connectors as Mermaid text
 dottie library list
 dottie library install shapes.dottielib
+dottie ext check my.dottieext                     # load an extension and try its shapes and commands
 ```
 
 `dottie render diagram.dottie -f js` writes the page and dottie.js's player as one script (see dottie.js below).

@@ -181,6 +181,9 @@ actor DottieTools {
              description: "Add one shape at an exact position. Returns its element id.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
+                "extension": prop("string", "Instead of kind: the id of an installed extension (see list_extensions) whose shape to add"),
+                "shape": prop("string", "With extension: the shape's id"),
+                "params": .object(["type": "object", "description": "With extension: values for the shape's parameters; ones left out take their defaults"]),
                 "kind": prop("string", "Shape type. A note is a sticky note whose text is GitHub Flavored Markdown (headings, lists, - [ ] tasks, tables, **bold**, `code`; a single newline is a line break), yellow unless fill is set", enum: kindValues),
                 "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
                 "width": prop("number", "Width; auto-sized from text if omitted"),
@@ -188,7 +191,7 @@ actor DottieTools {
                 "text": prop("string", "Label (Markdown for a note)"),
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
-             ].merging(lookProps) { a, _ in a }, required: ["path", "kind", "x", "y"])),
+             ].merging(lookProps) { a, _ in a }, required: ["path", "x", "y"])),
         Tool(name: "add_image",
              description: "Place a picture (PNG, JPEG, HEIC, GIF, TIFF, …) from a file with its top-left corner at x, y. "
                 + "It is embedded in the drawing. Give width or height to scale it (the other follows the aspect ratio), or "
@@ -235,6 +238,26 @@ actor DottieTools {
                 "args": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                  "description": "For a symbol instance: its values for the symbol's params, replacing the ones it had ({} clears them)"]),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "list_extensions",
+             description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
+                + "commands, or why it did not load. Shapes are added with add_shape (extension, shape, params); commands run with run_command.",
+             inputSchema: schema([:])),
+        Tool(name: "reload_extensions",
+             description: "Rescan the Extensions folder, picking up bundles added or edited since the last call, and list them as list_extensions does.",
+             inputSchema: schema([:])),
+        Tool(name: "install_extension",
+             description: "Install a .dottieext bundle (a folder with manifest.json and main.js) into the Extensions folder. It must load "
+                + "first, and an extension with the same id must not be installed already.",
+             inputSchema: schema(["path_to_bundle": prop("string", "Absolute path of the .dottieext folder")], required: ["path_to_bundle"])),
+        Tool(name: "run_command",
+             description: "Run an installed extension's command on a page, in one call and one undo step. Nothing changes if it throws. "
+                + "Returns what it logged and its result.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "extension": prop("string", "The extension's id (see list_extensions)"),
+                "command": prop("string", "The command's id"),
+                "params": .object(["type": "object", "description": "Values for the command's parameters; ones left out take their defaults"]),
+             ], required: ["path", "extension", "command"])),
         Tool(name: "run_script",
              description: "Code mode: run a JavaScript program that edits the diagram through a `dottie` object, in one call "
                 + "and one undo step. Use it for loops, conditionals and bulk or computed edits (grids, fan-outs, restyling "
@@ -511,6 +534,40 @@ actor DottieTools {
     /// Sentinel for "the frontmost window in the app": live only, never a file.
     private static let currentURL = URL(string: "dottie-live:current")!
 
+    /// The extensions in the Extensions folder that loaded, scanned afresh so edits since the last call count.
+    private func loadedRuntimes() -> [ExtensionRuntime] {
+        let registry = ExtensionRegistry()
+        registry.scan()
+        return registry.entries.compactMap(\.runtime)
+    }
+
+    private func extensionListing() -> String {
+        let registry = ExtensionRegistry()
+        registry.scan()
+        guard !registry.entries.isEmpty else { return "No extensions are installed in \(ExtensionRegistry.folder.path)." }
+        return registry.entries.map { entry -> String in
+            if let rt = entry.runtime {
+                let lines = ["\(rt.manifest.name) (\(rt.manifest.id)) \(rt.manifest.version): loaded"]
+                    + rt.shapes.map { "  shape \($0.id): \($0.name)" }
+                    + rt.commands.map { "  command \($0.id): \($0.name)" }
+                return lines.joined(separator: "\n")
+            }
+            return entry.enabled ? "\(entry.name): not loaded: \(entry.error ?? "unknown error")" : "\(entry.name): turned off in Settings"
+        }.joined(separator: "\n")
+    }
+
+    /// Parameter values from a tool argument: numbers, booleans and text.
+    private func extensionParams(_ value: Value?) throws -> [String: ExtensionValue] {
+        var out: [String: ExtensionValue] = [:]
+        for (name, v) in value?.objectValue ?? [:] {
+            if let b = v.boolValue { out[name] = .bool(b) }
+            else if let n = v.doubleValue ?? v.intValue.map(Double.init) { out[name] = .number(n) }
+            else if let s = v.stringValue { out[name] = .string(s) }
+            else { throw ToolFailure(message: "params.\(name) must be a number, boolean or text") }
+        }
+        return out
+    }
+
     private func fileURL(_ args: Args, key: String = "path", ext: String = "dottie") throws -> URL {
         let raw = try args.require(key)
         if key == "path", raw == "current" { return Self.currentURL }
@@ -635,9 +692,20 @@ actor DottieTools {
             guard let x = a.double("x"), let y = a.double("y") else { throw ToolFailure(message: "'x' and 'y' are required") }
             var frame: CGRect?
             if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: x, y: y, width: w, height: h) }
-            let e = try DiagramOps.addShape(&file.pages[p], kind: try a.kind("kind"), frame: frame, at: CGPoint(x: x, y: y),
+            let e: Element
+            if let extensionID = a.string("extension") {
+                guard let runtime = loadedRuntimes().first(where: { $0.manifest.id == extensionID }) else {
+                    throw ToolFailure(message: "No loaded extension with id '\(extensionID)'; see list_extensions")
+                }
+                e = try DiagramOps.addExtensionShape(&file.pages[p], runtime: runtime, shape: try a.require("shape"),
+                                                     params: try extensionParams(a.raw["params"]), frame: frame, at: CGPoint(x: x, y: y),
+                                                     text: a.string("text"), fill: try a.color("fill"), stroke: try a.color("stroke"),
+                                                     look: try a.look())
+            } else {
+                e = try DiagramOps.addShape(&file.pages[p], kind: try a.kind("kind"), frame: frame, at: CGPoint(x: x, y: y),
                                             text: a.string("text"), fill: try a.color("fill"), stroke: try a.color("stroke"),
                                             roughness: a.roughness, look: try a.look())
+            }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
 
@@ -716,6 +784,53 @@ actor DottieTools {
             return text(DottieScript.apiReference + "\n\nInstalled modules for require(): "
                 + (installed.isEmpty ? "none (add .js files to \(DottieScript.modulesDirectory.path))" : installed.joined(separator: ", ")))
 
+        case "list_extensions", "reload_extensions":
+            return text(extensionListing())
+
+        case "install_extension":
+            let source = URL(fileURLWithPath: (try a.require("path_to_bundle") as NSString).expandingTildeInPath)
+            let runtime = try ExtensionRuntime(bundle: source)
+            let existing = ExtensionRegistry()
+            existing.scan()
+            if existing.entries.contains(where: { $0.runtime?.manifest.id == runtime.manifest.id }) {
+                throw ToolFailure(message: "An extension with id \(runtime.manifest.id) is installed already")
+            }
+            let folder = ExtensionRegistry.folder
+            let destination = folder.appendingPathComponent(source.lastPathComponent, isDirectory: true)
+            guard !FileManager.default.fileExists(atPath: destination.path) else {
+                throw ToolFailure(message: "\(destination.lastPathComponent) already exists in the Extensions folder")
+            }
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: source, to: destination)
+            return text("Installed \(runtime.manifest.name) \(runtime.manifest.version) at \(destination.path)")
+
+        case "run_command":
+            let url = try fileURL(a)
+            var file = try load(url, createIfMissing: true)
+            let p = try pageIndex(file, a)
+            var doc = file.pages[p]
+            let before = doc
+            let extensionID = try a.require("extension")
+            guard let runtime = loadedRuntimes().first(where: { $0.manifest.id == extensionID }) else {
+                throw ToolFailure(message: "No loaded extension with id '\(extensionID)'; see list_extensions")
+            }
+            let source = try runtime.commandSource(try a.require("command"), params: try extensionParams(a.raw["params"]))
+            let result = DottieScript.run(source, on: &doc, in: file, extensions: loadedRuntimes())
+            var report = result.logs.joined(separator: "\n")
+            func append(_ line: String) { report += (report.isEmpty ? "" : "\n") + line }
+            if let error = result.error {
+                append("Command error: \(error)")
+                append("Nothing was changed.")
+                return .init(content: [.plain(report)], isError: true)
+            }
+            if doc != before {
+                file.pages[p] = doc
+                try save(file, to: url)
+                append("Applied\(on(file, p)): \(doc.elements.count) elements now (was \(before.elements.count)).")
+            } else { append("No changes.") }
+            if let value = result.value { append("Result: \(value)") }
+            return text(report)
+
         case "run_script":
             let url = try fileURL(a)
             var file = try load(url, createIfMissing: true)
@@ -725,7 +840,7 @@ actor DottieTools {
             let code = try a.require("code")
             let limit = min(max(a.double("timeout") ?? DottieScript.defaultTimeLimit, 1), 60)
             let modules = (a.raw["modules"]?.objectValue ?? [:]).compactMapValues(\.stringValue)
-            let result = DottieScript.run(code, on: &doc, in: file, modules: modules, timeLimit: limit)
+            let result = DottieScript.run(code, on: &doc, in: file, modules: modules, extensions: loadedRuntimes(), timeLimit: limit)
             let typeCheck = a.bool("typecheck") == false ? [] : DottieScript.typeCheckSummary(code)
             var report = result.logs.joined(separator: "\n")
             func append(_ line: String) { report += (report.isEmpty ? "" : "\n") + line }

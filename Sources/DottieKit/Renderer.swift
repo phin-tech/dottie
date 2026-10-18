@@ -552,7 +552,7 @@ public enum Renderer {
             return
         }
         if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
-            drawText(t, in: e.frame.insetBy(dx: 6, dy: 6), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
+            drawText(t, in: e.labelFrame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
         }
     }
 

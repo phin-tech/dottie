@@ -126,7 +126,9 @@ extension Exporter {
             }
             s += "<path d=\"\(pathData(Renderer.outline(for: e)))\" fill=\"none\" \(strokeAttrs)/>\n"
             if let t = e.text, !t.isEmpty {
-                s += e.kind == .note ? noteText(t, e: e) : textElement(t, frame: e.frame, e: e, centered: true)
+                // An extension shape's label goes in its labelRect; other shapes keep their whole frame here.
+                let box = e.labelRect == nil ? e.frame : e.labelFrame
+                s += e.kind == .note ? noteText(t, e: e) : textElement(t, frame: box, e: e, centered: true)
             }
             return s
         }

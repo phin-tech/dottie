@@ -188,7 +188,7 @@ function svgElement(e: Element, index: Index, labelBackground: RGBA | null): str
         }
       }
       s += `<path d="${outline(e).data()}" fill="none" ${strokeAttrs}/>\n`;
-      if (text) s += e.kind === "note" ? noteMarkup(text, e) : textElement(text, frame(e), e, true);
+      if (text) s += e.kind === "note" ? noteMarkup(text, e) : textElement(text, e.kind === "path" ? pathLabelBox(e) : frame(e), e, true);
       return s;
     }
     default:
@@ -202,6 +202,13 @@ function placeholder(e: Element, strokeAttrs: string): string {
   const p = Path.rect(f).moveTo({ x: f.x, y: f.y }).lineTo({ x: f.x + f.width, y: f.y + f.height });
   return `<path d="${p.data()}" fill="none" ${strokeAttrs} stroke-opacity="0.5" stroke-dasharray="6 4"/>\n`
     + textElement(`${e.kind}${e.text ? `: ${e.text}` : ""}`, f, { ...e, style: { ...e.style, fontSize: Math.min(e.style.fontSize, 12) } }, true);
+}
+
+/** Where a path's label is centered: its `labelRect` within the frame, or the whole frame. */
+function pathLabelBox(e: Element): Rect {
+  const f = frame(e), r = e.labelRect;
+  if (!r) return f;
+  return { x: f.x + r.x * f.width, y: f.y + r.y * f.height, width: r.width * f.width, height: r.height * f.height };
 }
 
 export function textElement(text: string, f: Rect, e: Element, centered: boolean): string {

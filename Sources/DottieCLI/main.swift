@@ -13,6 +13,7 @@ USAGE
   dottie library list
   dottie library install <file.dottielib>...
   dottie script-types [<dir>]
+  dottie ext check <bundle.dottieext>
   dottie --help | --version
 
 RENDER
@@ -358,6 +359,81 @@ func runScriptTypes(_ args: [String]) -> Int32 {
     return 0
 }
 
+/// `dottie ext check`: loads a bundle as Dottie does, generates each shape with its defaults and runs each command
+/// on an empty drawing, then reports an advisory type check of main.js when a TypeScript compiler is installed.
+func runExtension(_ args: [String]) -> Int32 {
+    guard let sub = args.first else { fail("ext needs a subcommand: check", code: 2) }
+    switch sub {
+    case "check":
+        guard args.count == 2 else { fail("ext check takes one bundle folder", code: 2) }
+        let dir = absolute(args[1])
+        let runtime: ExtensionRuntime
+        do { runtime = try ExtensionRuntime(bundle: dir) } catch { fail("\(dir.lastPathComponent): \(error)") }
+        print("\(runtime.manifest.name) \(runtime.manifest.version) (\(runtime.manifest.id)), dottieApi \(runtime.manifest.dottieApi)")
+        var failures = 0
+        for shape in runtime.shapes {
+            do {
+                _ = try runtime.generate(shape: shape.id, params: [:], width: 100, height: 100)
+                print("  ok     shape \(shape.id)")
+            } catch {
+                failures += 1
+                print("  error  shape \(shape.id): \(error)")
+            }
+        }
+        for command in runtime.commands {
+            var doc = DottieDocument()
+            let result: ScriptResult
+            do {
+                result = DottieScript.run(try runtime.commandSource(command.id, params: [:]), on: &doc,
+                                          extensions: [runtime], timeLimit: 5)
+            } catch {
+                failures += 1
+                print("  error  command \(command.id): \(error)")
+                continue
+            }
+            if let error = result.error {
+                failures += 1
+                print("  error  command \(command.id): \(error)")
+            } else {
+                print("  ok     command \(command.id)")
+            }
+        }
+        // Advisory: a TypeScript entry (src/main.ts or main.ts) is checked with the TypeScript compiler Dottie finds
+        // (DOTTIE_TSC, then PATH). Problems are printed but do not fail the check; plain JavaScript has no check.
+        let entry = ["src/main.ts", "main.ts"].map { dir.appendingPathComponent($0) }.first { FileManager.default.fileExists(atPath: $0.path) }
+        if let entry {
+            if let tsc = DottieScript.findTypeScript() {
+                let process = Process()
+                process.executableURL = tsc.url
+                process.currentDirectoryURL = dir
+                process.arguments = ["--noEmit", "--strict", "--target", "es2023", "--lib", "es2023",
+                                     String(entry.path.dropFirst(dir.path.count + 1))]
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = pipe
+                do {
+                    try process.run()
+                    let output = String(decoding: pipe.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+                    process.waitUntilExit()
+                    if process.terminationStatus == 0 {
+                        print("  type check ok (TypeScript \(tsc.version.replacingOccurrences(of: "Version ", with: "")))")
+                    } else {
+                        print("  type check (TypeScript \(tsc.version.replacingOccurrences(of: "Version ", with: ""))):")
+                        for line in output.split(separator: "\n").prefix(40) { print("    \(line)") }
+                    }
+                } catch {
+                    print("  type check skipped: \(error.localizedDescription)")
+                }
+            } else {
+                print("  type check skipped: no TypeScript compiler found (set DOTTIE_TSC to one)")
+            }
+        }
+        return failures == 0 ? 0 : 1
+    default:
+        fail("unknown ext subcommand '\(sub)' (check)", code: 2)
+    }
+}
+
 let argv = Array(CommandLine.arguments.dropFirst())
 switch argv.first {
 case nil, "-h", "--help", "help":
@@ -373,6 +449,8 @@ case "library", "lib":
     exit(runLibrary(Array(argv.dropFirst())))
 case "script-types":
     exit(runScriptTypes(Array(argv.dropFirst())))
+case "ext", "extension":
+    exit(runExtension(Array(argv.dropFirst())))
 default:
     fail("unknown command '\(argv[0])'. Run 'dottie --help'.", code: 2)
 }

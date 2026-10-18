@@ -10,11 +10,14 @@ struct DraggedStencil: Codable {
     var keepOriginalColors: Bool
 }
 
-/// Asks the canvas to put a stencil item at the middle of the view (or at `at`, in model coordinates).
+/// Asks the canvas to put a stencil item or an extension shape at the middle of the view.
 struct PlaceRequest: Equatable {
+    enum Source: Equatable {
+        case stencil(StencilItem, keepOriginalColors: Bool)
+        case extensionShape(extensionID: String, shape: String)
+    }
     var id = UUID()
-    var item: StencilItem
-    var keepOriginalColors: Bool
+    var source: Source
 }
 
 enum Tool: String, CaseIterable, Identifiable {
@@ -109,6 +112,8 @@ private enum Gesture {
     case creating(Element)
     case moving
     case resizing(id: UUID, handle: Handle, original: CGRect)
+    /// Dragging an extension shape's adjustment handle (by the handle's id in its extension).
+    case adjusting(id: UUID, handle: String)
     case marquee
     case connecting(id: UUID)
     case endpoint(id: UUID, isStart: Bool)
@@ -246,6 +251,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var lastPasteChangeCount = -1
     static let pasteboardType = NSPasteboard.PasteboardType("tech.phin.dottie.elements")
     private var hoverShapeID: UUID? { didSet { if oldValue != hoverShapeID { needsDisplay = true } } }
+    /// A problem from an adjustment drag, reported to the console when the drag ends.
+    private var adjustError: String?
     private var editor: NSTextField?
     private var editingID: UUID?
     private var editBase: DottieDocument? // set for new text so undo removes the box entirely
@@ -383,6 +390,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             ctx.move(to: stemTop); ctx.addLine(to: knob); ctx.strokePath()
             let kr = CGRect(x: knob.x - hs / 2, y: knob.y - hs / 2, width: hs, height: hs)
             ctx.fillEllipse(in: kr); ctx.strokeEllipse(in: kr)
+        }
+        if tool == .select, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
+            ctx.setFillColor(accent.cgColor)
+            ctx.setStrokeColor(NSColor.white.cgColor)
+            for h in adjustmentHandles(for: e) {
+                let r = CGRect(x: h.at.x - hs / 2, y: h.at.y - hs / 2, width: hs, height: hs)
+                ctx.fillEllipse(in: r); ctx.strokeEllipse(in: r)
+            }
         }
         if let (box, knob) = groupRotationKnob() {
             ctx.setLineWidth(1 / zoom)
@@ -834,6 +849,23 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return nil
     }
 
+    /// An extension shape's adjustment handles, by id, at their canvas positions. Empty for anything else.
+    private func adjustmentHandles(for e: Element) -> [(id: String, at: CGPoint)] {
+        guard let ref = e.extension, let rt = ExtensionHost.shared.runtime(for: ref.id),
+              let def = rt.shape(named: ref.shape) else { return [] }
+        return (def.handles ?? []).compactMap { h in
+            guard let p = try? rt.handlePosition(shape: ref.shape, handle: h.id, params: ref.params,
+                                                 width: e.width, height: e.height) else { return nil }
+            return (h.id, e.rotated(CGPoint(x: e.frame.minX + p.x, y: e.frame.minY + p.y)))
+        }
+    }
+
+    /// The adjustment handle under `p`, on the single selected extension shape. Checked after the resize handles.
+    private func adjustmentHit(_ p: CGPoint) -> (UUID, String)? {
+        guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) else { return nil }
+        return adjustmentHandles(for: e).first { hypot(p.x - $0.at.x, p.y - $0.at.y) <= hs }.map { (id, $0.id) }
+    }
+
     /// Canvas position of the rotation knob: above the top edge, in the element's rotated frame.
     private func rotationKnob(for e: Element) -> CGPoint {
         e.rotated(CGPoint(x: e.frame.midX, y: e.frame.minY - 4 - 24 / zoom))
@@ -888,7 +920,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .connector: Renderer.labelRect(for: e, in: model)
         case .text: e.frame
         case .note: Note.textRect(e.frame)
-        default: e.frame.insetBy(dx: 6, dy: 6)
+        default: e.labelFrame
         }
     }
 
@@ -1212,6 +1244,38 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return try? JSONDecoder().decode(DraggedStencil.self, from: data)
     }
 
+    /// Puts a stencil or an extension shape on the canvas at the middle of the view.
+    @discardableResult
+    func place(_ source: PlaceRequest.Source) -> Bool {
+        switch source {
+        case .stencil(let item, let keep): return placeStencil(item, keepOriginalColors: keep)
+        case .extensionShape(let id, let shape): return placeExtensionShape(extensionID: id, shape: shape)
+        }
+    }
+
+    /// Puts an extension shape with its default parameters at the middle of the view, as one undo step.
+    @discardableResult
+    func placeExtensionShape(extensionID: String, shape: String) -> Bool {
+        guard let runtime = ExtensionHost.shared.runtime(for: extensionID), let def = runtime.shape(named: shape) else { return false }
+        let params = Dictionary(uniqueKeysWithValues: def.parameters.map { ($0.name, $0.default) })
+        let c = viewportCenter
+        var next = model
+        do {
+            let e = try DiagramOps.addExtensionShape(&next, runtime: runtime, shape: shape, params: params,
+                                                     frame: CGRect(x: c.x - 50, y: c.y - 50, width: 100, height: 100),
+                                                     at: CGPoint(x: c.x - 50, y: c.y - 50))
+            selection = [e.id]
+            tool = .select
+            onToolChange?(.select)
+            onCommit?(next, "Add \(def.name)")
+            return true
+        } catch {
+            ExtensionHost.report("\(runtime.manifest.name): \(ExtensionHost.message(error))")
+            NSSound.beep()
+            return false
+        }
+    }
+
     /// Puts a stencil on the canvas centered at `center` (the view's middle by default), as one undo step.
     @discardableResult
     func placeStencil(_ item: StencilItem, keepOriginalColors: Bool, at center: CGPoint? = nil) -> Bool {
@@ -1373,6 +1437,14 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             m.addItem(.separator())
             m.addItem(ClosureMenuItem("Frame Camera on Selection", actions.frameCamera))
         })
+        // Extension commands that act on a selection; the actions run with this selection.
+        let commands = ExtensionHost.shared.commands.filter { $0.command.when == "selection" }
+        if !commands.isEmpty {
+            menu.addItem(.separator())
+            for item in commands {
+                menu.addItem(ClosureMenuItem(item.command.name) { actions.runExtensionCommand(item.extension, item.command) })
+            }
+        }
     }
 
     /// Empty canvas: what can be added to the page, and its animation.
@@ -1648,6 +1720,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             gesture = .rotating(id: id)
         } else if let (id, h, frame) = handle(at: p) {
             gesture = .resizing(id: id, handle: h, original: frame)
+        } else if tool == .select, let (id, handleID) = adjustmentHit(p) {
+            gesture = .adjusting(id: id, handle: handleID)
         } else if let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) {
             let hitSet = model.expandingGroups([hit.id])
             if event.modifierFlags.contains(.shift) {
@@ -1691,7 +1765,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let raw = convert(event.locationInWindow, from: nil)
             if hypot(raw.x - pressPoint.x, raw.y - pressPoint.y) < Self.dragThreshold {
                 switch gesture {
-                case .moving?, .marquee?, .redacting?, .resizing?, .rotating?, .rotatingGroup?, .endpoint?, .editingPoint?: return
+                case .moving?, .marquee?, .redacting?, .resizing?, .adjusting?, .rotating?, .rotatingGroup?, .endpoint?, .editingPoint?: return
                 default: break
                 }
             }
@@ -1787,6 +1861,23 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                                            fx: h.hx < 0 ? 1 : h.hx > 0 ? 0 : 0.5, fy: h.hy < 0 ? 1 : h.hy > 0 ? 0 : 0.5)
                 }
                 next.elements[i].frame = f
+                // An extension shape reflows at its new size as it is dragged; a failure waits for the commit.
+                _ = ExtensionHost.shared.regenerate(&next.elements[i])
+            }
+        case .adjusting(let id, let handleID):
+            if let i = next.elements.firstIndex(where: { $0.id == id }), let ref = next.elements[i].extension,
+               let rt = ExtensionHost.shared.runtime(for: ref.id) {
+                let e = next.elements[i]
+                let local = e.unrotated(point(event))
+                do {
+                    let params = try rt.handleDrag(shape: ref.shape, handle: handleID, params: ref.params,
+                                                   width: e.width, height: e.height,
+                                                   to: CGPoint(x: local.x - e.frame.minX, y: local.y - e.frame.minY))
+                    next.elements[i].extension?.params = params
+                    adjustError = ExtensionHost.shared.regenerate(&next.elements[i])
+                } catch {
+                    adjustError = "\(rt.manifest.name): \(ExtensionHost.message(error))"
+                }
             }
         case .panning, .erasing, .guide, .camera:
             return
@@ -1852,6 +1943,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if spaceDown { window?.invalidateCursorRects(for: self) }
         }
         guard let base = baseline, let g = gesture else { return }
+        if let problem = adjustError { ExtensionHost.report(problem); adjustError = nil }
         switch g {
         case .creating(let e):
             if e.kind == .note { // a click places a default-size note; either way, start typing in it
@@ -1912,6 +2004,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .moving where model != base: commit(base, "Move")
         case .moving: if let target = pressedLink { jump(to: target) } // ⌘-click on a linked shape
         case .resizing where model != base: commit(base, "Resize")
+        case .adjusting where model != base: commit(base, "Adjust Shape")
         default: break
         }
     }
@@ -2364,7 +2457,7 @@ struct CanvasView: NSViewRepresentable {
             v.handledPlace = req.id
             // Applying it changes the model and bindings, so do it after this update pass.
             DispatchQueue.main.async {
-                v.placeStencil(req.item, keepOriginalColors: req.keepOriginalColors)
+                v.place(req.source)
                 if placeRequest == req { placeRequest = nil }
             }
         }

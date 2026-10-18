@@ -34,6 +34,9 @@ struct ContentView: View {
     @State var selectedKey: KeyRef?
     /// The timeline's timing popover is open.
     @State var editingTiming = false
+    /// An extension command whose parameter form is open.
+    @State var pendingCommand: PendingCommand?
+    @ObservedObject private var host = ExtensionHost.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -108,9 +111,11 @@ struct ContentView: View {
                                   activeLayer: $activeLayer, undoManager: undoManager,
                                   onSelect: { selection = $0 }, onJump: { jumpRequest = JumpRequest(target: $0) })
                     case .library:
-                        LibraryPanel(document: document, selection: selection) { item, keep in
-                            placeRequest = PlaceRequest(item: item, keepOriginalColors: keep)
-                        }
+                        LibraryPanel(document: document, selection: selection, place: { item, keep in
+                            placeRequest = PlaceRequest(source: .stencil(item, keepOriginalColors: keep))
+                        }, placeExtension: { extensionID, shape in
+                            placeRequest = PlaceRequest(source: .extensionShape(extensionID: extensionID, shape: shape))
+                        })
                     }
                 }
                 .inspectorColumnWidth(min: 250, ideal: 270, max: 360)
@@ -149,6 +154,18 @@ struct ContentView: View {
         .sheet(isPresented: $showScriptConsole) {
             ScriptConsole(source: $scriptSource, output: $scriptOutput, selectionCount: selection.count,
                           running: scriptRunning, run: runScript)
+        }
+        .sheet(item: $pendingCommand) { p in
+            ExtensionCommandSheet(command: p.command,
+                                  preview: { previewCommand(p, $0) },
+                                  revert: { document.preview(p.base) },
+                                  run: { runPendingCommand(p, $0) })
+        }
+        // Extension errors for this window: its own document's, and load errors (sent with no document) to the key window.
+        .onReceive(NotificationCenter.default.publisher(for: .extensionProblem)) { note in
+            let mine = note.object == nil ? activeState == .key : (note.object as? DrawingDocument) === document
+            guard mine, let text = note.userInfo?["text"] as? String else { return }
+            scriptOutput = scriptOutput.isEmpty ? text : scriptOutput + "\n" + text
         }
         .focusedSceneValue(\.tool, $tool)
         .focusedSceneValue(\.editor, editorActions)
@@ -256,6 +273,9 @@ struct Inspector: View {
     // MARK: Style
 
     @ViewBuilder private var styleTab: some View {
+        if selected.count == 1, let e = selected.first, let ref = e.extension {
+            ExtensionShapeSection(document: document, elementID: e.id, ref: ref, undoManager: undoManager)
+        }
         Section(selected.isEmpty ? "Style for New Shapes" : "Style") {
             Picker("Look", selection: style.look) {
                 Text("Sketchy").tag(true)

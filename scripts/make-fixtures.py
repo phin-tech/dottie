@@ -716,6 +716,43 @@ def js_only():
           extra={})
 
 
+def extension_shapes():
+    """Paths with an outline that isn't its box, ports and label rects (what extension shapes carry), and connectors
+    to them: edge-following runs the outline, portIndex pins to a port. Shapes are written as Dottie stores them
+    after an extension generates them, so this file opens without any extension installed."""
+    def poly(corners):
+        # Each edge is a cubic whose control points sit a third and two thirds along it: the edge is straight.
+        coords = [corners[0][0], corners[0][1]]
+        for i in range(len(corners)):
+            (ax, ay), (bx, by) = corners[i], corners[(i + 1) % len(corners)]
+            coords += [ax + (bx - ax) / 3, ay + (by - ay) / 3, ax + 2 * (bx - ax) / 3, ay + 2 * (by - ay) / 3, bx, by]
+        return [{"closed": True, "coords": coords}]
+
+    p = Page()
+    tri = p.add("path", 360, 40, 160, 120, subpaths=poly([(0.5, 0), (1, 1), (0, 1)]), text="triangle",
+                labelRect={"x": 0.25, "y": 0.5, "width": 0.5, "height": 0.4})
+    p.elements[-1]["extension"] = {"id": "com.example.shapes", "shape": "triangle", "version": "1.0.0",
+                                   "params": {"inset": 0.25}}
+    rot = p.add("path", 40, 40, 120, 80, subpaths=poly([(0, 0), (1, 0.25), (1, 1), (0, 0.75)]), rotation=0.6, text="rotated")
+    # A hexagon with a port on each of two opposite vertices and a label rect in its middle.
+    hexa = p.add("path", 40, 260, 180, 120, subpaths=poly([(0.25, 0), (0.75, 0), (1, 0.5), (0.75, 1), (0.25, 1), (0, 0.5)]),
+                 ports=[{"x": 0, "y": 0.5}, {"x": 1, "y": 0.5}], labelRect={"x": 0.2, "y": 0.3, "width": 0.6, "height": 0.4},
+                 text="hex")
+    p.elements[-1]["extension"] = {"id": "com.example.shapes", "shape": "hex", "version": "2.1.0",
+                                   "params": {"sides": 6, "round": False}}
+    box = p.add("rectangle", 360, 260, 120, 60, text="box")
+    # Edge-following to the outlines, and pinned to a port.
+    p.connect(box, tri)
+    p.connect(rot, tri, routing="curved", end_head="triangle")
+    p.connect(hexa, box, routing="elbow", start_head="dot")
+    e1 = p.connect(hexa, tri, text="to the ports")
+    p.elements[-1]["connector"]["start"]["portIndex"] = 1
+    p.elements[-1]["connector"]["end"]["portIndex"] = 0
+    p.connect(hexa, rot, routing="curved", start_head="bar", text="from port 0")
+    p.elements[-1]["connector"]["start"]["portIndex"] = 0
+    write(EDGE / "extensions.dottie", [p])
+
+
 def main():
     shapes()
     connectors()
@@ -733,6 +770,7 @@ def main():
     symbols()
     buttons()
     params()
+    extension_shapes()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

@@ -66,6 +66,9 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     /// Replace one page (matched by id), registering one undo step that restores the previous state.
     @MainActor
     func commit(_ page: DottieDocument, actionName: String, undoManager: UndoManager?) {
+        // Extension shapes whose size changed reflow here, for every edit that resizes them.
+        var page = page
+        for problem in ExtensionHost.shared.reflow(&page, from: model) { ExtensionHost.report(problem, in: self) }
         var next = file
         guard next.replacing(page, editing: editingSymbol, on: currentPageID) else { return }
         commitFile(next, actionName: actionName, undoManager: undoManager)

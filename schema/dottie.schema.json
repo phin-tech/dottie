@@ -126,7 +126,36 @@
         "offset": { "type": "number", "description": "Seconds into its symbol's timeline a symbol element is when the page's starts." },
         "args": { "type": "object", "additionalProperties": { "type": "string" }, "description": "A symbol element's values for its symbol's params; ones it leaves out take the default." },
         "image": { "$ref": "#/$defs/image" },
-        "reveal": { "type": "number" }
+        "reveal": { "type": "number" },
+        "extension": { "$ref": "#/$defs/extensionRef", "description": "For a path made by an extension: the shape that generated its subpaths, and its parameters." },
+        "ports": { "type": "array", "items": { "$ref": "#/$defs/normalizedPoint" }, "description": "For an extension shape: connection points, normalized to the frame." },
+        "labelRect": { "$ref": "#/$defs/normalizedRect", "description": "For an extension shape: where its label goes, normalized to the frame." }
+      }
+    },
+    "extensionRef": {
+      "type": "object",
+      "required": ["id", "shape", "version", "params"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "shape": { "type": "string" },
+        "version": { "type": "string" },
+        "params": { "type": "object", "additionalProperties": { "type": ["number", "boolean", "string"] } }
+      }
+    },
+    "normalizedPoint": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
+    },
+    "normalizedRect": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "x": { "type": "number" }, "y": { "type": "number" },
+        "width": { "type": "number" }, "height": { "type": "number" }
       }
     },
     "strokePoint": {
@@ -171,6 +200,7 @@
       "properties": {
         "elementID": { "$ref": "#/$defs/uuid" },
         "port": { "enum": ["top", "right", "bottom", "left"] },
+        "portIndex": { "type": "integer", "minimum": 0, "description": "Pins the end to one of the bound extension shape's ports (its index in the element's ports)." },
         "x": { "type": "number" },
         "y": { "type": "number" }
       }

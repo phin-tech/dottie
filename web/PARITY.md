@@ -22,6 +22,8 @@ fixture, so the gap is visible rather than silent.
 | Pages | Supported | [edge/themes](../fixtures/edge/themes.dottie) | `page` attribute or option: name or number |
 | Connectors: straight, curved, elbow | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Ports and edge-following, rotated shapes, free ends | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
+| Connectors and labels on outlines (ADR 0001) | Supported | [edge/extensions](../fixtures/edge/extensions.dottie) | Edge-following meets a `.path`'s actual outline, not its box (ray against 16-step flattened curves). Endpoints pinned with `portIndex` attach to the element's `ports`. A path's label goes in its `labelRect`. |
+| Extension shapes as stored (ADR 0001) | Supported | [edge/extensions](../fixtures/edge/extensions.dottie) | Drawn from the stored path with no extension installed. The `extension` field is kept as metadata and nothing runs. Parameters, commands and handles are Dottie-only. |
 | Arrowheads: arrow, triangle, dot, bar | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Connector labels | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | Label boxes sized with CoreText's measurements. The player paints them on the page color, like the app; Dottie's flipbook export leaves them unpainted |
 | Keys and eases (linear, in, out, in-out, hold, spring, bounce, elastic) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie), [edge/eases](../fixtures/edge/eases.dottie) | Unknown ease names play linear, with a warning |

@@ -531,7 +531,7 @@ extension LottieWriter {
                         }
                     }
                 } else {
-                    let (f, box) = Renderer.textFrame(s, in: e.frame.insetBy(dx: 6, dy: 6), fontSize: e.style.fontSize,
+                    let (f, box) = Renderer.textFrame(s, in: e.labelFrame, fontSize: e.style.fontSize,
                                                       color: e.style.stroke.cgColor, centered: true)
                     out += text(f, in: box)
                 }

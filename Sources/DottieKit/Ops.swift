@@ -136,6 +136,27 @@ public enum DiagramOps {
         return e
     }
 
+    /// Adds an extension shape generated from `params`, at `frame`, or at `origin` in the default size. The element
+    /// keeps the extension's reference, so it can be regenerated when it is edited.
+    @discardableResult
+    public static func addExtensionShape(_ doc: inout DottieDocument, runtime: ExtensionRuntime, shape: String,
+                                         params: [String: ExtensionValue], frame: CGRect?, at origin: CGPoint,
+                                         text: String? = nil, fill: RGBA? = nil, stroke: RGBA? = nil,
+                                         look: Look = Look()) throws -> Element {
+        var style = Style()
+        if let fill { style.fill = fill }
+        if let stroke { style.stroke = stroke }
+        let size = frame?.size ?? CGSize(width: 100, height: 100)
+        var e = Element(kind: .path, frame: CGRect(origin: frame?.origin ?? origin, size: size), style: style,
+                        layerID: activeLayerID(&doc), text: text)
+        let normal = try runtime.normalized(params, shape: shape)
+        e.extension = ExtensionRef(id: runtime.manifest.id, shape: shape, version: runtime.manifest.version, params: normal)
+        e.apply(try runtime.generate(shape: shape, params: normal, width: size.width, height: size.height))
+        look.apply(to: &e)
+        doc.elements.append(e)
+        return e
+    }
+
     @discardableResult
     public static func addConnector(_ doc: inout DottieDocument, from: UUID, to: UUID, routing: Routing = .straight,
                                     arrow: Bool = true, port: (Port?, Port?) = (nil, nil), roughness: Double? = nil,

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="540.11" height="414.89" viewBox="3.89 -10.89 540.11 414.89">
+<rect x="3.89" y="-10.89" width="540.11" height="414.89" fill="#ffffff"/>
+<path d="M440 40 C466.67 80 493.33 120 520 160 C466.67 160 413.33 160 360 160 C386.67 120 413.33 80 440 40 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="440" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="440" y="130.48">triangle</tspan></text>
+<g transform="rotate(34.38 100 80)">
+<path d="M40 40 C80 46.67 120 53.33 160 60 C160 80 160 100 160 120 C120 113.33 80 106.67 40 100 C40 80 40 60 40 40 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="86.48">rotated</tspan></text>
+</g>
+<path d="M85 260 C115 260 145 260 175 260 C190 280 205 300 220 320 C205 340 190 360 175 380 C145 380 115 380 85 380 C70 360 55 340 40 320 C55 300 70 280 85 260 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="130" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="130" y="326.48">hex</tspan></text>
+<path d="M360 260 L480 260 L480 320 L360 320 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="296.48">box</tspan></text>
+<path d="M423.16 260 L433.68 160 M428.43 168.51 L433.68 160 M437.06 169.41 L433.68 160" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M145.51 82.68 C273.51 82.68 273.51 97.74 401.51 97.74 M392.52 93.35 L401.51 97.74 M392.48 102.03 L401.51 97.74 M392.52 93.35 L392.48 102.03" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M401.51 97.74 L392.52 93.35 L392.48 102.03 Z" fill="#1f1f21" stroke="none"/>
+<path d="M213.52 311.36 L286.76 311.36 M286.76 311.36 L286.76 296.21 M286.76 296.21 L360 296.21 M350.99 291.87 L360 296.21 M350.99 300.55 L360 296.21" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M219.92 311.36 C219.92 313.13 218.49 314.56 216.72 314.56 C214.95 314.56 213.52 313.13 213.52 311.36 C213.52 309.59 214.95 308.16 216.72 308.16 C218.49 308.16 219.92 309.59 219.92 311.36 Z" fill="#1f1f21" stroke="none"/>
+<path d="M220 320 L364.08 153.88 M354.9 157.84 L364.08 153.88 M361.46 163.53 L364.08 153.88" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="239.04" y="223.44" width="106" height="27" fill="#ffffff"/>
+<text x="292.04" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="292.04" y="243.42">to the ports</tspan></text>
+<path d="M40 320 C40 223.31 105.83 223.31 105.83 126.62 M101.23 135.5 L105.83 126.62 M109.91 135.75 L105.83 126.62 M45 320.14 L35 319.86" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="21.91" y="209.81" width="102" height="27" fill="#ffffff"/>
+<text x="72.91" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="72.91" y="229.79">from port 0</tspan></text>
+</svg>

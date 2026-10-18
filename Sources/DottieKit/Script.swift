@@ -74,9 +74,10 @@ public enum DottieScript {
     public static func run(_ source: String, on doc: inout DottieDocument, in file: DottieFile? = nil, selection: [UUID] = [],
                            libraries: [StencilLibrary]? = nil, modules: [String: String] = [:],
                            modulesDirectory: URL? = DottieScript.modulesDirectory,
+                           extensions: [ExtensionRuntime] = [],
                            timeLimit: TimeInterval = defaultTimeLimit) -> ScriptResult {
         let host = Host(doc: doc, file: file, selection: selection, libraries: libraries,
-                        modules: modules, modulesDirectory: modulesDirectory)
+                        modules: modules, modulesDirectory: modulesDirectory, extensions: extensions)
         guard let context = JSContext() else {
             return ScriptResult(logs: [], value: nil, error: "JavaScript is unavailable", operations: 0)
         }
@@ -144,10 +145,13 @@ public enum DottieScript {
         let modules: [String: String]
         let modulesDirectory: URL?
 
+        /// The extensions `dottie.shape({extension, params})` can draw from.
+        let extensions: [ExtensionRuntime]
+
         init(doc: DottieDocument, file: DottieFile?, selection: [UUID], libraries: [StencilLibrary]?,
-             modules: [String: String], modulesDirectory: URL?) {
+             modules: [String: String], modulesDirectory: URL?, extensions: [ExtensionRuntime]) {
             self.doc = doc; self.file = file; self.selection = selection; self.libraries = libraries
-            self.modules = modules; self.modulesDirectory = modulesDirectory
+            self.modules = modules; self.modulesDirectory = modulesDirectory; self.extensions = extensions
         }
 
         /// Source for a module id already normalized by the JS shim (no `.`/`..`, no leading slash).
@@ -370,6 +374,24 @@ public enum DottieScript {
 
             case "get":
                 return describe(try element(try a.uuid("id")))
+
+            case "shape" where a.has("extension"):
+                // dottie.shape({extension: {id, shape}, params, x, y, width, height, text, ...}): an extension's shape.
+                guard let ext = a.object("extension"), let extID = ext.string("id"), let shape = ext.string("shape") else {
+                    throw OpsError.invalid("'extension' needs an id and a shape")
+                }
+                guard let runtime = extensions.first(where: { $0.manifest.id == extID }) else {
+                    throw OpsError.invalid("no installed extension with id '\(extID)'")
+                }
+                let x = a.double("x") ?? 0, y = a.double("y") ?? 0
+                var frame: CGRect?
+                if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: x, y: y, width: w, height: h) }
+                let e = try DiagramOps.addExtensionShape(&doc, runtime: runtime, shape: shape,
+                                                         params: try ExtensionValue.values(in: a.raw["params"] as? [String: Any] ?? [:]),
+                                                         frame: frame, at: CGPoint(x: x, y: y), text: a.string("text"),
+                                                         fill: try a.color("fill"), stroke: try a.color("stroke"),
+                                                         look: try a.look())
+                return describe(try element(e.id))
 
             case "shape":
                 let kindName = a.string("kind") ?? "rectangle"
@@ -943,7 +965,7 @@ public enum DottieScript {
 /// JavaScriptCore can terminate a runaway script, but only through a function it does not declare in
 /// its public headers. It is looked up at run time; if it is ever missing, scripts still run, they
 /// just aren't time-limited (the operation limit still bounds ones that edit in a loop).
-private enum ExecutionLimit {
+enum ExecutionLimit {
     private typealias ShouldTerminate = @convention(c) (JSContextRef?, UnsafeMutableRawPointer?) -> Bool
     private typealias SetLimit = @convention(c) (JSContextGroupRef?, Double, ShouldTerminate?, UnsafeMutableRawPointer?) -> Void
 
