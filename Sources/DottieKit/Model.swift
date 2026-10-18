@@ -151,6 +151,10 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Another element this one jumps to when its link badge is clicked. May name an element that has since
     /// been deleted; such a link is shown as broken and comes back if the delete is undone.
     public var link: UUID?
+    /// Where the element links outside the drawing, instead of `link`: a web or mail address, or another drawing as
+    /// a path relative to this file with an optional `#anchor` (see `OutsideLink`). The app follows it, PDF and SVG
+    /// exports make web addresses clickable, and the web players open them when the element has no `click`.
+    public var url: String?
     /// A hidden label for finding and linking to the element. Never drawn or exported.
     public var anchor: String?
     /// What clicking the element does when the drawing plays on the web (the HTML export and

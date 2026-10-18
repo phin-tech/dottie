@@ -264,6 +264,8 @@ extension DottieScript {
             group?: string;
             /** The shape this one jumps to when its link badge is clicked. */
             link?: string;
+            /** Where its link badge goes outside the drawing: a web address, or another drawing ("next.dottie#Login"). */
+            url?: string;
             anchor?: string;
             layer?: string;
             routing?: Routing;
@@ -345,6 +347,9 @@ extension DottieScript {
             routing?: Routing;
             /** Another shape, on this page or another (see dottie.pages()); null removes the link. */
             link?: Ref | null;
+            /** An http, https or mailto link, or another drawing as a path relative to this one, with an optional
+             * "#anchor" (or page name) to open it at; null removes it. Setting it clears `link`, and the other way round. */
+            url?: string | null;
             /** "" removes it. */
             anchor?: string;
             /** What clicking it does on the web; null removes it. */

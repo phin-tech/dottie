@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="528" height="304.39" viewBox="16 -0.39 528 304.39">
+<rect x="16" y="-0.39" width="528" height="304.39" fill="#ffffff"/>
+<a href="https://example.com/docs?a=1&amp;b=&quot;2&quot;" target="_blank">
+<path d="M40 40 L180 40 L180 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="76.48">Docs</tspan></text>
+</a>
+<a href="mailto:team@example.com" target="_blank">
+<g opacity="0.6">
+<g transform="rotate(17.19 280 70)">
+<path d="M340 70 C340 86.57 313.14 100 280 100 C246.86 100 220 86.57 220 70 C220 53.43 246.86 40 280 40 C313.14 40 340 53.43 340 70 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="280" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="280" y="76.48">Mail</tspan></text>
+</g>
+</g>
+</a>
+<path d="M380 40 L520 40 L520 100 L380 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="450" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="450" y="76.48">Next plan</tspan></text>
+<path d="M40 140 L180 140 L180 200 L40 200 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="176.48">Script</tspan></text>
+<a href="https://example.com/click" target="_blank">
+<path d="M280 140 L340 170 L280 200 L220 170 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="280" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="280" y="176.48">Click wins</tspan></text>
+</a>
+<path d="M380 140 L520 140 L520 200 L380 200 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="450" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="450" y="176.48">Section</tspan></text>
+<a href="https://example.com/help" target="_blank">
+<path d="M40 240 L140 240 L140 280 L40 280 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="90" y="266.48">Help</tspan></text>
+</a>
+</svg>

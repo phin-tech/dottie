@@ -4,17 +4,22 @@ import CoreGraphics
 /// Rendering for the Quick Look extensions: a multi-page PDF for the preview, a fitted drawing for Finder
 /// thumbnails, and a sheet of a stencil library's items so `.dottielib` files preview too.
 extension Exporter {
-    /// Every page of `file` as one PDF, one PDF page per Dottie page, each sized to its own drawing.
+    /// Every page of `file` as one PDF, one PDF page per Dottie page, each sized to its own drawing, with its links.
     public static func pdf(_ file: DottieFile) -> Data? {
         let data = NSMutableData()
         guard let consumer = CGDataConsumer(data: data),
               let ctx = CGContext(consumer: consumer, mediaBox: nil, nil) else { return nil }
-        for doc in file.pages.map(\.still) {
+        let targets = linkTargets(in: file.pages)
+        for page in file.pages {
+            let doc = page.still
             let b = bounds(of: doc)
             var box = CGRect(origin: .zero, size: b.size)
             let info = [kCGPDFContextMediaBox as String: Data(bytes: &box, count: MemoryLayout<CGRect>.size)]
             ctx.beginPDFPage(info as CFDictionary)
             draw(doc, in: ctx, size: b.size)
+            // Links jump between pages, and web links open, as they do in the app.
+            addLinkDestinations(page, bounds: b, targets: targets, in: ctx)
+            addLinks(page, bounds: b, targets: targets, in: ctx)
             ctx.endPDFPage()
         }
         ctx.closePDF()

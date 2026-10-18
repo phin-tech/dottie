@@ -132,7 +132,10 @@ extension DottieDocument {
             guard t.kind != .connector else { throw OpsError.invalid("A link must point at a shape, not a connector") }
             guard !ids.contains(target) else { throw OpsError.invalid("An element cannot link to itself") }
         }
-        for i in elements.indices where ids.contains(elements[i].id) { elements[i].link = target }
+        for i in elements.indices where ids.contains(elements[i].id) {
+            elements[i].link = target
+            if target != nil { elements[i].url = nil }   // one place to go: an element or an outside link
+        }
     }
 
     /// Where following a link to `id` should look: the element, or its whole group so a grouped "section"

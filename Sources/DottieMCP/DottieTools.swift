@@ -229,6 +229,10 @@ actor DottieTools {
                 "anchor": prop("string", "Hidden label for finding and linking to the element; never drawn. Empty string removes it"),
                 "link": prop("string", "Id of a shape this element jumps to when its link badge is clicked in the app, on any page "
                     + "(the app switches tabs to follow it); an empty string removes the link"),
+                "url": prop("string", "Where the link badge goes outside the drawing, instead of link: an http(s) or mailto link, or "
+                    + "another drawing as a path relative to this file, optionally with #anchor (or #page name) to open it at, "
+                    + "e.g. plans/next.dottie#Login. PDF and SVG exports make web links clickable, and the web players open them "
+                    + "when the element has no click. Setting it clears link and the other way round; an empty string removes it"),
                 "click_scene": prop("string", "When the drawing plays on the web (HTML export, <dottie-player>), clicking this element "
                     + "jumps to the scene of this name (see add_scene) and plays on to the next one. Empty string removes the click"),
                 "click_url": prop("string", "When played on the web, clicking this element opens this http(s) or mailto link in a "
@@ -823,6 +827,7 @@ actor DottieTools {
                                       x: a.double("x"), y: a.double("y"), width: a.double("width"), height: a.double("height"),
                                       fill: try a.color("fill"), stroke: try a.color("stroke"), roughness: a.roughness,
                                       routing: try a.routing("routing"), look: try a.look(), link: link,
+                                      url: a.string("url").map { Optional($0) },
                                       anchor: a.string("anchor").map { Optional($0) }, click: click, hover: hover,
                                       otherPages: file.pages)
             } catch let e as OpsError { throw ToolFailure(message: e.description) }

@@ -65,6 +65,9 @@ export interface Element {
   evenOdd: boolean | null;
   rotation: number | null;
   link: string | null;
+  /** Where the element links outside the drawing (Element.url): a web address, or another drawing. Only web
+   * addresses are followed here (`webLink`). */
+  url: string | null;
   anchor: string | null;
   click: ClickAction | null;
   hover: HoverLook | null;
@@ -179,7 +182,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal",
+    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
@@ -240,6 +243,11 @@ export function allowedURL(url: string): string | null {
   // eslint-disable-next-line no-control-regex
   if (!/^(https?:\/\/|mailto:)/i.test(u) || [...u].length <= 7 || /[\u0000-\u001f\u007f-\u009f]/.test(u)) return null;
   return u;
+}
+
+/** An element's `url`, if it is a web address (OutsideLink.webAddress); a link to another drawing gives null. */
+export function webLink(url: string | null | undefined): string | null {
+  return url ? allowedURL(url) : null;
 }
 
 function rgba(v: unknown): RGBA | undefined {
@@ -354,6 +362,7 @@ class Reader {
       evenOdd: bool(v.evenOdd) ?? null,
       rotation: num(v.rotation) ?? null,
       link: uuid(v.link) ?? null,
+      url: str(v.url) ?? null,
       anchor: str(v.anchor) ?? null,
       click: this.click(v.click),
       hover: this.hover(v.hover),

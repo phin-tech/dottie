@@ -2,7 +2,8 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DottieFormatError, KINDS, KNOWN_FIELDS, parseDottie } from "../src/model.ts";
+import { DottieFormatError, KINDS, KNOWN_FIELDS, parseDottie, webLink } from "../src/model.ts";
+import { svg } from "../src/svg.ts";
 import { render } from "../src/index.ts";
 import { clickTargets } from "../src/clicks.ts";
 import { MAX_ELEMENTS, derivedID } from "../src/symbols.ts";
@@ -89,6 +90,27 @@ test("clicks: scenes by name in any case, safe links only, links to other pages"
   const hostile = parseDottie(read("js-only", "hostile-clicks.dottie"));
   assert.deepEqual(hostile.pages[0].elements.map((e) => e.click?.url), [null, null, null]);
   assert.equal(clickTargets(hostile.pages[0], hostile).size, 0);
+});
+
+test("links: web addresses open on click and in SVG, other drawings and scripts do nothing", () => {
+  const f = parseDottie(read("edge", "links.dottie"));
+  const p = f.pages[0];
+  const id = (text: string): string => p.elements.find((e) => e.text === text)!.id;
+  const targets = clickTargets(p, f);
+  assert.deepEqual(targets.get(id("Docs")), { url: 'https://example.com/docs?a=1&b="2"' });
+  assert.deepEqual(targets.get(id("Mail")), { url: "mailto:team@example.com" });
+  assert.deepEqual(targets.get(id("Click wins")), { url: "https://example.com/click" });
+  assert.equal(targets.has(id("Next plan")), false, "another drawing can't open on the web");
+  assert.equal(targets.has(id("Script")), false, "javascript: is never followed");
+  assert.equal(webLink(" JavaScript:alert(1)"), null);
+  const out = svg(p);
+  assert.ok(out.includes('<a href="https://example.com/docs?a=1&amp;b=&quot;2&quot;" target="_blank">'));
+  assert.ok(out.includes('<a href="https://example.com/click"'), "a click's link wins in SVG too");
+  assert.ok(out.includes('<a href="https://example.com/help"'), "a symbol's parts keep their links");
+  assert.ok(!out.includes("next.dottie") && !out.includes("javascript"));
+  const hostile = parseDottie(read("js-only", "hostile-links.dottie"));
+  assert.equal(clickTargets(hostile.pages[0], hostile).size, 0);
+  assert.ok(!svg(hostile.pages[0]).includes("<a "));
 });
 
 test("symbols: a self-containing symbol and a flood of nested instances are cut short", () => {

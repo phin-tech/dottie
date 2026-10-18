@@ -11,7 +11,7 @@ extension Exporter {
 
     /// `bounds` fixes the viewBox, so every frame of an animation lines up.
     static func svg(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> String {
-        let (b, parts) = svgParts(doc, background: background, bounds: fixed)
+        let (b, parts) = svgParts(doc, background: background, bounds: fixed, links: true)
         return svgOpen(b, background: doc.resolvedTheme?.background ?? background.map { $0 }, paint: background != nil)
             + parts.map(\.markup).joined() + "</svg>\n"
     }
@@ -31,9 +31,12 @@ extension Exporter {
 
     /// The SVG for each thing drawn, back to front, keyed by element id (dungeon rock hatching as "rock"),
     /// and the bounds they were drawn for. Joined, they are the body of `svg(_:background:bounds:)`; kept
-    /// apart, an animation export can store what doesn't change between frames once.
-    static func svgParts(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> (CGRect, [(key: String, markup: String)]) {
-        if doc.hasInstances { return svgParts(doc.expandingSymbols(at: 0), background: background, bounds: fixed) }
+    /// apart, an animation export can store what doesn't change between frames once. With `links`, an element whose
+    /// click or `url` is a web address is wrapped in an `<a>` that opens it, the click's first (the web players make
+    /// their own clickable groups).
+    static func svgParts(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?,
+                         links: Bool = false) -> (CGRect, [(key: String, markup: String)]) {
+        if doc.hasInstances { return svgParts(doc.expandingSymbols(at: 0), background: background, bounds: fixed, links: links) }
         let theme = doc.resolvedTheme
         let background = background.map { plain in theme?.background ?? plain }
         let d = doc.resolvingInk(to: theme?.ink ?? .black)
@@ -53,7 +56,11 @@ extension Exporter {
             if e.angle != 0, e.kind != .connector {
                 body = "<g transform=\"rotate(\(num(e.angle * 180 / .pi)) \(num(e.frame.midX)) \(num(e.frame.midY)))\">\n\(body)</g>\n"
             }
-            parts.append((e.id.uuidString, alpha < 1 ? "<g opacity=\"\(num(alpha))\">\n\(body)</g>\n" : body))
+            if alpha < 1 { body = "<g opacity=\"\(num(alpha))\">\n\(body)</g>\n" }
+            if links, let href = e.click?.url.flatMap(ClickAction.allowed) ?? e.outsideLink?.webAddress {
+                body = "<a href=\"\(escape(href).replacingOccurrences(of: "\"", with: "&quot;"))\" target=\"_blank\">\n\(body)</a>\n"
+            }
+            parts.append((e.id.uuidString, body))
         }
         return (b, parts)
     }

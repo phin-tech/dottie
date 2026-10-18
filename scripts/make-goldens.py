@@ -66,7 +66,7 @@ def generate(out, dottie):
     # The HTML export's own player, for the browser tests of clicking (they run where Dottie can't).
     html = out / "goldens" / "html"
     html.mkdir(parents=True, exist_ok=True)
-    for name in ["clicks", "symbols", "buttons"]:
+    for name in ["clicks", "links", "symbols", "buttons"]:
         subprocess.run([dottie, "render", out / "edge" / f"{name}.dottie", "-f", "html", "-o", html / f"{name}.html"],
                        check=True, capture_output=True)
 

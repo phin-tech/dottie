@@ -1,0 +1,297 @@
+{
+  "pages": [
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "000001F6-0000-4000-8000-0000000001F6",
+          "kind": "rectangle",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Docs",
+          "url": "https://example.com/docs?a=1&b=\"2\"",
+          "width": 140,
+          "x": 40,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000001F7-0000-4000-8000-0000000001F7",
+          "kind": "ellipse",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "rotation": 0.3,
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "opacity": 0.6,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Mail",
+          "url": "mailto:team@example.com",
+          "width": 120,
+          "x": 220,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000001F8-0000-4000-8000-0000000001F8",
+          "kind": "rectangle",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Next plan",
+          "url": "plans/next.dottie#Login",
+          "width": 140,
+          "x": 380,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000001F9-0000-4000-8000-0000000001F9",
+          "kind": "rectangle",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Script",
+          "url": "javascript:alert(1)",
+          "width": 140,
+          "x": 40,
+          "y": 140
+        },
+        {
+          "click": {
+            "url": "https://example.com/click"
+          },
+          "height": 60,
+          "id": "000001FA-0000-4000-8000-0000000001FA",
+          "kind": "diamond",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Click wins",
+          "url": "https://example.com/url",
+          "width": 120,
+          "x": 220,
+          "y": 140
+        },
+        {
+          "anchor": "Section",
+          "height": 60,
+          "id": "000001FB-0000-4000-8000-0000000001FB",
+          "kind": "rectangle",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "seed": 4109647057,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "Section",
+          "width": 140,
+          "x": 380,
+          "y": 140
+        },
+        {
+          "height": 40,
+          "id": "000001FF-0000-4000-8000-0000000001FF",
+          "kind": "symbol",
+          "layerID": "000001F5-0000-4000-8000-0000000001F5",
+          "seed": 198874155,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "000001FC-0000-4000-8000-0000000001FC",
+          "width": 100,
+          "x": 40,
+          "y": 240
+        }
+      ],
+      "id": "000001F4-0000-4000-8000-0000000001F4",
+      "layers": [
+        {
+          "id": "000001F5-0000-4000-8000-0000000001F5",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Links",
+      "symbols": [
+        {
+          "elements": [
+            {
+              "height": 40,
+              "id": "000001FE-0000-4000-8000-0000000001FE",
+              "kind": "rectangle",
+              "layerID": "000001FD-0000-4000-8000-0000000001FD",
+              "seed": 4003630850,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 0,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "text": "Help",
+              "url": "https://example.com/help",
+              "width": 100,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "height": 40,
+          "id": "000001FC-0000-4000-8000-0000000001FC",
+          "layers": [
+            {
+              "id": "000001FD-0000-4000-8000-0000000001FD",
+              "locked": false,
+              "name": "Layer 1",
+              "visible": true
+            }
+          ],
+          "name": "Badge",
+          "width": 100
+        }
+      ]
+    }
+  ],
+  "version": 2
+}

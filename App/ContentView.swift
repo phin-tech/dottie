@@ -1,5 +1,6 @@
 import SwiftUI
 import DottieKit
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @ObservedObject var document: DrawingDocument
@@ -51,6 +52,7 @@ struct ContentView: View {
             Divider()
             CanvasView(document: document, tool: $tool, selection: $selection, style: newStyle, routing: newRouting,
                        activeLayerID: activeLayer, placeRequest: $placeRequest, showRulers: showRulers, jumpRequest: $jumpRequest,
+                       fileURL: fileURL,
                        playhead: document.model.timeline == nil || !playing ? nil : playhead,
                        pose: poseTime,
                        onExitPreview: { playing = false; playhead = nil },
@@ -108,8 +110,11 @@ struct ContentView: View {
                     switch sidebarTab {
                     case .style, .behavior, .layers, .page:
                         Inspector(document: document, tab: sidebarTab, selection: selection, tool: tool, style: selectionStyle,
-                                  activeLayer: $activeLayer, undoManager: undoManager,
-                                  onSelect: { selection = $0 }, onJump: { jumpRequest = JumpRequest(target: $0) })
+                                  activeLayer: $activeLayer, undoManager: undoManager, fileURL: fileURL,
+                                  onSelect: { selection = $0 }, onJump: { jumpRequest = JumpRequest(target: $0) },
+                                  onOpenOutside: { OutsideLinks.open($0, from: fileURL) })
+                    case .anchors:
+                        AnchorsPanel(document: document, fileURL: fileURL) { jumpRequest = JumpRequest(target: $0) }
                     case .library:
                         LibraryPanel(document: document, selection: selection, place: { item, keep in
                             placeRequest = PlaceRequest(source: .stencil(item, keepOriginalColors: keep))
@@ -147,7 +152,10 @@ struct ContentView: View {
             LiveRegistry.shared.markFront(document, undoManager: undoManager)
             registerDebugHooks()
             UpdateChecker.shared.start()
+            followPendingAnchor()
         }
+        // A link in another drawing opened this one, which was open already: go where it points.
+        .onReceive(NotificationCenter.default.publisher(for: .followDrawingAnchor)) { _ in followPendingAnchor() }
         .onChange(of: activeState) { _, state in
             if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager); registerDebugHooks() }
         }
@@ -201,6 +209,21 @@ extension ContentView {
         document.commit(next, actionName: name, undoManager: undoManager)
     }
 
+    /// Goes to the shape or page a link from another drawing opened this one at, if one is waiting.
+    @MainActor
+    func followPendingAnchor() {
+        guard let name = OutsideLinks.take(for: fileURL) else { return }
+        switch document.file.destination(name) {
+        case .element(let id):
+            // After the window's first layout, so the jump centers the shape in the canvas it will have.
+            DispatchQueue.main.async { jumpRequest = JumpRequest(target: id) }
+        case .page(let id):
+            document.currentPageID = id
+        case nil:
+            NSSound.beep()
+        }
+    }
+
     /// Lets `scripts/dottie-debug.py` drive this window in Debug builds (see `DebugDriver`).
     @MainActor
     func registerDebugHooks() {
@@ -217,7 +240,7 @@ extension ContentView {
 }
 
 enum SidebarTab: String, CaseIterable, Identifiable {
-    case style = "Style", behavior = "Behavior", layers = "Layers", page = "Page", library = "Library"
+    case style = "Style", behavior = "Behavior", layers = "Layers", anchors = "Anchors", page = "Page", library = "Library"
     var id: String { rawValue }
 
     var symbol: String {
@@ -225,6 +248,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         case .style: "paintbrush"
         case .behavior: "cursorarrow.click.2"
         case .layers: "square.3.layers.3d"
+        case .anchors: "bookmark"
         case .page: "doc"
         case .library: "books.vertical"
         }
@@ -235,6 +259,7 @@ enum SidebarTab: String, CaseIterable, Identifiable {
         case .style: "Style: how the selection looks"
         case .behavior: "Behavior: links, clicks on the web, and how a symbol's copy plays"
         case .layers: "Layers"
+        case .anchors: "Anchors: the drawing's anchored shapes, to go to or link to"
         case .page: "Page: theme, rulers and guides"
         case .library: "Library: stencils to place"
         }
@@ -249,8 +274,11 @@ struct Inspector: View {
     var style: SelectionStyle
     @Binding var activeLayer: UUID?
     var undoManager: UndoManager?
+    /// Where the drawing is saved, which links to other drawings are written relative to.
+    var fileURL: URL?
     var onSelect: (Set<UUID>) -> Void = { _ in }
     var onJump: (UUID) -> Void = { _ in }
+    var onOpenOutside: (OutsideLink) -> Void = { _ in }
     @AppStorage(Pref.showRulers) private var showRulers = false
 
     private var selected: [Element] { style.selected }
@@ -264,7 +292,7 @@ struct Inspector: View {
                 LayersSection(document: document, selection: selection, activeLayer: $activeLayer, undoManager: undoManager,
                               onSelect: onSelect)
             case .page: pageTab
-            case .library: EmptyView()
+            case .anchors, .library: EmptyView()
             }
         }
         .formStyle(.grouped)
@@ -356,8 +384,22 @@ struct Inspector: View {
                     ForEach(targets) { t in Text(t.title).tag(UUID?.some(t.id)) }
                 }
                 .help("Click the badge beside the shape, or ⌘-click the shape, to go there")
-                if let id = selectedLink {
-                    Button("Go") { onJump(id) }
+                LinkURLField(value: selectedURL, mixed: selectedURL == nil && selected.contains { $0.url != nil },
+                             identity: selection, commit: setURL)
+                if let link = selectedURL.flatMap(OutsideLink.init), case .drawing = link {
+                    DrawingAnchorPicker(link: link, base: fileURL) { anchor in
+                        guard case .drawing(let path, _) = link else { return }
+                        setURL(OutsideLink.drawing(path: path, anchor: anchor).string)
+                    }
+                }
+                HStack {
+                    Button("Choose Drawing…", action: chooseDrawing)
+                        .help("Link to another Dottie drawing, written relative to this one so they can move together")
+                    if let id = selectedLink {
+                        Button("Go") { onJump(id) }
+                    } else if let link = selectedURL.flatMap(OutsideLink.init) {
+                        Button("Go") { onOpenOutside(link) }
+                    }
                 }
                 if selected.count == 1, let e = selected.first {
                     AnchorField(element: e) { anchor in
@@ -398,6 +440,34 @@ struct Inspector: View {
     }
 
     private static let linkTargetLimit = 200
+
+    /// The outside link the selection shares, if every selected element has the same one.
+    private var selectedURL: String? {
+        guard let first = selected.first?.url, selected.allSatisfy({ $0.url == first }) else { return nil }
+        return first
+    }
+
+    /// Points the selection at `text`, a web address or another drawing; empty removes the link. A drawing given by
+    /// its full path is written relative to this one when they share a folder tree. Beeps at anything else.
+    private func setURL(_ text: String) {
+        var value = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if case .drawing(let path, let anchor)? = OutsideLink(value), path.hasPrefix("/") {
+            value = OutsideLink.drawing(at: URL(fileURLWithPath: path), from: fileURL, anchor: anchor).string
+        }
+        var next = document.model
+        guard (try? next.setURL(selection, to: value)) != nil else { NSSound.beep(); return }
+        guard next != document.model else { return }
+        document.commit(next, actionName: value.isEmpty ? "Remove Link" : "Link", undoManager: undoManager)
+    }
+
+    private func chooseDrawing() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [UTType(filenameExtension: "dottie") ?? .json]
+        panel.directoryURL = fileURL?.deletingLastPathComponent()
+        panel.prompt = "Link"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        setURL(OutsideLink.drawing(at: url, from: fileURL).string)
+    }
 
     /// The link the selection shares, if every selected element has the same one.
     private var selectedLink: UUID? {

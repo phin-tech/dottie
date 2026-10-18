@@ -84,6 +84,17 @@ enum Tool: String, CaseIterable, Identifiable {
     }
 }
 
+/// Where a link badge goes: a shape in this drawing, or somewhere outside it (`Element.url`).
+enum LinkGoal: Equatable {
+    case element(UUID)
+    case outside(OutsideLink)
+
+    /// The link `e` follows, if it has one: its `link` to a shape, else its `url`.
+    init?(_ e: Element) {
+        if let t = e.link { self = .element(t) } else if let o = e.outsideLink { self = .outside(o) } else { return nil }
+    }
+}
+
 /// Asks the canvas to follow a link to `target`, as clicking its badge would.
 struct JumpRequest: Equatable {
     var id = UUID()
@@ -232,6 +243,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var editorActions: ((Set<UUID>) -> EditorActions)?
     /// Links shapes on page `page` (not the one on screen) to `target`, as one undo step.
     var onLinkOtherPage: ((_ sources: Set<UUID>, _ page: UUID, _ target: UUID) -> Bool)?
+    /// Follows a link out of the drawing: opens a web address, or another drawing at its anchor.
+    var onOpenOutsideLink: ((OutsideLink) -> Void)?
+    /// Whether a link out of the drawing leads nowhere (another drawing that isn't there).
+    var outsideLinkBroken: ((OutsideLink) -> Bool)?
+    /// The file the drawing is saved in, which links to other drawings start from.
+    var linkBase: URL? { didSet { if linkBase != oldValue { linksElsewhereChanged() } } }
 
     /// Viewport offset in view points; model coordinates are unchanged by panning.
     private var pan: CGPoint = .zero { didSet { viewportChanged() } }
@@ -271,7 +288,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var flashToken = 0
     private var badgeCache: [LinkBadge]?
     /// The link of the shape under a ⌘-press, followed on release if the press did not turn into a drag.
-    private var pressedLink: UUID?
+    private var pressedLink: LinkGoal?
     /// While set, the next click on a shape links these elements to it (Link to Element… in the context menu).
     /// It survives a page switch, so the target can be on another page.
     private var linkSources: Set<UUID>? {
@@ -687,12 +704,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     func linksElsewhereChanged() { badgeCache = nil; needsDisplay = true }
 
     /// A link badge: `corner` is the top-right of the linked element (or of its group, which shares one badge).
-    private struct LinkBadge { var corner: CGPoint; var target: UUID; var broken: Bool }
+    private struct LinkBadge { var corner: CGPoint; var target: LinkGoal; var broken: Bool }
 
     private var linkBadges: [LinkBadge] {
         if let cached = badgeCache { return cached }
         var out: [LinkBadge] = []
-        if model.elements.contains(where: { $0.link != nil }) {
+        if model.elements.contains(where: { $0.link != nil || $0.url != nil }) {
             let visible = Set(model.layers.filter(\.visible).map(\.id))
             var groupBounds: [UUID: CGRect] = [:]
             for e in model.elements where e.kind != .connector {
@@ -701,17 +718,24 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             // A target is reachable when it exists on a visible layer (what `linkBounds(to:)` checks), found in one pass.
             let reachable = Set(model.elements.filter { visible.contains($0.layerID) && $0.kind != .connector }.map(\.id))
             var seen = Set<[UUID]>()
+            var seenOutside = Set<[String]>()
             for e in model.orderedElements {
-                guard let target = e.link, visible.contains(e.layerID) else { continue }
+                guard let target = LinkGoal(e), visible.contains(e.layerID) else { continue }
                 let b: CGRect
                 if let g = e.groupID, let box = groupBounds[g] {
-                    guard seen.insert([g, target]).inserted else { continue }
+                    switch target {
+                    case .element(let t): guard seen.insert([g, t]).inserted else { continue }
+                    case .outside(let o): guard seenOutside.insert([g.uuidString, o.string]).inserted else { continue }
+                    }
                     b = box
                 } else {
                     b = e.kind == .connector ? Connector.bounds(of: e, in: model) : e.rotatedBounds
                 }
-                out.append(LinkBadge(corner: CGPoint(x: b.maxX, y: b.minY), target: target,
-                                     broken: !reachable.contains(target) && findPage?(target) == nil))
+                let broken = switch target {
+                case .element(let t): !reachable.contains(t) && findPage?(t) == nil
+                case .outside(let o): outsideLinkBroken?(o) ?? false
+                }
+                out.append(LinkBadge(corner: CGPoint(x: b.maxX, y: b.minY), target: target, broken: broken))
             }
         }
         badgeCache = out
@@ -737,7 +761,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return true
     }
 
-    private func badgeHit(_ p: CGPoint) -> UUID? {
+    private func badgeHit(_ p: CGPoint) -> LinkGoal? {
         linkBadges.last { b in
             let c = badgeCenter(b)
             return hypot(p.x - c.x, p.y - c.y) <= 10 / zoom
@@ -757,10 +781,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             if badge.broken { // a cross: the target is gone or hidden
                 ctx.move(to: CGPoint(x: c.x - a, y: c.y - a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y + a))
                 ctx.move(to: CGPoint(x: c.x - a, y: c.y + a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y - a))
-            } else { // an arrow pointing up and right
+            } else { // an arrow pointing up and right; out of the drawing, it leaves a box
                 ctx.move(to: CGPoint(x: c.x - a, y: c.y + a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y - a))
                 ctx.move(to: CGPoint(x: c.x - a / 3, y: c.y - a)); ctx.addLine(to: CGPoint(x: c.x + a, y: c.y - a))
                 ctx.addLine(to: CGPoint(x: c.x + a, y: c.y + a / 3))
+                if case .outside = badge.target {
+                    let k = a * 1.25
+                    ctx.move(to: CGPoint(x: c.x - k / 3, y: c.y - k)); ctx.addLine(to: CGPoint(x: c.x - k, y: c.y - k))
+                    ctx.addLine(to: CGPoint(x: c.x - k, y: c.y + k)); ctx.addLine(to: CGPoint(x: c.x + k, y: c.y + k))
+                    ctx.addLine(to: CGPoint(x: c.x + k, y: c.y + k / 3))
+                }
             }
             ctx.strokePath()
         }
@@ -836,8 +866,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     // Menu commands (View ▸ Follow Link, Back, Forward) arrive through the responder chain.
 
     @objc func followLink(_ sender: Any?) {
-        guard let target = model.elements.first(where: { selection.contains($0.id) && $0.link != nil })?.link else { NSSound.beep(); return }
-        jump(to: target)
+        guard let goal = model.elements.lazy.filter({ self.selection.contains($0.id) }).compactMap(LinkGoal.init).first
+        else { NSSound.beep(); return }
+        follow(goal)
+    }
+
+    /// Follows a link badge's link: jumps to a shape, or hands a link out of the drawing to the window.
+    func follow(_ goal: LinkGoal) {
+        switch goal {
+        case .element(let target): jump(to: target)
+        case .outside(let link):
+            guard let open = onOpenOutsideLink else { NSSound.beep(); return }
+            open(link)
+        }
     }
 
     @objc func jumpBack(_ sender: Any?) { step(from: &backStack, to: &forwardStack, animated: true) }
@@ -1499,7 +1540,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
     }
 
-    private var selectionHasLink: Bool { model.elements.contains { selection.contains($0.id) && $0.link != nil } }
+    private var selectionHasLink: Bool { model.elements.contains { selection.contains($0.id) && ($0.link != nil || $0.url != nil) } }
 
     /// Waits for a click on the shape the selection should link to.
     @objc func linkToElement(_ sender: Any?) {
@@ -1511,7 +1552,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     @objc func removeLink(_ sender: Any?) {
         var next = model
-        guard (try? next.setLink(selection, to: nil)) != nil, next != model else { return }
+        guard (try? next.setLink(selection, to: nil)) != nil, (try? next.setURL(selection, to: nil)) != nil, next != model else { return }
         onCommit?(next, "Remove Link")
     }
 
@@ -1663,7 +1704,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         if tool.kind != nil, tool != .text, tool != .pencil, tool != .highlighter { p = snapped(p, event) }
         dragStart = p
         if tool == .select, event.clickCount == 1, let target = badgeHit(p) { // a link badge: go there
-            jump(to: target)
+            follow(target)
             return
         }
         if tool == .select, event.clickCount == 1, toggleCheckbox(at: p) { return }
@@ -1756,7 +1797,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             } else if !selection.contains(hit.id) {
                 selection = hitSet
             }
-            pressedLink = tool == .select && event.modifierFlags.contains(.command) ? hit.link : nil
+            pressedLink = tool == .select && event.modifierFlags.contains(.command) ? LinkGoal(hit) : nil
             gesture = .moving
         } else {
             if !event.modifierFlags.contains(.shift) { selection = [] }
@@ -2030,7 +2071,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 selection = event.modifierFlags.contains(.shift) ? selection.symmetricDifference(hitSet) : hitSet
             }
         case .moving where model != base: commit(base, "Move")
-        case .moving: if let target = pressedLink { jump(to: target) } // ⌘-click on a linked shape
+        case .moving: if let target = pressedLink { follow(target) } // ⌘-click on a linked shape
         case .resizing where model != base: commit(base, "Resize")
         case .adjusting where model != base: commit(base, "Adjust Shape")
         default: break
@@ -2424,6 +2465,8 @@ struct CanvasView: NSViewRepresentable {
     @Binding var placeRequest: PlaceRequest?
     var showRulers = false
     @Binding var jumpRequest: JumpRequest?
+    /// Where the drawing is saved, for links to other drawings.
+    var fileURL: URL?
     var playhead: Double?
     /// Seconds into the animation to pose, while paused on the timeline; nil edits the page itself.
     var pose: Double?
@@ -2472,6 +2515,9 @@ struct CanvasView: NSViewRepresentable {
             document.commitFile(next, actionName: "Link", undoManager: undoManager)
             return true
         }
+        v.linkBase = fileURL
+        v.onOpenOutsideLink = { [fileURL] in OutsideLinks.open($0, from: fileURL) }
+        v.outsideLinkBroken = { [fileURL] in OutsideLinks.isBroken($0, from: fileURL) }
         v.showsSymbol = document.editingSymbol != nil
         if let t = pose {
             if v.poseSource != document.model || v.poseTime != t {

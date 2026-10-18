@@ -102,6 +102,9 @@ public enum Exporter {
         ctx.translateBy(x: -b.minX, y: -b.minY)
         ctx.setFillColor(background); ctx.fill(b)
         Renderer.draw(doc.resolvingInk(to: ink), in: ctx, background: background)
+        let targets = linkTargets(in: [doc])
+        addLinkDestinations(doc, bounds: b, targets: targets, in: ctx)
+        addLinks(doc, bounds: b, targets: targets, in: ctx)
         ctx.endPDFPage(); ctx.closePDF()
         return data as Data
     }

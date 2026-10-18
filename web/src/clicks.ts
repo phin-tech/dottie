@@ -1,6 +1,6 @@
 // Clickable elements in a played drawing (Clicks.swift): what a click does, and how an element looks hovered.
 
-import { type DottieFile, type Element, type Marker, type Page, allowedURL } from "./model.ts";
+import { type DottieFile, type Element, type Marker, type Page, allowedURL, webLink } from "./model.ts";
 import { expandingSymbols } from "./symbols.ts";
 
 /** Jump to scene `scene` (an index into the page's markers) and play on to the next; open `url` in a new tab; or,
@@ -14,7 +14,7 @@ export function sceneNamed(name: string, markers: Marker[]): number {
 }
 
 /** The page's clickable elements and what each click does, by element id. A scene named by no marker, or a link
- * that isn't allowed, makes nothing clickable. Given the whole file, an element whose `link` points at an element on
+ * that isn't allowed, makes nothing clickable; an element with no `click` opens its `url` when that is a web link. Given the whole file, an element whose `link` points at an element on
  * another page shows that page (the HTML export holds one page, so it can't). */
 export function clickTargets(page: Page, file?: DottieFile): Map<string, Click> {
   const markers = page.timeline?.markers ?? [];
@@ -26,7 +26,7 @@ export function clickTargets(page: Page, file?: DottieFile): Map<string, Click> 
       const i = sceneNamed(c.scene, markers);
       if (i >= 0) { out.set(e.id, { scene: i }); continue; }
     }
-    const url = c?.url ? allowedURL(c.url) : null;
+    const url = (c?.url ? allowedURL(c.url) : null) ?? webLink(e.url);
     if (url) { out.set(e.id, { url }); continue; }
     if (e.link && file && file.pages.length > 1) {
       if (!pageOf) {

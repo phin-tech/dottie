@@ -269,6 +269,19 @@ test("clicks from a hostile file never run script", async () => {
   await close();
 });
 
+test("links from a hostile file never run script", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/js-only/hostile-links.dottie"></dottie-player>`);
+  await ready(page);
+  await page.evaluate(() => { window.open = () => { window.__pwned = 1; }; });
+  for (const text of ["url", "mixed"]) await page.click(`dottie-player >> text=${text}`, { force: true });
+  const found = await page.evaluate(() => {
+    const root = document.querySelector("dottie-player").shadowRoot;
+    return { pwned: window.__pwned === 1, clickable: root.querySelectorAll(".dottie-a, a").length };
+  });
+  assert.deepEqual(found, { pwned: false, clickable: 0 });
+  await close();
+});
+
 // The HTML export (Exporter.player) is its own player, drawn ahead of time; its golden is made by `just goldens`.
 async function exported(options = {}) {
   const context = await browser.newContext({ reducedMotion: options.reducedMotion ?? "no-preference" });
