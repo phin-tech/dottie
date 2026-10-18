@@ -104,7 +104,7 @@ release-tool *args:
 doctor:
     {{release_tool}} doctor
 
-# Bump the version (major, minor, patch, or beta: 0.6.1 -> 0.7.0-beta.1 -> -beta.2) everywhere, and the build number
+# Bump the version (major, minor, patch, or beta: 0.6.1 -> 0.7.0-beta.1 -> -beta.2; beta --of patch: 0.6.2-beta.1) everywhere, and the build number
 [positional-arguments]
 bump part *args:
     {{release_tool}} bump "$@"
@@ -124,7 +124,7 @@ release *args:
 notarize *args:
     {{release_tool}} notarize "$@"
 
-# The whole release: bump, commit, push, npm, notarize, GitHub release, appcast, cask (`ship beta`: a pre-release, no cask)
+# The whole release: bump, commit, push, npm, notarize, GitHub release, appcast, cask (`ship beta [--of patch|major]`: a pre-release, no cask)
 [positional-arguments]
 ship part *args:
     {{release_tool}} ship "$@"

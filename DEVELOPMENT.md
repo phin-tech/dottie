@@ -121,7 +121,9 @@ staples the ticket (`just notarize`), then publishes the GitHub release, its Spa
 certificate in its keychain, from a clean, pushed `main`. Every release recipe takes `--dry-run`, which runs the checks
 and reads but only prints what it would change: `just ship beta --dry-run`.
 
-**Betas.** `just ship beta` makes the next beta: from 0.6.1, `0.7.0-beta.1`, then `-beta.2`. A beta is a GitHub
+**Betas.** `just ship beta` makes the next beta: from 0.6.1, `0.7.0-beta.1`, then `-beta.2`. For a beta of a
+patch or a major instead, `just ship beta --of patch` (0.6.1 → `0.6.2-beta.1`) or `--of major` (`1.0.0-beta.1`);
+later betas carry on with plain `just ship beta`, and `just ship patch` releases it. A beta is a GitHub
 pre-release, so GitHub's "latest", the download link and the cask stay on the last release. dottie.js goes to npm
 under the `beta` tag. Its appcast entry is added to the latest release's appcast in Sparkle's `beta` channel, which only
 copies with Settings › Updates › Get beta versions turned on take (on by default in a beta build). A later
