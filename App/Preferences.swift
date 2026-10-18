@@ -90,6 +90,7 @@ private struct GeneralSettings: View {
     @AppStorage(Pref.gridSize) private var gridSize = Pref.gridSizeDefault
     @AppStorage(Pref.singleKeyShortcuts) private var singleKeyShortcuts = true
     @AppStorage(Pref.returnToSelect) private var returnToSelect = true
+    @AppStorage(UpdateChecker.betaKey) private var betaUpdates = UpdateChecker.runningBeta
     @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
 
@@ -129,11 +130,13 @@ private struct GeneralSettings: View {
                 Toggle("Check for updates automatically", isOn: Binding(
                     get: { UpdateChecker.shared.automaticChecks },
                     set: { UpdateChecker.shared.automaticChecks = $0 }))
+                Toggle("Get beta versions", isOn: $betaUpdates)
                 Button("Check Now") { UpdateChecker.shared.checkForUpdates() }
             } header: {
                 Text("Updates")
             } footer: {
-                Text("Once a day, Dottie asks GitHub for a newer release, and offers to install it and relaunch.")
+                Text("Once a day, Dottie asks GitHub for a newer release, and offers to install it and relaunch. "
+                    + "Betas come out before a release and may have rough edges; when the release ships, you move on to it.")
                     .foregroundStyle(.secondary)
             }
             Section {
