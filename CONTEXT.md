@@ -32,6 +32,6 @@ _Avoid_: custom shape, smart shape
 A named action an extension adds to the menus that changes the document.
 _Avoid_: action, effect
 
-**Handle**:
-An on-canvas knob an extension shape declares for adjusting one of its parameters by dragging.
-_Avoid_: adjustment point, knob
+**Adjustment handle**:
+An on-canvas control an extension shape declares for adjusting one of its parameters by dragging.
+_Avoid_: handle (that also means the resize and rotation handles), knob, adjustment point

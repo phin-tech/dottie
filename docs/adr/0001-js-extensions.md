@@ -19,7 +19,7 @@ file system, network or timers, and code is never embedded in documents.
 **Scope, in phases.**
 
 - v1: extension shapes (parameter schema, inspector, `generate`) and commands.
-- v1.1: on-canvas adjustment handles for shapes; live preview in command forms.
+- v1.1: adjustment handles for shapes; live preview in command forms.
 - Later: drawing tools, which first need the mouse handling in `CanvasView` turned from an if-chain over the closed
   `Tool` enum into a protocol; fill styles and connector styles.
 - Out of scope: importers and exporters; shapes regenerated per animation frame; extension code inside documents.
@@ -32,7 +32,7 @@ the modules bundled with Dottie (lodash, d3, dagre, dayjs) and to files inside t
 `Scripts/modules` folder, so a bundle is self-contained. Settings › Extensions lists them with an enable switch each.
 
 **Runtime.** One long-lived `JSContext` per extension, created at load and recreated on reload. Shape functions
-(`generate`, and the handle functions `position` and `drag`) are pure: plain data in, plain data out, no `dottie`
+(`generate`, and the adjustment handle functions `position` and `drag`) are pure: plain data in, plain data out, no `dottie`
 document object. They run synchronously on the main actor under a short execution limit using the existing
 `JSContextGroupSetExecutionTimeLimit` hook. If one throws or times out, the element keeps its last good path and the
 inspector shows the error. Commands run the way `run_script` does today: the full `dottie` object on a copy of the
@@ -45,7 +45,7 @@ document, written back only if the command finishes, as one undo step.
 - `generate(params, frame)` returns normalized subpaths (the form `.path` already uses, with even-odd fill) in the
   element's own style, plus optional `ports` (normalized connection points) and an optional `labelRect`. Resizing
   calls `generate` again, so a cylinder's lip keeps its height instead of stretching.
-- Handles (v1.1) each declare `position(params, frame)` and `drag(params, frame, point) → params`; Dottie calls
+- Adjustment handles (v1.1) each declare `position(params, frame)` and `drag(params, frame, point) → params`; Dottie calls
   `generate` on every drag step.
 - The element stores `extension: { id, version, params }`, the subpaths, and the optional `ports` and `labelRect`.
 - Extension shapes appear in the shape library under the extension's name. `add_shape`, `build_diagram` and
@@ -98,4 +98,7 @@ adjustment handles; Inkscape "Repeat last extension".
 - dottie.js needs the outline-based `edgePoint` and support for `ports` and `labelRect`, with fixtures covering them,
   before extension shapes ship.
 - The schema in `schema/dottie.schema.json` gains the optional `extension`, `ports` and `labelRect` fields.
+- Existing documents redraw connectors attached to `.path` elements, including every Basics stencil shape, at the
+  real outline instead of the bounding box. The goldens in `fixtures/` change on both the Swift and dottie.js sides
+  and are regenerated together in the same change.
 - Drawing tools cannot be added as extensions until the `CanvasView` tool refactor is done.
