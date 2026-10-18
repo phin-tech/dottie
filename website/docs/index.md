@@ -30,9 +30,21 @@ arrow keys.
 - **Extend it.** Extensions add shapes drawn from your own JavaScript, with handles to adjust them, commands
   for the Extensions menu, and drawing tools for the toolbar, like the Ribbon pen in the
   [extension template](https://github.com/phin-tech/dottie/tree/main/extension-template). Extensions can't read
-  your files or use the network, and drawings that use them open anywhere, extension or not.
+  your files or use the network, and drawings that use them open anywhere, extension or not. Your assistant can
+  write one for you with the `dottie-extension` skill.
 - **Bring diagrams in and send them out:** Mermaid, Excalidraw, draw.io and SVG in; PNG, SVG, PDF, Mermaid
   and HTML out.
 
 The [README](https://github.com/phin-tech/dottie#readme) has the details, from installing to keyboard
 shortcuts.
+
+## Teach your assistant
+
+Two skills show an AI assistant how to use Dottie well. **dottie** covers drawing over MCP, looking at the
+result and fixing it, scripting, animating, and the `dottie` command line. **dottie-extension** walks it through
+writing an extension, starting from the template. They work with Claude Code, Codex, Cursor and other assistants
+that read skills:
+
+```sh
+npx skills add phin-tech/dottie
+```
