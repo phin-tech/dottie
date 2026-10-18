@@ -152,11 +152,11 @@ final class ExtensionHost: ObservableObject {
     /// Runs a command on a copy of `page`, as Run Script does: the result is only used if the command finishes.
     func run(_ runtime: ExtensionRuntime, _ command: CommandDefinition, params: [String: ExtensionValue],
              on page: DottieDocument, file: DottieFile, selection: [UUID]) -> CommandRun {
-        let source: String
-        do { source = try runtime.commandSource(command.id, params: params) }
-        catch { return CommandRun(page: page, error: "\(runtime.manifest.name): \(Self.message(error))") }
         var working = page
-        let result = DottieScript.run(source, on: &working, in: file, selection: selection, extensions: runtimes)
+        let result: ScriptResult
+        do { result = try runtime.runCommand(command.id, params: params, on: &working, in: file, selection: selection,
+                                             extensions: runtimes) }
+        catch { return CommandRun(page: page, error: "\(runtime.manifest.name): \(Self.message(error))") }
         if let error = result.error {
             return CommandRun(page: page, logs: result.logs, error: "\(runtime.manifest.name): \(error)")
         }
@@ -172,6 +172,7 @@ final class ExtensionHost: ObservableObject {
     /// Regenerates an extension shape at its current frame. Returns what went wrong; the element keeps its path then.
     func regenerate(_ e: inout Element) -> String? {
         guard let ref = e.extension, let rt = runtime(for: ref.id) else { return nil }
+        defer { flushLogs() }
         do {
             try e.regenerate(with: rt)
             return nil
@@ -183,16 +184,15 @@ final class ExtensionHost: ObservableObject {
     /// Regenerates the extension shapes in `page` whose size differs from `old`, so they reflow (a cylinder's lip
     /// keeps its height) instead of stretching. Returns the problems; those shapes keep their paths.
     func reflow(_ page: inout DottieDocument, from old: DottieDocument) -> [String] {
-        guard page.elements.contains(where: { $0.extension != nil }) else { return [] }
-        let sizes = Dictionary(old.elements.map { ($0.id, CGSize(width: $0.width, height: $0.height)) },
-                               uniquingKeysWith: { a, _ in a })
-        var problems: [String] = []
-        for i in page.elements.indices where page.elements[i].extension != nil {
-            let e = page.elements[i]
-            guard let was = sizes[e.id], was != CGSize(width: e.width, height: e.height) else { continue }
-            if let problem = regenerate(&page.elements[i]) { problems.append(problem) }
+        defer { flushLogs() }
+        return page.reflowExtensionShapes(from: old, using: runtimes)
+    }
+
+    /// Hands what extensions logged with `console` to the Script Console.
+    private func flushLogs() {
+        for rt in runtimes {
+            for line in rt.takeLogs() { Self.report("\(rt.manifest.name): \(line)") }
         }
-        return problems
     }
 
     /// Regenerates every extension shape in the file, pages and symbols alike, from its stored parameters (after

@@ -534,16 +534,27 @@ actor DottieTools {
     /// Sentinel for "the frontmost window in the app": live only, never a file.
     private static let currentURL = URL(string: "dottie-live:current")!
 
-    /// The extensions in the Extensions folder that loaded, scanned afresh so edits since the last call count.
-    private func loadedRuntimes() -> [ExtensionRuntime] {
+    /// The Extensions folder as last scanned, and what it looked like then.
+    private var extensionCache: (fingerprint: [String], registry: ExtensionRegistry)?
+
+    /// The Extensions folder, rescanned only when a file in it has changed since the last call (or when `rescan`),
+    /// so each extension's context stays warm between calls.
+    private func extensionRegistry(rescan: Bool = false) -> ExtensionRegistry {
+        let fingerprint = ExtensionRegistry.fingerprint()
+        if !rescan, let cache = extensionCache, cache.fingerprint == fingerprint { return cache.registry }
         let registry = ExtensionRegistry()
         registry.scan()
-        return registry.entries.compactMap(\.runtime)
+        extensionCache = (fingerprint, registry)
+        return registry
     }
 
-    private func extensionListing() -> String {
-        let registry = ExtensionRegistry()
-        registry.scan()
+    /// The extensions in the Extensions folder that loaded.
+    private func loadedRuntimes() -> [ExtensionRuntime] {
+        extensionRegistry().entries.compactMap(\.runtime)
+    }
+
+    private func extensionListing(rescan: Bool = false) -> String {
+        let registry = extensionRegistry(rescan: rescan)
         guard !registry.entries.isEmpty else { return "No extensions are installed in \(ExtensionRegistry.folder.path)." }
         return registry.entries.map { entry -> String in
             if let rt = entry.runtime {
@@ -747,6 +758,7 @@ actor DottieTools {
             var file = try load(url)
             let id = try a.uuid("id")
             let p = try pageIndex(file, a, element: id)
+            let before = file.pages[p]
             var link: UUID?? = nil
             if let s = a.string("link") { link = .some(s.isEmpty ? nil : try a.uuid("link")) }
             do {
@@ -775,8 +787,10 @@ actor DottieTools {
                                       anchor: a.string("anchor").map { Optional($0) }, click: click, hover: hover,
                                       otherPages: file.pages)
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
+            let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
             try save(file, to: url)
-            return text("Updated")
+            return text((["Updated"] + problems).joined(separator: "\n"))
 
         case "script_api":
             if a.string("format") == "typescript" { return text(DottieScript.typeDefinitions) }
@@ -784,15 +798,16 @@ actor DottieTools {
             return text(DottieScript.apiReference + "\n\nInstalled modules for require(): "
                 + (installed.isEmpty ? "none (add .js files to \(DottieScript.modulesDirectory.path))" : installed.joined(separator: ", ")))
 
-        case "list_extensions", "reload_extensions":
+        case "list_extensions":
             return text(extensionListing())
+
+        case "reload_extensions":
+            return text(extensionListing(rescan: true))
 
         case "install_extension":
             let source = URL(fileURLWithPath: (try a.require("path_to_bundle") as NSString).expandingTildeInPath)
             let runtime = try ExtensionRuntime(bundle: source)
-            let existing = ExtensionRegistry()
-            existing.scan()
-            if existing.entries.contains(where: { $0.runtime?.manifest.id == runtime.manifest.id }) {
+            if extensionRegistry().entries.contains(where: { $0.runtime?.manifest.id == runtime.manifest.id }) {
                 throw ToolFailure(message: "An extension with id \(runtime.manifest.id) is installed already")
             }
             let folder = ExtensionRegistry.folder
@@ -811,11 +826,12 @@ actor DottieTools {
             var doc = file.pages[p]
             let before = doc
             let extensionID = try a.require("extension")
-            guard let runtime = loadedRuntimes().first(where: { $0.manifest.id == extensionID }) else {
+            let runtimes = loadedRuntimes()
+            guard let runtime = runtimes.first(where: { $0.manifest.id == extensionID }) else {
                 throw ToolFailure(message: "No loaded extension with id '\(extensionID)'; see list_extensions")
             }
-            let source = try runtime.commandSource(try a.require("command"), params: try extensionParams(a.raw["params"]))
-            let result = DottieScript.run(source, on: &doc, in: file, extensions: loadedRuntimes())
+            let result = try runtime.runCommand(try a.require("command"), params: try extensionParams(a.raw["params"]),
+                                                on: &doc, in: file, extensions: runtimes)
             var report = result.logs.joined(separator: "\n")
             func append(_ line: String) { report += (report.isEmpty ? "" : "\n") + line }
             if let error = result.error {

@@ -210,6 +210,80 @@ final class ExtensionTests: XCTestCase {
         let json = try JSONSerialization.jsonObject(with: plainData) as? [String: Any]
         XCTAssertNil(json?["extension"], "an element that is not an extension shape writes no extension key")
     }
+
+    // MARK: require, console, reflow
+
+    /// A shape whose lip is 10 points tall whatever the frame, so a resize must regenerate rather than stretch it.
+    private static let lip = """
+        var lib = require("./lib/geometry");
+        extension.shape({
+          id: "lip", name: "Lip", parameters: {},
+          generate: function (p, frame) {
+            var y = lib.points(10, frame.height);
+            console.log("lip at", y);
+            return { subpaths: [{ closed: false, coords: [0, y, 1 / 3, y, 2 / 3, y, 1, y] }] };
+          }
+        });
+        extension.command({
+          id: "wide", name: "Wide", parameters: {},
+          run: function () { dottie.rect({ x: 0, y: 0, width: lib.points(10, 1) * 100, height: 10 }); }
+        });
+        """
+
+    private func lipBundle() throws -> URL {
+        let dir = try bundle("Lip", id: "com.example.lip", main: Self.lip)
+        let lib = dir.appendingPathComponent("lib", isDirectory: true)
+        try FileManager.default.createDirectory(at: lib, withIntermediateDirectories: true)
+        try "module.exports = { points: function (pt, size) { return pt / size; } };"
+            .write(to: lib.appendingPathComponent("geometry.js"), atomically: true, encoding: .utf8)
+        return dir
+    }
+
+    func testRequireReadsTheBundleAndConsoleIsCollected() throws {
+        let runtime = try ExtensionRuntime(bundle: try lipBundle())
+        let out = try runtime.generate(shape: "lip", params: [:], width: 100, height: 50)
+        XCTAssertEqual(out.subpaths[0].coords[1], 0.2, accuracy: 1e-9)
+        XCTAssertEqual(runtime.takeLogs(), ["lip at 0.2"])
+        XCTAssertEqual(runtime.takeLogs(), [])
+    }
+
+    func testRequireCannotLeaveTheBundle() throws {
+        try "module.exports = 1;".write(to: root.appendingPathComponent("outside.js"), atomically: true, encoding: .utf8)
+        let dir = try bundle("Escape", main: #"require("../outside");"#)
+        XCTAssertThrowsError(try ExtensionRuntime(bundle: dir))
+    }
+
+    func testBundledModulesStillLoad() throws {
+        let dir = try bundle("Lodash", main: #"var _ = require("lodash"); if (_.clamp(5, 0, 1) !== 1) throw new Error("no lodash");"#)
+        XCTAssertNoThrow(try ExtensionRuntime(bundle: dir))
+    }
+
+    func testCommandRequireReadsTheBundle() throws {
+        let runtime = try ExtensionRuntime(bundle: try lipBundle())
+        var doc = DottieDocument()
+        let result = try runtime.runCommand("wide", params: [:], on: &doc, extensions: [runtime])
+        XCTAssertNil(result.error)
+        XCTAssertEqual(doc.elements.map(\.width), [1000])
+    }
+
+    func testScriptResizeRegeneratesInsteadOfStretching() throws {
+        let runtime = try ExtensionRuntime(bundle: try lipBundle())
+        var doc = DottieDocument()
+        let e = try DiagramOps.addExtensionShape(&doc, runtime: runtime, shape: "lip", params: [:],
+                                                 frame: CGRect(x: 0, y: 0, width: 100, height: 50), at: .zero)
+        let result = DottieScript.run("dottie.update(\"\(e.id.uuidString)\", { height: 200 })", on: &doc, extensions: [runtime])
+        XCTAssertNil(result.error)
+        XCTAssertEqual(doc.elements[0].height, 200)
+        XCTAssertEqual(doc.elements[0].subpaths?[0].coords[1] ?? 0, 0.05, accuracy: 1e-9) // still 10 points
+    }
+
+    func testFingerprintChangesWhenABundleChanges() throws {
+        let dir = try lipBundle()
+        let before = ExtensionRegistry.fingerprint(of: root)
+        XCTAssertEqual(ExtensionRegistry.fingerprint(of: root), before)
+        try (Self.lip + "\n// edited").write(to: dir.appendingPathComponent("main.js"), atomically: true, encoding: .utf8)
+        XCTAssertNotEqual(ExtensionRegistry.fingerprint(of: root), before)
+    }
 }
 
 @MainActor
@@ -248,4 +322,5 @@ final class ExtensionHandleTests: XCTestCase {
         XCTAssertEqual(moved, ["inset": .number(0.3)])
         XCTAssertThrowsError(try runtime.handlePosition(shape: "box", handle: "nope", params: [:], width: 1, height: 1))
     }
+
 }

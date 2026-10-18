@@ -384,8 +384,7 @@ func runExtension(_ args: [String]) -> Int32 {
             var doc = DottieDocument()
             let result: ScriptResult
             do {
-                result = DottieScript.run(try runtime.commandSource(command.id, params: [:]), on: &doc,
-                                          extensions: [runtime], timeLimit: 5)
+                result = try runtime.runCommand(command.id, params: [:], on: &doc, extensions: [runtime], timeLimit: 5)
             } catch {
                 failures += 1
                 print("  error  command \(command.id): \(error)")

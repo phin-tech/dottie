@@ -88,6 +88,20 @@ declare const extension: {
   migrate(fn: MigrateFunction): void;
 };
 
+/** Output goes to the Script Console in the app; a command's output is also in run_command's reply. */
+declare const console: {
+  log(...values: unknown[]): void;
+  info(...values: unknown[]): void;
+  warn(...values: unknown[]): void;
+  error(...values: unknown[]): void;
+};
+
+/**
+ * Loads a CommonJS module from this bundle ("./lib/geometry" is lib/geometry.js) or one bundled with Dottie
+ * (lodash, d3-*, dagre, dayjs). Nothing outside the bundle can be loaded. Modules have no types here.
+ */
+declare function require(name: string): any;
+
 /**
  * The `dottie` object commands run with. Typed loosely here; run `dottie script-types <dir>` to write the full
  * dottie.d.ts for it and replace this declaration with a reference to that file.

@@ -206,6 +206,15 @@ public final class ExtensionRuntime {
     public private(set) var commands: [CommandDefinition] = []
     private var context: JSContext?
     private let source: String
+    /// `console` output from `main.js`, `generate`, `migrate` and handles, until `takeLogs` hands it on.
+    private var logs: [String] = []
+    static let logLimit = 200
+
+    /// The `console` lines logged since the last call, for the Script Console or a tool's reply.
+    public func takeLogs() -> [String] {
+        defer { logs = [] }
+        return logs
+    }
 
     public init(bundle directory: URL) throws {
         self.directory = directory
@@ -227,6 +236,23 @@ public final class ExtensionRuntime {
         context = nil
         guard let context = JSContext() else { throw ExtensionError.failed("JavaScript is unavailable") }
         ExecutionLimit.apply(to: context, seconds: Self.callTimeLimit)
+        // `require` reads only this bundle and the modules bundled with Dottie, so a bundle is self-contained.
+        let directory = self.directory
+        let lookup: @convention(block) (String) -> String = { id in
+            guard let ctx = JSContext.current() else { return "" }
+            do { let m = try DottieScript.moduleSource(id, directory: directory); return m.path + "\n" + m.text }
+            catch {
+                ctx.exception = JSValue(newErrorFromMessage: (error as? OpsError)?.description ?? "\(error)", in: ctx)
+                return ""
+            }
+        }
+        let log: @convention(block) (String) -> Void = { [weak self] line in
+            guard let self, self.logs.count < Self.logLimit else { return }
+            self.logs.append(line)
+        }
+        context.setObject(unsafeBitCast(lookup, to: AnyObject.self), forKeyedSubscript: "__source" as NSString)
+        context.setObject(unsafeBitCast(log, to: AnyObject.self), forKeyedSubscript: "__log" as NSString)
+        context.evaluateScript(DottieScript.runtimeShim)
         context.evaluateScript(Self.prelude, withSourceURL: directory.appendingPathComponent("prelude.js"))
         context.evaluateScript(source, withSourceURL: directory.appendingPathComponent("main.js"))
         if let e = context.exception { throw ExtensionError.failed(e.toString() ?? "error in main.js") }
@@ -324,6 +350,15 @@ public final class ExtensionRuntime {
         let idJSON = String(decoding: try JSONSerialization.data(withJSONObject: [id], options: []), as: UTF8.self).dropFirst().dropLast()
         // The prelude shares line 1 with main.js, so error line numbers still match the bundle's.
         return Self.preludeOnOneLine + " " + source + "\n__runCommand(\(idJSON), \(paramsJSON));"
+    }
+
+    /// Runs a command on `doc` the way `run_script` runs a script, with `require` reading this bundle (and the
+    /// modules bundled with Dottie) rather than the shared Scripts folder.
+    public func runCommand(_ id: String, params: [String: ExtensionValue], on doc: inout DottieDocument,
+                           in file: DottieFile? = nil, selection: [UUID] = [], extensions: [ExtensionRuntime] = [],
+                           timeLimit: TimeInterval = DottieScript.defaultTimeLimit) throws -> ScriptResult {
+        DottieScript.run(try commandSource(id, params: params), on: &doc, in: file, selection: selection,
+                         modulesDirectory: directory, extensions: extensions, timeLimit: timeLimit)
     }
 
     /// Calls a prelude function by name. Any exception rebuilds the context, since a time-out leaves it unusable.
@@ -483,6 +518,19 @@ public final class ExtensionRegistry {
         try JSONEncoder().encode(ids.sorted()).write(to: directory.appendingPathComponent("disabled.json"), options: .atomic)
     }
 
+    /// Every file under `directory` with its size and modification time: equal fingerprints mean nothing a scan
+    /// would see has changed (bundles, the modules they require, `disabled.json`).
+    public static func fingerprint(of directory: URL = ExtensionRegistry.folder) -> [String] {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+        guard let walk = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: keys) else { return [] }
+        var out: [String] = []
+        for case let url as URL in walk {
+            let v = try? url.resourceValues(forKeys: Set(keys))
+            out.append("\(url.path) \(v?.fileSize ?? -1) \(v?.contentModificationDate?.timeIntervalSinceReferenceDate ?? 0)")
+        }
+        return out.sorted()
+    }
+
     /// The manifest alone, so a disabled extension can be listed without running its code.
     public static func readManifest(_ directory: URL) throws -> ExtensionManifest {
         do {
@@ -499,6 +547,26 @@ public final class ExtensionRegistry {
     /// Every loaded command, with the extension it belongs to.
     public var commands: [(extension: ExtensionRuntime, command: CommandDefinition)] {
         entries.compactMap(\.runtime).flatMap { rt in rt.commands.map { (rt, $0) } }
+    }
+}
+
+extension DottieDocument {
+    /// Regenerates the extension shapes whose size differs from `old`, so they reflow (a cylinder's lip keeps its
+    /// height) instead of stretching. Shapes whose extension isn't in `runtimes` keep their path; so do ones whose
+    /// extension fails, and those failures are returned.
+    public mutating func reflowExtensionShapes(from old: DottieDocument, using runtimes: [ExtensionRuntime]) -> [String] {
+        guard !runtimes.isEmpty, elements.contains(where: { $0.extension != nil }) else { return [] }
+        let sizes = Dictionary(old.elements.map { ($0.id, CGSize(width: $0.width, height: $0.height)) },
+                               uniquingKeysWith: { a, _ in a })
+        var problems: [String] = []
+        for i in elements.indices {
+            let e = elements[i]
+            guard let ref = e.extension, let rt = runtimes.first(where: { $0.manifest.id == ref.id }),
+                  let was = sizes[e.id], was != CGSize(width: e.width, height: e.height) else { continue }
+            do { try elements[i].regenerate(with: rt) }
+            catch { problems.append("\(rt.manifest.name): \((error as? ExtensionError)?.description ?? "\(error)")") }
+        }
+        return problems
     }
 }
 
