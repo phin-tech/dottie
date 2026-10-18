@@ -9,8 +9,8 @@ settings:
   base:
     # The release version (`just release` tags v<this>); bump both for each release. Project-wide because the
     # Quick Look extensions must carry the app's version and build number.
-    MARKETING_VERSION: "0.5.4"
-    CURRENT_PROJECT_VERSION: "12"
+    MARKETING_VERSION: "0.6.0"
+    CURRENT_PROJECT_VERSION: "13"
 packages:
   Dottie:
     path: .
