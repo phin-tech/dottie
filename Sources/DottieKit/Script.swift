@@ -103,7 +103,7 @@ public enum DottieScript {
         if failure == nil {
             // An extension shape the script resized reflows rather than stretching; one that can't keeps its path.
             var edited = host.doc
-            logs += edited.reflowExtensionShapes(from: doc, using: extensions)
+            logs += edited.reflowExtensionShapes(from: doc, using: extensions, includingNew: true)
             doc = edited
         }
         return ScriptResult(logs: logs, value: json, error: failure, operations: host.operations)

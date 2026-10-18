@@ -553,16 +553,21 @@ public final class ExtensionRegistry {
 extension DottieDocument {
     /// Regenerates the extension shapes whose size differs from `old`, so they reflow (a cylinder's lip keeps its
     /// height) instead of stretching. Shapes whose extension isn't in `runtimes` keep their path; so do ones whose
-    /// extension fails, and those failures are returned.
-    public mutating func reflowExtensionShapes(from old: DottieDocument, using runtimes: [ExtensionRuntime]) -> [String] {
+    /// extension fails, and those failures are returned. With `includingNew`, shapes that aren't in `old` at all are
+    /// regenerated too (a script that adds a shape and then resizes it); without it they are left alone, so pasting
+    /// a shape never reruns its extension.
+    public mutating func reflowExtensionShapes(from old: DottieDocument, using runtimes: [ExtensionRuntime],
+                                               includingNew: Bool = false) -> [String] {
         guard !runtimes.isEmpty, elements.contains(where: { $0.extension != nil }) else { return [] }
         let sizes = Dictionary(old.elements.map { ($0.id, CGSize(width: $0.width, height: $0.height)) },
                                uniquingKeysWith: { a, _ in a })
         var problems: [String] = []
         for i in elements.indices {
             let e = elements[i]
-            guard let ref = e.extension, let rt = runtimes.first(where: { $0.manifest.id == ref.id }),
-                  let was = sizes[e.id], was != CGSize(width: e.width, height: e.height) else { continue }
+            guard let ref = e.extension, let rt = runtimes.first(where: { $0.manifest.id == ref.id }) else { continue }
+            if let was = sizes[e.id] {
+                guard was != CGSize(width: e.width, height: e.height) else { continue }
+            } else if !includingNew { continue }
             do { try elements[i].regenerate(with: rt) }
             catch { problems.append("\(rt.manifest.name): \((error as? ExtensionError)?.description ?? "\(error)")") }
         }

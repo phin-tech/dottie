@@ -277,6 +277,31 @@ final class ExtensionTests: XCTestCase {
         XCTAssertEqual(doc.elements[0].subpaths?[0].coords[1] ?? 0, 0.05, accuracy: 1e-9) // still 10 points
     }
 
+    func testShapeAddedAndResizedInOneScriptRegenerates() throws {
+        let runtime = try ExtensionRuntime(bundle: try lipBundle())
+        var doc = DottieDocument()
+        let script = """
+            var e = dottie.shape({ extension: { id: "com.example.lip", shape: "lip" }, x: 0, y: 0, width: 100, height: 50 });
+            dottie.update(e, { height: 200 });
+            """
+        let result = DottieScript.run(script, on: &doc, extensions: [runtime])
+        XCTAssertNil(result.error)
+        XCTAssertEqual(doc.elements[0].subpaths?[0].coords[1] ?? 0, 0.05, accuracy: 1e-9)
+    }
+
+    func testReflowLeavesPastedShapesAlone() throws {
+        let runtime = try ExtensionRuntime(bundle: try lipBundle())
+        var source = DottieDocument()
+        try DiagramOps.addExtensionShape(&source, runtime: runtime, shape: "lip", params: [:],
+                                         frame: CGRect(x: 0, y: 0, width: 100, height: 50), at: .zero)
+        var pasted = source.elements[0]
+        pasted.subpaths = [PathSubpath(closed: false, coords: [0, 0.5, 0.3, 0.5, 0.6, 0.5, 1, 0.5])]
+        var doc = DottieDocument()
+        doc.elements = [pasted]
+        XCTAssertEqual(doc.reflowExtensionShapes(from: DottieDocument(), using: [runtime]), [])
+        XCTAssertEqual(doc.elements[0].subpaths, pasted.subpaths)
+    }
+
     func testFingerprintChangesWhenABundleChanges() throws {
         let dir = try lipBundle()
         let before = ExtensionRegistry.fingerprint(of: root)

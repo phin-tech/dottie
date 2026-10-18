@@ -513,13 +513,25 @@ actor DottieTools {
     ]
 
     func call(name: String, arguments: [String: Value]) -> CallTool.Result {
+        let result: CallTool.Result
         do {
-            return try run(name, Args(raw: arguments))
+            result = try run(name, Args(raw: arguments))
         } catch let e as ToolFailure {
-            return .init(content: [.plain(e.message)], isError: true)
+            result = .init(content: [.plain(e.message)], isError: true)
         } catch {
-            return .init(content: [.plain("\(error)")], isError: true)
+            result = .init(content: [.plain("\(error)")], isError: true)
         }
+        // What extensions logged with `console` while generating, migrating or loading, so an agent can debug a shape.
+        let logs = extensionLogs()
+        guard !logs.isEmpty else { return result }
+        return .init(content: result.content + [.plain("Extension console:\n" + logs.joined(separator: "\n"))],
+                     isError: result.isError)
+    }
+
+    /// The `console` lines the loaded extensions have logged since the last reply.
+    private func extensionLogs() -> [String] {
+        guard let registry = extensionCache?.registry else { return [] }
+        return registry.entries.compactMap(\.runtime).flatMap { rt in rt.takeLogs().map { "\(rt.manifest.name): \($0)" } }
     }
 
     /// The built-in library plus the user's, optionally only the one called `name`.
