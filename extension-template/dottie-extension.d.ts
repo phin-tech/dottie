@@ -91,6 +91,7 @@ type ToolColor = string;
 interface DrawnStyle {
   fill?: ToolColor;
   stroke?: ToolColor;
+  /** 0...24. */
   strokeWidth?: number;
   fillStyle?: "solid" | "hachure" | "crossHatch" | "grid";
   /** 0 is precise, 1 hand-drawn, 2 very sketchy. */
@@ -98,13 +99,15 @@ interface DrawnStyle {
 }
 
 /** An element a tool draws: a path in canvas points, or a box-shaped shape. They are plain elements, so the drawing
- * opens and renders without the extension. */
+ * opens and renders without the extension. Points stay within 100000 of the origin, each element at most 20000
+ * points wide and tall, and text at most 10000 characters; anything past that is refused. */
 type DrawnElement =
   | (DrawnStyle & { kind: "path"; subpaths: Subpath[] })
   | (DrawnStyle & { kind: "rectangle" | "ellipse" | "diamond"; x: number; y: number; width: number; height: number; text?: string });
 
 /** A drawing tool, shown in the toolbar and the Tools menu. Extensions can't assign it a key. */
 interface ToolDefinition {
+  /** Letters, digits, "-", "_" and ".". */
   id: string;
   name: string;
   /** An SF Symbol name for the toolbar, such as "paintbrush.pointed". */

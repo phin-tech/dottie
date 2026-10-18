@@ -268,7 +268,11 @@ public final class ExtensionRuntime {
             commands = d.commands
             tools = d.tools
         } catch {
-            throw ExtensionError.failed("shapes and commands: \(error.localizedDescription)")
+            throw ExtensionError.failed("shapes, commands and tools: \(error.localizedDescription)")
+        }
+        // A tool's id is part of the toolbar's id for it, "<extension id>/<tool id>", so it can't contain a slash.
+        if let bad = tools.first(where: { $0.id.isEmpty || $0.id.contains { !($0.isLetter || $0.isNumber || "-_.".contains($0)) } }) {
+            throw ExtensionError.failed("tool id '\(bad.id)' may only use letters, digits, '-', '_' and '.'")
         }
         self.context = context
     }

@@ -111,6 +111,31 @@ final class ExtensionToolTests: XCTestCase {
         XCTAssertEqual(try attempt(6).count, 1, "a failure doesn't break the next call")
     }
 
+    func testOutputTooFarOrTooBigIsRefusedRatherThanDrawn() throws {
+        func drawn(_ json: String) throws -> DrawnElement { try JSONDecoder().decode(DrawnElement.self, from: Data(json.utf8)) }
+        let refused = [
+            // Finite but huge: flattening this would overflow, and a fill this big would never finish.
+            #"{"kind":"path","subpaths":[{"closed":false,"coords":[-1.7e308,0,0,0,0,0,1.7e308,0]}]}"#,
+            #"{"kind":"path","subpaths":[{"closed":false,"coords":[0,0,10000,0,20000,0,30000,0]}]}"#,
+            #"{"kind":"rectangle","x":0,"y":1e17,"width":100,"height":1e17,"fillStyle":"hachure"}"#,
+            #"{"kind":"rectangle","x":0,"y":0,"width":100,"height":40000000}"#,
+            #"{"kind":"ellipse","x":200000,"y":0,"width":10,"height":10}"#,
+            #"{"kind":"rectangle","x":0,"y":0,"width":10,"height":10,"strokeWidth":25}"#,
+            "{\"kind\":\"rectangle\",\"x\":0,\"y\":0,\"width\":10,\"height\":10,\"text\":\"\(String(repeating: "a", count: 10_001))\"}",
+        ]
+        for json in refused {
+            XCTAssertThrowsError(try drawn(json).element(style: Style(), layerID: UUID(), seed: 1), String(json.prefix(80)))
+        }
+        XCTAssertNoThrow(try drawn(#"{"kind":"rectangle","x":-90000,"y":90000,"width":20000,"height":20000,"strokeWidth":24}"#)
+            .element(style: Style(), layerID: UUID(), seed: 1), "the limits themselves are fine")
+    }
+
+    func testAToolIdMayNotContainASlash() throws {
+        XCTAssertThrowsError(try runtime(#"extension.tool({ id: "a/b", name: "AB", draw: function () { return { elements: [] }; } })"#)) {
+            XCTAssertTrue("\($0)".contains("tool id 'a/b'"), "\($0)")
+        }
+    }
+
     func testTooManyElementsAreRefused() throws {
         let rt = try runtime("""
             extension.tool({ id: "many", name: "Many", draw: function () {
