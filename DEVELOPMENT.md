@@ -137,7 +137,10 @@ number only goes up.
 [apple-template](https://git.phin.tech/sam/apple-template): a Python program pinned to a tag in
 `scripts/release/pyproject.toml` and run with uv, which fetches it with your git credentials for git.phin.tech. What it
 knows about Dottie is in `release.toml`; dottie.js's steps (the npm version, the embedded player, staging on npm) are
-hooks in `scripts/release/hooks.py`. Its lanes are written over a little DSL of plumbum commands: `read()` for commands
+hooks in `scripts/release/hooks.py`. The release recipes are in `release.just`, which the justfile imports and
+apple-template keeps current: Dottie is linked to it in release-only mode (`.copier-answers.yml`), so `uvx copier
+update` brings new recipes, and Dottie's own recipes stay in the justfile. Besides GitHub and the cask, each release
+goes on the download page, apps.phin.tech (`[downloads]` in `release.toml`). Its lanes are written over a little DSL of plumbum commands: `read()` for commands
 that only look, `run()` for ones that change something (skipped in a dry run), `secret()` for values never to print.
 `just release-check` checks `release.toml` and the hooks, and `just doctor` everything a release needs outside the
 repository. A fix to the tooling goes in app-release, then a new tag here. Versions are written by [bump-my-version](https://github.com/callowayproject/bump-my-version) (`.bumpversion.toml` lists the
