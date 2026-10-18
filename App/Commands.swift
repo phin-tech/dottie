@@ -282,7 +282,7 @@ struct DottieCommands: Commands {
         CodeCommands(editor: editor)
         CommandMenu("Tools") {
             Picker("Tool", selection: Binding(get: { tool ?? .select }, set: { tool = $0 })) {
-                ForEach(Tool.allCases) { t in
+                ForEach(Tool.all) { t in
                     Text("\(t.label)  \(String(t.shortcut).uppercased())").tag(t)
                 }
             }

@@ -20,70 +20,6 @@ struct PlaceRequest: Equatable {
     var source: Source
 }
 
-enum Tool: String, CaseIterable, Identifiable {
-    case select, rectangle, ellipse, diamond, text, note, connector, pencil, highlighter, eraser, redact
-    var id: String { rawValue }
-    var symbol: String {
-        switch self {
-        case .select: "cursorarrow"
-        case .rectangle: "rectangle"
-        case .ellipse: "circle"
-        case .diamond: "diamond"
-        case .text: "textformat"
-        case .note: "note.text"
-        case .connector: "arrow.up.right"
-        case .pencil: "pencil.tip"
-        case .highlighter: "highlighter"
-        case .eraser: "eraser"
-        case .redact: "eye.slash"
-        }
-    }
-    var label: String {
-        switch self {
-        case .select: "Select"
-        case .rectangle: "Rectangle"
-        case .ellipse: "Ellipse"
-        case .diamond: "Diamond"
-        case .text: "Text"
-        case .note: "Note"
-        case .connector: "Connector"
-        case .pencil: "Pencil"
-        case .highlighter: "Highlighter"
-        case .eraser: "Eraser"
-        case .redact: "Redact"
-        }
-    }
-    /// Single-key tool switch, Photoshop-style.
-    var shortcut: Character {
-        switch self {
-        case .select: "v"
-        case .rectangle: "r"
-        case .ellipse: "o"
-        case .diamond: "d"
-        case .text: "t"
-        case .note: "n"
-        case .connector: "c"
-        case .pencil: "p"
-        case .highlighter: "h"
-        case .eraser: "e"
-        case .redact: "x"
-        }
-    }
-    var kind: ElementKind? {
-        switch self {
-        case .select: nil
-        case .rectangle: .rectangle
-        case .ellipse: .ellipse
-        case .diamond: .diamond
-        case .text: .text
-        case .note: .note
-        case .connector: nil
-        case .pencil, .highlighter: .freehand
-        case .eraser, .redact: nil
-        }
-    }
-}
-
 /// Where a link badge goes: a shape in this drawing, or somewhere outside it (`Element.url`).
 enum LinkGoal: Equatable {
     case element(UUID)
@@ -102,7 +38,7 @@ struct JumpRequest: Equatable {
 }
 
 /// Which edge(s) a resize handle moves: -1 = min side, 1 = max side, 0 = unchanged.
-private struct Handle: Equatable {
+struct Handle: Equatable {
     var hx: Int, hy: Int
     static let all: [Handle] = [(-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1)].map { Handle(hx: $0.0, hy: $0.1) }
 
@@ -119,7 +55,7 @@ private struct Handle: Equatable {
     }
 }
 
-private enum Gesture {
+enum CanvasGesture {
     case creating(Element)
     case moving
     case resizing(id: UUID, handle: Handle, original: CGRect)
@@ -156,12 +92,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// Elements that only exist in motion (packets): not drawn or clickable while editing, unless selected
     /// (from the timeline). A posed frame has no timeline, so none are hidden while posing.
     private var transient: Set<UUID> = []
-    private var hiddenInEditor: Set<UUID> { transient.subtracting(selection) }
+    var hiddenInEditor: Set<UUID> { transient.subtracting(selection) }
     /// Built lazily for the current `model`. Panning and zooming reuse it; an edit marks it stale and
     /// the next use folds the changed elements in (or rebuilds when the structure changed).
     private var spatialCache: SpatialIndex?
     private var spatialStale = true
-    private var spatial: SpatialIndex {
+    var spatial: SpatialIndex {
         if var s = spatialCache {
             if !spatialStale { return s }
             spatialCache = nil // drop our reference so the update mutates in place instead of copying
@@ -257,22 +193,22 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private let zoomRange: ClosedRange<CGFloat> = 0.1...8
     private var spaceDown = false { didSet { window?.invalidateCursorRects(for: self) } }
     private var panAnchor: (raw: CGPoint, pan: CGPoint) = (.zero, .zero)
-    private var gesture: Gesture?
+    var gesture: CanvasGesture?
     /// Where the press began, in view points, and whether it has since moved far enough to be a drag: a click
     /// whose finger slides a little moves nothing and draws no marquee.
     private var pressPoint: CGPoint = .zero
     private var dragging = false
     private static let dragThreshold: CGFloat = 3
     private var dragStart: CGPoint = .zero
-    private var baseline: DottieDocument?
+    var baseline: DottieDocument?
     private var marqueeRect: CGRect?
     private var guides: [Snap.Guide] = []
     private var spacingGuides: [Snap.SpacingGuide] = []
-    private var strokePoints: [CGPoint] = []
+    var strokePoints: [CGPoint] = []
     private var pasteStep = 0
     private var lastPasteChangeCount = -1
     static let pasteboardType = NSPasteboard.PasteboardType("tech.phin.dottie.elements")
-    private var hoverShapeID: UUID? { didSet { if oldValue != hoverShapeID { needsDisplay = true } } }
+    var hoverShapeID: UUID? { didSet { if oldValue != hoverShapeID { needsDisplay = true } } }
     /// A problem from an adjustment drag, reported to the console when the drag ends.
     private var adjustError: String?
     private var editor: NSTextField?
@@ -288,7 +224,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var flashToken = 0
     private var badgeCache: [LinkBadge]?
     /// The link of the shape under a ⌘-press, followed on release if the press did not turn into a drag.
-    private var pressedLink: LinkGoal?
+    var pressedLink: LinkGoal?
     /// While set, the next click on a shape links these elements to it (Link to Element… in the context menu).
     /// It survives a page switch, so the target can be on another page.
     private var linkSources: Set<UUID>? {
@@ -307,7 +243,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     private let handleSize: CGFloat = 8
     /// Handle size in model units so handles stay the same size on screen at any zoom.
-    private var hs: CGFloat { handleSize / zoom }
+    var hs: CGFloat { handleSize / zoom }
 
     override var isFlipped: Bool { true }
     override var acceptsFirstResponder: Bool { true }
@@ -413,7 +349,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let kr = CGRect(x: knob.x - hs / 2, y: knob.y - hs / 2, width: hs, height: hs)
             ctx.fillEllipse(in: kr); ctx.strokeEllipse(in: kr)
         }
-        if tool == .select, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
+        if tool.behavior.editsSelection, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
             ctx.setFillColor(accent.cgColor)
             ctx.setStrokeColor(NSColor.white.cgColor)
             for h in adjustmentHandles(for: e) {
@@ -431,7 +367,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             ctx.setFillColor(NSColor.white.cgColor)
             ctx.fillEllipse(in: kr); ctx.strokeEllipse(in: kr)
         }
-        if tool == .select, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
+        if tool.behavior.editsSelection, let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
            let cp = e.strokeControlPoints {
             ctx.setLineWidth(1 / zoom)
             ctx.setStrokeColor(accent.withAlphaComponent(0.6).cgColor)
@@ -640,7 +576,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     override func mouseExited(with event: NSEvent) { rulerCursor = nil }
 
     /// The guide under a model-space point (within a few screen pixels), if any.
-    private func guideHit(_ p: CGPoint) -> (vertical: Bool, index: Int)? {
+    func guideHit(_ p: CGPoint) -> (vertical: Bool, index: Int)? {
         guard model.guidesLocked != true else { return nil }
         let tol = 4 / zoom
         if let i = (model.guidesX ?? []).firstIndex(where: { abs($0 - p.x) <= tol }) { return (true, i) }
@@ -749,7 +685,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// The target of the link badge under `p`, front-most first.
     /// Ticks or unticks the task checkbox in a note under `p`, as one undo step. False if there is none.
-    private func toggleCheckbox(at p: CGPoint) -> Bool {
+    func toggleCheckbox(at p: CGPoint) -> Bool {
         guard let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor), hit.kind == .note,
               let line = Note.checkboxLine(at: hit.unrotated(p), in: hit),
               let i = model.elements.firstIndex(where: { $0.id == hit.id }) else { return false }
@@ -761,7 +697,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return true
     }
 
-    private func badgeHit(_ p: CGPoint) -> LinkGoal? {
+    func badgeHit(_ p: CGPoint) -> LinkGoal? {
         linkBadges.last { b in
             let c = badgeCenter(b)
             return hypot(p.x - c.x, p.y - c.y) <= 10 / zoom
@@ -906,7 +842,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     private var singleSelectionID: UUID? { selection.count == 1 ? selection.first : nil }
 
-    private func handle(at p: CGPoint) -> (UUID, Handle, CGRect)? {
+    func handle(at p: CGPoint) -> (UUID, Handle, CGRect)? {
         guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }), e.kind != .connector else { return nil }
         let box = e.frame.insetBy(dx: -4, dy: -4)
         let local = e.unrotated(p)
@@ -929,7 +865,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// The adjustment handle under `p`, on the single selected extension shape. Checked after the resize handles.
-    private func adjustmentHit(_ p: CGPoint) -> (UUID, String)? {
+    func adjustmentHit(_ p: CGPoint) -> (UUID, String)? {
         guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) else { return nil }
         return adjustmentHandles(for: e).first { hypot(p.x - $0.at.x, p.y - $0.at.y) <= hs }.map { (id, $0.id) }
     }
@@ -940,16 +876,15 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// For a multi-selection: its bounds (padded) and the rotation knob above them.
-    private func groupRotationKnob() -> (CGRect, CGPoint)? {
-        guard tool == .select || tool == .rectangle || tool == .ellipse || tool == .diamond || tool == .text || tool == .note,
-              selection.count >= 2 else { return nil }
+    func groupRotationKnob() -> (CGRect, CGPoint)? {
+        guard tool.behavior.showsGroupRotation, selection.count >= 2 else { return nil }
         let b = model.selectionBounds(selection)
         guard !b.isNull else { return nil }
         let box = b.insetBy(dx: -6, dy: -6)
         return (box, CGPoint(x: box.midX, y: box.minY - 24 / zoom))
     }
 
-    private func rotationHit(_ p: CGPoint) -> UUID? {
+    func rotationHit(_ p: CGPoint) -> UUID? {
         guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }), e.kind != .connector else { return nil }
         let k = rotationKnob(for: e)
         return hypot(p.x - k.x, p.y - k.y) <= hs ? id : nil
@@ -959,7 +894,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private var eraserRadius: CGFloat { 9 / zoom }
 
     /// Control point of the single selected pen stroke under `p`.
-    private func strokePointHit(_ p: CGPoint) -> (UUID, Int)? {
+    func strokePointHit(_ p: CGPoint) -> (UUID, Int)? {
         guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }),
               let cp = e.strokeControlPoints else { return nil }
         // Anchors win over handles when they overlap.
@@ -1639,7 +1574,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     // MARK: Connector helpers
 
     /// Topmost non-connector shape under `p`.
-    private func shape(at p: CGPoint, in doc: DottieDocument) -> Element? {
+    func shape(at p: CGPoint, in doc: DottieDocument) -> Element? {
         doc.orderedElements.last { e in
             e.kind != .connector && e.frame.insetBy(dx: -6, dy: -6).contains(p)
                 && doc.layers.first { $0.id == e.layerID }.map { $0.visible && !$0.locked } == true
@@ -1647,12 +1582,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// Binds to the shape under the cursor (snapping to a connection point when close), otherwise stays free.
-    private func endpoint(at p: CGPoint, in doc: DottieDocument) -> Endpoint {
+    func endpoint(at p: CGPoint, in doc: DottieDocument) -> Endpoint {
         guard let s = shape(at: p, in: doc) else { return .free(p) }
         return Connector.endpoint(near: p, on: s)
     }
 
-    private func connectorEndpointHit(_ p: CGPoint) -> (UUID, Bool)? {
+    func connectorEndpointHit(_ p: CGPoint) -> (UUID, Bool)? {
         guard let id = singleSelectionID, let c = model.elements.first(where: { $0.id == id }), c.kind == .connector else { return nil }
         let (a, b) = Connector.endpoints(of: c, in: model)
         if hypot(p.x - a.x, p.y - a.y) <= 8 / zoom { return (id, true) }
@@ -1681,7 +1616,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         if playhead != nil { return }
-        if tool == .select, let view = posedCameraView, let hit = cameraHit(point(event), view) {
+        if tool.behavior.editsSelection, let view = posedCameraView, let hit = cameraHit(point(event), view) {
             gesture = .camera(corner: hit, original: view, start: point(event))
             cameraDraft = view
             return
@@ -1700,109 +1635,19 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 return
             }
         }
+        let current = tool.behavior
         var p = point(event)
-        if tool.kind != nil, tool != .text, tool != .pencil, tool != .highlighter { p = snapped(p, event) }
+        if current.snapsPress { p = snapped(p, event) }
         dragStart = p
-        if tool == .select, event.clickCount == 1, let target = badgeHit(p) { // a link badge: go there
-            follow(target)
-            return
-        }
-        if tool == .select, event.clickCount == 1, toggleCheckbox(at: p) { return }
+        current.press(self, at: p, event: event)
+    }
+
+    /// Starts a gesture from the page as it is now (`baseline`), and returns the layer new elements go on: the
+    /// active one, else the first that is visible and unlocked. Nil when there is none to draw on.
+    func startPress() -> UUID? {
         baseline = model
-        if showRulers, tool == .select, let hit = guideHit(p), handle(at: p) == nil, spatial.element(at: p, in: model, skipping: hiddenInEditor) == nil {
-            gesture = .guide(vertical: hit.vertical, index: hit.index)
-            return
-        }
         let usable = model.layers.filter { !$0.locked && $0.visible }
-        guard let layer = usable.first(where: { $0.id == activeLayerID }) ?? usable.first else { return }
-
-        if event.clickCount == 2, tool == .select, let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) {
-            selection = [hit.id]
-            if hit.kind == .symbol { gesture = nil; onEditSymbol?(hit.id); return }
-            beginEditing(hit.id)
-            gesture = nil
-            return
-        }
-
-        if tool == .text {
-            var e = Element(kind: .text, frame: CGRect(x: p.x, y: p.y, width: 180, height: 28), style: style, layerID: layer.id, text: "")
-            e.style.roughness = 0
-            model.elements.append(e)
-            selection = [e.id]
-            onPreview?(model)
-            gesture = nil
-            beginEditing(e.id, isNew: true)
-            returnToSelectIfWanted()
-            return
-        }
-
-        if tool == .redact {
-            if poseTime != nil { gesture = nil; return NSSound.beep() } // a pose keys motion, not pictures
-            gesture = .redacting
-            return
-        }
-        if tool == .eraser {
-            gesture = .erasing
-            eraseStep(at: p)
-            return
-        }
-        if tool == .select, let (id, index) = strokePointHit(p) {
-            gesture = .editingPoint(id: id, index: index)
-            return
-        }
-
-        if tool == .connector {
-            var st = style
-            st.fill = .clear
-            let c = ConnectorData(start: endpoint(at: p, in: model), end: .free(p), routing: routing)
-            let e = Element(kind: .connector, frame: .zero, style: st, layerID: layer.id, connector: c)
-            model.elements.append(e)
-            selection = [e.id]
-            hoverShapeID = shape(at: p, in: model)?.id
-            gesture = .connecting(id: e.id)
-            onPreview?(model)
-        } else if tool == .select, let (id, isStart) = connectorEndpointHit(p) {
-            gesture = .endpoint(id: id, isStart: isStart)
-        } else if tool == .pencil || tool == .highlighter {
-            var st = tool == .highlighter ? Self.highlighterStyle : style
-            st.fill = .clear
-            st.roughness = 0
-            let e = Element(kind: .freehand, frame: CGRect(x: p.x, y: p.y, width: 1, height: 1), style: st, layerID: layer.id,
-                            points: [StrokePoint(x: 0, y: 0)])
-            strokePoints = [p]
-            model.elements.append(e)
-            selection = [e.id]
-            gesture = .drawing(id: e.id)
-            onPreview?(model)
-        } else if let kind = tool.kind {
-            let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: kind == .note ? Note.style(from: style) : style,
-                            layerID: layer.id)
-            gesture = .creating(e)
-            model.elements.append(e)
-            selection = [e.id]
-            onPreview?(model)
-        } else if tool == .select, let (box, knob) = groupRotationKnob(), hypot(p.x - knob.x, p.y - knob.y) <= hs {
-            let c = CGPoint(x: box.midX, y: box.midY)
-            gesture = .rotatingGroup(center: c, start: atan2(p.y - c.y, p.x - c.x))
-        } else if tool == .select, let id = rotationHit(p) {
-            gesture = .rotating(id: id)
-        } else if let (id, h, frame) = handle(at: p) {
-            gesture = .resizing(id: id, handle: h, original: frame)
-        } else if tool == .select, let (id, handleID) = adjustmentHit(p) {
-            gesture = .adjusting(id: id, handle: handleID)
-        } else if let hit = spatial.element(at: p, in: model, skipping: hiddenInEditor) {
-            let hitSet = model.expandingGroups([hit.id])
-            if event.modifierFlags.contains(.shift) {
-                selection = selection.isSuperset(of: hitSet) ? selection.subtracting(hitSet) : selection.union(hitSet)
-            } else if !selection.contains(hit.id) {
-                selection = hitSet
-            }
-            pressedLink = tool == .select && event.modifierFlags.contains(.command) ? LinkGoal(hit) : nil
-            gesture = .moving
-        } else {
-            if !event.modifierFlags.contains(.shift) { selection = [] }
-            gesture = .marquee
-        }
+        return (usable.first(where: { $0.id == activeLayerID }) ?? usable.first)?.id
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -2079,7 +1924,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// One eraser dab. Applied to the live model so a sweep accumulates; undo sees the whole sweep as one step.
-    private func eraseStep(at p: CGPoint) {
+    func eraseStep(at p: CGPoint) {
         var next = model
         guard next.erase(at: p, radius: eraserRadius) else { return }
         selection = selection.filter { id in next.elements.contains { $0.id == id } }
@@ -2089,7 +1934,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     /// With the preference on, a finished shape, arrow, text or note hands back to the Select tool, as in
     /// Excalidraw, so it can be moved straight away. The pencil and eraser keep going.
-    private func returnToSelectIfWanted() {
+    func returnToSelectIfWanted() {
         if tool != .select, Pref.bool(Pref.returnToSelect, default: true) { switchTool(.select) }
     }
 
@@ -2130,7 +1975,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         if plain, Pref.bool(Pref.singleKeyShortcuts, default: true),
            let ch = event.charactersIgnoringModifiers?.lowercased().first,
-           let t = Tool.allCases.first(where: { $0.shortcut == ch }) {
+           let t = Tool.all.first(where: { $0.shortcut == ch }) {
             switchTool(t)
             return
         }
@@ -2317,7 +2162,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
 
     // MARK: In-place text editing
 
-    private func beginEditing(_ id: UUID, isNew: Bool = false) {
+    func beginEditing(_ id: UUID, isNew: Bool = false) {
         guard let e = model.elements.first(where: { $0.id == id }), e.kind != .image else { return } // pictures have no label
         endEditing()
         let field = NSTextField(frame: viewFrame(editFrame(for: e)))

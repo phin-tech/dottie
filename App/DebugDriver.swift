@@ -206,7 +206,7 @@ final class DebugDriver {
             "page \"\(doc.name)\" (\(h.document.file.pages.count) pages), \(doc.elements.count) elements, \(h.selection().count) selected",
         ]
         if let c = try? canvas() {
-            lines.append("tool \(c.tool.rawValue)")
+            lines.append("tool \(c.tool.id)")
             let (pan, zoom) = c.viewport, mid = CGPoint(x: c.bounds.midX, y: c.bounds.midY)
             lines.append(String(format: "view centered on %.0f, %.0f at %.0f%%", (mid.x - pan.x) / zoom, (mid.y - pan.y) / zoom, zoom * 100))
             // The canvas edits a copy of the page; when they differ outside a gesture, its edits aren't arriving.

@@ -223,6 +223,7 @@ targets:
     sources:
       - CanvasTests
       - App/CanvasView.swift
+      - App/CanvasTools.swift
       - App/Preferences.swift
       - App/MCPSettings.swift
       - App/CommandLineSettings.swift

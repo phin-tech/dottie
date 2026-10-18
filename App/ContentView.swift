@@ -128,7 +128,7 @@ struct ContentView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Picker("Tool", selection: $tool) {
-                    ForEach(Tool.allCases) { t in
+                    ForEach(Tool.all) { t in
                         Image(systemName: t.symbol)
                             .accessibilityLabel(t.label)
                             .tag(t)

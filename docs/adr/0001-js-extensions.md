@@ -20,8 +20,8 @@ file system, network or timers, and code is never embedded in documents.
 
 - v1: extension shapes (parameter schema, inspector, `generate`) and commands.
 - v1.1: adjustment handles for shapes; live preview in command forms.
-- Later: drawing tools, which first need the mouse handling in `CanvasView` turned from an if-chain over the closed
-  `Tool` enum into a protocol; fill styles and connector styles.
+- Later: drawing tools, which build on the `CanvasTool` protocol the built-in tools use (`App/CanvasTools.swift`);
+  fill styles and connector styles.
 - Out of scope: importers and exporters; shapes regenerated per animation frame; extension code inside documents.
 
 **Bundle.** An extension is a folder, `<name>.dottieext/`, in `~/Library/Application Support/Dottie/Extensions/`,
@@ -104,4 +104,4 @@ adjustment handles; Inkscape "Repeat last extension".
 - Existing documents redraw connectors attached to `.path` elements, including every Basics stencil shape, at the
   real outline instead of the bounding box. The goldens in `fixtures/` change on both the Swift and dottie.js sides
   and are regenerated together in the same change.
-- Drawing tools cannot be added as extensions until the `CanvasView` tool refactor is done.
+- Drawing tools could not be added as extensions until the canvas's tools were moved behind a protocol (`CanvasTool`, done).
