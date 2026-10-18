@@ -56,6 +56,7 @@ final class DebugDriver {
     keydel <text> <t>            delete a key
     menu [Top/Sub/...]           list the menu bar (or a menu), or choose the item a path ends at; items read as disabled while the app is in
                                  the background, since commands follow the focused window
+    tool [id|name]               list the tools, or choose one (extension tools have no key)
     onion on|off                 onion skinning while posing (the Animate menu's toggle)
     exportanim <format> <path>   write the page's animation as File > Export Animation does, without the
                                  save panel: gif, apng, mp4, player, lottieSmooth, lottieExact
@@ -156,6 +157,15 @@ final class DebugDriver {
                 }
                 try format.write(try hooks().document.model, to: URL(fileURLWithPath: path))
                 return ok("wrote \(path)")
+            case "tool":
+                let c = try canvas()
+                guard let want = rest.first else { return ok(Tool.all.map { "\($0.id)  \($0.label)" }.joined(separator: "\n")) }
+                guard let t = Tool.all.first(where: { $0.id == want || $0.label.caseInsensitiveCompare(want) == .orderedSame }) else {
+                    throw DebugError("no tool '\(want)'")
+                }
+                c.tool = t
+                c.onToolChange?(t)
+                return ok("tool \(t.id)")
             case "onion":
                 UserDefaults.standard.set(rest.first == "on", forKey: "onionSkin")
                 return ok("onion skin \(rest.first == "on" ? "on" : "off")")

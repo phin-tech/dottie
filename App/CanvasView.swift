@@ -72,6 +72,9 @@ enum CanvasGesture {
     case editingPoint(id: UUID, index: Int)
     case rotating(id: UUID)
     case rotatingGroup(center: CGPoint, start: Double)
+    /// A tool's own gesture (an extension tool's): the canvas hands the drag and the release to the tool, which
+    /// adds what it draws on `layer`, with sketchy wobble from `seed`.
+    case tool(Tool, layer: UUID, seed: UInt32)
     /// Dragging a ruler guide; `vertical` guides live in `guidesX`.
     case guide(vertical: Bool, index: Int)
     /// Dragging the camera's view while posing: by its edge (`corner` nil) to move it, or by a corner (0 top
@@ -1675,6 +1678,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             return
         }
         if case .erasing? = gesture { eraseStep(at: point(event)); return }
+        if case .tool(let t, _, _)? = gesture { t.behavior.drag(self, to: point(event), event: event); return }
         if !dragging {
             let raw = convert(event.locationInWindow, from: nil)
             if hypot(raw.x - pressPoint.x, raw.y - pressPoint.y) < Self.dragThreshold {
@@ -1793,7 +1797,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                     adjustError = "\(rt.manifest.name): \(ExtensionHost.message(error))"
                 }
             }
-        case .panning, .erasing, .guide, .camera:
+        case .panning, .erasing, .guide, .camera, .tool:
             return
         case .rotating(let id):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
@@ -1859,6 +1863,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         guard let base = baseline, let g = gesture else { return }
         if let problem = adjustError { ExtensionHost.report(problem); adjustError = nil }
         switch g {
+        case .tool(let t, _, _):
+            let behavior = t.behavior
+            if behavior.tool == t { behavior.release(self, at: point(event), event: event) }
+            else { model = base; onPreview?(base) } // its extension went away mid-drag
         case .creating(let e):
             if e.kind == .note { // a click places a default-size note; either way, start typing in it
                 if let i = model.elements.firstIndex(where: { $0.id == e.id }),
@@ -2154,7 +2162,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     }
 
     /// Resets the document to the pre-gesture baseline, then commits so undo lands there.
-    private func commit(_ base: DottieDocument, _ name: String) {
+    func commit(_ base: DottieDocument, _ name: String) {
         let final = model
         onPreview?(base)
         onCommit?(final, name)

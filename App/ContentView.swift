@@ -132,7 +132,7 @@ struct ContentView: View {
                         Image(systemName: t.symbol)
                             .accessibilityLabel(t.label)
                             .tag(t)
-                            .help("\(t.label) (\(String(t.shortcut).uppercased()))")
+                            .help(t.shortcut.map { "\(t.label) (\(String($0).uppercased()))" } ?? t.label)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -156,6 +156,8 @@ struct ContentView: View {
         }
         // A link in another drawing opened this one, which was open already: go where it points.
         .onReceive(NotificationCenter.default.publisher(for: .followDrawingAnchor)) { _ in followPendingAnchor() }
+        // An extension tool that went away with its extension leaves the Select tool chosen.
+        .onChange(of: host.revision) { _, _ in if !Tool.all.contains(tool) { tool = .select } }
         .onChange(of: activeState) { _, state in
             if state == .key { LiveRegistry.shared.markFront(document, undoManager: undoManager); registerDebugHooks() }
         }

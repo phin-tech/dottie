@@ -787,6 +787,41 @@ def extension_shapes():
     write(EDGE / "extensions.dottie", [p])
 
 
+def extension_tools():
+    """What an extension's drawing tool leaves on the page: plain elements in their own looks. A calligraphy ribbon
+    (a closed, smooth, solid-filled path with no stroke, like the template's Ribbon tool draws), its ink dot, and a
+    box in its own stroke color and width. Nothing refers back to the extension, so the file draws without it."""
+    import math
+    # The ribbon's centre line, a wave, widened across a slanted nib and tapered at both ends.
+    pts = [(20 + i * 10, 100 + 40 * math.sin(i / 3)) for i in range(31)]
+    left, right = [], []
+    for i, (x, y) in enumerate(pts):
+        (ax, ay), (bx, by) = pts[max(0, i - 1)], pts[min(len(pts) - 1, i + 1)]
+        ln = math.hypot(bx - ax, by - ay) or 1
+        dx, dy = (bx - ax) / ln, (by - ay) / ln
+        across = abs(math.sin(math.atan2(dy, dx) + math.pi / 4))
+        half = 7 * (0.15 + 0.85 * across) * (0.2 + 0.8 * min(1, i / 3, (len(pts) - 1 - i) / 3))
+        left.append((x - dy * half, y + dx * half))
+        right.append((x + dy * half, y - dx * half))
+    loop = left + right[::-1]
+    xs, ys = [q[0] for q in loop], [q[1] for q in loop]
+    fx, fy, fw, fh = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+    norm = [((qx - fx) / fw, (qy - fy) / fh) for qx, qy in loop]
+    n = len(norm)
+    coords = list(norm[0])
+    for i in range(n):  # Catmull-Rom through the outline, closed
+        p0, p1, p2, p3 = norm[(i - 1) % n], norm[i], norm[(i + 1) % n], norm[(i + 2) % n]
+        coords += [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6,
+                   p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6, p2[0], p2[1]]
+    ink = rgba(0.184, 0.31, 0.847)
+    page = Page()
+    page.add("path", round(fx, 2), round(fy, 2), round(fw, 2), round(fh, 2),
+             style=style(stroke=CLEAR, fill=ink, roughness=0), subpaths=[{"closed": True, "coords": [round(c, 4) for c in coords]}])
+    page.add("ellipse", 340, 150, 7, 7, style=style(stroke=CLEAR, fill=ink, roughness=0))
+    page.add("rectangle", 380, 60, 160, 90, style=style(stroke=rgba(1, 0, 0), strokeWidth=4), text="boxed")
+    write(EDGE / "extension-tools.dottie", [page])
+
+
 def main():
     shapes()
     connectors()
@@ -806,6 +841,7 @@ def main():
     params()
     extension_shapes()
     links()
+    extension_tools()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

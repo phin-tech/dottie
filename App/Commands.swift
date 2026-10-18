@@ -283,7 +283,7 @@ struct DottieCommands: Commands {
         CommandMenu("Tools") {
             Picker("Tool", selection: Binding(get: { tool ?? .select }, set: { tool = $0 })) {
                 ForEach(Tool.all) { t in
-                    Text("\(t.label)  \(String(t.shortcut).uppercased())").tag(t)
+                    Text(t.shortcut.map { "\(t.label)  \(String($0).uppercased())" } ?? t.label).tag(t)
                 }
             }
             .pickerStyle(.inline)

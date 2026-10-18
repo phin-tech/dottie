@@ -189,7 +189,7 @@ final class ExtensionHost: ObservableObject {
     }
 
     /// Hands what extensions logged with `console` to the Script Console.
-    private func flushLogs() {
+    func flushLogs() {
         for rt in runtimes {
             for line in rt.takeLogs() { Self.report("\(rt.manifest.name): \(line)") }
         }

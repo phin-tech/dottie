@@ -25,20 +25,21 @@ struct Tool: Hashable, Identifiable, Sendable {
     @MainActor var behavior: any CanvasTool { CanvasTools.behavior(of: self) }
     @MainActor var symbol: String { behavior.symbol }
     @MainActor var label: String { behavior.label }
-    @MainActor var shortcut: Character { behavior.shortcut }
+    @MainActor var shortcut: Character? { behavior.shortcut }
 }
 
 /// A drawing tool: how it shows in the toolbar, and what a press on the canvas does with it. A press usually starts
-/// one of the canvas's gestures (`CanvasGesture`), which the canvas carries through the drag and the release, so tools
-/// that draw alike (the shape tools) share them.
+/// one of the canvas's gestures (`CanvasGesture`), which the canvas carries through the drag and the release, so
+/// tools that draw alike (the shape tools) share them. A tool that runs its own gesture starts `.tool`, and the canvas
+/// hands it the drag and the release.
 @MainActor
 protocol CanvasTool {
     var tool: Tool { get }
     /// An SF Symbol name for the toolbar.
     var symbol: String { get }
     var label: String { get }
-    /// The key that picks the tool, Photoshop-style.
-    var shortcut: Character { get }
+    /// The key that picks the tool, Photoshop-style; nil for none (extension tools).
+    var shortcut: Character? { get }
     /// Whether the press point snaps to the grid before `press` sees it.
     var snapsPress: Bool { get }
     /// Whether the selection's own controls show and take presses: adjustment handles, stroke control points, a
@@ -49,18 +50,30 @@ protocol CanvasTool {
     /// Handles a press at `p` (in model points, snapped when `snapsPress`), after the canvas has dealt with panning,
     /// pending links and the rulers.
     func press(_ canvas: CanvasNSView, at p: CGPoint, event: NSEvent)
+    /// A step of the drag, while the tool's own `.tool` gesture runs.
+    func drag(_ canvas: CanvasNSView, to p: CGPoint, event: NSEvent)
+    /// The release that ends the tool's own `.tool` gesture. The canvas clears the gesture afterwards.
+    func release(_ canvas: CanvasNSView, at p: CGPoint, event: NSEvent)
 }
 
 extension CanvasTool {
+    var shortcut: Character? { nil }
+    func drag(_ canvas: CanvasNSView, to p: CGPoint, event: NSEvent) {}
+    func release(_ canvas: CanvasNSView, at p: CGPoint, event: NSEvent) {}
     var snapsPress: Bool { false }
     var editsSelection: Bool { false }
     var showsGroupRotation: Bool { false }
 }
 
-/// The registered tools. A new tool is one more `CanvasTool` type and one more entry here.
+/// The registered tools: the built-in ones, then each loaded extension's. A new built-in tool is one more
+/// `CanvasTool` type and one more entry in `builtIn`.
 @MainActor
 enum CanvasTools {
-    static let registered: [any CanvasTool] = [
+    static var registered: [any CanvasTool] {
+        builtIn + ExtensionHost.shared.runtimes.flatMap { rt in rt.tools.map { ExtensionTool(runtime: rt, definition: $0) } }
+    }
+
+    static let builtIn: [any CanvasTool] = [
         SelectTool(),
         ShapeTool(tool: .rectangle, kind: .rectangle, symbol: "rectangle", label: "Rectangle", shortcut: "r"),
         ShapeTool(tool: .ellipse, kind: .ellipse, symbol: "circle", label: "Ellipse", shortcut: "o"),
@@ -75,7 +88,7 @@ enum CanvasTools {
     ]
 
     static func behavior(of tool: Tool) -> any CanvasTool {
-        registered.first { $0.tool == tool } ?? registered[0]
+        registered.first { $0.tool == tool } ?? builtIn[0]
     }
 }
 
@@ -83,7 +96,7 @@ enum CanvasTools {
 struct SelectTool: CanvasTool {
     let tool = Tool.select
     let symbol = "cursorarrow", label = "Select"
-    let shortcut: Character = "v"
+    let shortcut: Character? = "v"
     var editsSelection: Bool { true }
     var showsGroupRotation: Bool { true }
 
@@ -141,7 +154,7 @@ struct ShapeTool: CanvasTool {
     let tool: Tool
     let kind: ElementKind
     let symbol: String, label: String
-    let shortcut: Character
+    let shortcut: Character?
     var snapsPress: Bool { true }
     var showsGroupRotation: Bool { true }
 
@@ -160,7 +173,7 @@ struct ShapeTool: CanvasTool {
 struct TextTool: CanvasTool {
     let tool = Tool.text
     let symbol = "textformat", label = "Text"
-    let shortcut: Character = "t"
+    let shortcut: Character? = "t"
     var showsGroupRotation: Bool { true }
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
@@ -180,7 +193,7 @@ struct TextTool: CanvasTool {
 struct ConnectorTool: CanvasTool {
     let tool = Tool.connector
     let symbol = "arrow.up.right", label = "Connector"
-    let shortcut: Character = "c"
+    let shortcut: Character? = "c"
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
         guard let layer = c.startPress() else { return }
@@ -200,7 +213,7 @@ struct ConnectorTool: CanvasTool {
 struct PencilTool: CanvasTool {
     let tool: Tool
     let symbol: String, label: String
-    let shortcut: Character
+    let shortcut: Character?
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
         guard let layer = c.startPress() else { return }
@@ -221,7 +234,7 @@ struct PencilTool: CanvasTool {
 struct EraserTool: CanvasTool {
     let tool = Tool.eraser
     let symbol = "eraser", label = "Eraser"
-    let shortcut: Character = "e"
+    let shortcut: Character? = "e"
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
         guard c.startPress() != nil else { return }
@@ -234,11 +247,71 @@ struct EraserTool: CanvasTool {
 struct RedactTool: CanvasTool {
     let tool = Tool.redact
     let symbol = "eye.slash", label = "Redact"
-    let shortcut: Character = "x"
+    let shortcut: Character? = "x"
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
         guard c.startPress() != nil else { return }
         if c.poseTime != nil { c.gesture = nil; return NSSound.beep() } // a pose keys motion, not pictures
         c.gesture = .redacting
+    }
+}
+
+/// A drawing tool from an extension. Its `draw` runs on the press, on every step of the drag and on the release,
+/// each time from the page as it was at the press, so the preview never piles up; what it returns on release is
+/// added as one undo step. Nothing it draws refers back to the extension.
+struct ExtensionTool: CanvasTool {
+    let runtime: ExtensionRuntime
+    let definition: ToolDefinition
+
+    var tool: Tool { Tool(id: "\(runtime.manifest.id)/\(definition.id)") }
+    var label: String { definition.name }
+    var symbol: String {
+        guard let icon = definition.icon, NSImage(systemSymbolName: icon, accessibilityDescription: nil) != nil else { return "wand.and.stars" }
+        return icon
+    }
+
+    func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
+        guard let layer = c.startPress() else { return }
+        c.strokePoints = [p]
+        c.gesture = .tool(tool, layer: layer, seed: .random(in: 1...UInt32.max))
+        show(c, event: event, done: false)
+    }
+
+    func drag(_ c: CanvasNSView, to p: CGPoint, event: NSEvent) {
+        if let last = c.strokePoints.last, hypot(p.x - last.x, p.y - last.y) < 1 / c.viewport.zoom { return }
+        c.strokePoints.append(p)
+        show(c, event: event, done: false)
+    }
+
+    func release(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
+        if c.strokePoints.last != p { c.strokePoints.append(p) }
+        guard let base = c.baseline, let added = show(c, event: event, done: true) else { return }
+        guard !added.isEmpty else { c.model = base; c.onPreview?(base); return }
+        c.selection = Set(added)
+        c.commit(base, definition.name)
+    }
+
+    /// Draws the gesture so far over the page as it was at the press, and returns the new elements' ids. When `draw`
+    /// fails, the page goes back to how it was, the gesture ends and the error goes to the Script Console.
+    @discardableResult
+    private func show(_ c: CanvasNSView, event: NSEvent, done: Bool) -> [UUID]? {
+        guard let base = c.baseline, case .tool(_, let layer, let seed)? = c.gesture else { return nil }
+        let gesture = ToolGesture(points: c.strokePoints, done: done, shift: event.modifierFlags.contains(.shift),
+                                  option: event.modifierFlags.contains(.option))
+        defer { ExtensionHost.shared.flushLogs() }
+        do {
+            let drawn = try DrawnElement.elements(try runtime.draw(tool: definition.id, gesture), style: c.style, layerID: layer, seed: seed)
+            var next = base
+            next.elements += drawn
+            c.model = next
+            c.onPreview?(next)
+            return drawn.map(\.id)
+        } catch {
+            c.gesture = nil
+            c.model = base
+            c.onPreview?(base)
+            ExtensionHost.report("\(runtime.manifest.name): \(definition.name): \(ExtensionHost.message(error))")
+            return nil
+        }
     }
 }

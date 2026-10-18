@@ -74,6 +74,48 @@ interface CommandDefinition<P> {
   run(params: P): unknown;
 }
 
+/** A press and drag with a tool so far. `draw` is called on the press, on every step of the drag, and on release. */
+interface ToolGesture {
+  /** Every point since the press, in canvas points (y down). The first is where the press began. */
+  points: Point[];
+  /** True on the last call, when the button has been let go; what `draw` returns then is added as one undo step. */
+  done: boolean;
+  shift: boolean;
+  option: boolean;
+}
+
+/** A color: "#rrggbb" or "#rrggbbaa", or "none". */
+type ToolColor = string;
+
+/** What a drawn element may set; anything left out comes from the style new shapes get. */
+interface DrawnStyle {
+  fill?: ToolColor;
+  stroke?: ToolColor;
+  /** 0...24. */
+  strokeWidth?: number;
+  fillStyle?: "solid" | "hachure" | "crossHatch" | "grid";
+  /** 0 is precise, 1 hand-drawn, 2 very sketchy. */
+  roughness?: number;
+}
+
+/** An element a tool draws: a path in canvas points, or a box-shaped shape. They are plain elements, so the drawing
+ * opens and renders without the extension. Points stay within 100000 of the origin, each element at most 20000
+ * points wide and tall, and text at most 10000 characters; anything past that is refused. */
+type DrawnElement =
+  | (DrawnStyle & { kind: "path"; subpaths: Subpath[] })
+  | (DrawnStyle & { kind: "rectangle" | "ellipse" | "diamond"; x: number; y: number; width: number; height: number; text?: string });
+
+/** A drawing tool, shown in the toolbar and the Tools menu. Extensions can't assign it a key. */
+interface ToolDefinition {
+  /** Letters, digits, "-", "_" and ".". */
+  id: string;
+  name: string;
+  /** An SF Symbol name for the toolbar, such as "paintbrush.pointed". */
+  icon?: string;
+  /** What the gesture draws so far. Pure: it gets the whole gesture each time and keeps nothing between calls. */
+  draw(gesture: ToolGesture): { elements: DrawnElement[] };
+}
+
 /** Filled in when a parameter is migrated from an older version of this extension. */
 type MigrateFunction = (
   fromVersion: string,
@@ -81,10 +123,11 @@ type MigrateFunction = (
   shape: string,
 ) => Record<string, ParameterValue>;
 
-/** The global an extension's main.js declares its shapes, commands and migration with. */
+/** The global an extension's main.js declares its shapes, commands, tools and migration with. */
 declare const extension: {
   shape<P>(definition: ShapeDefinition<P>): void;
   command<P>(definition: CommandDefinition<P>): void;
+  tool(definition: ToolDefinition): void;
   migrate(fn: MigrateFunction): void;
 };
 
