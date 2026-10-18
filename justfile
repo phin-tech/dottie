@@ -90,26 +90,40 @@ cli-install: cli
 clean:
     rm -rf .build DerivedData Dottie.xcodeproj
 
-# Bump the version (major, minor or patch) in project.yml and the tools, and the build number
-bump part:
-    scripts/bump.sh "{{part}}"
+# Release tooling (scripts/release, run with uv): each recipe takes --dry-run, which checks and reads but only prints
+# what it would change. `uv run --project scripts/release dottie-release --help` lists it all.
+release_tool := "uv run --quiet --project scripts/release dottie-release"
 
-# Point the Homebrew cask in phin-tech/homebrew-tap at a published release (default: the current version)
-tap version="":
-    scripts/update-tap.sh {{version}}
+# Bump the version (major, minor, patch, or beta: 0.6.1 -> 0.7.0-beta.1 -> -beta.2) everywhere, and the build number
+[positional-arguments]
+bump part *args:
+    {{release_tool}} bump "$@"
 
-# Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or `app`, as a GitHub release
-release app="":
-    scripts/release.sh "{{app}}"
+# Point the Homebrew cask in phin-tech/homebrew-tap at a published release (default: the current version; never a beta)
+[positional-arguments]
+tap *args:
+    {{release_tool}} tap "$@"
+
+# Publish the newest notarized Dottie.app (Xcode: Archive, then Distribute App ▸ Direct Distribution), or a given app, as a GitHub release
+[positional-arguments]
+release *args:
+    {{release_tool}} release "$@"
 
 # Build, sign with Developer ID, notarize and staple Dottie.app headless (one-time: xcrun notarytool store-credentials dottie-notary)
-notarize:
-    scripts/notarize.sh
+[positional-arguments]
+notarize *args:
+    {{release_tool}} notarize "$@"
 
-# The whole release in one command: bump, commit, push, npm publish, notarize, GitHub release, Homebrew cask
-ship part:
-    scripts/ship.sh "{{part}}"
+# The whole release: bump, commit, push, npm, notarize, GitHub release, appcast, cask (`ship beta`: a pre-release, no cask)
+[positional-arguments]
+ship part *args:
+    {{release_tool}} ship "$@"
 
 # Make and upload the Sparkle appcast for a published release (default: the current version); `just release` does this
-appcast version="":
-    scripts/appcast.sh {{version}}
+[positional-arguments]
+appcast *args:
+    {{release_tool}} appcast "$@"
+
+# Test the release tooling
+release-test:
+    uv run --quiet --project scripts/release pytest scripts/release

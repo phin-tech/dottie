@@ -1,0 +1,25 @@
+[project]
+name = "dottie-release"
+version = "1.0.0"
+description = "Bumps, builds, notarizes and publishes Dottie: `just ship`, `just release` and friends."
+requires-python = ">=3.12"
+dependencies = [
+    "bump-my-version>=1.2",
+    "cyclopts>=4.10",
+    "plumbum>=1.9",
+    "rich>=13",
+    "semver>=3.0.4",
+]
+
+[project.scripts]
+dottie-release = "dottie_release.cli:main"
+
+[dependency-groups]
+dev = ["pynacl>=1.5", "pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

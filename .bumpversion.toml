@@ -1,0 +1,28 @@
+# Where Dottie's version is written, for bump-my-version. The release tool (scripts/release, `just bump`) works out
+# the next version and runs `bump-my-version replace`, so there is no current_version here: project.yml's
+# MARKETING_VERSION is the one source. dottie.js's package.json and lockfile are npm's to change (`npm version`).
+[tool.bumpversion]
+parse = '(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)(-(?P<pre_l>beta)\.(?P<pre_n>\d+))?'
+serialize = ["{major}.{minor}.{patch}-{pre_l}.{pre_n}", "{major}.{minor}.{patch}"]
+allow_dirty = true
+commit = false
+tag = false
+
+[tool.bumpversion.parts.pre_l]
+values = ["beta", "final"]
+optional_value = "final"
+
+[[tool.bumpversion.files]]
+filename = "project.yml"
+search = 'MARKETING_VERSION: "{current_version}"'
+replace = 'MARKETING_VERSION: "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "Sources/DottieKit/Version.swift"
+search = 'static let current = "{current_version}"'
+replace = 'static let current = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "web/src/index.ts"
+search = 'export const VERSION = "{current_version}";'
+replace = 'export const VERSION = "{new_version}";'

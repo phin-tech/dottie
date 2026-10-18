@@ -1,4 +1,4 @@
-// dottie.js goes out at Dottie's version (scripts/bump.sh sets both): package.json, VERSION and DottieVersion agree.
+// dottie.js goes out at Dottie's version (`just bump` sets both): package.json, VERSION and DottieVersion agree.
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

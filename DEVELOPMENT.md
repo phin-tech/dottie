@@ -113,40 +113,57 @@ just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm r
 
 ## Releasing
 
-**One command:** `just ship patch` (or `minor`, `major`). It bumps the version (`just bump`), commits and pushes
-to `main`, stages dottie.js on npm (`SKIP_NPM=1` skips that; the version goes live when you approve it with 2FA), builds the app headless, signs it with the
-Developer ID Application certificate, notarizes it with Apple and staples the ticket (`just notarize`), then
-publishes the GitHub release and updates the Homebrew cask (`just release`). Write `release-notes/<next version>.md`
-first for curated notes. It must run on a Mac with the certificate in its keychain, from a clean, pushed `main`.
+**One command:** `just ship patch` (or `minor`, `major`, `beta`). It bumps the version (`just bump`), commits and
+pushes to `main`, stages dottie.js on npm (`SKIP_NPM=1` skips that; the version goes live when you approve it with
+2FA), builds the app headless, signs it with the Developer ID Application certificate, notarizes it with Apple and
+staples the ticket (`just notarize`), then publishes the GitHub release, its Sparkle appcast and the Homebrew cask
+(`just release`). Write `release-notes/<next version>.md` first for curated notes. It must run on a Mac with the
+certificate in its keychain, from a clean, pushed `main`. Every release recipe takes `--dry-run`, which runs the checks
+and reads but only prints what it would change: `just ship beta --dry-run`.
+
+**Betas.** `just ship beta` makes the next beta: from 0.6.1, `0.7.0-beta.1`, then `-beta.2`. A beta is a GitHub
+pre-release, so GitHub's "latest", the download link and the cask stay on the last release. dottie.js goes to npm
+under the `beta` tag. Its appcast entry is added to the latest release's appcast in Sparkle's `beta` channel, which only
+copies with Settings › Updates › Get beta versions turned on take (on by default in a beta build). A later
+`just ship minor` (or `patch`) releases the beta's version, `0.7.0`, and beta testers move on to it, since the build
+number only goes up.
+
+**The tooling** is a small Python program in `scripts/release` (run with uv; `just release-test` tests it), written as
+lanes over a little DSL of plumbum commands (`dottie_release/dsl.py`): `read()` for commands that only look,
+`run()` for ones that change something (skipped in a dry run), `secret()` for values never to print. Versions are
+written by [bump-my-version](https://github.com/callowayproject/bump-my-version) (`.bumpversion.toml` lists the
+files), and the appcast by Sparkle's own `generate_appcast`. Settings come from the environment (`NOTARY_OP_ITEM`,
+`DEVELOPMENT_TEAM`, `NOTARY_PROFILE`, `SKIP_NPM`), so a build machine can run it unattended; `op` works there with a
+1Password service account (`OP_SERVICE_ACCOUNT_TOKEN`).
 
 Notarization credentials come from 1Password (`op://Development/Mac App Release`: the Apple ID, team
 ID and an app-specific password, plus the Developer ID certificate as a `.p12` and the npm token; its notes cover setting up a new Mac), so a Mac needs only two things to release: the 1Password CLI signed in
 (`op signin`), and the Developer ID Application certificate with its private key in the login keychain (export it
-from Keychain Access as a `.p12` and import it on the new Mac). Without `op`, `notarize.sh` falls back to a
+from Keychain Access as a `.p12` and import it on the new Mac). Without `op`, `just notarize` falls back to a
 notarytool keychain profile: `xcrun notarytool store-credentials dottie-notary --apple-id <apple id> --team-id
 J35P7AJDN7`.
 
 The steps by hand, if one fails halfway:
 
-1. `just bump patch`, commit and push, then `cd web && npm publish`.
+1. `just bump patch`, commit and push, then `cd web && npm stage publish`.
 2. `just notarize` (or in Xcode: Product ▸ Archive, then Distribute App ▸ Direct Distribution). It leaves the
    app in `build/release/<version>/export/Dottie.app`.
 3. `just release build/release/<version>/export/Dottie.app` (with no argument it takes the newest app Xcode
    notarized): checks it is a stapled, notarized Developer ID build of the version in `project.yml` and that
    `main` is clean and pushed, then publishes `Dottie-<version>.zip` as a GitHub release tagged `v<version>`. Its
-   notes are `release-notes/<version>.md` when that exists, and generated from the commits otherwise. Last, it
-   points the cask in [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at the new zip;
-   `just tap` does that step alone if it failed.
+   notes are `release-notes/<version>.md` when that exists, and generated from the commits otherwise. Then it makes
+   the appcast (`just appcast` redoes that) and, for a release, points the cask in
+   [phin-tech/homebrew-tap](https://github.com/phin-tech/homebrew-tap) at the new zip (`just tap` redoes that).
 
 **Updates.** The app updates itself in place with [Sparkle](https://sparkle-project.org) (`UpdateChecker`). Its feed,
 `SUFeedURL`, is `releases/latest/download/appcast.xml`: an asset of the newest release (GitHub skips drafts and
-pre-releases) that `scripts/appcast.sh` makes and uploads as part of `just release` (`just appcast` redoes it).
-It signs the published zip with the EdDSA key in the Mac App Release 1Password item (`sparkle_private_key`; the
-public half is `SUPublicEDKey` in `project.yml`), so installed copies only accept updates from this key. Do not
-lose or replace that key: copies already out there would reject every later update. To use the key on another
-Mac, `scripts/sparkle-tools.sh` fetches Sparkle's tools; `generate_keys -f <file>` imports it into the keychain
-(only needed to run Sparkle's tools by hand: `appcast.sh` reads it straight from 1Password). The cask sets
-`auto_updates true`, so `brew upgrade` skips Dottie unless `--greedy`. Debug builds do not check for updates.
+pre-releases), made by Sparkle's `generate_appcast` in `just appcast`. Entries are signed with the EdDSA key in the Mac
+App Release 1Password item (`sparkle_private_key`, given to the tool on stdin; the public half is `SUPublicEDKey` in
+`project.yml`), so installed copies only accept updates from this key. Do not lose or replace that key: copies already
+out there would reject every later update. `generate_appcast` leaves an entry unsigned, without failing, when the key
+doesn't match the app's `SUPublicEDKey`; `just appcast` checks every entry is signed and the new one verifies before it
+uploads. Sparkle's tools are downloaded, pinned, into `build/sparkle`. The cask sets `auto_updates true`, so
+`brew upgrade` skips Dottie unless `--greedy`. Debug builds do not check for updates.
 
 Copies older than the first Sparkle release (0.5.3) have to be updated by hand once.
 
