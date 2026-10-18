@@ -117,7 +117,7 @@ just web-test       # dottie.js's unit, contract and SVG tests (cd web for npm r
 pushes to `main`, stages dottie.js on npm (`SKIP_NPM=1` skips that; the version goes live when you approve it with
 2FA), builds the app headless, signs it with the Developer ID Application certificate, notarizes it with Apple and
 staples the ticket (`just notarize`), then publishes the GitHub release, its Sparkle appcast and the Homebrew cask
-(`just release`). Write `release-notes/<next version>.md` first for curated notes. It must run on a Mac with the
+(`just release`). Write `release-notes/<next version>.md` first for curated notes: `just notes patch` (or `minor`, `beta --of patch`, …) drafts it with a cheap model from the commits since the last release, to read and edit. It must run on a Mac with the
 certificate in its keychain, from a clean, pushed `main`. Every release recipe takes `--dry-run`, which runs the checks
 and reads but only prints what it would change: `just ship beta --dry-run`.
 

@@ -104,6 +104,11 @@ release-tool *args:
 doctor:
     {{release_tool}} doctor
 
+# Draft release-notes/<version>.md with a cheap model, from the commits since the last release (patch, minor, major, beta [--of patch], or a version)
+[positional-arguments]
+notes *args:
+    {{release_tool}} notes "$@"
+
 # Bump the version (major, minor, patch, or beta: 0.6.1 -> 0.7.0-beta.1 -> -beta.2; beta --of patch: 0.6.2-beta.1) everywhere, and the build number
 [positional-arguments]
 bump part *args:
