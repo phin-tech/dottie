@@ -128,10 +128,14 @@ copies with Settings › Updates › Get beta versions turned on take (on by def
 `just ship minor` (or `patch`) releases the beta's version, `0.7.0`, and beta testers move on to it, since the build
 number only goes up.
 
-**The tooling** is a small Python program in `scripts/release` (run with uv; `just release-test` tests it), written as
-lanes over a little DSL of plumbum commands (`dottie_release/dsl.py`): `read()` for commands that only look,
-`run()` for ones that change something (skipped in a dry run), `secret()` for values never to print. Versions are
-written by [bump-my-version](https://github.com/callowayproject/bump-my-version) (`.bumpversion.toml` lists the
+**The tooling** is [app-release](https://git.phin.tech/sam/app-release), shared with the apps made from
+[apple-template](https://git.phin.tech/sam/apple-template): a Python program pinned to a tag in
+`scripts/release/pyproject.toml` and run with uv, which fetches it with your git credentials for git.phin.tech. What it
+knows about Dottie is in `release.toml`; dottie.js's steps (the npm version, the embedded player, staging on npm) are
+hooks in `scripts/release/hooks.py`. Its lanes are written over a little DSL of plumbum commands: `read()` for commands
+that only look, `run()` for ones that change something (skipped in a dry run), `secret()` for values never to print.
+`just release-check` checks `release.toml` and the hooks, and `just doctor` everything a release needs outside the
+repository. A fix to the tooling goes in app-release, then a new tag here. Versions are written by [bump-my-version](https://github.com/callowayproject/bump-my-version) (`.bumpversion.toml` lists the
 files), and the appcast by Sparkle's own `generate_appcast`. Settings come from the environment (`NOTARY_OP_ITEM`,
 `DEVELOPMENT_TEAM`, `NOTARY_PROFILE`, `SKIP_NPM`), so a build machine can run it unattended; `op` works there with a
 1Password service account (`OP_SERVICE_ACCOUNT_TOKEN`).
@@ -162,7 +166,7 @@ App Release 1Password item (`sparkle_private_key`, given to the tool on stdin; t
 `project.yml`), so installed copies only accept updates from this key. Do not lose or replace that key: copies already
 out there would reject every later update. `generate_appcast` leaves an entry unsigned, without failing, when the key
 doesn't match the app's `SUPublicEDKey`; `just appcast` checks every entry is signed and the new one verifies before it
-uploads. Sparkle's tools are downloaded, pinned, into `build/sparkle`. The cask sets `auto_updates true`, so
+uploads. Sparkle's tools are downloaded, pinned, into `~/Library/Caches/app-release`. The cask sets `auto_updates true`, so
 `brew upgrade` skips Dottie unless `--greedy`. Debug builds do not check for updates.
 
 Copies older than the first Sparkle release (0.5.3) have to be updated by hand once.

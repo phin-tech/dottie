@@ -1,0 +1,16 @@
+# What app-release (`just ship` and friends; scripts/release) knows about Dottie. Every key: src/app_release/config.py
+# in https://git.phin.tech/sam/app-release. Top-level keys go before the tables.
+app = "Dottie"
+bundle_id = "tech.phin.dottie"
+repo = "phin-tech/dottie"
+description = "Hand-drawn style diagrams that AI agents can draw over MCP"
+team_id = "J35P7AJDN7"
+op_item = "op://Development/Mac App Release"
+notary_profile = "dottie-notary"
+hooks = "scripts/release/hooks.py"
+
+[homebrew]
+tap = "phin-tech/homebrew-tap"
+token = "dottie"
+macos = "sonoma"
+binary = { path = "Contents/Helpers/dottie-cli", name = "dottie" }

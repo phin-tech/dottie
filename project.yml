@@ -18,7 +18,7 @@ packages:
   MCP:
     url: https://github.com/modelcontextprotocol/swift-sdk.git
     revision: a0ae212ebf6eab5f754c3129608bc5557637e605
-  # In-place updates (App/UpdateChecker.swift). Keep SPARKLE_VERSION in scripts/release/dottie_release/lanes.py on the same version.
+  # In-place updates (App/UpdateChecker.swift). app-release reads this version to fetch the matching appcast tools.
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: 2.10.0

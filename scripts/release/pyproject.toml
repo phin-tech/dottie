@@ -1,25 +1,14 @@
+# The release tool, app-release (https://git.phin.tech/sam/app-release), pinned to a tag; what it knows about Dottie
+# is in release.toml, and Dottie's own steps (dottie.js on npm) are in hooks.py. To move to a newer app-release,
+# change the tag, then `uv lock --upgrade-package app-release --project scripts/release`.
 [project]
 name = "dottie-release"
-version = "1.0.0"
-description = "Bumps, builds, notarizes and publishes Dottie: `just ship`, `just release` and friends."
+version = "0"
 requires-python = ">=3.12"
-dependencies = [
-    "bump-my-version>=1.2",
-    "cyclopts>=4.10",
-    "plumbum>=1.9",
-    "rich>=13",
-    "semver>=3.0.4",
-]
+dependencies = ["app-release"]
 
-[project.scripts]
-dottie-release = "dottie_release.cli:main"
+[tool.uv]
+package = false
 
-[dependency-groups]
-dev = ["pynacl>=1.5", "pytest>=8"]
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
+[tool.uv.sources]
+app-release = { git = "https://git.phin.tech/sam/app-release", tag = "v1.0.1" }
