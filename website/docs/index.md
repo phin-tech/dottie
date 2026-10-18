@@ -27,6 +27,10 @@ arrow keys.
   own animation. Export a GIF, an animated PNG, an MP4, Lottie, or a web page like the ones here.
 - **Make it clickable.** On the web, a shape can play a scene when clicked, or open a link, so a diagram can
   wait for the reader to pick which request to follow.
+- **Extend it.** Extensions add shapes drawn from your own JavaScript, with handles to adjust them, commands
+  for the Extensions menu, and drawing tools for the toolbar, like the Ribbon pen in the
+  [extension template](https://github.com/phin-tech/dottie/tree/main/extension-template). Extensions can't read
+  your files or use the network, and drawings that use them open anywhere, extension or not.
 - **Bring diagrams in and send them out:** Mermaid, Excalidraw, draw.io and SVG in; PNG, SVG, PDF, Mermaid
   and HTML out.
 

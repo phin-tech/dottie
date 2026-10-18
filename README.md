@@ -22,7 +22,8 @@ it, and drag **Dottie** into your Applications folder. You need macOS 14 Sonoma 
 
 Dottie updates itself: once a day it checks GitHub for a newer release and offers to install it and relaunch
 (turn that off in Settings ▸ General, or use Dottie ▸ Check for Updates… any time). Updates are notarized and
-checked against a signing key built into the app. With Homebrew, `brew upgrade --greedy --cask dottie` also works.
+checked against a signing key built into the app. To try new features before they ship, turn on Get beta
+versions in the same place. With Homebrew, `brew upgrade --greedy --cask dottie` also works.
 
 ## Ask your AI assistant to draw
 
@@ -181,6 +182,11 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
   a grid of boxes or restyling everything labelled "TODO". The console includes a full reference. The scripts
   folder has TypeScript declarations (`dottie.d.ts`) for completion in an editor, and with TypeScript installed
   (`npm install -g typescript`) the console and the MCP server's `run_script` point out misspelled options.
+- **Extensions.** An extension adds shapes drawn by JavaScript (with handles to adjust them), commands in the
+  Extensions menu, and drawing tools in the toolbar. Put a `.dottieext` folder in the extensions folder
+  (Settings ▸ Extensions ▸ Show in Finder, then Reload), or have your assistant install one over MCP. Extensions
+  can't read files or use the network, and the shapes they draw are saved as ordinary paths, so a drawing opens the
+  same without them. Start from [extension-template](extension-template), whose Ribbon pen is a drawing tool.
 - **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
   from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng`,
   `.mp4`, or `.json` for Lottie) for an animated page. Run `dottie --help` for more.
