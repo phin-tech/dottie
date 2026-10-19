@@ -320,6 +320,9 @@ extension Exporter {
             }
         }
         let (defs, frames) = playerFrames(doc, plan: plan, clickable: clickable)
+        // The bundled fonts the drawing uses, on a line of their own.
+        let faces = Fonts.fontFaceCSS(Fonts.bundledFamilies(in: doc))
+        let fontCSS = faces.isEmpty ? "" : faces + "\n"
         var body = ""
         for (i, frame) in frames.enumerated() {
             body += "<div class=\"f\(i == 0 ? " on" : "")\">\(frame)</div>\n"
@@ -337,7 +340,7 @@ extension Exporter {
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>\(safeTitle)</title>
         <style>
-        :root { --page: \(hex(page)); --ink: \(hex(ink)); }
+        \(fontCSS):root { --page: \(hex(page)); --ink: \(hex(ink)); }
         html, body { margin: 0; min-height: 100%; background: var(--page); color: var(--ink);
           font: 14px -apple-system, system-ui, sans-serif; }
         body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;

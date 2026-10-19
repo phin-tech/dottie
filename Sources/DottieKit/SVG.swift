@@ -13,7 +13,14 @@ extension Exporter {
     static func svg(_ doc: DottieDocument, background: RGBA?, bounds fixed: CGRect?) -> String {
         let (b, parts) = svgParts(doc, background: background, bounds: fixed, links: true)
         return svgOpen(b, background: doc.resolvedTheme?.background ?? background.map { $0 }, paint: background != nil)
-            + parts.map(\.markup).joined() + "</svg>\n"
+            + fontFaces(doc) + parts.map(\.markup).joined() + "</svg>\n"
+    }
+
+    /// The bundled fonts `doc` uses, embedded on one line, so the file shows them anywhere (fonts of one's own
+    /// are named, never embedded). dottie.js writes everything but this line.
+    static func fontFaces(_ doc: DottieDocument) -> String {
+        let css = Fonts.fontFaceCSS(Fonts.bundledFamilies(in: doc))
+        return css.isEmpty ? "" : "<defs><style>\(css)</style></defs>\n"
     }
 
     /// The opening `<svg>` tag for `b`, with the page color behind everything when `paint`.
@@ -148,7 +155,7 @@ extension Exporter {
         let total = lineHeight * Double(lines.count)
         let x = centered ? frame.midX : frame.minX
         let top = centered ? frame.midY - total / 2 : frame.minY
-        var s = "<text x=\"\(num(x))\" font-family=\"Helvetica Neue, Helvetica, Arial, sans-serif\" font-size=\"\(num(size))\" fill=\"\(color(e.style.stroke))\"\(centered ? " text-anchor=\"middle\"" : "")>"
+        var s = "<text x=\"\(num(x))\" font-family=\"\(escape(Fonts.cssFamily(e.style.font)))\" font-size=\"\(num(size))\" fill=\"\(color(e.style.stroke))\"\(centered ? " text-anchor=\"middle\"" : "")>"
         for (i, line) in lines.enumerated() {
             s += "<tspan x=\"\(num(x))\" y=\"\(num(top + lineHeight * (Double(i) + 0.8)))\">\(escape(line))</tspan>"
         }
@@ -159,7 +166,7 @@ extension Exporter {
     /// line and a `<tspan>` per style run, so the SVG wraps exactly where the PNG does.
     private static func noteText(_ source: String, e: Element) -> String {
         let rect = Note.textRect(e.frame)
-        let (text, frame) = Note.layout(source, in: rect, fontSize: e.style.fontSize, color: e.style.stroke.cgColor)
+        let (text, frame) = Note.layout(source, in: rect, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor)
         let lines = Note.lines(of: frame, in: rect)
         let string = text.string as NSString
         var s = ""
@@ -192,7 +199,7 @@ extension Exporter {
                 }
             }
             guard !spans.isEmpty else { continue }
-            s += "<text y=\"\(num(l.origin.y))\" font-family=\"Helvetica Neue, Helvetica, Arial, sans-serif\" fill=\"\(color(e.style.stroke))\" xml:space=\"preserve\">\(spans)</text>\n"
+            s += "<text y=\"\(num(l.origin.y))\" font-family=\"\(escape(Fonts.cssFamily(e.style.font)))\" fill=\"\(color(e.style.stroke))\" xml:space=\"preserve\">\(spans)</text>\n"
         }
         for (a, b) in Note.decorations(lines, in: rect) {
             s += "<line x1=\"\(num(a.x))\" y1=\"\(num(a.y))\" x2=\"\(num(b.x))\" y2=\"\(num(b.y))\" stroke=\"\(color(e.style.stroke))\" stroke-width=\"\(num(max(1, e.style.fontSize / 14)))\"/>\n"

@@ -92,13 +92,29 @@ public enum DiagramOps {
         public var rotation: Double?
         /// Cell size of a grid fill, in points.
         public var gridSize: Double?
+        /// The font text is set in (see `Fonts`); "" or "Helvetica Neue" goes back to the default.
+        public var font: String?
+        public var fontSize: Double?
         public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
-                    startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil) {
+                    startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil,
+                    font: String? = nil, fontSize: Double? = nil) {
             self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
             self.startHead = startHead; self.endHead = endHead; self.rotation = rotation; self.gridSize = gridSize
+            self.font = font; self.fontSize = fontSize
+        }
+
+        /// Sets the font and text size, the part of the look a shape's default size depends on.
+        func applyText(to style: inout Style) {
+            if let font {
+                let name = font.trimmingCharacters(in: .whitespaces)
+                style.font = name.isEmpty || name.caseInsensitiveCompare(Fonts.defaultFamily) == .orderedSame
+                    ? nil : Fonts.bundledFamily(name) ?? name
+            }
+            if let fontSize { style.fontSize = min(max(fontSize, 4), 200) }
         }
 
         func apply(to e: inout Element) {
+            applyText(to: &e.style)
             if let fillStyle { e.style.fillStyle = fillStyle }
             if let dash { e.style.dash = dash }
             if let strokeWidth { e.style.strokeWidth = min(max(strokeWidth, 0.5), 24) }
@@ -128,6 +144,7 @@ public enum DiagramOps {
         if let roughness { style.roughness = roughness }
         if kind == .text { style.roughness = 0 }
         if kind == .note { style = Note.style(from: style) }
+        look.applyText(to: &style)
         let size = frame?.size ?? defaultSize(for: kind, text: text ?? "", fontSize: style.fontSize)
         let f = CGRect(origin: frame?.origin ?? origin, size: size)
         var e = Element(kind: kind, frame: f, style: style, layerID: activeLayerID(&doc), text: text)
@@ -242,7 +259,8 @@ public enum DiagramOps {
     @discardableResult
     public static func build(_ doc: inout DottieDocument, nodes: [NodeSpec], edges: [EdgeSpec],
                              direction: LayoutDirection = .topToBottom, roughness: Double = 1,
-                             defaultRouting: Routing = .elbow) throws -> [String: UUID] {
+                             defaultRouting: Routing = .elbow, font: String? = nil) throws -> [String: UUID] {
+        let text = Look(font: font)
         var seen = Set<String>()
         for n in nodes {
             guard n.kind != .image, n.kind != .connector else { throw OpsError.invalid("Node '\(n.key)' cannot be a \(n.kind.rawValue)") }
@@ -262,6 +280,7 @@ public enum DiagramOps {
             style.roughness = roughness
             if let f = n.fill { style.fill = f }
             if n.kind == .note { style = Note.style(from: style) }
+            text.applyText(to: &style)
             let auto = defaultSize(for: n.kind, text: n.text, fontSize: style.fontSize)
             let size = CGSize(width: n.width ?? auto.width, height: n.height ?? auto.height)
             let e = Element(kind: n.kind, frame: CGRect(origin: .zero, size: size), style: style, layerID: layerID,
@@ -288,7 +307,8 @@ public enum DiagramOps {
                 ports = direction == .topToBottom ? (.right, .right) : (.bottom, .bottom)
             }
             try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: edge.routing ?? defaultRouting,
-                             arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label, look: edge.look)
+                             arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label,
+                             look: { var l = edge.look; l.font = l.font ?? font; return l }())
         }
         return ids
     }

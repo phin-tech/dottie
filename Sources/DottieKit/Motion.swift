@@ -144,6 +144,7 @@ extension DottieDocument {
         let start = Connector.endpoints(of: c, in: self).0
         var style = Style()
         style.fill = color; style.stroke = color; style.roughness = min(c.style.roughness, 1); style.strokeWidth = 1.5
+        style.font = c.style.font
         var frame = CGSize(width: size, height: size)
         let text = label.map { String($0.prefix(60)) }.flatMap { $0.isEmpty ? nil : $0 }
         if let text {
@@ -151,7 +152,7 @@ extension DottieDocument {
             style.stroke = RGBA(r: 1, g: 1, b: 1)
             style.fontSize = 12
             style.roughness = 0
-            let fit = Renderer.textSize(text, fontSize: style.fontSize, maxWidth: 400)
+            let fit = Renderer.textSize(text, fontSize: style.fontSize, font: style.font, maxWidth: 400)
             frame = CGSize(width: ceil(fit.width) + 24, height: max(size, ceil(fit.height) + 14))
         }
         let dot = Element(kind: .ellipse, frame: CGRect(x: start.x - frame.width / 2, y: start.y - frame.height / 2,

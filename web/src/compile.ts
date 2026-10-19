@@ -6,13 +6,16 @@
 //   <script src="tour.js" data-target="#demo"></script>     a player inside #demo
 //   <script src="tour.js" data-clean data-no-loop></script>  data-* attributes become the player's attributes
 
+import { fontFaces, usedFonts } from "./fonts.ts";
+import type { Face } from "./metrics.ts";
 import { DottieFormatError, parseDottie } from "./model.ts";
 import { pageIndex } from "./player.ts";
 
 /** What follows the runtime; DOTTIE_DATA and DOTTIE_OPTIONS are replaced with JSON. Plain ES5, unminified. */
 export const LOADER = `;(function () {
-  var data = DOTTIE_DATA, options = DOTTIE_OPTIONS;
+  var data = DOTTIE_DATA, options = DOTTIE_OPTIONS, fonts = DOTTIE_FONTS;
   var script = document.currentScript;
+  if (window.Dottie.addFonts) window.Dottie.addFonts(Object.keys(fonts), fonts);
   function attr(el, name, value) { el.setAttribute(name.replace(/[A-Z]/g, function (c) { return "-" + c.toLowerCase(); }), value); }
   function mount() {
     var player = document.createElement("dottie-player"), k;
@@ -42,6 +45,9 @@ export interface CompileOptions {
   noAutoplay?: boolean;
   noLoop?: boolean;
   label?: string;
+  /** A bundled font's file (`fontFile`) as base64, so the drawing carries the fonts it uses; without it the
+   * player fetches them from beside itself. dottie-compile reads them from dist/fonts. */
+  fontData?: (family: string, face: Face) => string | undefined;
 }
 
 /** JSON safe inside a script: it can't close the tag or start a comment. */
@@ -77,5 +83,14 @@ export function compile(source: string | unknown, runtime: string, options: Comp
   const images = Object.fromEntries(Object.entries(json.images ?? {}).filter(([k]) => refs.has(k)));
   const data: Record<string, unknown> = { version: json.version, pages: [page] };
   if (Object.keys(images).length) data.images = images;
-  return runtime.trimEnd() + "\n" + LOADER.replace("DOTTIE_DATA", () => scriptJSON(data)).replace("DOTTIE_OPTIONS", () => scriptJSON(playerAttributes(options)));
+  // The bundled fonts that page uses, each face as base64.
+  const fonts: Record<string, Record<string, string>> = {};
+  for (const family of options.fontData ? usedFonts(file.pages[i]) : []) {
+    for (const face of fontFaces(family)) {
+      const b64 = options.fontData!(family, face);
+      if (b64) (fonts[family] ??= {})[face] = b64;
+    }
+  }
+  return runtime.trimEnd() + "\n" + LOADER.replace("DOTTIE_DATA", () => scriptJSON(data))
+    .replace("DOTTIE_OPTIONS", () => scriptJSON(playerAttributes(options))).replace("DOTTIE_FONTS", () => scriptJSON(fonts));
 }

@@ -31,9 +31,16 @@ extension Exporter {
         if options.noLoop { attrs.append(("no-loop", "")) }
         if let label = options.label { attrs.append(("label", label)) }
         let optionsJSON = "{" + attrs.map { "\(jsonString($0.0)):\(jsonString($0.1))" }.joined(separator: ",") + "}"
+        // The bundled fonts the page uses, each face as base64, so the file shows them anywhere.
+        var fonts: [String: [String: String]] = [:]
+        for family in Fonts.bundledFamilies(in: doc) { fonts[family] = BundledFonts.faces[family] }
+        let fontEncoder = JSONEncoder()
+        fontEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let fontsJSON = String(decoding: try fontEncoder.encode(fonts), as: UTF8.self)
         return PlayerScript.runtime + "\n"
             + PlayerScript.loader.replacingOccurrences(of: "DOTTIE_DATA", with: scriptSafe(data))
-                .replacingOccurrences(of: "DOTTIE_OPTIONS", with: scriptSafe(optionsJSON)) + "\n"
+                .replacingOccurrences(of: "DOTTIE_OPTIONS", with: scriptSafe(optionsJSON))
+                .replacingOccurrences(of: "DOTTIE_FONTS", with: scriptSafe(fontsJSON)) + "\n"
     }
 
     private static func jsonString(_ s: String) -> String {

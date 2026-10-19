@@ -5,13 +5,10 @@
 // `code`, ~~strikethrough~~ and links.
 
 import type { Element } from "./model.ts";
-import {
-  ascent, boldAscent, boldDescent, boldItalicAscent, boldItalicDescent, boldItalicLeading, boldLeading, descent, fallbackMetrics, fonts,
-  italicAscent, italicDescent, italicLeading, leading, monoAdvance, monoAscent, monoDescent,
-} from "./metrics.ts";
+import { type FamilyMetrics, families, monoAdvance, monoAscent, monoDescent } from "./metrics.ts";
 import { type Rect, fmt } from "./path.ts";
 import { color, escapeXML } from "./svg-util.ts";
-import { breaksAfter } from "./text.ts";
+import { breaksAfter, cssFamily, DEFAULT_FAMILY, faceOf, familyMetrics } from "./text.ts";
 
 export const PADDING = 12;
 const SEP = "\u2028";
@@ -225,30 +222,31 @@ interface Para {
   tableRule: [number, number] | null;
 }
 
-function face(r: { bold: boolean; italic: boolean }): "regular" | "bold" | "italic" | "boldItalic" {
-  return r.bold ? (r.italic ? "boldItalic" : "bold") : r.italic ? "italic" : "regular";
+/** The family a run is set in: code is Menlo, measured as Menlo except for what it falls back for, which is
+ * measured as Helvetica Neue does it. */
+function famOf(r: Run, fam: FamilyMetrics): FamilyMetrics {
+  return r.mono ? families[DEFAULT_FAMILY] : fam;
 }
 
-function charWidth(ch: string, r: Run): number {
-  if (r.mono && fallbackMetrics[ch] === undefined) return monoAdvance * r.size;
-  const f = fonts[face(r)];
-  return ((f.w[ch] ?? fonts.regular.w[ch] ?? f.w["n"]) * r.size) / 1000;
+function charWidth(ch: string, r: Run, fam: FamilyMetrics): number {
+  const f = famOf(r, fam);
+  if (r.mono && f.fallback[ch] === undefined) return monoAdvance * r.size;
+  const face = f.faces[faceOf(f, r.bold, r.italic)]!;
+  return ((face.w[ch] ?? f.faces.regular.w[ch] ?? face.w["n"]) * r.size) / 1000;
 }
 
-function kern(a: string, b: string, r: Run): number {
+function kern(a: string, b: string, r: Run, fam: FamilyMetrics): number {
   if (r.mono) return 0;
-  return ((fonts[face(r)].k[a + b] ?? 0) * r.size) / 1000;
+  return ((fam.faces[faceOf(fam, r.bold, r.italic)]!.k[a + b] ?? 0) * r.size) / 1000;
 }
 
-/** Ascent, descent and leading of a character in a run (a fallback font's for characters Helvetica Neue lacks). */
-function metrics(ch: string, r: Run): [number, number, number] {
-  const fb = fallbackMetrics[ch];
+/** Ascent, descent and leading of a character in a run (a fallback font's for characters the font lacks). */
+function metrics(ch: string, r: Run, fam: FamilyMetrics): [number, number, number] {
+  const fb = famOf(r, fam).fallback[ch];
   if (fb) return [fb[0] * r.size, fb[1] * r.size, fb[2] * r.size];
   if (r.mono) return [monoAscent * r.size, monoDescent * r.size, 0];
-  if (r.bold && r.italic) return [boldItalicAscent * r.size, boldItalicDescent * r.size, boldItalicLeading * r.size];
-  if (r.bold) return [boldAscent * r.size, boldDescent * r.size, boldLeading * r.size];
-  if (r.italic) return [italicAscent * r.size, italicDescent * r.size, italicLeading * r.size];
-  return [ascent * r.size, descent * r.size, leading * r.size];
+  const m = fam.faces[faceOf(fam, r.bold, r.italic)]!;
+  return [m.ascent * r.size, m.descent * r.size, m.leading * r.size];
 }
 
 interface Glyph { ch: string; run: number; x: number; w: number }
@@ -259,7 +257,8 @@ class Builder {
   nextSpacing: number | null = null;
   readonly fontSize: number;
   readonly width: number;
-  constructor(fontSize: number, width: number) { this.fontSize = fontSize; this.width = width; }
+  readonly fam: FamilyMetrics;
+  constructor(fontSize: number, width: number, fam: FamilyMetrics) { this.fontSize = fontSize; this.width = width; this.fam = fam; }
   get gap(): number { return this.fontSize * 0.5; }
   spacing(normal: number): number { return this.paras.length === 0 ? 0 : (this.nextSpacing ?? normal); }
 
@@ -300,7 +299,7 @@ class Builder {
       case "list": {
         const markers = b.items.map((it, i) => (it.checkbox === true ? "☑" : it.checkbox === false ? "☐"
           : b.ordered !== null ? `${b.ordered + i}.` : ctx.listDepth % 2 === 0 ? "•" : "◦"));
-        const plain = (s: string): number => measureRun({ text: s, size: this.fontSize, bold: false, italic: false, mono: false, strike: false, underline: false, alpha: 1 });
+        const plain = (s: string): number => measureRun({ text: s, size: this.fontSize, bold: false, italic: false, mono: false, strike: false, underline: false, alpha: 1 }, this.fam);
         const widest = Math.max(0, ...markers.map(plain));
         const hang = ctx.indent + Math.max(widest + this.fontSize * 0.45, this.fontSize * 1.2);
         b.items.forEach((item, i) => {
@@ -346,7 +345,7 @@ class Builder {
       c.map((i) => ({ ...this.run({ ...i, text: i.text.replaceAll(SEP, " ") }, size, quoted ? 0.7 : 1, { bold: header, italic: quoted }) }));
     const widths = (size: number): number[] => {
       const w = new Array<number>(columns).fill(0);
-      for (const row of rows) row.cells.forEach((c, i) => { if (i < columns) w[i] = Math.max(w[i], cell(c, row.header, size).reduce((s, r) => s + measureRun(r), 0)); });
+      for (const row of rows) row.cells.forEach((c, i) => { if (i < columns) w[i] = Math.max(w[i], cell(c, row.header, size).reduce((s, r) => s + measureRun(r, this.fam), 0)); });
       return w;
     };
     const available = Math.max(this.width - ctx.indent, 1);
@@ -389,9 +388,9 @@ class Builder {
 
 interface Ctx { indent: number; marker: { text: string; start: number; hang: number } | null; quote: number | null; listDepth: number }
 
-function measureRun(r: Run): number {
+function measureRun(r: Run, fam: FamilyMetrics): number {
   let w = 0, prev = "";
-  for (const ch of r.text) { w += charWidth(ch, r); if (prev) w += kern(prev, ch, r); prev = ch; }
+  for (const ch of r.text) { w += charWidth(ch, r, fam); if (prev) w += kern(prev, ch, r, fam); prev = ch; }
   return w;
 }
 
@@ -399,7 +398,7 @@ function measureRun(r: Run): number {
 const TAB_INTERVAL = 28;
 
 /** Lays paragraphs out into lines with baselines, top-down from y = 0, within `width` and `height`. */
-function layoutLines(paras: Para[], width: number, height: number, fontSize: number): Line[] {
+function layoutLines(paras: Para[], width: number, height: number, fontSize: number, fam: FamilyMetrics): Line[] {
   const lines: Line[] = [];
   let baseline = 0;
   let prev: Line | null = null;
@@ -430,7 +429,7 @@ function layoutLines(paras: Para[], width: number, height: number, fontSize: num
               let seg = 0, prevCh = "";
               for (let q = end + 1; q < chars.length && chars[q].ch !== "\t" && chars[q].ch !== "\n" && chars[q].ch !== SEP; q++) {
                 const rr = runs[chars[q].run];
-                seg += charWidth(chars[q].ch, rr) + (prevCh ? kern(prevCh, chars[q].ch, rr) : 0);
+                seg += charWidth(chars[q].ch, rr, fam) + (prevCh ? kern(prevCh, chars[q].ch, rr, fam) : 0);
                 prevCh = chars[q].ch;
               }
               tx = Math.max(x, stop.align === "right" ? stop.x - seg : stop.x - seg / 2);
@@ -441,9 +440,9 @@ function layoutLines(paras: Para[], width: number, height: number, fontSize: num
           continue;
         }
         const prevGlyph = glyphs[glyphs.length - 1];
-        const kx = prevGlyph && prevGlyph.run === run && prevGlyph.ch !== "\t" ? kern(prevGlyph.ch, ch, r) : 0;
+        const kx = prevGlyph && prevGlyph.run === run && prevGlyph.ch !== "\t" ? kern(prevGlyph.ch, ch, r, fam) : 0;
         if (prevGlyph) { prevGlyph.w += kx; x += kx; }
-        const w = charWidth(ch, r);
+        const w = charWidth(ch, r, fam);
         if (ch !== " " && x + w > maxX + 0.01 && glyphs.some((g) => g.ch !== "\t")) {
           if (lastSpace >= 0) { glyphs.length = lastSpace + 1; end = k + lastSpace + 1; }
           if (prevGlyph) prevGlyph.w -= kx;
@@ -457,15 +456,15 @@ function layoutLines(paras: Para[], width: number, height: number, fontSize: num
       }
       if (glyphs.length === 0 && end === k && k < chars.length) { // a single character wider than the line
         const { ch, run } = chars[k];
-        glyphs.push({ ch, run, x: start, w: charWidth(ch, runs[run]) });
+        glyphs.push({ ch, run, x: start, w: charWidth(ch, runs[run], fam) });
         end = k + 1;
       }
       let asc = 0, desc = 0, lead = 0;
       for (const g of glyphs) {
-        const [a, d, l] = metrics(g.ch, runs[g.run]);
+        const [a, d, l] = metrics(g.ch, runs[g.run], fam);
         asc = Math.max(asc, a); desc = Math.max(desc, d); lead = Math.max(lead, l);
       }
-      if (glyphs.length === 0) [asc, desc, lead] = metrics(" ", runs[0] ?? { text: " ", size: fontSize, bold: false, italic: false, mono: false, strike: false, underline: false, alpha: 1 });
+      if (glyphs.length === 0) [asc, desc, lead] = metrics(" ", runs[0] ?? { text: " ", size: fontSize, bold: false, italic: false, mono: false, strike: false, underline: false, alpha: 1 }, fam);
       baseline = prev ? baseline + Math.round(prev.desc) + Math.round(prev.lead) + (firstLine ? p.spacing : 0) + Math.round(asc) : Math.round(asc);
       if (baseline + desc > height + 0.5) return;   // text that doesn't fit is cut off at the note's edge
       const line: Line = { glyphs, asc, desc, lead, baseline, para: p, first: firstLine };
@@ -484,9 +483,10 @@ function layoutLines(paras: Para[], width: number, height: number, fontSize: num
 export function noteMarkup(source: string, e: Element): string {
   const rect = textRect({ x: e.x, y: e.y, width: e.width, height: e.height });
   if (!(rect.width > 1 && rect.height > 1)) return "";
-  const b = new Builder(e.style.fontSize, rect.width);
+  const fam = familyMetrics(e.style.font);
+  const b = new Builder(e.style.fontSize, rect.width, fam);
   for (const block of parseBlocks(source)) b.block(block, { indent: 0, marker: null, quote: null, listDepth: 0 });
-  const lines = layoutLines(b.paras, rect.width, rect.height, e.style.fontSize);
+  const lines = layoutLines(b.paras, rect.width, rect.height, e.style.fontSize, fam);
   const ink = color(e.style.stroke);
   let s = "";
   const marks: [number, number, number, number][] = [];
@@ -506,26 +506,28 @@ export function noteMarkup(source: string, e: Element): string {
       const r = gs[i].r;
       let j = i;
       let text = "";
-      const font = fontOf(gs[i].ch);
-      while (j < gs.length && sameStyle(gs[j].r, r) && gs[j].ch !== "\t" && fontOf(gs[j].ch) === font) { text += gs[j].ch; j++; }
+      const font = fontOf(gs[i].ch, famOf(r, fam));
+      while (j < gs.length && sameStyle(gs[j].r, r) && gs[j].ch !== "\t" && fontOf(gs[j].ch, famOf(r, fam)) === font) { text += gs[j].ch; j++; }
       const shown = text.replaceAll("\n", "").replaceAll(SEP, "");
       if (shown.trim() !== "") {
         let a = `font-size="${fmt(r.size)}"`;
         if (r.mono) a += ` font-family="Menlo, Consolas, monospace"`;
-        if (r.bold) a += ` font-weight="bold"`;
-        if (r.italic) a += ` font-style="italic"`;
+        // Bold and italic only where the font has that face, as Dottie writes what the run is set in.
+        const face = r.mono ? "regular" : faceOf(fam, r.bold, r.italic);
+        if (r.mono ? r.bold : face === "bold" || face === "boldItalic") a += ` font-weight="bold"`;
+        if (r.mono ? r.italic : face === "italic" || face === "boldItalic") a += ` font-style="italic"`;
         if (r.underline) a += ` text-decoration="underline"`;
         if (r.alpha < 1) a += ` fill-opacity="${fmt(r.alpha * e.style.stroke.a)}"`;
         spans += `<tspan x="${fmt(rect.x + gs[i].x)}" ${a}>${escapeXML(shown)}</tspan>`;
       }
       if (r.strike && j > i) {
-        const y = l.baseline - metrics(gs[i].ch, r)[0] * 0.32;
+        const y = l.baseline - metrics(gs[i].ch, r, fam)[0] * 0.32;
         marks.push([rect.x + gs[i].x, rect.y + y, rect.x + gs[j - 1].x + gs[j - 1].w, rect.y + y]);
       }
       if (j === i) j++;   // a tab
       i = j;
     }
-    if (spans) s += `<text y="${fmt(rect.y + l.baseline)}" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="${ink}" xml:space="preserve">${spans}</text>\n`;
+    if (spans) s += `<text y="${fmt(rect.y + l.baseline)}" font-family="${cssFamily(e.style.font)}" fill="${ink}" xml:space="preserve">${spans}</text>\n`;
   }
   const width = fmt(Math.max(1, e.style.fontSize / 14));
   for (const [x1, y1, x2, y2] of marks) {
@@ -534,9 +536,9 @@ export function noteMarkup(source: string, e: Element): string {
   return s;
 }
 
-/** Characters Helvetica Neue lacks come from a fallback font, in a CoreText run of their own. */
-function fontOf(ch: string): string {
-  return fallbackMetrics[ch] ? `fb:${ch}` : "";
+/** Characters the font lacks come from a fallback font, in a CoreText run of their own. */
+function fontOf(ch: string, fam: FamilyMetrics): string {
+  return fam.fallback[ch] ? `fb:${ch}` : "";
 }
 
 function sameStyle(a: Run, b: Run): boolean {

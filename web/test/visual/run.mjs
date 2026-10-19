@@ -11,7 +11,7 @@ import { chromium } from "playwright";
 import { PNG } from "pngjs";
 import { ROOT } from "../browser/serve.mjs";
 
-const { parseDottie, resolved, svg, withRoughness } = await import(join(ROOT, "web", "dist", "dottie.js"));
+const { fontFaces, fontFile, parseDottie, resolved, svg, usedFonts, withRoughness } = await import(join(ROOT, "web", "dist", "dottie.js"));
 const LIMITS = { clean: 0.001, sketchy: 0.01 };   // fraction of pixels allowed to differ
 const OUT = join(ROOT, "web", "test-results", "visual");
 mkdirSync(OUT, { recursive: true });
@@ -24,7 +24,21 @@ async function raster(markup) {
   const w = Math.min(4000, Math.ceil(Number(m[1]))), h = Math.min(4000, Math.ceil(Number(m[2])));
   await page.setViewportSize({ width: Math.max(w, 1), height: Math.max(h, 1) });
   await page.setContent(`<!doctype html><body style="margin:0;background:#fff">${markup}</body>`);
+  await page.evaluate(() => document.fonts.ready);
   return PNG.sync.read(await page.screenshot({ clip: { x: 0, y: 0, width: w, height: h } }));
+}
+
+/** `markup` with the bundled fonts the player would add for it (Dottie's SVG embeds its own). */
+function withFonts(markup, families) {
+  let css = "";
+  for (const family of families) {
+    for (const face of fontFaces(family)) {
+      const data = readFileSync(join(ROOT, "web", "dist", "fonts", fontFile(family, face))).toString("base64");
+      css += `@font-face{font-family:'${family}';font-weight:${face.startsWith("bold") ? "bold" : "normal"};`
+        + `font-style:${face.endsWith("Italic") || face === "italic" ? "italic" : "normal"};src:url(data:font/woff2;base64,${data})}`;
+    }
+  }
+  return css ? `<style>${css}</style>${markup}` : markup;
 }
 
 const failures = [];
@@ -39,7 +53,7 @@ for (const group of ["design", "edge"]) {
     let p = resolved(file.pages[Number(pageNo) - 1], Number(t));
     if (look === "clean") p = withRoughness(p, 0);
     const golden = readFileSync(join(dir, f), "utf8");
-    const mine = svg(p);
+    const mine = withFonts(svg(p), usedFonts(p));
     const a = await raster(golden), b = await raster(mine);
     count++;
     if (a.width !== b.width || a.height !== b.height) { failures.push({ f, why: `size ${a.width}x${a.height} vs ${b.width}x${b.height}`, golden, mine }); continue; }

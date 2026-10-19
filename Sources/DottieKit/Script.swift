@@ -269,7 +269,7 @@ public enum DottieScript {
                                 strokeWidth: double("strokeWidth"), bowing: double("bowing"),
                                 startHead: try enumValue("startHead", as: Arrowhead.self),
                                 endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"),
-                                gridSize: double("gridSize"))
+                                gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"))
             }
             /// `sketchy: true|false` as a roughness override.
             var roughness: Double? { bool("sketchy").map { $0 ? 1 : 0 } }
@@ -310,7 +310,8 @@ public enum DottieScript {
                 "stroke": hex(e.style.stroke), "sketchy": e.style.roughness > 0,
                 "strokeWidth": e.style.strokeWidth,
             ]
-            if let t = e.text { d["text"] = t }
+            if let t = e.text { d["text"] = t; d["fontSize"] = e.style.fontSize }
+            if let f = e.style.font { d["font"] = f }
             if e.style.fill.a > 0 { d["fill"] = hex(e.style.fill) }
             if e.style.fillStyle != .solid { d["fillStyle"] = e.style.fillStyle.rawValue }
             if e.style.fillStyle == .grid { d["gridSize"] = e.style.cellSize }
@@ -492,7 +493,8 @@ public enum DottieScript {
                                         arrow: e.bool("arrow") ?? true, label: e.string("label"))
                 }
                 let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
-                let ids = try DiagramOps.build(&doc, nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1)
+                let ids = try DiagramOps.build(&doc, nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
+                                               font: a.string("font"))
                 return ids.mapValues(\.uuidString)
 
             case "layout":
@@ -920,7 +922,7 @@ public enum DottieScript {
         fromPort/toPort pin an end: top | right | bottom | left, or a number for an extension shape's connection points (0 up, as the shape declares them)
       dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}
       dottie.build({nodes: [{key, text, kind?, fill?, width?, height?}], edges: [{from, to, routing?, arrow?, label?}], \
-    direction?: "TB"|"LR", sketchy?})   laid out below existing content; returns {key: id}
+    direction?: "TB"|"LR", sketchy?, font?})   laid out below existing content; returns {key: id}
 
     Changing
       dottie.update(id, {text?, x?, y?, width?, height?, fill?, stroke?, sketchy?, routing?, link?, url?, anchor?, ...look})  returns the element
@@ -1001,7 +1003,9 @@ public enum DottieScript {
 
     Look fields (any shape or connector): fillStyle solid|hachure|crossHatch|grid, dash solid|dashed|dotted, \
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
-    strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors).
+    strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
+    font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
+    exports but not embedded; "" for Helvetica Neue), fontSize 4-200.
 
     Example
       const a = dottie.rect({x: 0, y: 0, text: "Start", fill: "#d6f5d6"});

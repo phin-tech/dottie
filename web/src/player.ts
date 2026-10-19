@@ -12,6 +12,7 @@
 // that page, by mouse or keyboard. Each click first fires a cancelable `action` event with the element and what it
 // does, so a page can handle it itself.
 
+import { addFonts, usedFonts } from "./fonts.ts";
 import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, partsOf } from "./clicks.ts";
 import { type DottieFile, type Page, type RGBA, clampTime, luminance, parseDottie } from "./model.ts";
 import { Path, fmt, rotate } from "./path.ts";
@@ -87,6 +88,7 @@ export class Playback {
   /** `file` is the drawing `page` belongs to, so links to its other pages are clickable. */
   constructor(page: Page, into: Element, options: { clean?: boolean; file?: DottieFile } = {}) {
     this.page = options.clean ? withRoughness(page, 0) : page;
+    addFonts(usedFonts(this.page));
     this.plan = plan(this.page);
     this.clicks = clickTargets(page, options.file);
     const table = symbolTable(this.page);

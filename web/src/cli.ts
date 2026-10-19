@@ -3,6 +3,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { type CompileOptions, compile } from "./compile.ts";
+import { fontFile } from "./fonts.ts";
+import type { Face } from "./metrics.ts";
 import { parseDottie } from "./model.ts";
 import { VERSION } from "./index.ts";
 
@@ -62,7 +64,11 @@ try { source = readFileSync(input, "utf8"); } catch { fail(`${input}: cannot rea
 try {
   for (const w of parseDottie(source).warnings) process.stderr.write(`dottie-compile: ${input}: ${w}\n`);
   const runtime = readFileSync(new URL("./dottie-player.min.js", import.meta.url), "utf8");
-  const js = compile(source, runtime, options);
+  // The fonts ship beside this script (dist/fonts); a drawing carries the ones it uses.
+  const fontData = (family: string, face: Face): string | undefined => {
+    try { return readFileSync(new URL(`./fonts/${fontFile(family, face)}`, import.meta.url)).toString("base64"); } catch { return undefined; }
+  };
+  const js = compile(source, runtime, { ...options, fontData });
   if (output === "-") process.stdout.write(js);
   else {
     const target = output ?? input.replace(/\.dottie$/i, "") + ".js";

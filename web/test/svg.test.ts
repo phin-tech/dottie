@@ -41,7 +41,9 @@ for (const group of ["design", "edge"]) {
       const file = parseDottie(read(group, `${name}.dottie`));
       let p = resolved(file.pages[Number(page) - 1], Number(t));
       if (look === "clean") p = withRoughness(p, 0);
-      const problems = svgDiff(read("goldens", "svg", group, f), svg(p));
+      // Dottie's export embeds the bundled fonts it uses on a line of their own; dottie.js's player serves them.
+      const expected = read("goldens", "svg", group, f).split("\n").filter((l) => !l.startsWith("<defs><style>@font-face")).join("\n");
+      const problems = svgDiff(expected, svg(p));
       assert.deepEqual(problems, [], `${group}/${f}:\n  ${problems.join("\n  ")}`);
     });
   }

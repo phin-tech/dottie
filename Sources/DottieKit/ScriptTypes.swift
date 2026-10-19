@@ -253,6 +253,10 @@ extension DottieScript {
             sketchy: boolean;
             strokeWidth: number;
             text?: string;
+            /** With text: its size in points. */
+            fontSize?: number;
+            /** Absent for Helvetica Neue. */
+            font?: string;
             /** Absent when the element has no fill. */
             fill?: Color;
             fillStyle?: FillStyle;
@@ -298,6 +302,11 @@ extension DottieScript {
             startHead?: Arrowhead;
             /** Connectors only. */
             endHead?: Arrowhead;
+            /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
+             * (named in exports, not embedded), or "" for Helvetica Neue. */
+            font?: string;
+            /** Text size in points, 4-200. */
+            fontSize?: number;
         }
 
         /** A shape an installed extension generates from parameters. */
@@ -452,7 +461,7 @@ extension DottieScript {
             /** Places a stencil item with its top-left corner at x, y; its elements are grouped. */
             stencil(options: { name: string; x?: number; y?: number; library?: string; scale?: number; keepOriginalColors?: boolean; sketchy?: boolean }): { ids: string[]; width: number; height: number };
             /** Lays nodes out below existing content and connects them. Returns node key → element id. */
-            build(options: { nodes: BuildNode[]; edges?: BuildEdge[]; direction?: Direction; sketchy?: boolean }): Record<string, string>;
+            build(options: { nodes: BuildNode[]; edges?: BuildEdge[]; direction?: Direction; sketchy?: boolean; font?: string }): Record<string, string>;
 
             update(id: Ref, changes: Changes): Element;
             /** Deletes and returns how many; connectors on a deleted shape stay as free arrows. */

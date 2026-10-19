@@ -35,6 +35,9 @@ public struct Style: Codable, Equatable, Sendable {
     /// Sideways bow of sketchy lines, independent of roughness. 0 is straight but shaky.
     public var bowing: Double = 1
     public var fontSize: Double = 18
+    /// The font text is set in (see `Fonts`): nil is Helvetica Neue, a bundled handwriting font by name, or a
+    /// font installed on the Mac.
+    public var font: String?
     /// Cell size of a `.grid` fill in points; nil is `Style.defaultGridSize`.
     public var gridSize: Double?
     /// How opaque the whole element is, 0...1; nil is fully opaque. Keyable, so elements can fade.
@@ -62,6 +65,7 @@ public struct Style: Codable, Equatable, Sendable {
         roughness = try c.decodeIfPresent(Double.self, forKey: .roughness) ?? 1
         bowing = try c.decodeIfPresent(Double.self, forKey: .bowing) ?? 1
         fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? 18
+        font = try c.decodeIfPresent(String.self, forKey: .font).flatMap { $0.isEmpty ? nil : $0 }
         gridSize = try c.decodeIfPresent(Double.self, forKey: .gridSize)
         opacity = try c.decodeIfPresent(Double.self, forKey: .opacity)
         dashOffset = try c.decodeIfPresent(Double.self, forKey: .dashOffset).flatMap { $0.isFinite ? $0 : nil }

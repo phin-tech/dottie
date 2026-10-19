@@ -272,13 +272,13 @@ public enum Renderer {
     public static func labelRect(for e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> CGRect {
         let m = midpoint(of: e, in: doc, index: index)
         let text = e.text ?? ""
-        let size = textSize(text.isEmpty ? "Label" : text, fontSize: e.style.fontSize, maxWidth: 200)
+        let size = textSize(text.isEmpty ? "Label" : text, fontSize: e.style.fontSize, font: e.style.font, maxWidth: 200)
         let w = max(size.width + 12, 44), h = size.height + 6
         return CGRect(x: m.x - w / 2, y: m.y - h / 2, width: w, height: h)
     }
 
-    static func textSize(_ s: String, fontSize: Double, maxWidth: Double) -> CGSize {
-        let font = CTFontCreateWithName("Helvetica Neue" as CFString, fontSize, nil)
+    static func textSize(_ s: String, fontSize: Double, font family: String? = nil, maxWidth: Double) -> CGSize {
+        let font = Fonts.font(family, size: fontSize)
         let str = CFAttributedStringCreate(nil, s as CFString, [kCTFontAttributeName: font] as CFDictionary)!
         let setter = CTFramesetterCreateWithAttributedString(str)
         let size = CTFramesetterSuggestFrameSizeWithConstraints(setter, CFRange(), nil, CGSize(width: maxWidth, height: .greatestFiniteMagnitude), nil)
@@ -489,7 +489,7 @@ public enum Renderer {
             if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
                 let r = labelRect(for: e, in: document, index: index)
                 if let background { ctx.setFillColor(background); ctx.fill(r) }
-                drawText(t, in: r, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
+                drawText(t, in: r, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
             }
             return
         }
@@ -506,7 +506,7 @@ public enum Renderer {
         }
         if e.kind == .text {
             if lod?.showsText(fontSize: e.style.fontSize) ?? true {
-                drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
+                drawText(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, ctx: ctx)
             }
             return
         }
@@ -547,12 +547,12 @@ public enum Renderer {
         ctx.strokePath()
         if e.kind == .note {
             if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
-                Note.draw(t, in: Note.textRect(e.frame), fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx)
+                Note.draw(t, in: Note.textRect(e.frame), fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, ctx: ctx)
             }
             return
         }
         if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
-            drawText(t, in: e.labelFrame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
+            drawText(t, in: e.labelFrame, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
         }
     }
 
@@ -588,8 +588,8 @@ public enum Renderer {
         ctx.strokePath()
     }
 
-    static func drawText(_ s: String, in rect: CGRect, fontSize: Double, color: CGColor, ctx: CGContext, centered: Bool = false) {
-        let (frame, box) = textFrame(s, in: rect, fontSize: fontSize, color: color, centered: centered)
+    static func drawText(_ s: String, in rect: CGRect, fontSize: Double, font: String? = nil, color: CGColor, ctx: CGContext, centered: Bool = false) {
+        let (frame, box) = textFrame(s, in: rect, fontSize: fontSize, font: font, color: color, centered: centered)
         // CoreText draws y-up; flip locally within the top-left-origin context.
         ctx.saveGState()
         ctx.translateBy(x: 0, y: box.minY + box.maxY)
@@ -599,8 +599,8 @@ public enum Renderer {
     }
 
     /// `s` laid out as `drawText` draws it: the CoreText frame and the box (top-left coordinates) it fills.
-    static func textFrame(_ s: String, in rect: CGRect, fontSize: Double, color: CGColor, centered: Bool) -> (frame: CTFrame, box: CGRect) {
-        let font = CTFontCreateWithName("Helvetica Neue" as CFString, fontSize, nil)
+    static func textFrame(_ s: String, in rect: CGRect, fontSize: Double, font family: String? = nil, color: CGColor, centered: Bool) -> (frame: CTFrame, box: CGRect) {
+        let font = Fonts.font(family, size: fontSize)
         var align: CTTextAlignment = centered ? .center : .left
         let para = withUnsafeBytes(of: &align) { buf -> CTParagraphStyle in
             var setting = CTParagraphStyleSetting(spec: .alignment, valueSize: MemoryLayout<CTTextAlignment>.size, value: buf.baseAddress!)

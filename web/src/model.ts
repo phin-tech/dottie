@@ -21,6 +21,8 @@ export interface Style {
   roughness: number;
   bowing: number;
   fontSize: number;
+  /** The font text is set in: null is Helvetica Neue, else a bundled handwriting font or one of the viewer's own. */
+  font: string | null;
   gridSize: number | null;
   opacity: number | null;
   /** How far into its dash pattern a dashed or dotted line starts; marching ants set it on every frame. */
@@ -180,7 +182,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
-  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "gridSize", "opacity", "dashOffset"],
+  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension"],
@@ -286,6 +288,7 @@ class Reader {
       roughness: num(s.roughness) ?? 1,
       bowing: num(s.bowing) ?? 1,
       fontSize: num(s.fontSize) ?? 18,
+      font: str(s.font) || null,
       gridSize: num(s.gridSize) ?? null,
       opacity: num(s.opacity) ?? null,
       dashOffset: num(s.dashOffset) ?? null,

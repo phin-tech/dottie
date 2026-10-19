@@ -42,6 +42,8 @@ Edit the source and regenerate:
 - `Dottie.xcodeproj` from `project.yml` (`just gen`).
 - `Sources/DottieKit/PlayerScript.swift` from `web/` (`just player-script`).
 - `Sources/DottieKit/BundledModules.swift` from `scripts/update-script-modules.py`.
+- `Sources/DottieKit/BundledFonts.swift` and `web/fonts/` from `scripts/update-fonts.py`, then `web/src/metrics.ts`
+  from `swift scripts/font-metrics.swift`.
 - Version strings from `just bump` (bump-my-version; `.bumpversion.toml` lists the files).
 
 ## Gotchas

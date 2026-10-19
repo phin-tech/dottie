@@ -26,6 +26,8 @@ private let routingValues = ["straight", "curved", "elbow"]
 private let fillStyleValues = ["solid", "hachure", "crossHatch", "grid"]
 private let dashValues = ["solid", "dashed", "dotted"]
 private let headValues = ["none", "arrow", "triangle", "dot", "bar"]
+private let fontProp = prop("string", "Font for the text: Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), "
+        + "Helvetica Neue (the default), or any font installed on this Mac (named in exports, not embedded)")
 
 /// Look options shared by add_shape, add_connector and update_element.
 private let lookProps: [String: Value] = [
@@ -38,6 +40,8 @@ private let lookProps: [String: Value] = [
     "rotation": prop("number", "Degrees clockwise about the shape's center (shapes only)"),
     "start_head": prop("string", "Connector start arrowhead", enum: headValues),
     "end_head": prop("string", "Connector end arrowhead", enum: headValues),
+    "font": fontProp,
+    "font_size": prop("number", "Text size in points, 4 to 200 (default 18; notes 16)"),
 ]
 
 private struct ToolFailure: Error { var message: String }
@@ -122,7 +126,8 @@ private struct Args {
         DiagramOps.Look(fillStyle: try enumValue("fill_style", fillStyleValues), dash: try enumValue("dash", dashValues),
                         strokeWidth: double("stroke_width"), bowing: double("bowing"),
                         startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
-                        rotation: double("rotation"), gridSize: double("grid_size"))
+                        rotation: double("rotation"), gridSize: double("grid_size"),
+                        font: string("font"), fontSize: double("font_size"))
     }
 }
 
@@ -167,6 +172,7 @@ actor DottieTools {
                 ])]),
                 "direction": prop("string", "TB = top to bottom (default), LR = left to right", enum: ["TB", "LR"]),
                 "sketchy": prop("boolean", "Hand-drawn look (default true); false for precise geometry"),
+                "font": fontProp,
              ], required: ["path", "nodes"])),
         Tool(name: "import_mermaid",
              description: "Draw a Mermaid flowchart (text starting with `flowchart` or `graph`): nodes, shapes, labelled, dashed, "
@@ -176,6 +182,7 @@ actor DottieTools {
                 "path": pathProp, "page": pageProp,
                 "mermaid": prop("string", "Mermaid flowchart source, e.g. \"flowchart LR\\n  A[Start] --> B{OK?}\""),
                 "sketchy": prop("boolean", "Hand-drawn look (default true); false for precise geometry"),
+                "font": fontProp,
              ], required: ["path", "mermaid"])),
         Tool(name: "add_shape",
              description: "Add one shape at an exact position. Returns its element id.",
@@ -717,7 +724,8 @@ actor DottieTools {
             let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
             let ids: [String: UUID]
             do {
-                ids = try DiagramOps.build(&file.pages[p], nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1)
+                ids = try DiagramOps.build(&file.pages[p], nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
+                                         font: a.string("font"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             let map = ids.mapValues(\.uuidString)
@@ -730,7 +738,7 @@ actor DottieTools {
             let p = try pageIndex(file, a)
             let result: (ids: [String: UUID], notes: [String])
             do {
-                result = try MermaidImporter.build(&file.pages[p], mermaid: source, roughness: a.roughness ?? 1)
+                result = try MermaidImporter.build(&file.pages[p], mermaid: source, roughness: a.roughness ?? 1, font: a.string("font"))
             } catch let e as MermaidError { throw ToolFailure(message: e.description) }
             catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)

@@ -43,14 +43,20 @@ The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(ele
 Without modules, `dist/dottie-player.min.js` is a classic script that registers the element and sets
 `window.Dottie`.
 
+**Fonts.** Text in Dottie's handwriting fonts (Caveat, Patrick Hand, Architects Daughter; SIL Open Font License)
+is drawn in them: the player loads the ones a drawing uses from `fonts/` beside its own script, as `dist/fonts` on
+npm and the CDNs. If you host the player yourself, copy that folder with it, or call `Dottie.setFontBase(url)`
+before the player loads a drawing. A font of the drawing's own is named, not shipped: viewers who have it see it,
+and the rest see Helvetica Neue or its stand-ins.
+
 ## Compile a drawing into one script
 
 ```sh
 npx -p @phin-tech/dottie dottie-compile tour.dottie        # writes tour.js
 ```
 
-`tour.js` holds the player and the drawing (about 75 KB plus the drawing; around 25 KB gzipped), so one file
-shows it anywhere you can put a script tag:
+`tour.js` holds the player and the drawing (about 110 KB plus the drawing; around 38 KB gzipped), and the
+handwriting fonts the drawing uses (15 to 30 KB each), so one file shows it anywhere you can put a script tag:
 
 ```html
 <script src="tour.js"></script>                            <!-- a player right here -->
