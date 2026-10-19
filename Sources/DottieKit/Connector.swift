@@ -19,12 +19,26 @@ public struct Endpoint: Codable, Equatable, Sendable {
 
 public enum Arrowhead: String, Codable, Sendable, CaseIterable { case none, arrow, triangle, dot, bar }
 
+/// A point on the canvas a connector's line passes through.
+public struct Waypoint: Codable, Equatable, Hashable, Sendable {
+    public var x, y: Double
+    public init(x: Double, y: Double) { self.x = x; self.y = y }
+    public init(_ p: CGPoint) { x = p.x; y = p.y }
+    public var point: CGPoint { CGPoint(x: x, y: y) }
+}
+
 public struct ConnectorData: Codable, Equatable, Sendable {
     public var start: Endpoint
     public var end: Endpoint
     public var routing: Routing = .straight
     public var startHead: Arrowhead = .none
     public var endHead: Arrowhead = .arrow
+    /// Bends the user dragged in, start to end, on the canvas. The line passes through each in turn, whatever its
+    /// routing; they stay put when the end shapes move, and move with the connector. Nil (or empty) routes it
+    /// from its ends alone.
+    public var waypoints: [Waypoint]? = nil
+    /// Hops (small arcs) where the line crosses a connector drawn beneath it. Straight and elbow lines only.
+    public var hops: Bool? = nil
     public init(start: Endpoint, end: Endpoint, routing: Routing = .straight, endArrow: Bool = true) {
         self.start = start; self.end = end; self.routing = routing
         self.endHead = endArrow ? .arrow : .none
@@ -37,6 +51,31 @@ public struct ConnectorData: Codable, Equatable, Sendable {
     public var startArrow: Bool {
         get { startHead != .none }
         set { startHead = newValue ? (startHead == .none ? .arrow : startHead) : .none }
+    }
+
+    /// Moves what belongs to the connector itself, its free ends and its waypoints, through `f` (a move, a turn, a
+    /// scale). Bound ends follow their shapes, so they are left alone.
+    public mutating func transformFree(_ f: (CGPoint) -> CGPoint) {
+        for isStart in [true, false] {
+            var ep = isStart ? start : end
+            if ep.elementID == nil {
+                let p = f(CGPoint(x: ep.x, y: ep.y))
+                ep.x = p.x; ep.y = p.y
+            }
+            if isStart { start = ep } else { end = ep }
+        }
+        if let w = waypoints { waypoints = w.map { Waypoint(f($0.point)) } }
+    }
+
+    /// Changes the routing. An elbow line's waypoints are its corners, which mean nothing to a straight or curved
+    /// line (and the other way round), so a change between the two kinds takes the bends out.
+    public mutating func setRouting(_ r: Routing) {
+        if (routing == .elbow) != (r == .elbow) { waypoints = nil }
+        routing = r
+    }
+
+    public mutating func translateFree(dx: Double, dy: Double) {
+        transformFree { CGPoint(x: $0.x + dx, y: $0.y + dy) }
     }
 }
 
@@ -140,25 +179,33 @@ public enum Connector {
 
     public static func endpoints(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> (CGPoint, CGPoint) {
         guard let c = e.connector else { return (.zero, .zero) }
-        let s = resolve(c.start, other: reference(c.end, in: doc, index), in: doc, index)
-        let t = resolve(c.end, other: reference(c.start, in: doc, index), in: doc, index)
+        // An edge-following end aims at the next point along the line: its nearest waypoint, else the other end.
+        let w = c.waypoints ?? []
+        let s = resolve(c.start, other: w.first?.point ?? reference(c.end, in: doc, index), in: doc, index)
+        let t = resolve(c.end, other: w.last?.point ?? reference(c.start, in: doc, index), in: doc, index)
         return (s, t)
     }
 
     /// The routed centerline plus the direction the final segment arrives in.
     public enum Route {
         case polyline([CGPoint])
-        case cubic(CGPoint, CGPoint, CGPoint, CGPoint)
+        /// Joined cubic Béziers: the start, then two controls and an end per segment.
+        case curve([CGPoint])
 
         public var points: [CGPoint] {
             switch self {
             case .polyline(let p): return p
-            case .cubic(let a, let b, let c, let d):
-                return (0...24).map { i in
-                    let t = CGFloat(i) / 24, u = 1 - t
-                    return CGPoint(x: u*u*u*a.x + 3*u*u*t*b.x + 3*u*t*t*c.x + t*t*t*d.x,
-                                   y: u*u*u*a.y + 3*u*u*t*b.y + 3*u*t*t*c.y + t*t*t*d.y)
+            case .curve(let p):
+                var out: [CGPoint] = []
+                for s in 0..<((p.count - 1) / 3) {
+                    let a = p[3 * s], b = p[3 * s + 1], c = p[3 * s + 2], d = p[3 * s + 3]
+                    for i in (s == 0 ? 0 : 1)...24 {
+                        let t = CGFloat(i) / 24, u = 1 - t
+                        out.append(CGPoint(x: u*u*u*a.x + 3*u*u*t*b.x + 3*u*t*t*c.x + t*t*t*d.x,
+                                           y: u*u*u*a.y + 3*u*u*t*b.y + 3*u*t*t*c.y + t*t*t*d.y))
+                    }
                 }
+                return out
             }
         }
     }
@@ -166,6 +213,7 @@ public enum Connector {
     public static func route(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> Route {
         guard let c = e.connector else { return .polyline([]) }
         let (a, b) = endpoints(of: e, in: doc, index: index)
+        if let w = c.waypoints, !w.isEmpty { return route(through: [a] + w.map(\.point) + [b], c) }
         let dx = b.x - a.x, dy = b.y - a.y
         let horizontal = abs(dx) >= abs(dy)
         switch c.routing {
@@ -173,12 +221,11 @@ public enum Connector {
             return .polyline([a, b])
         case .curved:
             if horizontal {
-                return .cubic(a, CGPoint(x: a.x + dx / 2, y: a.y), CGPoint(x: b.x - dx / 2, y: b.y), b)
+                return .curve([a, CGPoint(x: a.x + dx / 2, y: a.y), CGPoint(x: b.x - dx / 2, y: b.y), b])
             }
-            return .cubic(a, CGPoint(x: a.x, y: a.y + dy / 2), CGPoint(x: b.x, y: b.y - dy / 2), b)
+            return .curve([a, CGPoint(x: a.x, y: a.y + dy / 2), CGPoint(x: b.x, y: b.y - dy / 2), b])
         case .elbow:
             // A pinned port decides the axis the connector leaves / arrives along; otherwise use the dominant axis.
-            func vertical(_ port: Port?) -> Bool? { port.map { $0 == .top || $0 == .bottom } }
             let startV = vertical(c.start.port) ?? !horizontal
             let endV = vertical(c.end.port) ?? !horizontal
             switch (startV, endV) {
@@ -193,6 +240,125 @@ public enum Connector {
             case (false, true):
                 return .polyline([a, CGPoint(x: b.x, y: a.y), b])
             }
+        }
+    }
+
+    private static func vertical(_ port: Port?) -> Bool? { port.map { $0 == .top || $0 == .bottom } }
+
+    /// The route through `p` (the start, the waypoints, the end): straight lines between them, a smooth curve
+    /// through them (Catmull-Rom), or right angles that turn as little as they can.
+    private static func route(through p: [CGPoint], _ c: ConnectorData) -> Route {
+        switch c.routing {
+        case .straight:
+            return .polyline(p)
+        case .curved:
+            var out = [p[0]]
+            for i in 0..<(p.count - 1) {
+                let p0 = p[max(i - 1, 0)], p1 = p[i], p2 = p[i + 1], p3 = p[min(i + 2, p.count - 1)]
+                out.append(CGPoint(x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6))
+                out.append(CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6))
+                out.append(p2)
+            }
+            return .curve(out)
+        case .elbow:
+            let first = p[1], a = p[0]
+            var goVertical = vertical(c.start.port) ?? (abs(first.y - a.y) > abs(first.x - a.x))
+            let endV = vertical(c.end.port)
+            var out = [a]
+            for i in 1..<p.count {
+                let q = p[i], cur = out[out.count - 1]
+                let alignedX = abs(cur.x - q.x) < 0.5, alignedY = abs(cur.y - q.y) < 0.5
+                if alignedX || alignedY {
+                    out.append(q)
+                    if alignedX != alignedY { goVertical = !alignedX } // turn after a vertical leg, and vice versa
+                    continue
+                }
+                // The last leg arrives along a pinned port's axis; every other leg sets off along `goVertical`.
+                let up = i == p.count - 1 ? endV.map { !$0 } ?? goVertical : goVertical
+                let corner = up ? CGPoint(x: cur.x, y: q.y) : CGPoint(x: q.x, y: cur.y)
+                out.append(corner); out.append(q)
+                goVertical = up // the leg ended along the other axis, so the next sets off along this one
+            }
+            return .polyline(simplified(out))
+        }
+    }
+
+    /// Drops repeated points and the middle of three in a line, so dragged bends that fall into line disappear.
+    static func simplified(_ pts: [CGPoint]) -> [CGPoint] {
+        var out: [CGPoint] = []
+        for q in pts {
+            if let l = out.last, abs(l.x - q.x) < 0.5, abs(l.y - q.y) < 0.5 { continue }
+            if out.count >= 2 {
+                let p = out[out.count - 2], m = out[out.count - 1]
+                if (abs(p.x - m.x) < 0.5 && abs(m.x - q.x) < 0.5) || (abs(p.y - m.y) < 0.5 && abs(m.y - q.y) < 0.5) {
+                    out[out.count - 1] = q; continue
+                }
+            }
+            out.append(q)
+        }
+        return out.count >= 2 ? out : pts
+    }
+
+    // MARK: Bends
+
+    /// A place on a selected connector to drag to reshape it.
+    public enum BendHandle: Equatable, Sendable {
+        /// One of its waypoints, on a straight or curved line.
+        case waypoint(Int)
+        /// Halfway between two points along a straight or curved line: dragging it adds a waypoint at this index.
+        case insert(Int)
+        /// One segment of an elbow line, by its index in the route: dragging moves it sideways.
+        case segment(Int)
+    }
+
+    /// Where a connector's bend handles are: on a straight or curved line its waypoints and a handle halfway along
+    /// each stretch between them; on an elbow line the middle of each segment.
+    public static func bendHandles(of e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> [(handle: BendHandle, at: CGPoint)] {
+        guard let c = e.connector else { return [] }
+        let r = route(of: e, in: doc, index: index)
+        let w = c.waypoints ?? []
+        func mid(_ p: CGPoint, _ q: CGPoint) -> CGPoint { CGPoint(x: (p.x + q.x) / 2, y: (p.y + q.y) / 2) }
+        switch r {
+        case .polyline(let route) where c.routing == .elbow:
+            let pts = simplified(route) // a bare elbow can have zero-length segments; they get no handles
+            return (0..<max(pts.count - 1, 0)).map { (.segment($0), mid(pts[$0], pts[$0 + 1])) }
+        case .polyline(let pts):
+            return w.indices.map { (.waypoint($0), w[$0].point) }
+                + (0..<max(pts.count - 1, 0)).map { (.insert($0), mid(pts[$0], pts[$0 + 1])) }
+        case .curve(let pts):
+            let halves = (0..<((pts.count - 1) / 3)).map { s -> CGPoint in
+                let a = pts[3 * s], b = pts[3 * s + 1], c = pts[3 * s + 2], d = pts[3 * s + 3]
+                return CGPoint(x: (a.x + 3 * b.x + 3 * c.x + d.x) / 8, y: (a.y + 3 * b.y + 3 * c.y + d.y) / 8)
+            }
+            return w.indices.map { (.waypoint($0), w[$0].point) } + halves.indices.map { (.insert($0), halves[$0]) }
+        }
+    }
+
+    /// The waypoints `e` gets when `handle` is dragged to `p`, worked out from `e` as it was when the drag began.
+    /// An elbow segment moves sideways only; when it is the first or last, a new corner keeps the end where it is.
+    public static func bend(_ e: Element, in doc: DottieDocument, handle: BendHandle, to p: CGPoint) -> [Waypoint]? {
+        guard let c = e.connector else { return nil }
+        var w = c.waypoints ?? []
+        switch handle {
+        case .waypoint(let i):
+            guard w.indices.contains(i) else { return c.waypoints }
+            w[i] = Waypoint(p)
+            return w
+        case .insert(let i):
+            w.insert(Waypoint(p), at: min(max(i, 0), w.count))
+            return w
+        case .segment(let k):
+            guard case .polyline(let route) = route(of: e, in: doc) else { return c.waypoints }
+            let r = simplified(route) // as bendHandles numbers the segments
+            guard r.indices.contains(k + 1) else { return c.waypoints }
+            let horizontal = abs(r[k].y - r[k + 1].y) < abs(r[k].x - r[k + 1].x)
+            var pts = r, lo = k, hi = k + 1
+            if hi == pts.count - 1 { pts.insert(pts[hi], at: hi) }
+            if lo == 0 { pts.insert(pts[0], at: 0); lo += 1; hi += 1 }
+            for i in [lo, hi] {
+                if horizontal { pts[i].y = p.y } else { pts[i].x = p.x }
+            }
+            return pts[1..<(pts.count - 1)].map(Waypoint.init)
         }
     }
 

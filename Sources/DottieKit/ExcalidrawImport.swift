@@ -159,8 +159,10 @@ public enum ExcalidrawImporter {
                 var c = ConnectorData(start: endpoint("startBinding", pts[0]), end: endpoint("endBinding", pts[pts.count - 1]))
                 c.startHead = head("startArrowhead", default: .none)
                 c.endHead = isArrow ? head("endArrowhead", default: .arrow) : .none
-                if isArrow, pts.count > 2 || (r["elbowed"] as? Bool) == true { c.routing = .elbow }
-                else if isArrow, r["roundness"] is [String: Any], pts.count == 3 { c.routing = .curved }
+                if isArrow, (r["elbowed"] as? Bool) == true { c.routing = .elbow }
+                else if isArrow, r["roundness"] is [String: Any], pts.count >= 3 { c.routing = .curved }
+                // The points between an arrow's ends are its bends.
+                if isArrow, pts.count > 2 { c.waypoints = pts[1..<(pts.count - 1)].map(Waypoint.init) }
                 var e = Element(id: id, kind: .connector, frame: .zero, style: st, seed: seed, layerID: layerID,
                                 text: labels[sid], connector: c, groupID: group)
                 e.style.fill = .clear

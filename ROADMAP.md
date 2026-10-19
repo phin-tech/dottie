@@ -51,6 +51,9 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] Screenshot markup: lossless pictures keep up to 8192 px as PNG; Highlighter (H); Redact (X) pixelates a picture's own pixels under a dragged box
 - [x] Rulers mark the pointer's position; scene flags drag to retime them; the poster frame is set, shown and cleared on the timeline ruler; a Layers list context menu; Settings ▸ Scripting downloads TypeScript for script type checks
 
+- [x] Bends and hops: drag a connector to bend it (waypoints, on straight, curved and elbow lines; double-click
+  removes one), hops where a line crosses the ones beneath it; from draw.io and Excalidraw, over MCP and scripts, and in dottie.js
+
 ## Next
 - Custom themes and a color palette per theme
 

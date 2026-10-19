@@ -25,6 +25,26 @@ final class ScriptTests: XCTestCase {
 
     /// An error from a dottie call gives the script line that made it (not the prelude's), the one the type check
     /// reports too, including when a top-level return has the script run wrapped in a function.
+    func testConnectorsTakeBendsAndHopsAndReportThem() {
+        var doc = DottieDocument()
+        let r = run("""
+            const a = dottie.rect({x: 0, y: 0, text: "A"});
+            const b = dottie.rect({x: 300, y: 0, text: "B"});
+            const c = dottie.connect(a, b, {waypoints: [{x: 150, y: 120}], hops: true});
+            const changed = dottie.update(c.id, {waypoints: [{x: 150, y: -80}, {x: 200, y: -80}]});
+            return [c.waypoints, c.hops, changed.waypoints.length];
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(r.value, ##"[[{"x":150,"y":120}],true,2]"##)
+        XCTAssertEqual(doc.elements[2].connector?.waypoints, [Waypoint(x: 150, y: -80), Waypoint(x: 200, y: -80)])
+        XCTAssertEqual(doc.elements[2].connector?.hops, true)
+        let cleared = run("dottie.update(dottie.elements()[2].id, {waypoints: [], hops: false});", &doc)
+        XCTAssertNil(cleared.error)
+        XCTAssertNil(doc.elements[2].connector?.waypoints)
+        XCTAssertNil(doc.elements[2].connector?.hops)
+        XCTAssertNotNil(run("dottie.update(dottie.elements()[2].id, {waypoints: [{x: 1}]});", &doc).error)
+    }
+
     func testErrorsGiveTheScriptsLineNumber() {
         var doc = DottieDocument()
         let returning = run("""

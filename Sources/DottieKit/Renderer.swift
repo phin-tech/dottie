@@ -26,6 +26,8 @@ public enum Renderer {
         var startHead, endHead: Arrowhead
         var startPort, endPort: Port?
         var ax, ay, bx, by: Double
+        var waypoints: [Waypoint]?
+        var hops: [[Double]]
     }
 
     final class PathCache: @unchecked Sendable {
@@ -171,36 +173,106 @@ public enum Renderer {
     /// (triangle and dot heads) that are also filled with the stroke color. Sketchy when roughness > 0.
     public static func connectorParts(for e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> (line: CGPath, filled: CGPath) {
         guard let c = e.connector else { return (CGMutablePath(), CGMutablePath()) }
-        // The route depends on the document only through the two resolved endpoints.
+        // The route depends on the document only through the two resolved endpoints, and the lines it hops.
         let (a, b) = Connector.endpoints(of: e, in: doc, index: index)
+        let route = Connector.route(of: e, in: doc, index: index)
+        let hops = c.hops == true ? hopCrossings(of: e, route: route, in: doc, index: index) : []
         let key = ConnectorKey(seed: e.seed, roughness: e.style.roughness, bowing: e.style.bowing,
                                strokeWidth: e.style.strokeWidth, routing: c.routing, startHead: c.startHead,
                                endHead: c.endHead, startPort: c.start.port, endPort: c.end.port,
-                               ax: a.x, ay: a.y, bx: b.x, by: b.y)
-        let parts = cache.connector(key) { computeConnector(for: e, in: doc, index: index) }
+                               ax: a.x, ay: a.y, bx: b.x, by: b.y, waypoints: c.waypoints, hops: hops)
+        let parts = cache.connector(key) { computeConnector(for: e, route: route, hops: hops) }
         return (parts.0, parts.1)
     }
 
-    private static func computeConnector(for e: Element, in doc: DottieDocument, index: [UUID: Element]?) -> (CGPath, CGPath) {
+    /// How big a hop is for a line `strokeWidth` wide: its radius.
+    static func hopRadius(_ strokeWidth: Double) -> Double { max(6, strokeWidth * 3) }
+
+    /// Where a hopping connector's straight segments cross the connectors drawn beneath it (earlier on a visible
+    /// layer): for each segment, the distances along it, ascending. A crossing too close to the segment's ends or
+    /// to the hop before it is left out, so hops never run into bends or each other.
+    static func hopCrossings(of e: Element, route: Connector.Route, in doc: DottieDocument, index: [UUID: Element]?) -> [[Double]] {
+        guard case .polyline(let pts) = route, pts.count > 1 else { return [] }
+        let visible = Set(doc.layers.filter(\.visible).map(\.id))
+        var beneath: [[CGPoint]] = []
+        for o in doc.orderedElements {
+            if o.id == e.id { break }
+            guard o.kind == .connector, visible.contains(o.layerID) else { continue }
+            beneath.append(Connector.route(of: o, in: doc, index: index).points)
+        }
+        let r = hopRadius(e.style.strokeWidth)
+        var out: [[Double]] = []
+        for i in 0..<(pts.count - 1) {
+            let p = pts[i], q = pts[i + 1]
+            let d = CGPoint(x: q.x - p.x, y: q.y - p.y)
+            let length = hypot(d.x, d.y)
+            var found: [Double] = []
+            for line in beneath where line.count > 1 {
+                for k in 0..<(line.count - 1) {
+                    let a = line[k], b = line[k + 1]
+                    let ex = b.x - a.x, ey = b.y - a.y
+                    let det = d.x * ey - d.y * ex
+                    if abs(det) < 1e-9 { continue }
+                    let wx = a.x - p.x, wy = a.y - p.y
+                    // Solves p + t·d = a + s·(b - a).
+                    let t = (wx * ey - wy * ex) / det, s = (wx * d.y - wy * d.x) / det
+                    if t > 0, t < 1, s >= 0, s <= 1 { found.append(t * length) }
+                }
+            }
+            var kept: [Double] = []
+            for at in found.sorted() where at >= r + 2 && at <= length - r - 2 && (kept.last.map { at - $0 >= 2 * r + 2 } ?? true) {
+                kept.append(at)
+            }
+            out.append(kept)
+        }
+        return out
+    }
+
+    private static func computeConnector(for e: Element, route: Connector.Route, hops: [[Double]]) -> (CGPath, CGPath) {
         guard let c = e.connector else { return (CGMutablePath(), CGMutablePath()) }
         var rng = SeededRNG(seed: e.seed)
         let rough = e.style.roughness
         let bow = e.style.bowing
         let path = CGMutablePath()
         let solid = CGMutablePath()
-        let route = Connector.route(of: e, in: doc, index: index)
+        let w = rough * 3
+        func j() -> CGFloat { CGFloat(rng.signed() * w) }
 
         switch route {
         case .polyline(let pts):
+            let r = hopRadius(e.style.strokeWidth)
             for i in 0..<max(pts.count - 1, 0) {
-                if rough <= 0 { path.move(to: pts[i]); path.addLine(to: pts[i + 1]) }
-                else { Rough.line(pts[i], pts[i + 1], rng: &rng, roughness: rough, bowing: bow, preserveEnds: true, into: path) }
+                let p = pts[i], q = pts[i + 1]
+                let length = hypot(q.x - p.x, q.y - p.y)
+                let u = length > 0 ? CGPoint(x: (q.x - p.x) / length, y: (q.y - p.y) / length) : .zero
+                func at(_ d: Double) -> CGPoint { CGPoint(x: p.x + u.x * d, y: p.y + u.y * d) }
+                // A hop bulges up, or left on an upright segment.
+                var n = CGPoint(x: u.y, y: -u.x)
+                if n.y > 1e-9 || (abs(n.y) <= 1e-9 && n.x > 0) { n = CGPoint(x: -n.x, y: -n.y) }
+                var from = p
+                for d in i < hops.count ? hops[i] : [] {
+                    let s = at(d - r), m = at(d), t = at(d + r)
+                    if rough <= 0 { path.move(to: from); path.addLine(to: s) }
+                    else { Rough.line(from, s, rng: &rng, roughness: rough, bowing: bow, preserveEnds: true, into: path) }
+                    // A half circle over the crossing, as two quarter arcs.
+                    let k = r * 0.5523
+                    let top = CGPoint(x: m.x + n.x * r, y: m.y + n.y * r)
+                    path.move(to: s)
+                    path.addCurve(to: top, control1: CGPoint(x: s.x + n.x * k + j(), y: s.y + n.y * k + j()),
+                                  control2: CGPoint(x: top.x - u.x * k + j(), y: top.y - u.y * k + j()))
+                    path.addCurve(to: t, control1: CGPoint(x: top.x + u.x * k + j(), y: top.y + u.y * k + j()),
+                                  control2: CGPoint(x: t.x + n.x * k + j(), y: t.y + n.y * k + j()))
+                    from = t
+                }
+                if rough <= 0 { path.move(to: from); path.addLine(to: q) }
+                else { Rough.line(from, q, rng: &rng, roughness: rough, bowing: bow, preserveEnds: true, into: path) }
             }
-        case .cubic(let a, let b, let c2, let d):
-            path.move(to: a)
-            let w = rough * 3
-            func j() -> CGFloat { CGFloat(rng.signed() * w) }
-            path.addCurve(to: d, control1: CGPoint(x: b.x + j(), y: b.y + j()), control2: CGPoint(x: c2.x + j(), y: c2.y + j()))
+        case .curve(let pts):
+            path.move(to: pts[0])
+            for s in 0..<((pts.count - 1) / 3) {
+                let b = pts[3 * s + 1], c2 = pts[3 * s + 2], d = pts[3 * s + 3]
+                path.addCurve(to: d, control1: CGPoint(x: b.x + j(), y: b.y + j()), control2: CGPoint(x: c2.x + j(), y: c2.y + j()))
+            }
         }
 
         let pts = route.points

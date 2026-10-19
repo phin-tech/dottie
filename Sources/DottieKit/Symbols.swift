@@ -234,6 +234,7 @@ extension DottieDocument {
                 return Endpoint(elementID: nil, port: p.port, x: q.x, y: q.y)
             }
             c.start = end(c.start); c.end = end(c.end)
+            c.waypoints = c.waypoints?.map { Waypoint(point($0.point)) }
             e.connector = c
         }
         return e
@@ -297,8 +298,7 @@ extension DottieDocument {
             e.layerID = layer.id
             e.x -= dx; e.y -= dy
             if var c = e.connector {
-                if c.start.elementID == nil { c.start.x -= dx; c.start.y -= dy }
-                if c.end.elementID == nil { c.end.x -= dx; c.end.y -= dy }
+                c.translateFree(dx: -dx, dy: -dy)
                 e.connector = c
             }
             return e

@@ -1,10 +1,10 @@
 // The paths an element draws (Renderer.swift): outlines, fills, hatching and connectors, sketchy or clean.
 // Pure functions of the element, cached by what they depend on, as Dottie does.
 
-import { type Index, arrowhead, endpoints, route, routePoints } from "./connector.ts";
+import { type Index, type Route, arrowhead, endpoints, route, routePoints } from "./connector.ts";
 import { type Contour, frame, shapeContours, shapePath } from "./element.ts";
 import { gridLines } from "./dungeon.ts";
-import type { DashStyle, Element } from "./model.ts";
+import { type DashStyle, type Element, type Page, orderedElements } from "./model.ts";
 import { Path, type Point, type Rect, flatten, maxX, maxY, midX, midY } from "./path.ts";
 import { SeededRNG } from "./rng.ts";
 import * as Rough from "./rough.ts";
@@ -184,34 +184,113 @@ export function dashPattern(dash: DashStyle, width: number): number[] | null {
   }
 }
 
-/** A connector as the stroked line (with open arrowheads) and the closed heads filled in the stroke color. */
-export function connectorParts(e: Element, index: Index): [Path, Path] {
+/**
+ * A connector as the stroked line (with open arrowheads) and the closed heads filled in the stroke color. `page`
+ * holds the connectors a hopping line hops over; without it a line draws no hops.
+ */
+export function connectorParts(e: Element, index: Index, page?: Page): [Path, Path] {
   const c = e.connector;
   if (!c) return [new Path(), new Path()];
   const [a, b] = endpoints(e, index);
+  const r = route(e, index);
+  const hops = c.hops === true && page ? hopCrossings(e, r, page, index) : [];
   const key = [e.seed, e.style.roughness, e.style.bowing, e.style.strokeWidth, c.routing, c.startHead, c.endHead,
-    c.start.port, c.end.port, a.x, a.y, b.x, b.y].join("|");
-  return connectors.get(key, () => computeConnector(e, index));
+    c.start.port, c.end.port, a.x, a.y, b.x, b.y, JSON.stringify(c.waypoints), JSON.stringify(hops)].join("|");
+  return connectors.get(key, () => computeConnector(e, r, hops));
 }
 
-function computeConnector(e: Element, index: Index): [Path, Path] {
+/** How big a hop is for a line `strokeWidth` wide: its radius. */
+export function hopRadius(strokeWidth: number): number { return Math.max(6, strokeWidth * 3); }
+
+/**
+ * Where a hopping connector's straight segments cross the connectors drawn beneath it (earlier on a visible layer):
+ * for each segment, the distances along it, ascending, leaving out crossings too close to its ends or the hop before.
+ */
+export function hopCrossings(e: Element, r: Route, page: Page, index: Index): number[][] {
+  if (r.kind !== "polyline" || r.points.length < 2) return [];
+  const pts = r.points;
+  const visible = new Set(page.layers.filter((l) => l.visible).map((l) => l.id));
+  const beneath: Point[][] = [];
+  for (const o of orderedElements(page)) {
+    if (o.id === e.id) break;
+    if (o.kind !== "connector" || !visible.has(o.layerID)) continue;
+    beneath.push(routePoints(route(o, index)));
+  }
+  const rad = hopRadius(e.style.strokeWidth);
+  const out: number[][] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p = pts[i], q = pts[i + 1];
+    const dx = q.x - p.x, dy = q.y - p.y;
+    const length = Math.hypot(dx, dy);
+    const found: number[] = [];
+    for (const line of beneath) {
+      for (let k = 0; k < line.length - 1; k++) {
+        const a = line[k], b = line[k + 1];
+        const ex = b.x - a.x, ey = b.y - a.y;
+        const det = dx * ey - dy * ex;
+        if (Math.abs(det) < 1e-9) continue;
+        const wx = a.x - p.x, wy = a.y - p.y;
+        // Solves p + t·d = a + s·(b - a).
+        const t = (wx * ey - wy * ex) / det, s = (wx * dy - wy * dx) / det;
+        if (t > 0 && t < 1 && s >= 0 && s <= 1) found.push(t * length);
+      }
+    }
+    const kept: number[] = [];
+    for (const at of found.sort((x, y) => x - y)) {
+      if (at < rad + 2 || at > length - rad - 2) continue;
+      if (kept.length > 0 && at - kept[kept.length - 1] < 2 * rad + 2) continue;
+      kept.push(at);
+    }
+    out.push(kept);
+  }
+  return out;
+}
+
+function computeConnector(e: Element, r: Route, hops: number[][]): [Path, Path] {
   const c = e.connector!;
   const rng = new SeededRNG(e.seed);
   const rough = e.style.roughness, bow = e.style.bowing;
   const path = new Path(), solid = new Path();
-  const r = route(e, index);
+  const w = rough * 3;
+  const j = (): number => rng.signed() * w;
   if (r.kind === "polyline") {
     const pts = r.points;
+    const rad = hopRadius(e.style.strokeWidth);
+    const straight = (p: Point, q: Point): void => {
+      if (rough <= 0) path.moveTo(p).lineTo(q);
+      else Rough.line(p, q, rng, rough, bow, true, path);
+    };
     for (let i = 0; i < Math.max(pts.length - 1, 0); i++) {
-      if (rough <= 0) path.moveTo(pts[i]).lineTo(pts[i + 1]);
-      else Rough.line(pts[i], pts[i + 1], rng, rough, bow, true, path);
+      const p = pts[i], q = pts[i + 1];
+      const length = Math.hypot(q.x - p.x, q.y - p.y);
+      const u = length > 0 ? { x: (q.x - p.x) / length, y: (q.y - p.y) / length } : { x: 0, y: 0 };
+      const at = (d: number): Point => ({ x: p.x + u.x * d, y: p.y + u.y * d });
+      // A hop bulges up, or left on an upright segment.
+      let n = { x: u.y, y: -u.x };
+      if (n.y > 1e-9 || (Math.abs(n.y) <= 1e-9 && n.x > 0)) n = { x: -n.x, y: -n.y };
+      let from = p;
+      for (const d of i < hops.length ? hops[i] : []) {
+        const s = at(d - rad), m = at(d), t = at(d + rad);
+        straight(from, s);
+        const k = rad * 0.5523;
+        const top = { x: m.x + n.x * rad, y: m.y + n.y * rad };
+        path.moveTo(s);
+        const a1x = s.x + n.x * k + j(), a1y = s.y + n.y * k + j(), a2x = top.x - u.x * k + j(), a2y = top.y - u.y * k + j();
+        path.curveTo(top, { x: a1x, y: a1y }, { x: a2x, y: a2y });
+        const b1x = top.x + u.x * k + j(), b1y = top.y + u.y * k + j(), b2x = t.x + n.x * k + j(), b2y = t.y + n.y * k + j();
+        path.curveTo(t, { x: b1x, y: b1y }, { x: b2x, y: b2y });
+        from = t;
+      }
+      straight(from, q);
     }
   } else {
-    path.moveTo(r.a);
-    const w = rough * 3;
-    const j = (): number => rng.signed() * w;
-    const c1x = r.b.x + j(), c1y = r.b.y + j(), c2x = r.c.x + j(), c2y = r.c.y + j();
-    path.curveTo(r.d, { x: c1x, y: c1y }, { x: c2x, y: c2y });
+    const pts = r.points;
+    path.moveTo(pts[0]);
+    for (let s = 0; s < Math.floor((pts.length - 1) / 3); s++) {
+      const b = pts[3 * s + 1], c2 = pts[3 * s + 2];
+      const c1x = b.x + j(), c1y = b.y + j(), c2x = c2.x + j(), c2y = c2.y + j();
+      path.curveTo(pts[3 * s + 3], { x: c1x, y: c1y }, { x: c2x, y: c2y });
+    }
   }
   const pts = routePoints(r);
   const size = Math.max(10, e.style.strokeWidth * 5);

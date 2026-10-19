@@ -207,6 +207,67 @@ final class CanvasGestureTests: XCTestCase {
         XCTAssertEqual(c.end.elementID, b.id)
     }
 
+    // MARK: Bends
+
+    func connector(_ a: Element, _ b: Element, routing: Routing = .straight) -> Element {
+        var st = Style(); st.roughness = 0
+        let e = Element(kind: .connector, frame: .zero, style: st, layerID: layer,
+                        connector: ConnectorData(start: .bound(a.id), end: .bound(b.id), routing: routing))
+        view.model.elements.append(e)
+        return e
+    }
+
+    func testDraggingALinesMiddleBendsItAndDoubleClickingTheBendRemovesIt() throws {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 100, height: 60))
+        let b = add(.rectangle, CGRect(x: 500, y: 100, width: 100, height: 60))
+        let c = connector(a, b)
+        view.selection = [c.id]
+        drag(CGPoint(x: 350, y: 130), CGPoint(x: 350, y: 300)) // the halfway handle
+        XCTAssertEqual(commits.map(\.name), ["Bend Connector"])
+        XCTAssertEqual(element(c.id).connector?.waypoints, [Waypoint(x: 350, y: 300)])
+        // The bend is a handle of its own now: dragging it moves it, in one more step.
+        drag(CGPoint(x: 350, y: 300), CGPoint(x: 380, y: 320))
+        XCTAssertEqual(commits.map(\.name), ["Bend Connector", "Bend Connector"])
+        XCTAssertEqual(element(c.id).connector?.waypoints, [Waypoint(x: 380, y: 320)])
+        // Edge-following ends aim at the bend.
+        let (s, _) = Connector.endpoints(of: element(c.id), in: view.model)
+        XCTAssertGreaterThan(s.y, 130)
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 380, y: 320), clicks: 1))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 380, y: 320), clicks: 1))
+        view.mouseDown(with: event(.leftMouseDown, CGPoint(x: 380, y: 320), clicks: 2))
+        view.mouseUp(with: event(.leftMouseUp, CGPoint(x: 380, y: 320), clicks: 2))
+        XCTAssertEqual(commits.last?.name, "Remove Bend")
+        XCTAssertNil(element(c.id).connector?.waypoints)
+    }
+
+    func testDraggingAnElbowSegmentMovesItSideways() throws {
+        let a = add(.rectangle, CGRect(x: 100, y: 100, width: 100, height: 60))
+        let b = add(.rectangle, CGRect(x: 500, y: 300, width: 100, height: 60))
+        var c = connector(a, b, routing: .elbow)
+        c.connector?.start.port = .right; c.connector?.end.port = .left
+        view.model.elements[view.model.elements.count - 1] = c
+        view.selection = [c.id]
+        // Right from A at y 130, down at x 350, right into B at y 330: drag the upright segment to x 420.
+        drag(CGPoint(x: 350, y: 230), CGPoint(x: 420, y: 250))
+        XCTAssertEqual(commits.map(\.name), ["Bend Connector"])
+        guard case .polyline(let pts) = Connector.route(of: element(c.id), in: view.model) else { return XCTFail() }
+        XCTAssertEqual(pts, [CGPoint(x: 200, y: 130), CGPoint(x: 420, y: 130), CGPoint(x: 420, y: 330), CGPoint(x: 500, y: 330)])
+    }
+
+    func testMovingABentLineMovesItsBendsAndRemoveBendsStraightensIt() throws {
+        let c = Element(kind: .connector, frame: .zero, style: Style(), layerID: layer,
+                        connector: ConnectorData(start: .free(CGPoint(x: 100, y: 400)), end: .free(CGPoint(x: 500, y: 400))))
+        view.model.elements.append(c)
+        view.model.elements[0].connector?.waypoints = [Waypoint(x: 300, y: 500)]
+        view.selection = [c.id]
+        drag(CGPoint(x: 150, y: 425), CGPoint(x: 170, y: 415)) // on the line, away from every handle
+        XCTAssertEqual(commits.map(\.name), ["Move"])
+        XCTAssertEqual(element(c.id).connector?.waypoints, [Waypoint(x: 320, y: 490)])
+        view.removeBends()
+        XCTAssertEqual(commits.last?.name, "Remove Bends")
+        XCTAssertNil(element(c.id).connector?.waypoints)
+    }
+
     func testHighlighterDrawsInItsOwnStyleAndKeepsGoing() {
         view.tool = .highlighter
         drag(CGPoint(x: 100, y: 300), CGPoint(x: 400, y: 320), steps: 30)

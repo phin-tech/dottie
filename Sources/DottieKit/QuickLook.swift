@@ -70,8 +70,7 @@ extension StencilLibrary {
                 e.layerID = layer
                 e.x += dx; e.y += dy
                 if var c = e.connector {
-                    if c.start.elementID == nil { c.start.x += dx; c.start.y += dy }
-                    if c.end.elementID == nil { c.end.x += dx; c.end.y += dy }
+                    c.translateFree(dx: dx, dy: dy)
                     e.connector = c
                 }
                 doc.elements.append(e)

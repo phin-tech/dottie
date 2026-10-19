@@ -219,6 +219,15 @@ the web players draw each clickable copy as one focusable group holding its part
 too, with a layer on top that takes the clicks (the `hit` scene's shapes, invisible, or the copy's frame). Both
 draw the states by expanding with `times`, which puts a copy on the page at a moment of its own symbol; dottie.js
 uses the same to replay a copy whose playback is `click`.
+A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
+bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right
+angles, adding a corner between any two that are out of line and dropping any that fall into line
+(`Connector.route(through:)`). They stay put when the end shapes move and move with the connector itself, so
+everything that moves a connector's free ends moves them too (`ConnectorData.transformFree`). Switching between
+elbow and the other routings, and `auto_layout`, take them out. A connector with `hops: true` draws a half-circle
+hop where a straight segment crosses a connector drawn before it on a visible layer (`Renderer.hopCrossings`);
+crossings within a hop of a bend or of another hop are skipped, and curved lines never hop. Earlier versions open
+such a file with the lines unbent and drop both fields when they save.
 
 **Fonts.** An element's `style.font` names the font its text is set in (`Fonts.swift`). Absent is Helvetica Neue.
 Caveat, Patrick Hand and Architects Daughter are bundled: Google Fonts under the SIL Open Font License, cut to
@@ -258,7 +267,8 @@ work, plus each element's id and pixel box), `export_svg`, `export_mermaid`, `cr
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element
 id find its page themselves. `add_shape` and `build_diagram` take kind `note` for a sticky note
 whose text is Markdown. Connectors take a `label`; shapes and connectors take `fill_style`, `dash`,
-`stroke_width`, `bowing`, `rotation` and `start_head` / `end_head`. `update_element` also sets what a click does
+`stroke_width`, `bowing`, `rotation` and `start_head` / `end_head`; connectors also take `waypoints` (bends, as
+`{x, y}` points) and `hops`. `update_element` also sets what a click does
 on the web (`click_scene`, `click_url`, `hover_*`) and how a symbol instance plays (`playback`, `offset`).
 
 **Live mode.** The app listens on `~/Library/Application Support/Dottie/live.sock`. When it has the file open,

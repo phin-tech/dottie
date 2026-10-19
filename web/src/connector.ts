@@ -1,7 +1,7 @@
 // Connector geometry (Connector.swift): endpoints from bindings, routes, arrowhead wings.
 
 import { angle, center, frame, rotated, shapeContours, unrotated } from "./element.ts";
-import type { Element, Endpoint, Page, Port } from "./model.ts";
+import type { ConnectorData, Element, Endpoint, Page, Port } from "./model.ts";
 import { type Point, type Rect, bezierPoint, maxX, maxY, midX, midY } from "./path.ts";
 
 export type Index = Map<string, Element>;
@@ -94,39 +94,103 @@ function resolve(ep: Endpoint, other: Point, index: Index): Point {
 export function endpoints(e: Element, index: Index): [Point, Point] {
   const c = e.connector;
   if (!c) return [{ x: 0, y: 0 }, { x: 0, y: 0 }];
-  return [resolve(c.start, reference(c.end, index), index), resolve(c.end, reference(c.start, index), index)];
+  // An edge-following end aims at the next point along the line: its nearest waypoint, else the other end.
+  const w = c.waypoints ?? [];
+  return [resolve(c.start, w.length > 0 ? w[0] : reference(c.end, index), index),
+    resolve(c.end, w.length > 0 ? w[w.length - 1] : reference(c.start, index), index)];
 }
 
-export type Route = { kind: "polyline"; points: Point[] } | { kind: "cubic"; a: Point; b: Point; c: Point; d: Point };
+/** A curve is joined cubic Béziers: the start, then two controls and an end per segment. */
+export type Route = { kind: "polyline"; points: Point[] } | { kind: "curve"; points: Point[] };
 
-/** A route's centerline as points; a cubic is sampled at 25 points. */
+/** A route's centerline as points; each cubic segment is sampled at 25 points. */
 export function routePoints(r: Route): Point[] {
   if (r.kind === "polyline") return r.points;
-  const out: Point[] = [];
-  for (let i = 0; i <= 24; i++) {
-    const t = i / 24, u = 1 - t;
-    out.push({
-      x: u * u * u * r.a.x + 3 * u * u * t * r.b.x + 3 * u * t * t * r.c.x + t * t * t * r.d.x,
-      y: u * u * u * r.a.y + 3 * u * u * t * r.b.y + 3 * u * t * t * r.c.y + t * t * t * r.d.y,
-    });
+  const out: Point[] = [], p = r.points;
+  for (let s = 0; s < Math.floor((p.length - 1) / 3); s++) {
+    const a = p[3 * s], b = p[3 * s + 1], c = p[3 * s + 2], d = p[3 * s + 3];
+    for (let i = s === 0 ? 0 : 1; i <= 24; i++) {
+      const t = i / 24, u = 1 - t;
+      out.push({
+        x: u * u * u * a.x + 3 * u * u * t * b.x + 3 * u * t * t * c.x + t * t * t * d.x,
+        y: u * u * u * a.y + 3 * u * u * t * b.y + 3 * u * t * t * c.y + t * t * t * d.y,
+      });
+    }
   }
   return out;
+}
+
+const vertical = (p: Port | null): boolean | null => (p === null ? null : p === "top" || p === "bottom");
+
+/** Drops repeated points and the middle of three in a line, so dragged bends that fall into line disappear. */
+export function simplified(pts: Point[]): Point[] {
+  const out: Point[] = [];
+  for (const q of pts) {
+    const l = out[out.length - 1];
+    if (l && Math.abs(l.x - q.x) < 0.5 && Math.abs(l.y - q.y) < 0.5) continue;
+    if (out.length >= 2) {
+      const p = out[out.length - 2], m = out[out.length - 1];
+      if ((Math.abs(p.x - m.x) < 0.5 && Math.abs(m.x - q.x) < 0.5) || (Math.abs(p.y - m.y) < 0.5 && Math.abs(m.y - q.y) < 0.5)) {
+        out[out.length - 1] = q;
+        continue;
+      }
+    }
+    out.push(q);
+  }
+  return out.length >= 2 ? out : pts;
+}
+
+/** The route through `p` (the start, the waypoints, the end), as Connector.route(through:) does. */
+function routeThrough(p: Point[], c: ConnectorData): Route {
+  switch (c.routing) {
+    case "straight":
+      return { kind: "polyline", points: p };
+    case "curved": {
+      const out = [p[0]];
+      for (let i = 0; i < p.length - 1; i++) {
+        const p0 = p[Math.max(i - 1, 0)], p1 = p[i], p2 = p[i + 1], p3 = p[Math.min(i + 2, p.length - 1)];
+        out.push({ x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 });
+        out.push({ x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 });
+        out.push(p2);
+      }
+      return { kind: "curve", points: out };
+    }
+    case "elbow": {
+      const a = p[0], first = p[1];
+      let goVertical = vertical(c.start.port) ?? Math.abs(first.y - a.y) > Math.abs(first.x - a.x);
+      const endV = vertical(c.end.port);
+      const out = [a];
+      for (let i = 1; i < p.length; i++) {
+        const q = p[i], cur = out[out.length - 1];
+        const alignedX = Math.abs(cur.x - q.x) < 0.5, alignedY = Math.abs(cur.y - q.y) < 0.5;
+        if (alignedX || alignedY) {
+          out.push(q);
+          if (alignedX !== alignedY) goVertical = !alignedX;
+          continue;
+        }
+        const up = i === p.length - 1 && endV !== null ? !endV : goVertical;
+        out.push(up ? { x: cur.x, y: q.y } : { x: q.x, y: cur.y }, q);
+        goVertical = up;
+      }
+      return { kind: "polyline", points: simplified(out) };
+    }
+  }
 }
 
 export function route(e: Element, index: Index): Route {
   const c = e.connector;
   if (!c) return { kind: "polyline", points: [] };
   const [a, b] = endpoints(e, index);
+  if (c.waypoints && c.waypoints.length > 0) return routeThrough([a, ...c.waypoints.map((w) => ({ x: w.x, y: w.y })), b], c);
   const dx = b.x - a.x, dy = b.y - a.y;
   const horizontal = Math.abs(dx) >= Math.abs(dy);
   switch (c.routing) {
     case "straight":
       return { kind: "polyline", points: [a, b] };
     case "curved":
-      if (horizontal) return { kind: "cubic", a, b: { x: a.x + dx / 2, y: a.y }, c: { x: b.x - dx / 2, y: b.y }, d: b };
-      return { kind: "cubic", a, b: { x: a.x, y: a.y + dy / 2 }, c: { x: b.x, y: b.y - dy / 2 }, d: b };
+      if (horizontal) return { kind: "curve", points: [a, { x: a.x + dx / 2, y: a.y }, { x: b.x - dx / 2, y: b.y }, b] };
+      return { kind: "curve", points: [a, { x: a.x, y: a.y + dy / 2 }, { x: b.x, y: b.y - dy / 2 }, b] };
     case "elbow": {
-      const vertical = (p: Port | null): boolean | null => (p === null ? null : p === "top" || p === "bottom");
       const startV = vertical(c.start.port) ?? !horizontal;
       const endV = vertical(c.end.port) ?? !horizontal;
       if (startV && endV) {

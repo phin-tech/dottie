@@ -157,7 +157,10 @@ function placed(inner: Element, instance: Element, symbol: Symbol): Element {
       const q = point(p);
       return { elementID: null, port: p.port, x: q.x, y: q.y };
     };
-    e.connector = { ...inner.connector, start: end(inner.connector.start), end: end(inner.connector.end) };
+    e.connector = {
+      ...inner.connector, start: end(inner.connector.start), end: end(inner.connector.end),
+      waypoints: inner.connector.waypoints?.map(point) ?? null,
+    };
   }
   return e;
 }

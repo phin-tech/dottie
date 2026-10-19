@@ -40,6 +40,10 @@ export interface ConnectorData {
   routing: Routing;
   startHead: Arrowhead;
   endHead: Arrowhead;
+  /** Bends on the canvas the line passes through, start to end. */
+  waypoints: StrokePoint[] | null;
+  /** Hops where the line crosses a connector drawn beneath it. */
+  hops: boolean | null;
 }
 
 export interface PathSubpath { closed: boolean; coords: number[] }
@@ -193,7 +197,8 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   extensionRef: ["id", "shape", "version", "params"],
   normalizedPoint: ["x", "y"],
   normalizedRect: ["x", "y", "width", "height"],
-  connector: ["start", "end", "routing", "startHead", "endHead"],
+  connector: ["start", "end", "routing", "startHead", "endHead", "waypoints", "hops"],
+  waypoint: ["x", "y"],
   timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
   track: ["element", "keys", "boil", "follow", "repeats", "march"],
   keyframe: ["t", "x", "y", "width", "height", "rotation", "strokeWidth", "stroke", "fill", "visible", "reveal", "opacity", "ease"],
@@ -322,6 +327,10 @@ class Reader {
       routing: routing && ["straight", "curved", "elbow"].includes(routing) ? (routing as Routing) : "straight",
       startHead: head(v.startHead, "none"),
       endHead: head(v.endHead, "arrow"),
+      waypoints: Array.isArray(v.waypoints)
+        ? v.waypoints.filter(isObj).map((w) => { this.fields(w, "waypoint"); return { x: num(w.x) ?? 0, y: num(w.y) ?? 0 }; })
+        : null,
+      hops: typeof v.hops === "boolean" ? v.hops : null,
     };
   }
 
@@ -598,7 +607,10 @@ export function cloneElement(e: Element): Element {
   return {
     ...e,
     style: { ...e.style, stroke: { ...e.style.stroke }, fill: { ...e.style.fill } },
-    connector: e.connector ? { ...e.connector, start: { ...e.connector.start }, end: { ...e.connector.end } } : null,
+    connector: e.connector ? {
+      ...e.connector, start: { ...e.connector.start }, end: { ...e.connector.end },
+      waypoints: e.connector.waypoints?.map((w) => ({ ...w })) ?? null,
+    } : null,
   };
 }
 

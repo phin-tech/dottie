@@ -219,6 +219,8 @@ final class ExcalidrawImportTests: XCTestCase {
       {"id":"ar","type":"arrow","x":260,"y":240,"width":140,"height":0,"points":[[0,0],[140,0]],
        "startBinding":{"elementId":"a","focus":0,"gap":4},"endBinding":{"elementId":"b","focus":0,"gap":4},
        "startArrowhead":null,"endArrowhead":"triangle","strokeColor":"#1e1e1e","backgroundColor":"transparent","isDeleted":false},
+      {"id":"bent","type":"arrow","x":100,"y":300,"width":200,"height":60,"points":[[0,0],[100,60],[200,0]],
+       "roundness":{"type":2},"strokeColor":"#1e1e1e","backgroundColor":"transparent","isDeleted":false},
       {"id":"gone","type":"rectangle","x":0,"y":0,"width":10,"height":10,"isDeleted":true},
       {"id":"img","type":"image","x":0,"y":0,"width":10,"height":10,"isDeleted":false},
       {"id":"fd","type":"freedraw","x":10,"y":10,"width":30,"height":20,"points":[[0,0],[10,8],[30,20]],
@@ -230,7 +232,12 @@ final class ExcalidrawImportTests: XCTestCase {
         let items = try ExcalidrawImporter.importItems(from: Data(scene.utf8), layerID: UUID())
         XCTAssertEqual(items.count, 1)
         let els = items[0].elements
-        XCTAssertEqual(els.map(\.kind), [.rectangle, .ellipse, .connector, .path]) // label folded, deleted/image dropped
+        XCTAssertEqual(els.map(\.kind), [.rectangle, .ellipse, .connector, .connector, .path]) // label folded, deleted/image dropped
+        let bent = els[3].connector
+        XCTAssertEqual(bent?.routing, .curved)                                 // a rounded arrow, through its middle point
+        XCTAssertEqual(bent?.waypoints?.count, 1)
+        XCTAssertEqual((bent?.waypoints?.first?.x ?? 0) - (bent?.start.x ?? 0), 100, accuracy: 0.01)
+        XCTAssertEqual((bent?.waypoints?.first?.y ?? 0) - (bent?.start.y ?? 0), 60, accuracy: 0.01)
         let rect = els[0], ell = els[1], arrow = els[2]
         XCTAssertEqual(rect.text, "Hello")
         XCTAssertTrue(rect.style.stroke.isAutomaticInk)
@@ -293,6 +300,8 @@ final class DrawioImportTests: XCTestCase {
         <mxGeometry relative="1" as="geometry"/></mxCell>
       <mxCell id="e2" value="" style="endArrow=none;" edge="1" parent="1" target="d">
         <mxGeometry relative="1" as="geometry"><mxPoint x="50" y="50" as="sourcePoint"/></mxGeometry></mxCell>
+      <mxCell id="e3" value="bent" style="jumpStyle=arc;" edge="1" parent="1" source="a" target="d">
+        <mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="160" y="250"/><mxPoint x="290" y="250"/></Array></mxGeometry></mxCell>
       <mxCell id="g" value="" style="group" vertex="1" parent="1"><mxGeometry x="500" y="500" width="100" height="100" as="geometry"/></mxCell>
       <mxCell id="c" value="inner" style="text;" vertex="1" parent="g"><mxGeometry x="10" y="20" width="40" height="20" as="geometry"/></mxCell>
     </root></mxGraphModel>
@@ -320,6 +329,11 @@ final class DrawioImportTests: XCTestCase {
         let free = els.first { $0.kind == .connector && $0.text == nil }
         XCTAssertNil(free?.connector?.start.elementID)             // sourcePoint, not bound
         XCTAssertEqual(free?.connector?.endHead, Arrowhead.none)
+        let bent = byText["bent"]?.connector
+        XCTAssertEqual(bent?.hops, true)                                // jumpStyle
+        XCTAssertEqual(bent?.waypoints?.count, 2)                       // its bends, moved with the shapes
+        XCTAssertEqual((bent?.waypoints?.first?.x ?? 0) - (a?.x ?? 0), 60, accuracy: 0.5)
+        XCTAssertEqual((bent?.waypoints?.first?.y ?? 0) - (a?.y ?? 0), 150, accuracy: 0.5)
         let inner = byText["inner"]
         XCTAssertEqual(inner?.kind, .text)
         XCTAssertEqual((inner?.x ?? 0) - (a?.x ?? 0), 410, accuracy: 0.5)   // group origin 500 + 10 vs a at 100

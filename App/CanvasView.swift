@@ -64,6 +64,8 @@ enum CanvasGesture {
     case marquee
     case connecting(id: UUID)
     case endpoint(id: UUID, isStart: Bool)
+    /// Dragging one of a connector's bend handles (a waypoint, a halfway point, an elbow segment).
+    case bending(id: UUID, handle: Connector.BendHandle)
     case panning
     case drawing(id: UUID)
     case erasing
@@ -337,6 +339,16 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             for p in [a, b] {
                 let r = CGRect(x: p.x - 5 / zoom, y: p.y - 5 / zoom, width: 10 / zoom, height: 10 / zoom)
                 ctx.fillEllipse(in: r); ctx.strokeEllipse(in: r)
+            }
+            // Bends: a waypoint is a small solid dot; the places that add a bend or move a segment, hollow ones.
+            for (handle, p) in Connector.bendHandles(of: c, in: model) {
+                if case .waypoint = handle {
+                    let r = CGRect(x: p.x - 4 / zoom, y: p.y - 4 / zoom, width: 8 / zoom, height: 8 / zoom)
+                    ctx.setFillColor(accent.cgColor); ctx.fillEllipse(in: r)
+                } else {
+                    let r = CGRect(x: p.x - 3.5 / zoom, y: p.y - 3.5 / zoom, width: 7 / zoom, height: 7 / zoom)
+                    ctx.setFillColor(NSColor.white.withAlphaComponent(0.85).cgColor); ctx.fillEllipse(in: r); ctx.strokeEllipse(in: r)
+                }
             }
         } else if let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }) {
             ctx.setFillColor(NSColor.white.cgColor)
@@ -906,6 +918,33 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         return nil
     }
 
+    /// The bend handle of the single selected connector under `p`. Waypoints win over the others.
+    func bendHit(_ p: CGPoint) -> (UUID, Connector.BendHandle)? {
+        guard let id = singleSelectionID, let e = model.elements.first(where: { $0.id == id }), e.kind == .connector else { return nil }
+        let near = Connector.bendHandles(of: e, in: model).filter { hypot(p.x - $0.at.x, p.y - $0.at.y) <= 7 / zoom }
+        let pick = near.first { if case .waypoint = $0.handle { return true } else { return false } } ?? near.first
+        return pick.map { (id, $0.handle) }
+    }
+
+    /// Takes the bends out of the selected connectors, so they route from their ends again.
+    func removeBends() {
+        let base = model
+        for i in model.elements.indices where selection.contains(model.elements[i].id) && model.elements[i].connector?.waypoints != nil {
+            model.elements[i].connector?.waypoints = nil
+        }
+        if model != base { commit(base, "Remove Bends") }
+    }
+
+    /// Removes one waypoint of a connector (a double-click on it).
+    func removeWaypoint(_ index: Int, of id: UUID) {
+        guard let i = model.elements.firstIndex(where: { $0.id == id }), var w = model.elements[i].connector?.waypoints,
+              w.indices.contains(index) else { return }
+        let base = model
+        w.remove(at: index)
+        model.elements[i].connector?.waypoints = w.isEmpty ? nil : w
+        commit(base, "Remove Bend")
+    }
+
     // MARK: Viewport
 
     private func point(_ event: NSEvent) -> CGPoint {
@@ -1384,6 +1423,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         add("Delete", #selector(delete(_:)))
         menu.addItem(.separator())
         let elements = model.elements.filter { selection.contains($0.id) }
+        if elements.contains(where: { $0.connector?.waypoints != nil }) {
+            menu.addItem(ClosureMenuItem("Remove Bends") { [weak self] in self?.removeBends() })
+            menu.addItem(.separator())
+        }
         if actions.selectionCount >= 2 { menu.addItem(ClosureMenuItem("Group", actions.group)) }
         if actions.grouped { menu.addItem(ClosureMenuItem("Ungroup", actions.ungroup)) }
         menu.addItem(.submenu("Arrange") { m in
@@ -1683,7 +1726,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             let raw = convert(event.locationInWindow, from: nil)
             if hypot(raw.x - pressPoint.x, raw.y - pressPoint.y) < Self.dragThreshold {
                 switch gesture {
-                case .moving?, .marquee?, .redacting?, .resizing?, .adjusting?, .rotating?, .rotatingGroup?, .endpoint?, .editingPoint?: return
+                case .moving?, .marquee?, .redacting?, .resizing?, .adjusting?, .rotating?, .rotatingGroup?, .endpoint?, .bending?, .editingPoint?: return
                 default: break
                 }
             }
@@ -1727,9 +1770,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .moving:
             for i in next.elements.indices where selection.contains(next.elements[i].id) {
                 if var c = next.elements[i].connector {
-                    // Bound ends follow their shapes; only free ends move with the drag.
-                    if c.start.elementID == nil { c.start.x += d.x; c.start.y += d.y }
-                    if c.end.elementID == nil { c.end.x += d.x; c.end.y += d.y }
+                    // Bound ends follow their shapes; free ends and bends move with the drag.
+                    c.translateFree(dx: d.x, dy: d.y)
                     next.elements[i].connector = c
                 } else {
                     next.elements[i].x += d.x; next.elements[i].y += d.y
@@ -1747,6 +1789,11 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 next.elements.append(e)
             }
             hoverShapeID = shape(at: p, in: next)?.id
+        case .bending(let id, let handle):
+            if let i = next.elements.firstIndex(where: { $0.id == id }) {
+                let bent = Connector.bend(next.elements[i], in: next, handle: handle, to: p)
+                next.elements[i].connector?.waypoints = bent
+            }
         case .resizing(let id, let h, let original):
             if let i = next.elements.firstIndex(where: { $0.id == id }) {
                 if let grid = gridSize, !event.modifierFlags.contains(.command) {
@@ -1917,6 +1964,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         case .rotating where model != base: commit(base, "Rotate")
         case .rotatingGroup where model != base: commit(base, "Rotate")
         case .endpoint where model != base: commit(base, "Move Connector End")
+        case .bending where model != base: commit(base, "Bend Connector")
         case .marquee where !dragging:
             // A click that just missed a shape still picks it, if it is within a few screen points.
             if let hit = spatial.element(at: point(event), in: model, skipping: hiddenInEditor, tolerance: 8 / zoom) {
@@ -2021,8 +2069,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         var moved = false
         for i in next.elements.indices where selection.contains(next.elements[i].id) && editable.contains(next.elements[i].layerID) {
             if var c = next.elements[i].connector {
-                if c.start.elementID == nil { c.start.x += d.x; c.start.y += d.y }
-                if c.end.elementID == nil { c.end.x += d.x; c.end.y += d.y }
+                c.translateFree(dx: d.x, dy: d.y)
                 next.elements[i].connector = c
             } else {
                 next.elements[i].x += d.x; next.elements[i].y += d.y

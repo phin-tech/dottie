@@ -196,6 +196,13 @@ public enum DrawioImporter {
                 let es = kv["edgeStyle"] ?? ""
                 if es.contains("orthogonal") || es.contains("elbow") { cd.routing = .elbow }
                 else if kv["curved"] == "1" { cd.routing = .curved }
+                // Bends are relative to the edge's parent, when that is a container.
+                let base = cell.attrs["parent"].flatMap { byID[$0]?.attrs["vertex"] == "1" ? origin(of: $0) : nil } ?? .zero
+                let bends = (cell.geometry?.children.first { $0.name == "Array" && $0.attrs["as"] == "points" }?.children ?? [])
+                    .filter { $0.name == "mxPoint" }
+                    .map { Waypoint(x: base.x + (Double($0.attrs["x"] ?? "0") ?? 0), y: base.y + (Double($0.attrs["y"] ?? "0") ?? 0)) }
+                if !bends.isEmpty { cd.waypoints = bends }
+                if let jump = kv["jumpStyle"], jump != "none" { cd.hops = true }
                 st.fill = .clear
                 st.strokeWidth = max(1, st.strokeWidth * 1.5)
                 var el = Element(id: uid, kind: .connector, frame: .zero, style: st, seed: .random(in: 1...UInt32.max),

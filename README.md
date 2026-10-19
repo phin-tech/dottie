@@ -75,8 +75,11 @@ Pick a tool from the toolbar or press its letter:
 | N | Note | | H | Highlighter |
 | | | | X | Redact |
 
-Double-click a shape to give it a label. Connectors stay attached when you move shapes around. The arrow keys
-nudge the selection a point at a time (⇧ for ten); holding one down is a single undo step.
+Double-click a shape to give it a label. Connectors stay attached when you move shapes around. To route one
+around something, select it and drag the small circle halfway along it to add a bend (on an elbow line, drag a
+segment sideways); double-click a bend to remove it. **Hop over crossings**, in the inspector, draws a little arc
+where the line crosses another, so crossing lines don't look joined. The arrow keys nudge the selection a point at
+a time (⇧ for ten); holding one down is a single undo step.
 
 - **Flowcharts from the keyboard.** Select a rectangle, ellipse or diamond and hold ⌘ while you press an arrow
   key: a copy appears that way, joined to it by an arrow. Press the arrow again (still holding ⌘) for another

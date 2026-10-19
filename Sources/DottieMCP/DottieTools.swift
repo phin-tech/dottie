@@ -42,6 +42,11 @@ private let lookProps: [String: Value] = [
     "end_head": prop("string", "Connector end arrowhead", enum: headValues),
     "font": fontProp,
     "font_size": prop("number", "Text size in points, 4 to 200 (default 18; notes 16)"),
+    "waypoints": .object(["type": "array", "items": .object(["type": "object", "required": .array(["x", "y"]),
+                                                              "properties": .object(["x": .object(["type": "number"]), "y": .object(["type": "number"])])]),
+                          "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
+                              + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
+    "hops": prop("boolean", "Connectors: draw a small hop where this (straight or elbow) line crosses a connector drawn beneath it"),
 ]
 
 private struct ToolFailure: Error { var message: String }
@@ -127,7 +132,17 @@ private struct Args {
                         strokeWidth: double("stroke_width"), bowing: double("bowing"),
                         startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
                         rotation: double("rotation"), gridSize: double("grid_size"),
-                        font: string("font"), fontSize: double("font_size"))
+                        font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"))
+    }
+
+    /// A list of {x, y} points.
+    func points(_ k: String) throws -> [CGPoint]? {
+        guard raw[k] != nil else { return nil }
+        guard let list = array(k) else { throw ToolFailure(message: "'\(k)' must be a list of {x, y} points") }
+        return try list.map { p in
+            guard let x = p.double("x"), let y = p.double("y") else { throw ToolFailure(message: "Each of '\(k)' needs a number x and y") }
+            return CGPoint(x: x, y: y)
+        }
     }
 }
 

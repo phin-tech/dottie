@@ -1,0 +1,264 @@
+{
+  "pages": [
+    {
+      "elements": [
+        {
+          "height": 80,
+          "id": "00000242-0000-4000-8000-000000000242",
+          "kind": "symbol",
+          "layerID": "0000023B-0000-4000-8000-00000000023B",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "0000023C-0000-4000-8000-00000000023C",
+          "width": 100,
+          "x": 40,
+          "y": 40
+        },
+        {
+          "height": 120,
+          "id": "00000243-0000-4000-8000-000000000243",
+          "kind": "symbol",
+          "layerID": "0000023B-0000-4000-8000-00000000023B",
+          "rotation": 0.6,
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "symbol": "0000023C-0000-4000-8000-00000000023C",
+          "width": 200,
+          "x": 220,
+          "y": 40
+        }
+      ],
+      "id": "0000023A-0000-4000-8000-00000000023A",
+      "layers": [
+        {
+          "id": "0000023B-0000-4000-8000-00000000023B",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Page 1",
+      "symbols": [
+        {
+          "elements": [
+            {
+              "height": 20,
+              "id": "0000023E-0000-4000-8000-00000000023E",
+              "kind": "rectangle",
+              "layerID": "0000023D-0000-4000-8000-00000000023D",
+              "seed": 4003630850,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 1,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "width": 30,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "height": 20,
+              "id": "0000023F-0000-4000-8000-00000000023F",
+              "kind": "rectangle",
+              "layerID": "0000023D-0000-4000-8000-00000000023D",
+              "seed": 1927697874,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 1,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "width": 30,
+              "x": 70,
+              "y": 60
+            },
+            {
+              "connector": {
+                "end": {
+                  "elementID": "0000023F-0000-4000-8000-00000000023F",
+                  "x": 0,
+                  "y": 0
+                },
+                "endHead": "arrow",
+                "routing": "elbow",
+                "start": {
+                  "elementID": "0000023E-0000-4000-8000-00000000023E",
+                  "x": 0,
+                  "y": 0
+                },
+                "startHead": "none",
+                "waypoints": [
+                  {
+                    "x": 50,
+                    "y": 10
+                  },
+                  {
+                    "x": 50,
+                    "y": 70
+                  }
+                ]
+              },
+              "height": 0,
+              "id": "00000240-0000-4000-8000-000000000240",
+              "kind": "connector",
+              "layerID": "0000023D-0000-4000-8000-00000000023D",
+              "seed": 1614817368,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 1,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            {
+              "connector": {
+                "end": {
+                  "x": 100,
+                  "y": 0
+                },
+                "endHead": "arrow",
+                "routing": "straight",
+                "start": {
+                  "x": 0,
+                  "y": 60
+                },
+                "startHead": "none",
+                "waypoints": [
+                  {
+                    "x": 20,
+                    "y": 0
+                  }
+                ]
+              },
+              "height": 0,
+              "id": "00000241-0000-4000-8000-000000000241",
+              "kind": "connector",
+              "layerID": "0000023D-0000-4000-8000-00000000023D",
+              "seed": 2404543604,
+              "style": {
+                "bowing": 1,
+                "dash": "solid",
+                "fill": {
+                  "a": 0,
+                  "b": 0,
+                  "g": 0,
+                  "r": 0
+                },
+                "fillStyle": "solid",
+                "fontSize": 18,
+                "roughness": 1,
+                "stroke": {
+                  "a": 1,
+                  "b": 0.13,
+                  "g": 0.12,
+                  "r": 0.12
+                },
+                "strokeWidth": 2
+              },
+              "width": 0,
+              "x": 0,
+              "y": 0
+            }
+          ],
+          "height": 80,
+          "id": "0000023C-0000-4000-8000-00000000023C",
+          "layers": [
+            {
+              "id": "0000023D-0000-4000-8000-00000000023D",
+              "locked": false,
+              "name": "Layer 1",
+              "visible": true
+            }
+          ],
+          "name": "Bent",
+          "width": 100
+        }
+      ]
+    }
+  ],
+  "version": 2
+}
