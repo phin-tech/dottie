@@ -87,10 +87,13 @@ struct SelectionStyle {
                 set: { r in newRouting.wrappedValue = r; if !selectedConnectors.isEmpty { editConnectors("Change Routing") { $0.setRouting(r) } } })
     }
 
-    /// Whether the selected connectors hop over the ones beneath them.
+    /// Whether the selected connectors hop over the ones beneath them; with none selected, whether new ones will.
     var hops: Binding<Bool> {
-        Binding(get: { selectedConnectors.first?.connector?.hops == true },
-                set: { on in editConnectors(on ? "Hop Over Crossings" : "Stop Hopping") { $0.hops = on ? true : nil } })
+        Binding(get: { selectedConnectors.isEmpty ? Pref.bool(Pref.hops, default: true) : selectedConnectors.first?.connector?.hops == true },
+                set: { on in
+                    if selectedConnectors.isEmpty { UserDefaults.standard.set(on, forKey: Pref.hops); return }
+                    editConnectors(on ? "Hop Over Crossings" : "Stop Hopping") { $0.hops = on ? true : nil }
+                })
     }
 
     var hasBends: Bool { selectedConnectors.contains { $0.connector?.waypoints != nil } }

@@ -199,12 +199,14 @@ final class CanvasGestureTests: XCTestCase {
     func testConnectorToolBindsBothEnds() throws {
         let a = add(.rectangle, CGRect(x: 100, y: 100, width: 100, height: 60))
         let b = add(.rectangle, CGRect(x: 400, y: 100, width: 100, height: 60))
+        UserDefaults.standard.removeObject(forKey: Pref.hops)
         view.tool = .connector
         drag(CGPoint(x: 150, y: 130), CGPoint(x: 450, y: 130))
         XCTAssertEqual(commits.map(\.name), ["Add Connector"])
         let c = try XCTUnwrap(view.model.elements.first { $0.kind == .connector }?.connector)
         XCTAssertEqual(c.start.elementID, a.id)
         XCTAssertEqual(c.end.elementID, b.id)
+        XCTAssertEqual(c.hops, true) // new connectors hop unless Settings says not
     }
 
     // MARK: Bends

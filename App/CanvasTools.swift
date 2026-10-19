@@ -207,7 +207,8 @@ struct ConnectorTool: CanvasTool {
         guard let layer = c.startPress() else { return }
         var st = c.style
         st.fill = .clear
-        let data = ConnectorData(start: c.endpoint(at: p, in: c.model), end: .free(p), routing: c.routing)
+        var data = ConnectorData(start: c.endpoint(at: p, in: c.model), end: .free(p), routing: c.routing)
+        if Pref.bool(Pref.hops, default: true) { data.hops = true }
         let e = Element(kind: .connector, frame: .zero, style: st, layerID: layer, connector: data)
         c.model.elements.append(e)
         c.selection = [e.id]

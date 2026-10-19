@@ -361,9 +361,9 @@ struct Inspector: View {
                 Picker("End", selection: style.head(\.endHead, "Change End Arrowhead")) {
                     ForEach(StyleChoices.heads, id: \.0) { Text($0.1).tag($0.0) }
                 }
+                Toggle("Hop over crossings", isOn: style.hops)
+                    .help("Draw a small arc where the line crosses a connector beneath it")
                 if !style.selectedConnectors.isEmpty {
-                    Toggle("Hop over crossings", isOn: style.hops)
-                        .help("Draw a small arc where the line crosses a connector beneath it")
                     Button("Remove Bends", action: style.removeBends)
                         .disabled(!style.hasBends)
                         .help("Drag a line's middle to bend it; double-click a bend to remove just that one")

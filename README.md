@@ -77,8 +77,9 @@ Pick a tool from the toolbar or press its letter:
 
 Double-click a shape to give it a label. Connectors stay attached when you move shapes around. To route one
 around something, select it and drag the small circle halfway along it to add a bend (on an elbow line, drag a
-segment sideways); double-click a bend to remove it. **Hop over crossings**, in the inspector, draws a little arc
-where the line crosses another, so crossing lines don't look joined. The arrow keys nudge the selection a point at
+segment sideways); double-click a bend to remove it. Where a new connector crosses one beneath it, it hops over
+with a little arc, so crossing lines don't look joined; **Hop over crossings** in the inspector turns that on or off
+for the selected lines (or, with none selected, for new ones, as does Settings ▸ General). The arrow keys nudge the selection a point at
 a time (⇧ for ten); holding one down is a single undo step.
 
 - **Flowcharts from the keyboard.** Select a rectangle, ellipse or diamond and hold ⌘ while you press an arrow
