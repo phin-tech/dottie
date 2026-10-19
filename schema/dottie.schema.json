@@ -221,7 +221,7 @@
         "startHead": { "$ref": "#/$defs/arrowhead" },
         "endHead": { "$ref": "#/$defs/arrowhead" },
         "waypoints": { "type": "array", "items": { "$ref": "#/$defs/waypoint" }, "description": "Bends on the canvas the line passes through, start to end, whatever its routing." },
-        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it; straight and elbow lines only." }
+        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it." }
       }
     },
     "waypoint": {

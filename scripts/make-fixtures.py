@@ -869,8 +869,14 @@ def waypoints():
     p.connect(None, None, free_start=(400, 460), free_end=(560, 700), hops=True)
     p.connect(None, None, free_start=(600, 460), free_end=(600, 700), hops=True, end_head="triangle")
     p.connect(None, None, free_start=(700, 470), free_end=(720, 700), hops=False)
-    p.connect(None, None, routing="curved", free_start=(650, 460), free_end=(760, 700), hops=True)
+    p.connect(None, None, routing="curved", free_start=(650, 460), free_end=(760, 700), hops=True)  # a curve hops too
     p.connect(None, None, free_start=(40, 515), free_end=(160, 515), hops=True)  # nothing beneath it crosses
+    # A curve hopping a curve beneath it, sketchy and clean, and one with bends hopping twice.
+    p.connect(None, None, routing="curved", free_start=(40, 760), free_end=(400, 720))
+    p.connect(None, None, routing="curved", free_start=(160, 860), free_end=(260, 680), hops=True)
+    p.connect(None, None, routing="curved", free_start=(300, 860), free_end=(360, 680), hops=True, st=style(roughness=0))
+    p.connect(None, None, routing="curved", free_start=(440, 700), free_end=(760, 860),
+              waypoints=[(520, 860), (680, 690)], hops=True)
     write(EDGE / "waypoints.dottie", [p])
 
     # A connector with bends inside a symbol: the bends scale and turn with each copy.

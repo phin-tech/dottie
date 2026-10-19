@@ -37,7 +37,7 @@ public struct ConnectorData: Codable, Equatable, Sendable {
     /// routing; they stay put when the end shapes move, and move with the connector. Nil (or empty) routes it
     /// from its ends alone.
     public var waypoints: [Waypoint]? = nil
-    /// Hops (small arcs) where the line crosses a connector drawn beneath it. Straight and elbow lines only.
+    /// Hops (small arcs) where the line crosses a connector drawn beneath it.
     public var hops: Bool? = nil
     public init(start: Endpoint, end: Endpoint, routing: Routing = .straight, endArrow: Bool = true) {
         self.start = start; self.end = end; self.routing = routing

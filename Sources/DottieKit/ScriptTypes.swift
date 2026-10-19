@@ -308,7 +308,7 @@ extension DottieScript {
             endHead?: Arrowhead;
             /** Connectors only: canvas points the line bends through, start to end; [] removes them. */
             waypoints?: Point[];
-            /** Connectors only: a small hop where a straight or elbow line crosses a connector drawn beneath it. */
+            /** Connectors only: a small hop where the line crosses a connector drawn beneath it. */
             hops?: boolean;
             /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
              * (named in exports, not embedded), or "" for Helvetica Neue. */

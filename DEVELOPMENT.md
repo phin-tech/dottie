@@ -225,8 +225,9 @@ angles, adding a corner between any two that are out of line and dropping any th
 (`Connector.route(through:)`). They stay put when the end shapes move and move with the connector itself, so
 everything that moves a connector's free ends moves them too (`ConnectorData.transformFree`). Switching between
 elbow and the other routings, and `auto_layout`, take them out. A connector with `hops: true` draws a half-circle
-hop where a straight segment crosses a connector drawn before it on a visible layer (`Renderer.hopCrossings`);
-crossings within a hop of a bend or of another hop are skipped, and curved lines never hop. Earlier versions open
+hop where it crosses a connector drawn before it on a visible layer (`Renderer.hopCrossings`), measured along
+each straight segment or each cubic of a curve (sampled as the route is), which is cut either side of the
+crossing; crossings within a hop of a bend or of another hop are skipped. Earlier versions open
 such a file with the lines unbent and drop both fields when they save.
 
 **Fonts.** An element's `style.font` names the font its text is set in (`Fonts.swift`). Absent is Helvetica Neue.

@@ -1017,7 +1017,7 @@ public enum DottieScript {
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
     waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
-    (connectors: a small hop where a straight or elbow line crosses a connector drawn beneath it), \
+    (connectors: a small hop where the line crosses a connector drawn beneath it), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
     exports but not embedded; "" for Helvetica Neue), fontSize 4-200.
 

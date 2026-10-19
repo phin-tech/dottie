@@ -154,6 +154,20 @@ final class WaypointTests: XCTestCase {
         XCTAssertEqual(Renderer.hopCrossings(of: hopper, route: Connector.route(of: hopper, in: doc), in: doc, index: nil), [[150], []])
     }
 
+    func testACurveHopsTheCurveBeneathIt() {
+        line(.free(CGPoint(x: 0, y: 100)), .free(CGPoint(x: 400, y: 60)), routing: .curved)
+        let hopper = line(.free(CGPoint(x: 150, y: 250)), .free(CGPoint(x: 250, y: -50)), routing: .curved, hops: true)
+        let route = Connector.route(of: hopper, in: doc)
+        let crossings = Renderer.hopCrossings(of: hopper, route: route, in: doc, index: nil)
+        XCTAssertEqual(crossings.count, 1)
+        XCTAssertEqual(crossings[0].count, 1)
+        // The drawn line now has a gap bridged by the arc, so it is no longer one subpath.
+        let plain = Renderer.connectorParts(for: { var e = hopper; e.connector?.hops = nil; return e }(), in: doc).line
+        let hopped = Renderer.connectorParts(for: hopper, in: doc).line
+        XCTAssertNotEqual(plain, hopped)
+        XCTAssertGreaterThan(hopped.boundingBoxOfPath.width, plain.boundingBoxOfPath.width - 1)
+    }
+
     func testAHopAddsArcsToTheDrawnLine() {
         line(.free(CGPoint(x: 0, y: 100)), .free(CGPoint(x: 400, y: 100)))
         let plain = line(.free(CGPoint(x: 100, y: 0)), .free(CGPoint(x: 100, y: 300)))

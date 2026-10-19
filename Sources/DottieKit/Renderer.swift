@@ -186,13 +186,51 @@ public enum Renderer {
     }
 
     /// How big a hop is for a line `strokeWidth` wide: its radius.
-    static func hopRadius(_ strokeWidth: Double) -> Double { max(6, strokeWidth * 3) }
+    static func hopRadius(_ strokeWidth: Double) -> Double { max(8, strokeWidth * 4) }
 
-    /// Where a hopping connector's straight segments cross the connectors drawn beneath it (earlier on a visible
-    /// layer): for each segment, the distances along it, ascending. A crossing too close to the segment's ends or
-    /// to the hop before it is left out, so hops never run into bends or each other.
+    /// The points a route's segments are measured along: a straight segment's two ends, or a cubic sampled at 25.
+    static func hopSamples(_ route: Connector.Route) -> [[CGPoint]] {
+        switch route {
+        case .polyline(let pts):
+            return pts.count > 1 ? (0..<(pts.count - 1)).map { [pts[$0], pts[$0 + 1]] } : []
+        case .curve(let pts):
+            return (0..<((pts.count - 1) / 3)).map { s in
+                (0...24).map { i in cubicPoint(Array(pts[(3 * s)...(3 * s + 3)]), Double(i) / 24) }
+            }
+        }
+    }
+
+    /// Lengths along `samples` from its start, one per sample.
+    static func runningLengths(_ samples: [CGPoint]) -> [Double] {
+        var out = [0.0]
+        for i in 1..<samples.count { out.append(out[i - 1] + hypot(samples[i].x - samples[i - 1].x, samples[i].y - samples[i - 1].y)) }
+        return out
+    }
+
+    static func cubicPoint(_ p: [CGPoint], _ t: Double) -> CGPoint {
+        let u = 1 - t
+        return CGPoint(x: u*u*u*p[0].x + 3*u*u*t*p[1].x + 3*u*t*t*p[2].x + t*t*t*p[3].x,
+                       y: u*u*u*p[0].y + 3*u*u*t*p[1].y + 3*u*t*t*p[2].y + t*t*t*p[3].y)
+    }
+
+    /// The part of cubic `p` from `t0` to `t1`, by de Casteljau.
+    static func subCubic(_ p: [CGPoint], _ t0: Double, _ t1: Double) -> [CGPoint] {
+        func split(_ q: [CGPoint], _ t: Double) -> ([CGPoint], [CGPoint]) {
+            func lerp(_ a: CGPoint, _ b: CGPoint) -> CGPoint { CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t) }
+            let ab = lerp(q[0], q[1]), bc = lerp(q[1], q[2]), cd = lerp(q[2], q[3])
+            let abc = lerp(ab, bc), bcd = lerp(bc, cd), m = lerp(abc, bcd)
+            return ([q[0], ab, abc, m], [m, bcd, cd, q[3]])
+        }
+        let left = split(p, t1).0
+        return t1 > 0 ? split(left, t0 / t1).1 : [p[0], p[0], p[0], p[0]]
+    }
+
+    /// Where a hopping connector's segments (straight, or each cubic of a curve) cross the connectors drawn beneath
+    /// it (earlier on a visible layer): for each segment, the distances along it, ascending. A crossing too close to
+    /// the segment's ends or to the hop before it is left out, so hops never run into bends or each other.
     static func hopCrossings(of e: Element, route: Connector.Route, in doc: DottieDocument, index: [UUID: Element]?) -> [[Double]] {
-        guard case .polyline(let pts) = route, pts.count > 1 else { return [] }
+        let segments = hopSamples(route)
+        guard !segments.isEmpty else { return [] }
         let visible = Set(doc.layers.filter(\.visible).map(\.id))
         var beneath: [[CGPoint]] = []
         for o in doc.orderedElements {
@@ -202,21 +240,24 @@ public enum Renderer {
         }
         let r = hopRadius(e.style.strokeWidth)
         var out: [[Double]] = []
-        for i in 0..<(pts.count - 1) {
-            let p = pts[i], q = pts[i + 1]
-            let d = CGPoint(x: q.x - p.x, y: q.y - p.y)
-            let length = hypot(d.x, d.y)
+        for samples in segments {
+            let along = runningLengths(samples)
+            let length = along[along.count - 1]
             var found: [Double] = []
-            for line in beneath where line.count > 1 {
-                for k in 0..<(line.count - 1) {
-                    let a = line[k], b = line[k + 1]
-                    let ex = b.x - a.x, ey = b.y - a.y
-                    let det = d.x * ey - d.y * ex
-                    if abs(det) < 1e-9 { continue }
-                    let wx = a.x - p.x, wy = a.y - p.y
-                    // Solves p + t·d = a + s·(b - a).
-                    let t = (wx * ey - wy * ex) / det, s = (wx * d.y - wy * d.x) / det
-                    if t > 0, t < 1, s >= 0, s <= 1 { found.append(t * length) }
+            for i in 0..<(samples.count - 1) {
+                let p = samples[i], q = samples[i + 1]
+                let d = CGPoint(x: q.x - p.x, y: q.y - p.y)
+                for line in beneath where line.count > 1 {
+                    for k in 0..<(line.count - 1) {
+                        let a = line[k], b = line[k + 1]
+                        let ex = b.x - a.x, ey = b.y - a.y
+                        let det = d.x * ey - d.y * ex
+                        if abs(det) < 1e-9 { continue }
+                        let wx = a.x - p.x, wy = a.y - p.y
+                        // Solves p + t·d = a + s·(b - a).
+                        let t = (wx * ey - wy * ex) / det, s = (wx * d.y - wy * d.x) / det
+                        if t > 0, t < 1, s >= 0, s <= 1 { found.append(along[i] + t * (along[i + 1] - along[i])) }
+                    }
                 }
             }
             var kept: [Double] = []
@@ -237,6 +278,19 @@ public enum Renderer {
         let solid = CGMutablePath()
         let w = rough * 3
         func j() -> CGFloat { CGFloat(rng.signed() * w) }
+        /// A half circle from `s` to `t` (`u` the way along), as two quarter arcs; it bulges up, or left on an upright line.
+        func hop(from s: CGPoint, to t: CGPoint, u: CGPoint, radius r: Double) {
+            var n = CGPoint(x: u.y, y: -u.x)
+            if n.y > 1e-9 || (abs(n.y) <= 1e-9 && n.x > 0) { n = CGPoint(x: -n.x, y: -n.y) }
+            let k = r * 0.5523
+            let m = CGPoint(x: (s.x + t.x) / 2, y: (s.y + t.y) / 2)
+            let top = CGPoint(x: m.x + n.x * r, y: m.y + n.y * r)
+            path.move(to: s)
+            path.addCurve(to: top, control1: CGPoint(x: s.x + n.x * k + j(), y: s.y + n.y * k + j()),
+                          control2: CGPoint(x: top.x - u.x * k + j(), y: top.y - u.y * k + j()))
+            path.addCurve(to: t, control1: CGPoint(x: top.x + u.x * k + j(), y: top.y + u.y * k + j()),
+                          control2: CGPoint(x: t.x + n.x * k + j(), y: t.y + n.y * k + j()))
+        }
 
         switch route {
         case .polyline(let pts):
@@ -246,32 +300,50 @@ public enum Renderer {
                 let length = hypot(q.x - p.x, q.y - p.y)
                 let u = length > 0 ? CGPoint(x: (q.x - p.x) / length, y: (q.y - p.y) / length) : .zero
                 func at(_ d: Double) -> CGPoint { CGPoint(x: p.x + u.x * d, y: p.y + u.y * d) }
-                // A hop bulges up, or left on an upright segment.
-                var n = CGPoint(x: u.y, y: -u.x)
-                if n.y > 1e-9 || (abs(n.y) <= 1e-9 && n.x > 0) { n = CGPoint(x: -n.x, y: -n.y) }
                 var from = p
                 for d in i < hops.count ? hops[i] : [] {
-                    let s = at(d - r), m = at(d), t = at(d + r)
+                    let s = at(d - r), t = at(d + r)
                     if rough <= 0 { path.move(to: from); path.addLine(to: s) }
                     else { Rough.line(from, s, rng: &rng, roughness: rough, bowing: bow, preserveEnds: true, into: path) }
-                    // A half circle over the crossing, as two quarter arcs.
-                    let k = r * 0.5523
-                    let top = CGPoint(x: m.x + n.x * r, y: m.y + n.y * r)
-                    path.move(to: s)
-                    path.addCurve(to: top, control1: CGPoint(x: s.x + n.x * k + j(), y: s.y + n.y * k + j()),
-                                  control2: CGPoint(x: top.x - u.x * k + j(), y: top.y - u.y * k + j()))
-                    path.addCurve(to: t, control1: CGPoint(x: top.x + u.x * k + j(), y: top.y + u.y * k + j()),
-                                  control2: CGPoint(x: t.x + n.x * k + j(), y: t.y + n.y * k + j()))
+                    hop(from: s, to: t, u: u, radius: r)
                     from = t
                 }
                 if rough <= 0 { path.move(to: from); path.addLine(to: q) }
                 else { Rough.line(from, q, rng: &rng, roughness: rough, bowing: bow, preserveEnds: true, into: path) }
             }
         case .curve(let pts):
+            let r = hopRadius(e.style.strokeWidth)
+            let samples = hopSamples(route)
             path.move(to: pts[0])
             for s in 0..<((pts.count - 1) / 3) {
                 let b = pts[3 * s + 1], c2 = pts[3 * s + 2], d = pts[3 * s + 3]
-                path.addCurve(to: d, control1: CGPoint(x: b.x + j(), y: b.y + j()), control2: CGPoint(x: c2.x + j(), y: c2.y + j()))
+                let c1 = CGPoint(x: b.x + j(), y: b.y + j()), cc = CGPoint(x: c2.x + j(), y: c2.y + j())
+                let hopsHere = s < hops.count ? hops[s] : []
+                if hopsHere.isEmpty { path.addCurve(to: d, control1: c1, control2: cc); continue }
+                // Cut the curve either side of each crossing and bridge the gap with a hop.
+                let cubic = [pts[3 * s], c1, cc, d]
+                let along = runningLengths(samples[s])
+                func param(_ at: Double) -> Double {
+                    var i = 0
+                    while i < along.count - 2 && along[i + 1] < at { i += 1 }
+                    let span = along[i + 1] - along[i]
+                    return (Double(i) + (span > 0 ? (at - along[i]) / span : 0)) / 24
+                }
+                var from = 0.0
+                for at in hopsHere {
+                    let t0 = param(at - r), t1 = param(at + r)
+                    let piece = subCubic(cubic, from, t0)
+                    path.move(to: piece[0])
+                    path.addCurve(to: piece[3], control1: piece[1], control2: piece[2])
+                    let a = cubicPoint(cubic, t0), z = cubicPoint(cubic, t1)
+                    let width = hypot(z.x - a.x, z.y - a.y)
+                    let u = width > 0 ? CGPoint(x: (z.x - a.x) / width, y: (z.y - a.y) / width) : .zero
+                    hop(from: a, to: z, u: u, radius: width / 2)
+                    from = t1
+                }
+                let rest = subCubic(cubic, from, 1)
+                path.move(to: rest[0])
+                path.addCurve(to: rest[3], control1: rest[1], control2: rest[2])
             }
         }
 

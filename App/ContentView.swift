@@ -363,7 +363,7 @@ struct Inspector: View {
                 }
                 if !style.selectedConnectors.isEmpty {
                     Toggle("Hop over crossings", isOn: style.hops)
-                        .help("Draw a small arc where the line crosses a connector beneath it (straight and elbow lines)")
+                        .help("Draw a small arc where the line crosses a connector beneath it")
                     Button("Remove Bends", action: style.removeBends)
                         .disabled(!style.hasBends)
                         .help("Drag a line's middle to bend it; double-click a bend to remove just that one")

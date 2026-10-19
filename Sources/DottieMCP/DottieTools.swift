@@ -46,7 +46,7 @@ private let lookProps: [String: Value] = [
                                                               "properties": .object(["x": .object(["type": "number"]), "y": .object(["type": "number"])])]),
                           "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
                               + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
-    "hops": prop("boolean", "Connectors: draw a small hop where this (straight or elbow) line crosses a connector drawn beneath it"),
+    "hops": prop("boolean", "Connectors: draw a small hop where this line crosses a connector drawn beneath it"),
 ]
 
 private struct ToolFailure: Error { var message: String }
