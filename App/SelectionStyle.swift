@@ -84,8 +84,21 @@ struct SelectionStyle {
 
     var routing: Binding<Routing> {
         Binding(get: { selectedConnectors.first?.connector?.routing ?? newRouting.wrappedValue },
-                set: { r in newRouting.wrappedValue = r; if !selectedConnectors.isEmpty { editConnectors("Change Routing") { $0.routing = r } } })
+                set: { r in newRouting.wrappedValue = r; if !selectedConnectors.isEmpty { editConnectors("Change Routing") { $0.setRouting(r) } } })
     }
+
+    /// Whether the selected connectors hop over the ones beneath them; with none selected, whether new ones will.
+    var hops: Binding<Bool> {
+        Binding(get: { selectedConnectors.isEmpty ? Pref.bool(Pref.hops, default: true) : selectedConnectors.first?.connector?.hops == true },
+                set: { on in
+                    if selectedConnectors.isEmpty { UserDefaults.standard.set(on, forKey: Pref.hops); return }
+                    editConnectors(on ? "Hop Over Crossings" : "Stop Hopping") { $0.hops = on ? true : nil }
+                })
+    }
+
+    var hasBends: Bool { selectedConnectors.contains { $0.connector?.waypoints != nil } }
+
+    func removeBends() { editConnectors("Remove Bends") { $0.waypoints = nil } }
 
     func head(_ kp: WritableKeyPath<ConnectorData, Arrowhead>, _ name: String) -> Binding<Arrowhead> {
         let fallback: Arrowhead = kp == \ConnectorData.endHead ? .arrow : .none

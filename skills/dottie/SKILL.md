@@ -36,7 +36,9 @@ user restarts their session before the tools appear. Until then, the command lin
 3. **Look at it.** `export_png` returns the page as an image. Read it as the user would: overlapping labels, crossed
    or crowded arrows, text spilling out of shapes, a layout that runs the wrong way.
 4. **Fix and look again.** `list_elements` gives the ids that `update_element`, `delete_element` and
-   `add_connector` take; `auto_layout` re-ranks a page. The diagram is done when the latest PNG reads cleanly, with
+   `add_connector` take; `auto_layout` re-ranks a page. An arrow that cuts through a shape can be routed around it
+   with `waypoints` (canvas points it bends through, on `add_connector` or `update_element`), and `hops: true` puts
+   a small arc where it crosses an arrow beneath it. The diagram is done when the latest PNG reads cleanly, with
    every label legible and every arrow's ends clear.
 
 Loops, conditions and bulk edits (a grid of boxes, restyling everything labelled "TODO", a fan-out from one node)

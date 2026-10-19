@@ -18,6 +18,16 @@ _Avoid_: component
 A one-off JavaScript program run against a document with the `dottie` object.
 _Avoid_: macro, extension
 
+### Connectors
+
+**Waypoint**:
+A point on the canvas that a connector's line passes through, placed by dragging the line. The app calls it a bend.
+_Avoid_: control point (that is a pen stroke's), vertex
+
+**Hop**:
+The small arc a connector draws where it crosses a connector beneath it, so the two read as unconnected.
+_Avoid_: jump, bridge, crossover
+
 ### Extensions
 
 **Extension**:

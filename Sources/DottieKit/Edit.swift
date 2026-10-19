@@ -67,6 +67,7 @@ extension DottieDocument {
                     if ep.elementID == nil { ep.x += offset.x; ep.y += offset.y }
                     if isStart { c.start = ep } else { c.end = ep }
                 }
+                c.waypoints = c.waypoints?.map { Waypoint(x: $0.x + offset.x, y: $0.y + offset.y) }
                 e.connector = c
             } else {
                 e.x += offset.x; e.y += offset.y
@@ -223,14 +224,7 @@ extension DottieDocument {
     public mutating func rotate(_ ids: Set<UUID>, by delta: Double, about center: CGPoint) {
         for i in elements.indices where ids.contains(elements[i].id) {
             if var c = elements[i].connector {
-                for isStart in [true, false] {
-                    var ep = isStart ? c.start : c.end
-                    if ep.elementID == nil {
-                        let p = Element.rotate(CGPoint(x: ep.x, y: ep.y), about: center, by: delta)
-                        ep.x = p.x; ep.y = p.y
-                    }
-                    if isStart { c.start = ep } else { c.end = ep }
-                }
+                c.transformFree { Element.rotate($0, about: center, by: delta) }
                 elements[i].connector = c
             } else {
                 let f = elements[i].frame

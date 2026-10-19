@@ -96,7 +96,7 @@ export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, link
     if (!visible.has(e.layerID)) continue;
     const alpha = Math.min(Math.max(e.style.opacity ?? 1, 0), 1);
     if (alpha <= 0) continue;
-    let body = svgElement(e, index, bg);
+    let body = svgElement(e, index, bg, d);
     if (angle(e) !== 0 && e.kind !== "connector") {
       body = `<g transform="rotate(${fmt((angle(e) * 180) / Math.PI)} ${fmt(midX(frame(e)))} ${fmt(midY(frame(e)))})">\n${body}</g>\n`;
     }
@@ -133,7 +133,7 @@ function revealProgress(e: Element): number | null {
   return e.reveal !== null && e.reveal < 1 ? Math.max(0, e.reveal) : null;
 }
 
-function svgElement(e: Element, index: Index, labelBackground: RGBA | null): string {
+function svgElement(e: Element, index: Index, labelBackground: RGBA | null, page: Page): string {
   const stroke = color(e.style.stroke);
   let strokeAttrs = `stroke="${stroke}" stroke-width="${fmt(e.style.strokeWidth)}" stroke-linecap="round" stroke-linejoin="round"`;
   const dash = dashPattern(e.style.dash, e.style.strokeWidth);
@@ -144,14 +144,14 @@ function svgElement(e: Element, index: Index, labelBackground: RGBA | null): str
   if (r !== null) {
     if (e.kind === "text") text = typed(text ?? "", r);
     else if (e.kind === "connector") {
-      return `<path d="${connectorParts(e, index)[0].trimmed(r).data()}" fill="none" ${strokeAttrs}/>\n`;
+      return `<path d="${connectorParts(e, index, page)[0].trimmed(r).data()}" fill="none" ${strokeAttrs}/>\n`;
     } else {
       return `<path d="${outline(e).trimmed(r).data()}" fill="none" ${strokeAttrs}/>\n`;
     }
   }
   switch (e.kind) {
     case "connector": {
-      const [line, filled] = connectorParts(e, index);
+      const [line, filled] = connectorParts(e, index, page);
       let s = `<path d="${line.data()}" fill="none" ${strokeAttrs}/>\n`;
       if (!filled.isEmpty) s += `<path d="${filled.data()}" fill="${stroke}" stroke="none"/>\n`;
       if (text) {

@@ -1,10 +1,10 @@
 // The paths an element draws (Renderer.swift): outlines, fills, hatching and connectors, sketchy or clean.
 // Pure functions of the element, cached by what they depend on, as Dottie does.
 
-import { type Index, arrowhead, endpoints, route, routePoints } from "./connector.ts";
+import { type Index, type Route, arrowhead, endpoints, route, routePoints } from "./connector.ts";
 import { type Contour, frame, shapeContours, shapePath } from "./element.ts";
 import { gridLines } from "./dungeon.ts";
-import type { DashStyle, Element } from "./model.ts";
+import { type DashStyle, type Element, type Page, orderedElements } from "./model.ts";
 import { Path, type Point, type Rect, flatten, maxX, maxY, midX, midY } from "./path.ts";
 import { SeededRNG } from "./rng.ts";
 import * as Rough from "./rough.ts";
@@ -184,34 +184,188 @@ export function dashPattern(dash: DashStyle, width: number): number[] | null {
   }
 }
 
-/** A connector as the stroked line (with open arrowheads) and the closed heads filled in the stroke color. */
-export function connectorParts(e: Element, index: Index): [Path, Path] {
+/**
+ * A connector as the stroked line (with open arrowheads) and the closed heads filled in the stroke color. `page`
+ * holds the connectors a hopping line hops over; without it a line draws no hops.
+ */
+export function connectorParts(e: Element, index: Index, page?: Page): [Path, Path] {
   const c = e.connector;
   if (!c) return [new Path(), new Path()];
   const [a, b] = endpoints(e, index);
+  const r = route(e, index);
+  const hops = c.hops === true && page ? hopCrossings(e, r, page, index) : [];
   const key = [e.seed, e.style.roughness, e.style.bowing, e.style.strokeWidth, c.routing, c.startHead, c.endHead,
-    c.start.port, c.end.port, a.x, a.y, b.x, b.y].join("|");
-  return connectors.get(key, () => computeConnector(e, index));
+    c.start.port, c.end.port, a.x, a.y, b.x, b.y, JSON.stringify(c.waypoints), JSON.stringify(hops)].join("|");
+  return connectors.get(key, () => computeConnector(e, r, hops));
 }
 
-function computeConnector(e: Element, index: Index): [Path, Path] {
+/** How big a hop is for a line `strokeWidth` wide: its radius. */
+export function hopRadius(strokeWidth: number): number { return Math.max(8, strokeWidth * 4); }
+
+/** The points a route's segments are measured along: a straight segment's two ends, or a cubic sampled at 25. */
+export function hopSamples(r: Route): Point[][] {
+  const pts = r.points, out: Point[][] = [];
+  if (r.kind === "polyline") {
+    for (let i = 0; i < pts.length - 1; i++) out.push([pts[i], pts[i + 1]]);
+    return out;
+  }
+  for (let s = 0; s < Math.floor((pts.length - 1) / 3); s++) {
+    const seg = pts.slice(3 * s, 3 * s + 4), samples: Point[] = [];
+    for (let i = 0; i <= 24; i++) samples.push(cubicPoint(seg, i / 24));
+    out.push(samples);
+  }
+  return out;
+}
+
+function runningLengths(samples: Point[]): number[] {
+  const out = [0];
+  for (let i = 1; i < samples.length; i++) out.push(out[i - 1] + Math.hypot(samples[i].x - samples[i - 1].x, samples[i].y - samples[i - 1].y));
+  return out;
+}
+
+function cubicPoint(p: Point[], t: number): Point {
+  const u = 1 - t;
+  return {
+    x: u * u * u * p[0].x + 3 * u * u * t * p[1].x + 3 * u * t * t * p[2].x + t * t * t * p[3].x,
+    y: u * u * u * p[0].y + 3 * u * u * t * p[1].y + 3 * u * t * t * p[2].y + t * t * t * p[3].y,
+  };
+}
+
+/** The part of cubic `p` from `t0` to `t1`, by de Casteljau. */
+function subCubic(p: Point[], t0: number, t1: number): Point[] {
+  const split = (q: Point[], t: number): [Point[], Point[]] => {
+    const lerp = (a: Point, b: Point): Point => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
+    const ab = lerp(q[0], q[1]), bc = lerp(q[1], q[2]), cd = lerp(q[2], q[3]);
+    const abc = lerp(ab, bc), bcd = lerp(bc, cd), m = lerp(abc, bcd);
+    return [[q[0], ab, abc, m], [m, bcd, cd, q[3]]];
+  };
+  const left = split(p, t1)[0];
+  return t1 > 0 ? split(left, t0 / t1)[1] : [p[0], p[0], p[0], p[0]];
+}
+
+/**
+ * Where a hopping connector's segments (straight, or each cubic of a curve) cross the connectors drawn beneath it
+ * (earlier on a visible layer): for each segment, the distances along it, ascending, leaving out crossings too close
+ * to its ends or the hop before.
+ */
+export function hopCrossings(e: Element, r: Route, page: Page, index: Index): number[][] {
+  const segments = hopSamples(r);
+  if (segments.length === 0) return [];
+  const visible = new Set(page.layers.filter((l) => l.visible).map((l) => l.id));
+  const beneath: Point[][] = [];
+  for (const o of orderedElements(page)) {
+    if (o.id === e.id) break;
+    if (o.kind !== "connector" || !visible.has(o.layerID)) continue;
+    beneath.push(routePoints(route(o, index)));
+  }
+  const rad = hopRadius(e.style.strokeWidth);
+  const out: number[][] = [];
+  for (const samples of segments) {
+    const along = runningLengths(samples);
+    const length = along[along.length - 1];
+    const found: number[] = [];
+    for (let i = 0; i < samples.length - 1; i++) {
+      const p = samples[i], q = samples[i + 1];
+      const dx = q.x - p.x, dy = q.y - p.y;
+      for (const line of beneath) {
+        for (let k = 0; k < line.length - 1; k++) {
+          const a = line[k], b = line[k + 1];
+          const ex = b.x - a.x, ey = b.y - a.y;
+          const det = dx * ey - dy * ex;
+          if (Math.abs(det) < 1e-9) continue;
+          const wx = a.x - p.x, wy = a.y - p.y;
+          // Solves p + t·d = a + s·(b - a).
+          const t = (wx * ey - wy * ex) / det, s = (wx * dy - wy * dx) / det;
+          if (t > 0 && t < 1 && s >= 0 && s <= 1) found.push(along[i] + t * (along[i + 1] - along[i]));
+        }
+      }
+    }
+    const kept: number[] = [];
+    for (const at of found.sort((x, y) => x - y)) {
+      if (at < rad + 2 || at > length - rad - 2) continue;
+      if (kept.length > 0 && at - kept[kept.length - 1] < 2 * rad + 2) continue;
+      kept.push(at);
+    }
+    out.push(kept);
+  }
+  return out;
+}
+
+function computeConnector(e: Element, r: Route, hops: number[][]): [Path, Path] {
   const c = e.connector!;
   const rng = new SeededRNG(e.seed);
   const rough = e.style.roughness, bow = e.style.bowing;
   const path = new Path(), solid = new Path();
-  const r = route(e, index);
+  const w = rough * 3;
+  const j = (): number => rng.signed() * w;
+  /** A half circle from `s` to `t` (`u` the way along), as two quarter arcs; it bulges up, or left on an upright line. */
+  const hop = (s: Point, t: Point, u: Point, rad: number): void => {
+    let n = { x: u.y, y: -u.x };
+    if (n.y > 1e-9 || (Math.abs(n.y) <= 1e-9 && n.x > 0)) n = { x: -n.x, y: -n.y };
+    const k = rad * 0.5523;
+    const m = { x: (s.x + t.x) / 2, y: (s.y + t.y) / 2 };
+    const top = { x: m.x + n.x * rad, y: m.y + n.y * rad };
+    path.moveTo(s);
+    const a1x = s.x + n.x * k + j(), a1y = s.y + n.y * k + j(), a2x = top.x - u.x * k + j(), a2y = top.y - u.y * k + j();
+    path.curveTo(top, { x: a1x, y: a1y }, { x: a2x, y: a2y });
+    const b1x = top.x + u.x * k + j(), b1y = top.y + u.y * k + j(), b2x = t.x + n.x * k + j(), b2y = t.y + n.y * k + j();
+    path.curveTo(t, { x: b1x, y: b1y }, { x: b2x, y: b2y });
+  };
+  const rad = hopRadius(e.style.strokeWidth);
   if (r.kind === "polyline") {
     const pts = r.points;
+    const straight = (p: Point, q: Point): void => {
+      if (rough <= 0) path.moveTo(p).lineTo(q);
+      else Rough.line(p, q, rng, rough, bow, true, path);
+    };
     for (let i = 0; i < Math.max(pts.length - 1, 0); i++) {
-      if (rough <= 0) path.moveTo(pts[i]).lineTo(pts[i + 1]);
-      else Rough.line(pts[i], pts[i + 1], rng, rough, bow, true, path);
+      const p = pts[i], q = pts[i + 1];
+      const length = Math.hypot(q.x - p.x, q.y - p.y);
+      const u = length > 0 ? { x: (q.x - p.x) / length, y: (q.y - p.y) / length } : { x: 0, y: 0 };
+      const at = (d: number): Point => ({ x: p.x + u.x * d, y: p.y + u.y * d });
+      let from = p;
+      for (const d of i < hops.length ? hops[i] : []) {
+        const s = at(d - rad), t = at(d + rad);
+        straight(from, s);
+        hop(s, t, u, rad);
+        from = t;
+      }
+      straight(from, q);
     }
   } else {
-    path.moveTo(r.a);
-    const w = rough * 3;
-    const j = (): number => rng.signed() * w;
-    const c1x = r.b.x + j(), c1y = r.b.y + j(), c2x = r.c.x + j(), c2y = r.c.y + j();
-    path.curveTo(r.d, { x: c1x, y: c1y }, { x: c2x, y: c2y });
+    const pts = r.points;
+    const samples = hopSamples(r);
+    path.moveTo(pts[0]);
+    for (let s = 0; s < Math.floor((pts.length - 1) / 3); s++) {
+      const b = pts[3 * s + 1], c2 = pts[3 * s + 2], d = pts[3 * s + 3];
+      const c1x = b.x + j(), c1y = b.y + j(), c2x = c2.x + j(), c2y = c2.y + j();
+      const here = s < hops.length ? hops[s] : [];
+      if (here.length === 0) { path.curveTo(d, { x: c1x, y: c1y }, { x: c2x, y: c2y }); continue; }
+      // Cut the curve either side of each crossing and bridge the gap with a hop.
+      const cubic = [pts[3 * s], { x: c1x, y: c1y }, { x: c2x, y: c2y }, d];
+      const along = runningLengths(samples[s]);
+      const param = (at: number): number => {
+        let i = 0;
+        while (i < along.length - 2 && along[i + 1] < at) i++;
+        const span = along[i + 1] - along[i];
+        return (i + (span > 0 ? (at - along[i]) / span : 0)) / 24;
+      };
+      let from = 0;
+      for (const at of here) {
+        const t0 = param(at - rad), t1 = param(at + rad);
+        const piece = subCubic(cubic, from, t0);
+        // Core Graphics folds a move straight after a move into one, so the line's opening move stands alone.
+        if (s > 0 || from > 0) path.moveTo(piece[0]);
+        path.curveTo(piece[3], piece[1], piece[2]);
+        const a = cubicPoint(cubic, t0), z = cubicPoint(cubic, t1);
+        const width = Math.hypot(z.x - a.x, z.y - a.y);
+        const u = width > 0 ? { x: (z.x - a.x) / width, y: (z.y - a.y) / width } : { x: 0, y: 0 };
+        hop(a, z, u, width / 2);
+        from = t1;
+      }
+      const rest = subCubic(cubic, from, 1);
+      path.moveTo(rest[0]).curveTo(rest[3], rest[1], rest[2]);
+    }
   }
   const pts = routePoints(r);
   const size = Math.max(10, e.style.strokeWidth * 5);

@@ -6,6 +6,8 @@ enum Pref {
     /// The inspector's "style for new shapes", persisted as JSON so it survives relaunch.
     static let newStyle = "newShapeStyle"
     static let routing = "defaultRouting"
+    /// Whether connectors drawn from now on hop over the ones beneath them.
+    static let hops = "newConnectorsHop"
     static let snapToObjects = "snapToObjects"
     static let snapToGrid = "snapToGrid"
     static let gridSize = "gridSize"
@@ -93,6 +95,7 @@ private struct GeneralSettings: View {
     @AppStorage(UpdateChecker.betaKey) private var betaUpdates = UpdateChecker.runningBeta
     @AppStorage(Pref.newStyle) private var newStyle = ""
     @AppStorage(Pref.routing) private var routing = Pref.routingDefault
+    @AppStorage(Pref.hops) private var hops = true
 
     var body: some View {
         Form {
@@ -117,6 +120,7 @@ private struct GeneralSettings: View {
             }
             Section {
                 Toggle("Return to the Select tool after drawing", isOn: $returnToSelect)
+                Toggle("New connectors hop over crossings", isOn: $hops)
             } header: {
                 Text("Tools")
             } footer: {
@@ -143,6 +147,7 @@ private struct GeneralSettings: View {
                 Button("Reset Style for New Shapes") {
                     newStyle = ""
                     routing = Pref.routingDefault
+                    hops = true
                 }
             }
         }

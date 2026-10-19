@@ -269,7 +269,17 @@ public enum DottieScript {
                                 strokeWidth: double("strokeWidth"), bowing: double("bowing"),
                                 startHead: try enumValue("startHead", as: Arrowhead.self),
                                 endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"),
-                                gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"))
+                                gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"),
+                                waypoints: try points("waypoints"), hops: bool("hops"))
+            }
+            /// A list of {x, y} points.
+            func points(_ k: String) throws -> [CGPoint]? {
+                guard has(k) else { return nil }
+                guard let list = list(k) else { throw OpsError.invalid("'\(k)' must be a list of {x, y} points") }
+                return try list.map { p in
+                    guard let x = p.double("x"), let y = p.double("y") else { throw OpsError.invalid("Each of '\(k)' needs a number x and y") }
+                    return CGPoint(x: x, y: y)
+                }
             }
             /// `sketchy: true|false` as a roughness override.
             var roughness: Double? { bool("sketchy").map { $0 ? 1 : 0 } }
@@ -343,6 +353,8 @@ public enum DottieScript {
             if let layer = doc.layers.first(where: { $0.id == e.layerID }) { d["layer"] = layer.name }
             if let c = e.connector {
                 d["routing"] = c.routing.rawValue
+                if let w = c.waypoints { d["waypoints"] = w.map { ["x": $0.x, "y": $0.y] } }
+                if c.hops == true { d["hops"] = true }
                 if let f = c.start.elementID { d["from"] = f.uuidString }
                 if let t = c.end.elementID { d["to"] = t.uuidString }
             }
@@ -1004,6 +1016,8 @@ public enum DottieScript {
     Look fields (any shape or connector): fillStyle solid|hachure|crossHatch|grid, dash solid|dashed|dotted, \
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
+    waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
+    (connectors: a small hop where the line crosses a connector drawn beneath it), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
     exports but not embedded; "" for Helvetica Neue), fontSize 4-200.
 

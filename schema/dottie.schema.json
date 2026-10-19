@@ -219,8 +219,16 @@
         "end": { "$ref": "#/$defs/endpoint" },
         "routing": { "enum": ["straight", "curved", "elbow"] },
         "startHead": { "$ref": "#/$defs/arrowhead" },
-        "endHead": { "$ref": "#/$defs/arrowhead" }
+        "endHead": { "$ref": "#/$defs/arrowhead" },
+        "waypoints": { "type": "array", "items": { "$ref": "#/$defs/waypoint" }, "description": "Bends on the canvas the line passes through, start to end, whatever its routing." },
+        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it." }
       }
+    },
+    "waypoint": {
+      "type": "object",
+      "required": ["x", "y"],
+      "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" } }
     },
     "arrowhead": { "enum": ["none", "arrow", "triangle", "dot", "bar"] },
     "ease": { "enum": ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"] },

@@ -95,12 +95,16 @@ public enum DiagramOps {
         /// The font text is set in (see `Fonts`); "" or "Helvetica Neue" goes back to the default.
         public var font: String?
         public var fontSize: Double?
+        /// A connector's bends, start to end; empty takes them out.
+        public var waypoints: [CGPoint]?
+        /// Whether a connector hops over the connectors beneath it.
+        public var hops: Bool?
         public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
                     startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil,
-                    font: String? = nil, fontSize: Double? = nil) {
+                    font: String? = nil, fontSize: Double? = nil, waypoints: [CGPoint]? = nil, hops: Bool? = nil) {
             self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
             self.startHead = startHead; self.endHead = endHead; self.rotation = rotation; self.gridSize = gridSize
-            self.font = font; self.fontSize = fontSize
+            self.font = font; self.fontSize = fontSize; self.waypoints = waypoints; self.hops = hops
         }
 
         /// Sets the font and text size, the part of the look a shape's default size depends on.
@@ -123,6 +127,8 @@ public enum DiagramOps {
             if e.kind == .connector {
                 if let startHead { e.connector?.startHead = startHead }
                 if let endHead { e.connector?.endHead = endHead }
+                if let waypoints { e.connector?.waypoints = waypoints.isEmpty ? nil : waypoints.map(Waypoint.init) }
+                if let hops { e.connector?.hops = hops ? true : nil }
             } else if let rotation {
                 let a = (rotation * .pi / 180).truncatingRemainder(dividingBy: 2 * .pi)
                 e.rotation = abs(a) < 1e-9 ? nil : a
@@ -244,7 +250,7 @@ public enum DiagramOps {
         if let fill { doc.elements[i].style.fill = fill }
         if let stroke { doc.elements[i].style.stroke = stroke }
         if let roughness { doc.elements[i].style.roughness = roughness }
-        if let routing { doc.elements[i].connector?.routing = routing }
+        if let routing { doc.elements[i].connector?.setRouting(routing) }
         look.apply(to: &doc.elements[i])
     }
 
@@ -313,13 +319,15 @@ public enum DiagramOps {
         return ids
     }
 
-    /// Re-lays out every shape using the existing connectors as edges.
+    /// Re-lays out every shape using the existing connectors as edges. Their bends were placed for the old layout,
+    /// so they go.
     public static func autoLayout(_ doc: inout DottieDocument, direction: LayoutDirection = .topToBottom) {
         let edges: [(UUID, UUID)] = doc.elements.compactMap { e in
             guard let c = e.connector, let a = c.start.elementID, let b = c.end.elementID else { return nil }
             return (a, b)
         }
         Layout.layered(&doc, edges: edges, direction: direction)
+        for i in doc.elements.indices where doc.elements[i].connector?.waypoints != nil { doc.elements[i].connector?.waypoints = nil }
     }
 
     // MARK: Inspection
@@ -369,6 +377,9 @@ public enum DiagramOps {
         public var playback: String?
         /// For a symbol instance: its values for the symbol's params.
         public var args: [String: String]?
+        /// For a connector: the bends it runs through, and whether it hops the lines beneath it.
+        public var waypoints: [Waypoint]?
+        public var hops: Bool?
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
@@ -387,7 +398,8 @@ public enum DiagramOps {
                                   link: e.link?.uuidString, url: e.url, anchor: e.anchor,
                                   clickScene: e.click?.scene, clickURL: e.click?.url,
                                   symbol: e.symbol.map { id in doc.symbolIndex[id]?.name ?? id.uuidString },
-                                  playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil, args: e.args)
+                                  playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil, args: e.args,
+                                  waypoints: e.connector?.waypoints, hops: e.connector?.hops)
         }
     }
 }

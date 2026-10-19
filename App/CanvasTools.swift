@@ -113,6 +113,12 @@ struct SelectTool: CanvasTool {
         }
         guard layer != nil else { return }
         let hit = c.spatial.element(at: p, in: c.model, skipping: c.hiddenInEditor)
+        let bend = c.bendHit(p)
+        if event.clickCount == 2, let (id, handle) = bend, case .waypoint(let i) = handle { // double-click a bend: remove it
+            c.removeWaypoint(i, of: id)
+            c.gesture = nil
+            return
+        }
         if event.clickCount == 2, let hit {
             c.selection = [hit.id]
             if hit.kind == .symbol { c.gesture = nil; c.onEditSymbol?(hit.id); return }
@@ -124,6 +130,8 @@ struct SelectTool: CanvasTool {
             c.gesture = .editingPoint(id: id, index: index)
         } else if let (id, isStart) = c.connectorEndpointHit(p) {
             c.gesture = .endpoint(id: id, isStart: isStart)
+        } else if let (id, handle) = bend {
+            c.gesture = .bending(id: id, handle: handle)
         } else if let (box, knob) = c.groupRotationKnob(), hypot(p.x - knob.x, p.y - knob.y) <= c.hs {
             let center = CGPoint(x: box.midX, y: box.midY)
             c.gesture = .rotatingGroup(center: center, start: atan2(p.y - center.y, p.x - center.x))
@@ -199,7 +207,8 @@ struct ConnectorTool: CanvasTool {
         guard let layer = c.startPress() else { return }
         var st = c.style
         st.fill = .clear
-        let data = ConnectorData(start: c.endpoint(at: p, in: c.model), end: .free(p), routing: c.routing)
+        var data = ConnectorData(start: c.endpoint(at: p, in: c.model), end: .free(p), routing: c.routing)
+        if Pref.bool(Pref.hops, default: true) { data.hops = true }
         let e = Element(kind: .connector, frame: .zero, style: st, layerID: layer, connector: data)
         c.model.elements.append(e)
         c.selection = [e.id]

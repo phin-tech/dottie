@@ -244,6 +244,7 @@ extension DottieScript {
         }
 
         interface Rect { x: number; y: number; width: number; height: number }
+        interface Point { x: number; y: number }
 
         /** An element as calls return it. Units are canvas points, y down. */
         interface Element extends Rect {
@@ -273,6 +274,9 @@ extension DottieScript {
             anchor?: string;
             layer?: string;
             routing?: Routing;
+            /** Connectors: the bends the line runs through, and whether it hops the lines beneath it. */
+            waypoints?: Point[];
+            hops?: boolean;
             /** Connectors: the shape at each end, when attached. */
             from?: string;
             to?: string;
@@ -302,6 +306,10 @@ extension DottieScript {
             startHead?: Arrowhead;
             /** Connectors only. */
             endHead?: Arrowhead;
+            /** Connectors only: canvas points the line bends through, start to end; [] removes them. */
+            waypoints?: Point[];
+            /** Connectors only: a small hop where the line crosses a connector drawn beneath it. */
+            hops?: boolean;
             /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
              * (named in exports, not embedded), or "" for Helvetica Neue. */
             font?: string;

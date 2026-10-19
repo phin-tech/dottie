@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -79,9 +79,13 @@ class Page:
             return d
         kw = {"connector": {"start": ep(a, start_port, free_start), "end": ep(b, end_port, free_end),
                             "routing": routing, "startHead": start_head, "endHead": end_head}}
+        if waypoints is not None:
+            kw["connector"]["waypoints"] = [{"x": x, "y": y} for x, y in waypoints]
+        if hops is not None:
+            kw["connector"]["hops"] = hops
         if text:
             kw["text"] = text
-        return self.add("connector", 0, 0, 0, 0, style=st or style(), **kw)
+        return self.add("connector", 0, 0, 0, 0, style=st or style(), layer=layer, **kw)
 
     def animate(self, duration, fps=12, **kw):
         self.timeline = {"fps": fps, "duration": duration, "tracks": []}
@@ -838,6 +842,57 @@ def extension_tools():
     write(EDGE / "extension-tools.dottie", [page])
 
 
+def waypoints():
+    """Bends dragged into connectors, for every routing, and hops where a line crosses the ones beneath it."""
+    p = Page(layers=2)
+    a = p.add("rectangle", 40, 40, 100, 60, text="A")
+    b = p.add("ellipse", 420, 60, 100, 60, text="B")
+    c = p.add("rectangle", 40, 300, 100, 60, text="C")
+    d = p.add("diamond", 420, 300, 120, 80, text="D")
+    # Edge-following ends aim at the nearest bend; the label sits halfway along the bent line.
+    p.connect(a, b, waypoints=[(200, 10), (330, 10)], text="over")
+    p.connect(a, d, routing="curved", waypoints=[(120, 200), (300, 180), (380, 260)], end_head="triangle")
+    # Elbows: bends out of line get corners; a pinned port decides the last leg; bends in line fall away.
+    p.connect(c, b, routing="elbow", waypoints=[(250, 250), (330, 140)], start_head="dot")
+    p.connect(c, d, routing="elbow", start_port="bottom", end_port="bottom", waypoints=[(90, 420), (480, 420)],
+              st=style(roughness=0))
+    p.connect(None, None, routing="elbow", free_start=(600, 40), free_end=(700, 200),
+              waypoints=[(650, 40), (680, 40), (680, 120)], st=style(roughness=0))
+    p.connect(None, None, routing="curved", free_start=(600, 260), free_end=(740, 400), waypoints=[(700, 250)])
+    # Hops: over the lines beneath, not too near a bend, not over a hidden layer's line or one drawn above.
+    h1 = p.connect(None, None, free_start=(40, 520), free_end=(760, 520), st=style(roughness=0))
+    p.connect(None, None, routing="curved", free_start=(40, 600), free_end=(760, 560))
+    p.connect(None, None, free_start=(40, 640), free_end=(760, 640), layer=p.layers[1]["id"])
+    p.layers[1]["visible"] = False
+    p.connect(None, None, routing="elbow", free_start=(120, 460), free_end=(300, 700),
+              waypoints=[(120, 580), (300, 580)], hops=True, st=style(roughness=0, strokeWidth=3))
+    p.connect(None, None, free_start=(400, 460), free_end=(560, 700), hops=True)
+    p.connect(None, None, free_start=(600, 460), free_end=(600, 700), hops=True, end_head="triangle")
+    p.connect(None, None, free_start=(700, 470), free_end=(720, 700), hops=False)
+    p.connect(None, None, routing="curved", free_start=(650, 460), free_end=(760, 700), hops=True)  # a curve hops too
+    p.connect(None, None, free_start=(40, 515), free_end=(160, 515), hops=True)  # nothing beneath it crosses
+    # A curve hopping a curve beneath it, sketchy and clean, and one with bends hopping twice.
+    p.connect(None, None, routing="curved", free_start=(40, 760), free_end=(400, 720))
+    p.connect(None, None, routing="curved", free_start=(160, 860), free_end=(260, 680), hops=True)
+    p.connect(None, None, routing="curved", free_start=(300, 860), free_end=(360, 680), hops=True, st=style(roughness=0))
+    p.connect(None, None, routing="curved", free_start=(440, 700), free_end=(760, 860),
+              waypoints=[(520, 860), (680, 690)], hops=True)
+    write(EDGE / "waypoints.dottie", [p])
+
+    # A connector with bends inside a symbol: the bends scale and turn with each copy.
+    q = Page()
+    sp = Page("Bent")
+    x = sp.add("rectangle", 0, 0, 30, 20)
+    y = sp.add("rectangle", 70, 60, 30, 20)
+    sp.connect(x, y, routing="elbow", waypoints=[(50, 10), (50, 70)])
+    sp.connect(None, None, free_start=(0, 60), free_end=(100, 0), waypoints=[(20, 0)])
+    bent = {"id": sp.id, "name": "Bent", "width": 100, "height": 80, "layers": sp.layers, "elements": sp.elements}
+    q.extra = {"symbols": [bent]}
+    q.add("symbol", 40, 40, 100, 80, symbol=bent["id"], style=style(roughness=0))
+    q.add("symbol", 220, 40, 200, 120, symbol=bent["id"], rotation=0.6, style=style(roughness=0))
+    write(EDGE / "waypoints-symbol.dottie", [q])
+
+
 def main():
     shapes()
     connectors()
@@ -859,6 +914,7 @@ def main():
     links()
     extension_tools()
     fonts()
+    waypoints()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

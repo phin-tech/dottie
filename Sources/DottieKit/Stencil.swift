@@ -51,11 +51,7 @@ public struct StencilItem: Codable, Equatable, Identifiable, Sendable {
             e.style.strokeWidth = max(0.25, e.style.strokeWidth * scale)
             e.style.fontSize *= scale
             if var c = e.connector {
-                for isStart in [true, false] {
-                    var ep = isStart ? c.start : c.end
-                    if ep.elementID == nil { ep.x *= scale; ep.y *= scale }
-                    if isStart { c.start = ep } else { c.end = ep }
-                }
+                c.transformFree { CGPoint(x: $0.x * scale, y: $0.y * scale) }
                 e.connector = c
             }
             return e
@@ -203,11 +199,7 @@ public struct StencilLibrary: Codable, Equatable, Sendable {
         let box = Exporter.bounds(of: holder, padding: 0)
         for i in items.indices {
             if var c = items[i].connector {
-                for isStart in [true, false] {
-                    var ep = isStart ? c.start : c.end
-                    if ep.elementID == nil { ep.x -= box.minX; ep.y -= box.minY }
-                    if isStart { c.start = ep } else { c.end = ep }
-                }
+                c.translateFree(dx: -box.minX, dy: -box.minY)
                 items[i].connector = c
             } else {
                 items[i].x -= box.minX; items[i].y -= box.minY
