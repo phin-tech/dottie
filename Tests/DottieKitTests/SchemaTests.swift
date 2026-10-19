@@ -36,7 +36,7 @@ final class SchemaTests: XCTestCase {
     func testEverythingEncodedValidates() throws {
         let layer = Layer(name: "L")
         var style = Style()
-        style.gridSize = 20; style.opacity = 0.5; style.fillStyle = .grid; style.dash = .dotted
+        style.gridSize = 20; style.opacity = 0.5; style.fillStyle = .grid; style.dash = .dotted; style.font = "Caveat"
         var box = Element(kind: .path, frame: CGRect(x: 0, y: 0, width: 10, height: 10), style: style, layerID: layer.id,
                           text: "t", groupID: UUID(), points: [StrokePoint(x: 0, y: 1)])
         box.path = [0, 0, 1, 1, 1, 1, 1, 1]

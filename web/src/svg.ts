@@ -10,7 +10,7 @@ import { color, escapeXML } from "./svg-util.ts";
 import { Path, type Rect, fmt, inset, midX, midY, union } from "./path.ts";
 import { cellSize, connectorParts, dashPattern, fillPath, hachurePath, outline } from "./shapes.ts";
 import { expandingSymbols, hasInstances } from "./symbols.ts";
-import { textSize } from "./text.ts";
+import { cssFamily, textSize } from "./text.ts";
 import { themeNamed } from "./theme.ts";
 import { cameraView, frameTimes, resolved } from "./timeline.ts";
 
@@ -118,7 +118,7 @@ export function svg(page: Page, background: RGBA | null = { r: 1, g: 1, b: 1, a:
 export function labelRect(e: Element, index: Index): Rect {
   const m = midpoint(e, index);
   const text = e.text ?? "";
-  const size = textSize(text === "" ? "Label" : text, e.style.fontSize, 200);
+  const size = textSize(text === "" ? "Label" : text, e.style.fontSize, 200, e.style.font);
   const w = Math.max(size.width + 12, 44), h = size.height + 6;
   return { x: m.x - w / 2, y: m.y - h / 2, width: w, height: h };
 }
@@ -223,7 +223,7 @@ export function textElement(text: string, f: Rect, e: Element, centered: boolean
   const total = lineHeight * lines.length;
   const x = centered ? midX(f) : f.x;
   const top = centered ? midY(f) - total / 2 : f.y;
-  let s = `<text x="${fmt(x)}" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="${fmt(size)}" fill="${color(e.style.stroke)}"${centered ? ` text-anchor="middle"` : ""}>`;
+  let s = `<text x="${fmt(x)}" font-family="${cssFamily(e.style.font)}" font-size="${fmt(size)}" fill="${color(e.style.stroke)}"${centered ? ` text-anchor="middle"` : ""}>`;
   lines.forEach((line, i) => { s += `<tspan x="${fmt(x)}" y="${fmt(top + lineHeight * (i + 0.8))}">${escapeXML(line)}</tspan>`; });
   return s + "</text>\n";
 }

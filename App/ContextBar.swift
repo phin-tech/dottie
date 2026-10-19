@@ -77,6 +77,12 @@ struct ContextBar: View {
                     .fixedSize()
                 }
             }
+            if style.hasText {
+                labeled("Text") {
+                    FontMenu(font: style.binding(\.font, "Change Font"))
+                    textSize
+                }
+            }
             labeled("Line") {
                 Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
                     ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
@@ -127,6 +133,15 @@ struct ContextBar: View {
         }
         .fixedSize()
         .help("Line width")
+    }
+
+    private var textSize: some View {
+        let s = style.binding(\.fontSize, "Change Text Size")
+        return Menu(Inspector.points(s.wrappedValue)) {
+            ForEach(TextSizes.common, id: \.self) { v in Button(Inspector.points(v)) { s.wrappedValue = v } }
+        }
+        .fixedSize()
+        .help("Text size")
     }
 
     private var opacity: some View {

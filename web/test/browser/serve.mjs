@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 export const ROOT = normalize(join(fileURLToPath(import.meta.url), "..", "..", "..", ".."));
 const types = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".json": "application/json",
-  ".dottie": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".css": "text/css" };
+  ".dottie": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".css": "text/css", ".woff2": "font/woff2" };
 
 export async function serve(page, extra = {}) {
   await page.route("http://dottie.test/**", async (route) => {

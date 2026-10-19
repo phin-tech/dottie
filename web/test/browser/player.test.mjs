@@ -178,6 +178,51 @@ test("a compiled drawing shows itself where its script is, in a target, or from 
   await context.close();
 });
 
+// MARK: Fonts
+
+/** Which bundled fonts the page has loaded once the player is up, and the font files it asked for. */
+async function fontsIn(html, extra = {}) {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const errors = [], fetched = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("request", (r) => { if (r.url().endsWith(".woff2")) fetched.push(new URL(r.url()).pathname); });
+  await serve(page, { "/f.html": html, ...extra });
+  await page.goto("http://dottie.test/f.html");
+  await ready(page);
+  const loaded = await page.evaluate(async () => {
+    await Promise.all([...document.fonts].map((f) => f.load().catch(() => null)));
+    return [...document.fonts].filter((f) => f.status === "loaded").map((f) => `${f.family.replaceAll('"', "")} ${f.weight}`).sort();
+  });
+  await context.close();
+  return { loaded, fetched: fetched.sort(), errors };
+}
+
+const FONTS = ["Architects Daughter normal", "Caveat bold", "Caveat normal", "Patrick Hand normal"];
+
+test("the player loads the bundled fonts a drawing uses from beside its script, as a module or a classic script", async () => {
+  for (const script of [`<script type="module" src="/web/dist/dottie-player.js"></script>`, `<script src="/web/dist/dottie-player.min.js"></script>`]) {
+    const got = await fontsIn(`<!doctype html>${script}<dottie-player src="/fixtures/edge/fonts.dottie"></dottie-player>`);
+    assert.deepEqual(got.loaded, FONTS);
+    assert.deepEqual(got.fetched, ["/web/dist/fonts/architects-daughter-regular.woff2", "/web/dist/fonts/caveat-bold.woff2",
+      "/web/dist/fonts/caveat-regular.woff2", "/web/dist/fonts/patrick-hand-regular.woff2"]);
+    assert.deepEqual(got.errors, []);
+  }
+});
+
+test("a compiled drawing carries its fonts; one without fonts adds none", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { compile } = await import("../../dist/compile.js");
+  const { fontFile } = await import("../../dist/dottie.js");
+  const runtime = readFileSync(new URL("../../dist/dottie-player.min.js", import.meta.url), "utf8");
+  const read = (f) => readFileSync(new URL(`../../../fixtures/edge/${f}`, import.meta.url), "utf8");
+  const fontData = (family, face) => readFileSync(new URL(`../../dist/fonts/${fontFile(family, face)}`, import.meta.url)).toString("base64");
+  const got = await fontsIn(`<!doctype html><body><script src="/fonts.js"></script>`, { "/fonts.js": compile(read("fonts.dottie"), runtime, { fontData }) });
+  assert.deepEqual(got, { loaded: FONTS, fetched: [], errors: [] });
+  const plain = await fontsIn(`<!doctype html><body><script src="/shapes.js"></script>`, { "/shapes.js": compile(read("shapes.dottie"), runtime, { fontData }) });
+  assert.deepEqual(plain, { loaded: [], fetched: [], errors: [] });
+});
+
 // MARK: Clicks
 
 const button = (label) => `dottie-player .dottie-a[aria-label="${label}"]`;

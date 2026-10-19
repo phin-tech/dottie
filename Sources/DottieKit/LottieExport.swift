@@ -477,7 +477,7 @@ extension LottieWriter {
             if let s = e.text, !s.isEmpty {
                 let r = Renderer.labelRect(for: e, in: doc, index: index)
                 if let background { out.append(fill(CGPath(rect: r, transform: nil), background)) }
-                let (f, box) = Renderer.textFrame(s, in: r, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, centered: true)
+                let (f, box) = Renderer.textFrame(s, in: r, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, centered: true)
                 out += text(f, in: box)
             }
             return out.filter { !$0.contours.isEmpty }
@@ -488,7 +488,7 @@ extension LottieWriter {
         var out: [LottieItem] = []
         switch e.kind {
         case .text:
-            let (f, box) = Renderer.textFrame(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, color: e.style.stroke.cgColor, centered: false)
+            let (f, box) = Renderer.textFrame(e.text ?? "", in: e.frame, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, centered: false)
             out += text(f, in: box)
         case .image:
             if e.image?.cgImage == nil {   // a picture that can't be decoded shows as a crossed-out box
@@ -521,7 +521,7 @@ extension LottieWriter {
                 if e.kind == .note {
                     let rect = Note.textRect(e.frame)
                     if rect.width > 1, rect.height > 1 {
-                        let f = Note.layout(s, in: rect, fontSize: e.style.fontSize, color: e.style.stroke.cgColor).frame
+                        let f = Note.layout(s, in: rect, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor).frame
                         out += text(f, in: rect)
                         let marks = Note.decorations(Note.lines(of: f, in: rect), in: rect)
                         if !marks.isEmpty {
@@ -531,7 +531,7 @@ extension LottieWriter {
                         }
                     }
                 } else {
-                    let (f, box) = Renderer.textFrame(s, in: e.labelFrame, fontSize: e.style.fontSize,
+                    let (f, box) = Renderer.textFrame(s, in: e.labelFrame, fontSize: e.style.fontSize, font: e.style.font,
                                                       color: e.style.stroke.cgColor, centered: true)
                     out += text(f, in: box)
                 }

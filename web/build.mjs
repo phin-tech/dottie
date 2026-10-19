@@ -2,7 +2,7 @@
 // type declarations.
 import { build } from "esbuild";
 import { execFileSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { cpSync, readFileSync, writeFileSync } from "node:fs";
 import { LOADER } from "./src/compile.ts";
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url)));
@@ -12,11 +12,15 @@ const common = { bundle: true, target: "es2020", banner, logLevel: "warning", le
 await Promise.all([
   build({ ...common, entryPoints: ["src/index.ts"], format: "esm", outfile: "dist/dottie.js" }),
   build({ ...common, entryPoints: ["src/player-entry.ts"], format: "esm", outfile: "dist/dottie-player.js" }),
-  build({ ...common, entryPoints: ["src/player-entry.ts"], format: "iife", minify: true, outfile: "dist/dottie-player.min.js" }),
+  // A classic script has no import.meta; it finds its fonts from document.currentScript instead (fonts.ts).
+  build({ ...common, entryPoints: ["src/player-entry.ts"], format: "iife", minify: true, outfile: "dist/dottie-player.min.js",
+    define: { "import.meta.url": "undefined" } }),
   build({ ...common, entryPoints: ["src/compile.ts"], format: "esm", outfile: "dist/compile.js" }),
   build({ ...common, entryPoints: ["src/cli.ts"], format: "esm", platform: "node", outfile: "dist/dottie-compile.mjs",
     banner: { js: "#!/usr/bin/env node\n" + banner.js } }),
 ]);
+// The bundled fonts and their licenses, served from beside the scripts.
+cpSync("fonts", "dist/fonts", { recursive: true });
 // What follows the runtime in a compiled drawing; DottieKit embeds it with the runtime (scripts/update-player-script.py).
 writeFileSync("dist/dottie-loader.js", LOADER);
 execFileSync("npx", ["tsc", "-p", "tsconfig.build.json"], { stdio: "inherit" });

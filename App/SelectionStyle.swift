@@ -68,6 +68,9 @@ struct SelectionStyle {
             })
     }
 
+    /// Whether the selection (or the next shape) can hold text: pictures, freehand strokes and symbol copies can't.
+    var hasText: Bool { selected.isEmpty || selected.contains { ![.image, .freehand, .symbol].contains($0.kind) } }
+
     /// Whether the selection (or the next shape) has a fill: a picture has none.
     var hasFill: Bool { selected.isEmpty || !selected.allSatisfy { $0.kind == .image } }
 
@@ -97,6 +100,37 @@ enum StyleChoices {
     static let dashes: [(DashStyle, String)] = [(.solid, "Solid"), (.dashed, "Dashed"), (.dotted, "Dotted")]
     static let routings: [(Routing, String)] = [(.straight, "Straight"), (.curved, "Curved"), (.elbow, "Elbow")]
     static let heads: [(Arrowhead, String)] = [(.none, "None"), (.arrow, "Arrow"), (.triangle, "Triangle"), (.dot, "Dot"), (.bar, "Bar")]
+}
+
+/// The font text is set in: Helvetica Neue, one of the handwriting fonts Dottie bundles (and embeds in exports),
+/// or one installed on this Mac, which exports name but never embed.
+struct FontMenu: View {
+    @Binding var font: String?
+    private static let installed = Fonts.installedFamilies()
+
+    var body: some View {
+        Menu(font.map { Fonts.bundledFamily($0) ?? $0 } ?? Fonts.defaultFamily) {
+            item(nil, Fonts.defaultFamily)
+            Section("Handwriting") {
+                ForEach(Fonts.bundled, id: \.self) { item($0, $0) }
+            }
+            Menu("On This Mac") {
+                ForEach(Self.installed, id: \.self) { item($0, $0) }
+            }
+            .help("Exports name the font but don't carry it, so a viewer without it sees Helvetica Neue")
+        }
+        .fixedSize()
+        .help("Font")
+    }
+
+    private func item(_ value: String?, _ title: String) -> some View {
+        Toggle(title, isOn: Binding(get: { Fonts.bundledFamily(font) ?? font == value }, set: { if $0 { font = value } }))
+    }
+}
+
+/// Text sizes the menus offer; the Style tab's slider sets any.
+enum TextSizes {
+    static let common: [Double] = [10, 12, 14, 16, 18, 20, 24, 32, 48, 64]
 }
 
 /// A slider with its value written beside it.

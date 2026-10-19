@@ -64,4 +64,5 @@ Stack: SwiftUI + AppKit, `DottieKit` (SwiftPM) for everything testable headless.
 - [x] `update_scene`: rename, move or remove a scene (and `dottie.renameScene` / `moveScene` / `removeScene` in scripts)
 
 ## Open questions
-- Hand-drawn font: Excalidraw's Virgil/Excalifont have their own license; using system font until decided.
+- Hand-drawn fonts: settled on Caveat, Patrick Hand and Architects Daughter (Google Fonts, SIL OFL), bundled and
+  embedded in exports; any installed font can be named but is never embedded.

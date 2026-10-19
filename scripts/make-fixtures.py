@@ -513,6 +513,22 @@ def notes():
     write(EDGE / "notes.dottie", [p])
 
 
+def fonts():
+    """Text in each bundled handwriting font (a shape's label, a text element, a connector's label and a note
+    with bold, italic and code), a name in the wrong case, and a font nobody has, which draws as Helvetica Neue."""
+    p = Page()
+    note = "# Plan\nSome **bold**, *italic* and `code`.\n\n- [ ] arrows → ←\n- [x] “quotes” — dash"
+    for i, font in enumerate(["Caveat", "Patrick Hand", "Architects Daughter", "caveat", "No Such Font"]):
+        y = i * 260
+        a = p.add("rectangle", 20, y, 180, 90, text=f"{font} label that wraps", style=style(font=font))
+        b = p.add("ellipse", 360, y, 140, 90, text="Hi!", style=style(font=font, fontSize=24))
+        p.connect(a, b, text=f"{font} edge", st=style(font=font, fontSize=14))
+        p.add("text", 20, y + 110, 300, 40, text=f"Text in {font}: AVATAR, Wolf, 1234", style=style(font=font))
+        p.add("note", 560, y, 260, 230, text=note,
+              style=style(font=font, fill=rgba(1, 0.91, 0.52), strokeWidth=1, fontSize=16, roughness=0 if i % 2 else 1))
+    write(EDGE / "fonts.dottie", [p])
+
+
 def clicks():
     """Clickable elements for the web players: scenes by name (any case), links, hover looks, a link to another page,
     and clicks that must do nothing (a scene that isn't there, a javascript: link)."""
@@ -842,6 +858,7 @@ def main():
     extension_shapes()
     links()
     extension_tools()
+    fonts()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

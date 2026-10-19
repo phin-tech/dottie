@@ -57,10 +57,10 @@ public enum MermaidImporter {
 
     /// Parses `text` and adds the diagram to `doc` below existing content. Returns node id -> element id and notes.
     @discardableResult
-    public static func build(_ doc: inout DottieDocument, mermaid text: String, roughness: Double = 1) throws
+    public static func build(_ doc: inout DottieDocument, mermaid text: String, roughness: Double = 1, font: String? = nil) throws
         -> (ids: [String: UUID], notes: [String]) {
         let d = try parse(text)
-        let ids = try DiagramOps.build(&doc, nodes: d.nodes, edges: d.edges, direction: d.direction, roughness: roughness)
+        let ids = try DiagramOps.build(&doc, nodes: d.nodes, edges: d.edges, direction: d.direction, roughness: roughness, font: font)
         return (ids, d.notes)
     }
 

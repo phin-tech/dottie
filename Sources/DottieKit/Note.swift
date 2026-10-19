@@ -64,13 +64,9 @@ public enum Note {
     /// Breaks a line without ending the paragraph, so spacing and list indents carry on.
     static let lineSeparator = "\u{2028}"
 
-    static func font(_ size: Double, bold: Bool = false, italic: Bool = false, mono: Bool = false) -> CTFont {
-        let base = CTFontCreateWithName((mono ? "Menlo" : "Helvetica Neue") as CFString, size, nil)
-        var traits: CTFontSymbolicTraits = []
-        if bold { traits.insert(.traitBold) }
-        if italic { traits.insert(.traitItalic) }
-        guard !traits.isEmpty else { return base }
-        return CTFontCreateCopyWithSymbolicTraits(base, size, nil, traits, traits) ?? base
+    /// Text in `family` (see `Fonts`); code is always Menlo.
+    static func font(_ size: Double, family: String? = nil, bold: Bool = false, italic: Bool = false, mono: Bool = false) -> CTFont {
+        Fonts.font(mono ? "Menlo" : family, size: size, bold: bold, italic: italic)
     }
 
     private static func paragraphStyle(spacingBefore: Double, firstIndent: Double = 0, indent: Double = 0,
@@ -121,6 +117,7 @@ public enum Note {
     /// Builds the note as one attributed string, a CoreText paragraph per block.
     private struct Builder {
         let fontSize: Double
+        let family: String?
         let color: CGColor
         let faded: CGColor
         let width: Double
@@ -130,6 +127,10 @@ public enum Note {
         var nextSpacing: Double?
 
         var gap: Double { fontSize * 0.5 }
+
+        func font(_ size: Double, bold: Bool = false, italic: Bool = false, mono: Bool = false) -> CTFont {
+            Note.font(size, family: family, bold: bold, italic: italic, mono: mono)
+        }
 
         mutating func paragraph(_ content: NSMutableAttributedString, _ style: CTParagraphStyle, quote: Double?) {
             if let quote { content.addAttribute(quoteAttribute, value: quote, range: NSRange(location: 0, length: content.length)) }
@@ -323,8 +324,8 @@ public enum Note {
     nonisolated(unsafe) private static let linkDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
 
     /// The whole note as one attributed string, a paragraph per block, for text up to `width` wide.
-    static func attributed(_ source: String, fontSize: Double, color: CGColor, width: Double = .greatestFiniteMagnitude) -> NSAttributedString {
-        var b = Builder(fontSize: fontSize, color: color, faded: color.copy(alpha: color.alpha * 0.7) ?? color, width: width)
+    static func attributed(_ source: String, fontSize: Double, font: String? = nil, color: CGColor, width: Double = .greatestFiniteMagnitude) -> NSAttributedString {
+        var b = Builder(fontSize: fontSize, family: font, color: color, faded: color.copy(alpha: color.alpha * 0.7) ?? color, width: width)
         b.block(Document(parsing: source), Context())
         return b.out
     }
@@ -333,12 +334,12 @@ public enum Note {
 
     /// The laid-out text, in a CoreText frame whose path is `rect` (y-up), with the string it lays out.
     /// Use `lines(of:in:)` for top-left positions.
-    static func layout(_ source: String, in rect: CGRect, fontSize: Double, color: CGColor) -> (text: NSAttributedString, frame: CTFrame) {
+    static func layout(_ source: String, in rect: CGRect, fontSize: Double, font: String? = nil, color: CGColor) -> (text: NSAttributedString, frame: CTFrame) {
         // Parsing and typesetting cost far more than drawing, and a redraw (every drag event) repeats them
         // for every note on screen; everything the layout depends on is in the key.
-        let key = LayoutKey(source: source, fontSize: fontSize, color: color.components ?? [], rect: rect)
+        let key = LayoutKey(source: source, fontSize: fontSize, font: font, color: color.components ?? [], rect: rect)
         return cache.layout(key) {
-            let text = attributed(source, fontSize: fontSize, color: color, width: rect.width)
+            let text = attributed(source, fontSize: fontSize, font: font, color: color, width: rect.width)
             let setter = CTFramesetterCreateWithAttributedString(text as CFAttributedString)
             return (text, CTFramesetterCreateFrame(setter, CFRange(), CGPath(rect: rect, transform: nil), nil))
         }
@@ -347,10 +348,11 @@ public enum Note {
     struct LayoutKey: Hashable {
         var source: String
         var fontSize: Double
+        var font: String?
         var color: [CGFloat]
         var x, y, w, h: Double
-        init(source: String, fontSize: Double, color: [CGFloat], rect: CGRect) {
-            self.source = source; self.fontSize = fontSize; self.color = color
+        init(source: String, fontSize: Double, font: String?, color: [CGFloat], rect: CGRect) {
+            self.source = source; self.fontSize = fontSize; self.font = font; self.color = color
             x = rect.minX; y = rect.minY; w = rect.width; h = rect.height
         }
     }
@@ -430,7 +432,7 @@ public enum Note {
         guard e.kind == .note, let source = e.text, source.contains("[") else { return nil }
         let rect = textRect(e.frame)
         guard rect.insetBy(dx: -4, dy: -4).contains(p) else { return nil }
-        let (_, frame) = layout(source, in: rect, fontSize: e.style.fontSize, color: e.style.stroke.cgColor)
+        let (_, frame) = layout(source, in: rect, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor)
         let slop = 4.0
         for l in lines(of: frame, in: rect) {
             var ascent: CGFloat = 0, descent: CGFloat = 0
@@ -463,9 +465,9 @@ public enum Note {
     }
 
     /// Draws a note's text into `rect` of a top-left-origin context, clipped to it.
-    static func draw(_ source: String, in rect: CGRect, fontSize: Double, color: CGColor, ctx: CGContext) {
+    static func draw(_ source: String, in rect: CGRect, fontSize: Double, font: String? = nil, color: CGColor, ctx: CGContext) {
         guard rect.width > 1, rect.height > 1 else { return }
-        let f = layout(source, in: rect, fontSize: fontSize, color: color).frame
+        let f = layout(source, in: rect, fontSize: fontSize, font: font, color: color).frame
         ctx.saveGState()
         ctx.clip(to: rect)
         ctx.saveGState()

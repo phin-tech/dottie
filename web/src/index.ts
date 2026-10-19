@@ -6,6 +6,8 @@ import { svg } from "./svg.ts";
 import { posterTime, resolved } from "./timeline.ts";
 
 export * from "./model.ts";
+export { addFonts, fontFaces, fontFile, setFontBase, usedFonts } from "./fonts.ts";
+export { BUNDLED_FONTS } from "./text.ts";
 export { inspect, inspectFrame, inspectPage, sampleTimes } from "./inspect.ts";
 export { DottiePlayer, Playback, definePlayer, pageIndex, withRoughness } from "./player.ts";
 export { bounds, plan, svg, svgParts, type Plan, type Part } from "./svg.ts";

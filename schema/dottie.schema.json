@@ -90,6 +90,10 @@
         "roughness": { "type": "number" },
         "bowing": { "type": "number" },
         "fontSize": { "type": "number" },
+        "font": {
+          "type": "string",
+          "description": "The font text is set in. Absent is Helvetica Neue; Caveat, Patrick Hand and Architects Daughter are bundled and embedded in exports; any other name is a font installed where the drawing is viewed, never embedded."
+        },
         "gridSize": { "type": "number" },
         "opacity": { "type": "number" },
         "dashOffset": { "type": "number" }

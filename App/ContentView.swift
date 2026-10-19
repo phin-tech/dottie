@@ -331,6 +331,14 @@ struct Inspector: View {
                 ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
             }
         }
+        if style.hasText {
+            Section("Text") {
+                LabeledContent("Font") { FontMenu(font: style.binding(\.font, "Change Font")) }
+                let size = style.binding(\.fontSize, "Change Text Size")
+                ValueSlider(title: "Size", value: Binding(get: { size.wrappedValue }, set: { size.wrappedValue = $0.rounded() }),
+                            range: 8...96, format: Self.points)
+            }
+        }
         // Roughness and bowing mean nothing to a clean drawing, so they only show while it is sketchy.
         if style.isSketchy {
             Section("Sketchiness") {

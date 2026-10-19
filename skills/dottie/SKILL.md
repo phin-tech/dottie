@@ -43,6 +43,11 @@ Loops, conditions and bulk edits (a grid of boxes, restyling everything labelled
 go in one `run_script` program rather than many tool calls; it runs as one undo step and nothing applies if it
 throws. `script_api` documents the `dottie` object it uses.
 
+For handwritten text, pass `font` to `build_diagram`, `import_mermaid`, `add_shape`, `add_connector` or
+`update_element` (with `font_size` for the size): Caveat (quick pen; it runs small, so give it 22 or more), Patrick Hand (neat print) or
+Architects Daughter (draftsman's caps). Those three travel with every export. Any other name is a font installed on
+the Mac, which exports name but don't carry, so prefer the bundled ones for anything shared.
+
 More of the MCP tools, by purpose:
 
 | For | Tools |

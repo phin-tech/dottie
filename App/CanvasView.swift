@@ -934,7 +934,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     /// frame, so typing happens where the label will be drawn.
     private func layoutEditor() {
         guard let field = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
-        field.font = NSFont(name: "Helvetica Neue", size: e.style.fontSize * zoom)
+        field.font = Fonts.font(e.style.font, size: e.style.fontSize * zoom) as NSFont
         let box = viewFrame(editFrame(for: e))
         guard e.kind != .text, e.kind != .note, let cell = field.cell else { field.frame = box; return }
         let height = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: box.width, height: .greatestFiniteMagnitude)).height
@@ -2216,7 +2216,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             next.elements[i].text = text
             if next.elements[i].kind == .text {
                 // Grow the box to fit the text.
-                let w = (text as NSString).size(withAttributes: [.font: NSFont(name: "Helvetica Neue", size: next.elements[i].style.fontSize) ?? .systemFont(ofSize: 18)]).width + 12
+                let w = (text as NSString).size(withAttributes: [.font: Fonts.font(next.elements[i].style.font, size: next.elements[i].style.fontSize) as NSFont]).width + 12
                 next.elements[i].width = max(next.elements[i].width, ceil(w))
             }
         }

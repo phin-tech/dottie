@@ -71,8 +71,9 @@ rather than in Xcode's Signing & Capabilities pane, which is lost when the proje
 wrapping a picture of it: `resolved(at:)` and everything under it (keys, eases, visibility, reveal, follows,
 repeats, boil, settle, camera, scenes), connector routing, and `SVG.swift` with `Rough.swift`, hatching and
 dungeon grids (ported rather than taken from rough.js, so the same seeds give the same strokes). Labels and
-sticky notes are measured with Helvetica Neue widths, kerning and line metrics taken from CoreText by
-`scripts/font-metrics.swift` (output: `web/src/metrics.ts`), so they wrap where Dottie wraps them.
+sticky notes are measured with the widths, kerning and line metrics of Helvetica Neue and the bundled handwriting
+fonts, taken from CoreText by `scripts/font-metrics.swift` (output: `web/src/metrics.ts`), so they wrap where
+Dottie wraps them. The player loads a bundled font from `dist/fonts` (`web/src/fonts.ts`) when a page uses it.
 
 The risk is drift: Dottie gains a feature or changes routing and dottie.js quietly draws something else. Four
 things guard against it:
@@ -218,6 +219,19 @@ the web players draw each clickable copy as one focusable group holding its part
 too, with a layer on top that takes the clicks (the `hit` scene's shapes, invisible, or the copy's frame). Both
 draw the states by expanding with `times`, which puts a copy on the page at a moment of its own symbol; dottie.js
 uses the same to replay a copy whose playback is `click`.
+
+**Fonts.** An element's `style.font` names the font its text is set in (`Fonts.swift`). Absent is Helvetica Neue.
+Caveat, Patrick Hand and Architects Daughter are bundled: Google Fonts under the SIL Open Font License, cut to
+fixed faces with Latin text and only kerning by `scripts/update-fonts.py`, which writes `web/fonts/*.woff2` (with
+their licenses) and embeds the same files in `Sources/DottieKit/BundledFonts.swift`, so the app, `dottie` and
+`dottie-mcp` need no resource bundle. CoreText loads them from memory; nothing is installed. SVG and HTML exports
+embed the bundled faces a page uses as `data:` URLs on one line of their own, which dottie.js's SVG test skips,
+and compiled drawings carry them in the loader. Any other name is a font on the Mac: drawn if it is installed (else
+Helvetica Neue), named in exports but never embedded, and laid out as Helvetica Neue by dottie.js. To add a bundled
+font, add it to `update-fonts.py` and `Fonts.bundled`, then run `uv run scripts/update-fonts.py`,
+`swift scripts/font-metrics.swift`, `just goldens` and `just player-script`. Every kerning pair of every bundled
+face ships in dottie.js, so check the size of `metrics.ts` first: Shantell Sans, with about 5,500 pairs a face,
+would have added 220 KB.
 
 ## Mermaid
 
