@@ -1,6 +1,6 @@
 {
   "name": "@phin-tech/dottie",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Render, play and compile Dottie (.dottie) drawings and animations in the browser",
   "type": "module",
   "license": "Apache-2.0",
