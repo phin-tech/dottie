@@ -289,8 +289,10 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
                 ctx.restoreGState()
             }
         }
+        // The spatial index holds the model's elements, label and all, so it is left out while editing.
         Renderer.draw(drawn, in: ctx, background: canvasBackground.cgColor, clip: visible,
-                      zoom: Double(zoom), ink: canvasInk, spatial: spatial, skipping: hidden, symbolTime: poseTime ?? 0)
+                      zoom: Double(zoom), ink: canvasInk, spatial: editingID == nil ? spatial : nil, skipping: hidden,
+                      symbolTime: poseTime ?? 0)
 
         // Ruler guides sit over the drawing and under the selection.
         if showRulers {
