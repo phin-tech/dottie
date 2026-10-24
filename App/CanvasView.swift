@@ -142,8 +142,6 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var onPreview: ((DottieDocument) -> Void)?
     var onCommit: ((DottieDocument, String) -> Void)?
     var onSelectionChange: ((Set<UUID>) -> Void)?
-    /// The element whose text is being typed, or nil when typing ends.
-    var onEditingChange: ((UUID?) -> Void)?
     /// Leaves an animation preview (Esc).
     var onExitPreview: (() -> Void)?
     /// While posing, the time of the frame being edited (its edits become keyframes) and the page it was
@@ -2250,7 +2248,6 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         layoutEditor()
         window?.makeFirstResponder(field)
         (field.currentEditor() as? NSTextView)?.insertionPointColor = field.textColor
-        onEditingChange?(id)
         needsDisplay = true
     }
 
@@ -2260,7 +2257,6 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         let text = field.stringValue
         field.removeFromSuperview()
         editor = nil; editingID = nil
-        onEditingChange?(nil)
         needsDisplay = true
         guard let i = model.elements.firstIndex(where: { $0.id == id }) else { return }
         var next = model
@@ -2393,7 +2389,6 @@ struct CanvasView: NSViewRepresentable {
         v.clipsToBounds = true
         v.onToolChange = { t in DispatchQueue.main.async { tool = t } }
         v.onSelectionChange = { sel in DispatchQueue.main.async { selection = sel } }
-        v.onEditingChange = { [document] id in DispatchQueue.main.async { document.editingText = id } }
         v.onShowPage = { [document, weak v] page in
             guard document.file.index(of: page) != nil else { return }
             document.currentPageID = page

@@ -63,11 +63,25 @@ struct ContextBar: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            labeled("Stroke") { ColorPicker("Stroke", selection: style.stroke).labelsHidden() }
-            width
+            // Each part with its own color: the outline, the fill, the text.
+            if !style.onlyTextBoxes {
+                BarDivider()
+                labeled("Stroke") {
+                    ColorPicker("Stroke", selection: style.stroke).labelsHidden()
+                    width
+                    Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
+                        ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    .help("Line style")
+                }
+            }
             if onlyNotes {
-                NoteSwatches(fill: style.binding(\.fill, "Change Note Color"))
-            } else if style.hasFill && !onlyConnectors {
+                BarDivider()
+                labeled("Fill") { NoteSwatches(fill: style.binding(\.fill, "Change Note Color")) }
+            } else if style.hasFill && !onlyConnectors && !style.onlyTextBoxes {
+                BarDivider()
                 labeled("Fill") {
                     ColorPicker("Fill", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true).labelsHidden()
                     Picker("Fill pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {
@@ -78,18 +92,15 @@ struct ContextBar: View {
                 }
             }
             if style.hasText {
+                BarDivider()
                 labeled("Text") {
+                    ColorPicker("Text", selection: style.text).labelsHidden()
+                    if style.hasLabels && !style.onlyTextBoxes { followStroke }
                     FontMenu(font: style.binding(\.font, "Change Font"))
                     textSize
                 }
             }
-            labeled("Line") {
-                Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
-                    ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
-                }
-                .labelsHidden()
-                .fixedSize()
-            }
+            BarDivider()
             opacity
         }
         if showsConnector {
@@ -121,6 +132,18 @@ struct ContextBar: View {
             Text(title).foregroundStyle(.secondary)
             content()
         }
+    }
+
+    /// Lit while labels take the stroke color; clicking it toggles that.
+    private var followStroke: some View {
+        let follows = style.textFollowsStroke
+        return Button { follows.wrappedValue.toggle() } label: {
+            Image(systemName: "link")
+                .foregroundStyle(follows.wrappedValue ? Color.accentColor : .secondary)
+        }
+        .buttonStyle(.borderless)
+        .help(follows.wrappedValue ? "Text matches the stroke color; click to color it separately"
+                                   : "Text has its own color; click to match the stroke again")
     }
 
     private static let widths: [Double] = [1, 1.5, 2, 3, 4, 6, 8, 12]
