@@ -58,6 +58,7 @@ public enum Inspector {
             d["strokeWidth"] = num(e.style.strokeWidth)
             d["stroke"] = color(e.style.stroke)
             d["fill"] = color(e.style.fill)
+            if let c = e.style.textColor { d["textColor"] = color(c) }
             if e.kind == .connector {
                 let (a, b) = Connector.endpoints(of: e, in: f, index: index)
                 d["start"] = point(a)

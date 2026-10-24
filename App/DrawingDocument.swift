@@ -23,6 +23,9 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     }
     /// The symbol of the page on screen being edited in its own right (Edit Symbol), if any. Window state.
     @Published var editingSymbol: UUID?
+    /// The element whose text is being typed on the canvas: a stroke color picked meanwhile colors only a
+    /// shape's or connector's label, as in Excalidraw.
+    @Published var editingText: UUID?
     /// A page whose tab should start renaming (Page ▸ Rename Page…); the page bar takes it and clears it.
     @Published var renamingPage: UUID?
 

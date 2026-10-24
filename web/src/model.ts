@@ -27,6 +27,8 @@ export interface Style {
   opacity: number | null;
   /** How far into its dash pattern a dashed or dotted line starts; marching ants set it on every frame. */
   dashOffset: number | null;
+  /** The color of a shape's or connector's label; null follows `stroke`. Text boxes and notes ignore it. */
+  textColor: RGBA | null;
 }
 
 /** `portIndex` pins the end to one of the bound element's `ports`, and wins over `port`. */
@@ -186,7 +188,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
-  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset"],
+  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension"],
@@ -297,6 +299,7 @@ class Reader {
       gridSize: num(s.gridSize) ?? null,
       opacity: num(s.opacity) ?? null,
       dashOffset: num(s.dashOffset) ?? null,
+      textColor: rgba(s.textColor) ?? null,
     };
   }
 
@@ -606,7 +609,10 @@ export function isAutomaticInk(c: RGBA): boolean { return sameColor(c, black) ||
 export function cloneElement(e: Element): Element {
   return {
     ...e,
-    style: { ...e.style, stroke: { ...e.style.stroke }, fill: { ...e.style.fill } },
+    style: {
+      ...e.style, stroke: { ...e.style.stroke }, fill: { ...e.style.fill },
+      textColor: e.style.textColor ? { ...e.style.textColor } : null,
+    },
     connector: e.connector ? {
       ...e.connector, start: { ...e.connector.start }, end: { ...e.connector.end },
       waypoints: e.connector.waypoints?.map((w) => ({ ...w })) ?? null,

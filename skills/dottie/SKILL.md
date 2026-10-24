@@ -50,6 +50,9 @@ For handwritten text, pass `font` to `build_diagram`, `import_mermaid`, `add_sha
 Architects Daughter (draftsman's caps). Those three travel with every export. Any other name is a font installed on
 the Mac, which exports name but don't carry, so prefer the bundled ones for anything shared.
 
+A label takes its shape's or arrow's `stroke` color unless you give it `text_color` (hex; `""` follows the stroke
+again). Setting `stroke` on `update_element` recolors the label too, so pass both to color them apart.
+
 More of the MCP tools, by purpose:
 
 | For | Tools |

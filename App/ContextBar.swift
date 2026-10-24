@@ -63,7 +63,7 @@ struct ContextBar: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .fixedSize()
-            labeled("Stroke") { ColorPicker("Stroke", selection: style.color(\.stroke, "Change Stroke Color")).labelsHidden() }
+            labeled("Stroke") { ColorPicker("Stroke", selection: style.stroke).labelsHidden() }
             width
             if onlyNotes {
                 NoteSwatches(fill: style.binding(\.fill, "Change Note Color"))

@@ -57,8 +57,36 @@ struct SelectionStyle {
     var isSketchy: Bool { look.wrappedValue }
 
     func color(_ kp: WritableKeyPath<Style, RGBA>, _ name: String) -> Binding<Color> {
-        let raw = binding(kp, name)
-        return Binding(
+        color(binding(kp, name))
+    }
+
+    /// The stroke color, which also colors the labels of the shapes and connectors it is set on (clearing their
+    /// own text color), as in Excalidraw. While a label is being typed it colors only that label.
+    var stroke: Binding<Color> {
+        if let id = document.editingText, let e = shown.elements.first(where: { $0.id == id }),
+           e.kind != .text, e.kind != .note {
+            return color(Binding(get: { e.labelColor }, set: { value in
+                edit("Change Text Color") { next in
+                    if let i = next.elements.firstIndex(where: { $0.id == id }) { next.elements[i].style.textColor = value }
+                }
+            }))
+        }
+        let raw = binding(\.stroke, "Change Stroke Color")
+        return color(Binding(get: { raw.wrappedValue }, set: { value in
+            newStyle.wrappedValue.stroke = value
+            newStyle.wrappedValue.textColor = nil
+            guard !selection.isEmpty else { return }
+            edit("Change Stroke Color") { next in
+                for i in next.elements.indices where selection.contains(next.elements[i].id) {
+                    next.elements[i].style.stroke = value
+                    next.elements[i].style.textColor = nil
+                }
+            }
+        }))
+    }
+
+    private func color(_ raw: Binding<RGBA>) -> Binding<Color> {
+        Binding(
             get: { var c = raw.wrappedValue
                 if c.isAutomaticInk { c = colorScheme == .dark ? .inkOnDark : .black }
                 return Color(.sRGB, red: c.r, green: c.g, blue: c.b, opacity: c.a) },

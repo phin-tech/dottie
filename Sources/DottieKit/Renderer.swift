@@ -633,7 +633,7 @@ public enum Renderer {
             if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
                 let r = labelRect(for: e, in: document, index: index)
                 if let background { ctx.setFillColor(background); ctx.fill(r) }
-                drawText(t, in: r, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
+                drawText(t, in: r, fontSize: e.style.fontSize, font: e.style.font, color: e.labelColor.cgColor, ctx: ctx, centered: true)
             }
             return
         }
@@ -696,7 +696,7 @@ public enum Renderer {
             return
         }
         if let t = e.text, !t.isEmpty, lod?.showsText(fontSize: e.style.fontSize) ?? true {
-            drawText(t, in: e.labelFrame, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, ctx: ctx, centered: true)
+            drawText(t, in: e.labelFrame, fontSize: e.style.fontSize, font: e.style.font, color: e.labelColor.cgColor, ctx: ctx, centered: true)
         }
     }
 

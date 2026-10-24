@@ -477,7 +477,7 @@ extension LottieWriter {
             if let s = e.text, !s.isEmpty {
                 let r = Renderer.labelRect(for: e, in: doc, index: index)
                 if let background { out.append(fill(CGPath(rect: r, transform: nil), background)) }
-                let (f, box) = Renderer.textFrame(s, in: r, fontSize: e.style.fontSize, font: e.style.font, color: e.style.stroke.cgColor, centered: true)
+                let (f, box) = Renderer.textFrame(s, in: r, fontSize: e.style.fontSize, font: e.style.font, color: e.labelColor.cgColor, centered: true)
                 out += text(f, in: box)
             }
             return out.filter { !$0.contours.isEmpty }
@@ -532,7 +532,7 @@ extension LottieWriter {
                     }
                 } else {
                     let (f, box) = Renderer.textFrame(s, in: e.labelFrame, fontSize: e.style.fontSize, font: e.style.font,
-                                                      color: e.style.stroke.cgColor, centered: true)
+                                                      color: e.labelColor.cgColor, centered: true)
                     out += text(f, in: box)
                 }
             }

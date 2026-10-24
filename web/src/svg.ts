@@ -3,7 +3,7 @@
 
 import { type Index, connectorBounds, indexOf, midpoint } from "./connector.ts";
 import { BAND, isFloor, lineColor, rock } from "./dungeon.ts";
-import { angle, frame, resolvingInk, rotatedBounds } from "./element.ts";
+import { angle, frame, labelColor, resolvingInk, rotatedBounds } from "./element.ts";
 import { type Element, type Page, type RGBA, allowedURL, black, orderedElements, webLink } from "./model.ts";
 import { noteMarkup } from "./note.ts";
 import { color, escapeXML } from "./svg-util.ts";
@@ -223,7 +223,7 @@ export function textElement(text: string, f: Rect, e: Element, centered: boolean
   const total = lineHeight * lines.length;
   const x = centered ? midX(f) : f.x;
   const top = centered ? midY(f) - total / 2 : f.y;
-  let s = `<text x="${fmt(x)}" font-family="${cssFamily(e.style.font)}" font-size="${fmt(size)}" fill="${color(e.style.stroke)}"${centered ? ` text-anchor="middle"` : ""}>`;
+  let s = `<text x="${fmt(x)}" font-family="${cssFamily(e.style.font)}" font-size="${fmt(size)}" fill="${color(labelColor(e))}"${centered ? ` text-anchor="middle"` : ""}>`;
   lines.forEach((line, i) => { s += `<tspan x="${fmt(x)}" y="${fmt(top + lineHeight * (i + 0.8))}">${escapeXML(line)}</tspan>`; });
   return s + "</text>\n";
 }

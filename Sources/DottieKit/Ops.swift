@@ -99,12 +99,16 @@ public enum DiagramOps {
         public var waypoints: [CGPoint]?
         /// Whether a connector hops over the connectors beneath it.
         public var hops: Bool?
+        /// A shape's or connector's label color; `.some(nil)` goes back to following the stroke.
+        public var textColor: RGBA??
         public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
                     startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil,
-                    font: String? = nil, fontSize: Double? = nil, waypoints: [CGPoint]? = nil, hops: Bool? = nil) {
+                    font: String? = nil, fontSize: Double? = nil, waypoints: [CGPoint]? = nil, hops: Bool? = nil,
+                    textColor: RGBA?? = nil) {
             self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
             self.startHead = startHead; self.endHead = endHead; self.rotation = rotation; self.gridSize = gridSize
             self.font = font; self.fontSize = fontSize; self.waypoints = waypoints; self.hops = hops
+            self.textColor = textColor
         }
 
         /// Sets the font and text size, the part of the look a shape's default size depends on.
@@ -124,6 +128,7 @@ public enum DiagramOps {
             if let strokeWidth { e.style.strokeWidth = min(max(strokeWidth, 0.5), 24) }
             if let bowing { e.style.bowing = max(0, bowing) }
             if let gridSize { e.style.gridSize = min(max(gridSize, 8), 400) }
+            if let textColor, e.kind != .text, e.kind != .note { e.style.textColor = textColor }
             if e.kind == .connector {
                 if let startHead { e.connector?.startHead = startHead }
                 if let endHead { e.connector?.endHead = endHead }
@@ -248,7 +253,10 @@ public enum DiagramOps {
             if let height { doc.elements[i].height = max(1, height) }
         }
         if let fill { doc.elements[i].style.fill = fill }
-        if let stroke { doc.elements[i].style.stroke = stroke }
+        if let stroke { // recolors the label too, as in Excalidraw, unless `look` gives it its own color
+            doc.elements[i].style.stroke = stroke
+            doc.elements[i].style.textColor = nil
+        }
         if let roughness { doc.elements[i].style.roughness = roughness }
         if let routing { doc.elements[i].connector?.setRouting(routing) }
         look.apply(to: &doc.elements[i])

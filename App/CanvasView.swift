@@ -92,6 +92,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
             needsDisplay = true; spatialStale = true; badgeCache = nil
             if model.id != oldValue.id { enterPage() }
             transient = model.transientElements
+            if editor != nil { layoutEditor() } // a label colored while it is typed
         }
     }
     /// Elements that only exist in motion (packets): not drawn or clickable while editing, unless selected
@@ -141,6 +142,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     var onPreview: ((DottieDocument) -> Void)?
     var onCommit: ((DottieDocument, String) -> Void)?
     var onSelectionChange: ((Set<UUID>) -> Void)?
+    /// The element whose text is being typed, or nil when typing ends.
+    var onEditingChange: ((UUID?) -> Void)?
     /// Leaves an animation preview (Esc).
     var onExitPreview: (() -> Void)?
     /// While posing, the time of the frame being edited (its edits become keyframes) and the page it was
@@ -976,6 +979,12 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
     private func layoutEditor() {
         guard let field = editor, let id = editingID, let e = model.elements.first(where: { $0.id == id }) else { return }
         field.font = Fonts.font(e.style.font, size: e.style.fontSize * zoom) as NSFont
+        // The ink the label is drawn in: a dark label on a light fill even when the canvas ink is light.
+        let ink = nsColor(e.resolvingInk(to: canvasInk).labelColor)
+        if field.textColor != ink {
+            field.textColor = ink
+            (field.currentEditor() as? NSTextView)?.insertionPointColor = ink
+        }
         let box = viewFrame(editFrame(for: e))
         guard e.kind != .text, e.kind != .note, let cell = field.cell else { field.frame = box; return }
         let height = cell.cellSize(forBounds: NSRect(x: 0, y: 0, width: box.width, height: .greatestFiniteMagnitude)).height
@@ -2232,9 +2241,6 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         field.cell?.isScrollable = false
         field.lineBreakMode = .byWordWrapping
         field.backgroundColor = canvasBackground
-        // The ink the label is drawn in: a dark label on a light fill even when the canvas ink is light.
-        let ink = nsColor(e.resolvingInk(to: canvasInk).style.stroke)
-        field.textColor = ink
         field.drawsBackground = e.kind == .connector
         field.delegate = self
         addSubview(field)
@@ -2243,7 +2249,8 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         editBase = isNew ? baseline : nil
         layoutEditor()
         window?.makeFirstResponder(field)
-        (field.currentEditor() as? NSTextView)?.insertionPointColor = ink
+        (field.currentEditor() as? NSTextView)?.insertionPointColor = field.textColor
+        onEditingChange?(id)
         needsDisplay = true
     }
 
@@ -2253,6 +2260,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         let text = field.stringValue
         field.removeFromSuperview()
         editor = nil; editingID = nil
+        onEditingChange?(nil)
         needsDisplay = true
         guard let i = model.elements.firstIndex(where: { $0.id == id }) else { return }
         var next = model
@@ -2385,6 +2393,7 @@ struct CanvasView: NSViewRepresentable {
         v.clipsToBounds = true
         v.onToolChange = { t in DispatchQueue.main.async { tool = t } }
         v.onSelectionChange = { sel in DispatchQueue.main.async { selection = sel } }
+        v.onEditingChange = { [document] id in DispatchQueue.main.async { document.editingText = id } }
         v.onShowPage = { [document, weak v] page in
             guard document.file.index(of: page) != nil else { return }
             document.currentPageID = page

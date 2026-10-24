@@ -185,6 +185,10 @@ Copies older than the first Sparkle release (0.5.3) have to be updated by hand o
 A `.dottie` file is JSON (sorted keys, pretty-printed, rounded frames, so it diffs well in git): a `DottieFile`
 with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme.
 Element ids are unique across the file, which is what lets a link point at a shape on another page.
+A shape's or connector's label is drawn in its style's `textColor`, or its `stroke` when that is absent
+(`Element.labelColor`); a text box and a note always use their stroke. As in Excalidraw, setting a stroke color clears
+`textColor`, so the label recolors with the shape, and a stroke color picked while a label is being typed sets only
+`textColor`. Automatic ink in either resolves on its own (`resolvingInk`). Older versions draw the label in the stroke.
 A `note` element is a sticky note whose `text` is GitHub Flavored Markdown; `Note` parses it with
 [swift-markdown](https://github.com/swiftlang/swift-markdown) (cmark-gfm), DottieKit's only dependency, and lays
 it out with CoreText, and the renderer and SVG export share that layout. A single newline is a line break, as in

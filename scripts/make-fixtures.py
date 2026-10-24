@@ -893,6 +893,24 @@ def waypoints():
     write(EDGE / "waypoints-symbol.dottie", [q])
 
 
+def text_colors():
+    """A label's own color: automatic ink resolving per theme, a color apart from the stroke, and kinds that ignore it."""
+    pages = []
+    for theme in ["paper", "midnight"]:
+        p = Page(name=theme, theme=theme)
+        red, blue = rgba(0.8, 0.1, 0.1), rgba(0.1, 0.3, 0.85)
+        a = p.add("rectangle", 40, 40, 140, 60, text="Base ink label", style=style(stroke=red, textColor=INK))
+        b = p.add("ellipse", 240, 40, 140, 60, text="Blue label", style=style(textColor=blue))
+        p.add("rectangle", 440, 40, 140, 60, text="On light fill",
+              style=style(stroke=red, fill=rgba(1, 0.91, 0.52), textColor=INK))
+        p.connect(a, b, text="green", st=style(stroke=red, textColor=rgba(0.1, 0.6, 0.2)))
+        p.add("text", 40, 160, 160, 30, text="Text box: stroke", style=style(stroke=red, roughness=0, textColor=blue))
+        p.add("note", 240, 140, 160, 90, text="Note: stroke",
+              style=style(stroke=red, fill=rgba(1, 0.91, 0.52), strokeWidth=1, fontSize=16, textColor=blue))
+        pages.append(p)
+    write(EDGE / "text-colors.dottie", pages)
+
+
 def main():
     shapes()
     connectors()
@@ -915,6 +933,7 @@ def main():
     extension_tools()
     fonts()
     waypoints()
+    text_colors()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

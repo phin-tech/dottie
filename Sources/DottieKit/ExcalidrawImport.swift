@@ -64,12 +64,14 @@ public enum ExcalidrawImporter {
         for r in live { if let id = r["id"] as? String { ids[id] = UUID() } }
         var groupIDs: [String: UUID] = [:]
 
-        // Text bound to a container becomes that container's label.
+        // Text bound to a container becomes that container's label, keeping its own color.
         var labels: [String: String] = [:]
+        var labelColors: [String: RGBA] = [:]
         var consumed = Set<String>()
         for r in live where (r["type"] as? String) == "text" {
             if let c = r["containerId"] as? String, ids[c] != nil, let t = r["text"] as? String, let id = r["id"] as? String {
                 labels[c] = t; consumed.insert(id)
+                labelColors[c] = color(r["strokeColor"], opacity: min(max((num(r["opacity"]) ?? 100) / 100, 0), 1))
             }
         }
 
@@ -97,6 +99,7 @@ public enum ExcalidrawImporter {
             st.strokeWidth = max(0.5, num(r["strokeWidth"]) ?? 2)
             st.roughness = min(max(num(r["roughness"]) ?? 1, 0), 3)
             st.fontSize = num(r["fontSize"]) ?? 18
+            if let c = labelColors[sid], c != st.stroke { st.textColor = c }
 
             var group: UUID?
             if let gids = r["groupIds"] as? [String], let outer = gids.last {

@@ -96,7 +96,11 @@
         },
         "gridSize": { "type": "number" },
         "opacity": { "type": "number" },
-        "dashOffset": { "type": "number" }
+        "dashOffset": { "type": "number" },
+        "textColor": {
+          "$ref": "#/$defs/rgba",
+          "description": "The color of a shape's or connector's label. Absent follows stroke. Text boxes and notes are drawn in their stroke."
+        }
       }
     },
     "element": {

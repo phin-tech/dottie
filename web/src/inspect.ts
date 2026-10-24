@@ -48,6 +48,7 @@ export function inspectFrame(page: Page, t: number): Record<string, unknown> {
     d.strokeWidth = r4(e.style.strokeWidth);
     d.stroke = rgba(e.style.stroke);
     d.fill = rgba(e.style.fill);
+    if (e.style.textColor !== null) d.textColor = rgba(e.style.textColor);
     if (e.kind === "connector") {
       const [a, b] = endpoints(e, index);
       d.start = pt(a);
