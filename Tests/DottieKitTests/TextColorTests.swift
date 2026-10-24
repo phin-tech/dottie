@@ -18,6 +18,15 @@ final class TextColorTests: XCTestCase {
         }
     }
 
+    func testNewTextBoxesTakeTheTextColorForNewShapes() {
+        var st = Style()
+        st.stroke = red
+        XCTAssertEqual(st.forTextBox.stroke, red)
+        st.textColor = blue
+        XCTAssertEqual(st.forTextBox.stroke, blue)
+        XCTAssertNil(st.forTextBox.textColor)
+    }
+
     func testAutomaticInkLabelResolvesWithItsFill() {
         var e = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 100, height: 50), layerID: UUID(), text: "A")
         e.style.stroke = red

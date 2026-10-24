@@ -51,6 +51,14 @@ public struct Style: Codable, Equatable, Sendable {
     public init() {}
 
     public static let defaultGridSize = 50.0
+
+    /// The style for new shapes as a text box or note takes it: their text is drawn in their stroke, so a text color
+    /// chosen for new shapes becomes it.
+    public var forTextBox: Style {
+        var s = self
+        if let c = textColor { s.stroke = c; s.textColor = nil }
+        return s
+    }
     /// The `.grid` cell size actually drawn, never so small that the lines become a solid tint.
     public var cellSize: Double {
         get { max(8, gridSize ?? Style.defaultGridSize) }
