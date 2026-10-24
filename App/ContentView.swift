@@ -312,7 +312,7 @@ struct Inspector: View {
                 Text("Clean").tag(false)
             }
             .pickerStyle(.segmented)
-            ColorPicker("Stroke", selection: style.color(\.stroke, "Change Stroke Color"))
+            ColorPicker("Stroke", selection: style.stroke)
             if style.hasFill {
                 ColorPicker("Fill", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true)
                 Picker("Fill pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {

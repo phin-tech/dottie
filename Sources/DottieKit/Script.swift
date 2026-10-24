@@ -270,7 +270,8 @@ public enum DottieScript {
                                 startHead: try enumValue("startHead", as: Arrowhead.self),
                                 endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"),
                                 gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"),
-                                waypoints: try points("waypoints"), hops: bool("hops"))
+                                waypoints: try points("waypoints"), hops: bool("hops"),
+                                textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") })
             }
             /// A list of {x, y} points.
             func points(_ k: String) throws -> [CGPoint]? {
@@ -321,6 +322,7 @@ public enum DottieScript {
                 "strokeWidth": e.style.strokeWidth,
             ]
             if let t = e.text { d["text"] = t; d["fontSize"] = e.style.fontSize }
+            if let c = e.style.textColor { d["textColor"] = hex(c) }
             if let f = e.style.font { d["font"] = f }
             if e.style.fill.a > 0 { d["fill"] = hex(e.style.fill) }
             if e.style.fillStyle != .solid { d["fillStyle"] = e.style.fillStyle.rawValue }
@@ -1019,7 +1021,8 @@ public enum DottieScript {
     waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
     (connectors: a small hop where the line crosses a connector drawn beneath it), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
-    exports but not embedded; "" for Helvetica Neue), fontSize 4-200.
+    exports but not embedded; "" for Helvetica Neue), fontSize 4-200, textColor hex (a shape's or connector's label; \
+    "" follows the stroke again; setting stroke on update recolors the label too, as in Excalidraw).
 
     Example
       const a = dottie.rect({x: 0, y: 0, text: "Start", fill: "#d6f5d6"});

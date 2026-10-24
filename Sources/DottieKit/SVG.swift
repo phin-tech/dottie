@@ -155,7 +155,7 @@ extension Exporter {
         let total = lineHeight * Double(lines.count)
         let x = centered ? frame.midX : frame.minX
         let top = centered ? frame.midY - total / 2 : frame.minY
-        var s = "<text x=\"\(num(x))\" font-family=\"\(escape(Fonts.cssFamily(e.style.font)))\" font-size=\"\(num(size))\" fill=\"\(color(e.style.stroke))\"\(centered ? " text-anchor=\"middle\"" : "")>"
+        var s = "<text x=\"\(num(x))\" font-family=\"\(escape(Fonts.cssFamily(e.style.font)))\" font-size=\"\(num(size))\" fill=\"\(color(e.labelColor))\"\(centered ? " text-anchor=\"middle\"" : "")>"
         for (i, line) in lines.enumerated() {
             s += "<tspan x=\"\(num(x))\" y=\"\(num(top + lineHeight * (Double(i) + 0.8)))\">\(escape(line))</tspan>"
         }

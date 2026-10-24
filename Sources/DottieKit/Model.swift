@@ -45,6 +45,9 @@ public struct Style: Codable, Equatable, Sendable {
     /// How far into its dash pattern a dashed or dotted line starts, in points; nil is 0. Marching ants
     /// (`Track.march`) set it on every frame.
     public var dashOffset: Double?
+    /// The color of a shape's or connector's label; nil follows `stroke`. A text box or note is drawn in its
+    /// stroke and ignores it.
+    public var textColor: RGBA?
     public init() {}
 
     public static let defaultGridSize = 50.0
@@ -69,6 +72,7 @@ public struct Style: Codable, Equatable, Sendable {
         gridSize = try c.decodeIfPresent(Double.self, forKey: .gridSize)
         opacity = try c.decodeIfPresent(Double.self, forKey: .opacity)
         dashOffset = try c.decodeIfPresent(Double.self, forKey: .dashOffset).flatMap { $0.isFinite ? $0 : nil }
+        textColor = try c.decodeIfPresent(RGBA.self, forKey: .textColor)
     }
 }
 
@@ -230,12 +234,20 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Copy with automatic ink replaced by `ink`; a light ink is not used on a light, mostly opaque fill.
     /// Hatching leaves the page showing between its lines, so it never counts as a light fill.
     public func resolvingInk(to ink: RGBA) -> Element {
-        guard style.stroke.isAutomaticInk else { return self }
+        guard style.stroke.isAutomaticInk || style.textColor?.isAutomaticInk == true else { return self }
         var copy = self
         let covers = style.fillStyle == .solid || style.fillStyle == .grid
         let onLightFill = covers && style.fill.a >= 0.5 && style.fill.luminance > 0.5
-        copy.style.stroke = (ink.luminance > 0.5 && onLightFill) ? .black : ink
+        let resolved = (ink.luminance > 0.5 && onLightFill) ? RGBA.black : ink
+        if style.stroke.isAutomaticInk { copy.style.stroke = resolved }
+        if style.textColor?.isAutomaticInk == true { copy.style.textColor = resolved }
         return copy
+    }
+
+    /// What the element's text is drawn in: a text box's and a note's stroke, any other label's `textColor`
+    /// or, without one, its stroke.
+    public var labelColor: RGBA {
+        kind == .text || kind == .note ? style.stroke : style.textColor ?? style.stroke
     }
 
     /// Bounding box of the frame after rotation.

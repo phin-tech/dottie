@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="588" height="238" viewBox="16 16 588 238">
+<rect x="16" y="16" width="588" height="238" fill="#fbfaf6"/>
+<path d="M40 40 L180 40 L180 100 L40 100 Z" fill="none" stroke="#cc1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="76.48">Base ink label</tspan></text>
+<path d="M380 70 C380 86.57 348.66 100 310 100 C271.34 100 240 86.57 240 70 C240 53.43 271.34 40 310 40 C348.66 40 380 53.43 380 70 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="310" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1a4dd9" text-anchor="middle"><tspan x="310" y="76.48">Blue label</tspan></text>
+<path d="M440 40 L580 40 L580 100 L440 100 Z" fill="#ffe885" stroke="none"/>
+<path d="M440 40 L580 40 L580 100 L440 100 Z" fill="none" stroke="#cc1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="510" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="510" y="76.48">On light fill</tspan></text>
+<path d="M180 70 L240 70 M230.99 65.66 L240 70 M230.99 74.34 L240 70" fill="none" stroke="#cc1a1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="181" y="56.5" width="58" height="27" fill="#fbfaf6"/>
+<text x="210" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1a9933" text-anchor="middle"><tspan x="210" y="76.48">green</tspan></text>
+<text x="40" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#cc1a1a"><tspan x="40" y="177.28">Text box: stroke</tspan></text>
+<path d="M242 143 L402 143 L402 233 L242 233 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
+<path d="M240 140 L400 140 L400 230 L240 230 Z" fill="#ffe885" stroke="none"/>
+<path d="M240 140 L400 140 L400 230 L240 230 Z" fill="none" stroke="#cc1a1a" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text y="167" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#cc1a1a" xml:space="preserve"><tspan x="252" font-size="16">Note: stroke</tspan></text>
+</svg>

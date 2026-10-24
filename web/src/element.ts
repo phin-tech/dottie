@@ -26,12 +26,21 @@ export function rotatedBounds(e: Element): Rect {
 
 /** The element with automatic ink drawn as `ink`; a light ink is not used on a light, mostly opaque fill. */
 export function resolvingInk(e: Element, ink: RGBA): Element {
-  if (!isAutomaticInk(e.style.stroke)) return e;
+  const text = e.style.textColor !== null && isAutomaticInk(e.style.textColor);
+  if (!isAutomaticInk(e.style.stroke) && !text) return e;
   const copy = cloneElement(e);
   const covers = e.style.fillStyle === "solid" || e.style.fillStyle === "grid";
   const onLightFill = covers && e.style.fill.a >= 0.5 && luminance(e.style.fill) > 0.5;
-  copy.style.stroke = luminance(ink) > 0.5 && onLightFill ? { ...black } : { ...ink };
+  const resolved = luminance(ink) > 0.5 && onLightFill ? black : ink;
+  if (isAutomaticInk(e.style.stroke)) copy.style.stroke = { ...resolved };
+  if (text) copy.style.textColor = { ...resolved };
   return copy;
+}
+
+/** What the element's text is drawn in: a text box's and a note's stroke, any other label's `textColor` or,
+ * without one, its stroke. */
+export function labelColor(e: Element): RGBA {
+  return e.kind === "text" || e.kind === "note" ? e.style.stroke : e.style.textColor ?? e.style.stroke;
 }
 
 export interface Contour { closed: boolean; points: Point[] }

@@ -47,6 +47,8 @@ private let lookProps: [String: Value] = [
                           "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
                               + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
     "hops": prop("boolean", "Connectors: draw a small hop where this line crosses a connector drawn beneath it"),
+    "text_color": prop("string", "Hex color of a shape's or connector's label; \"\" follows the stroke again. Setting stroke on "
+                        + "update_element recolors the label too, as in Excalidraw"),
 ]
 
 private struct ToolFailure: Error { var message: String }
@@ -132,7 +134,8 @@ private struct Args {
                         strokeWidth: double("stroke_width"), bowing: double("bowing"),
                         startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
                         rotation: double("rotation"), gridSize: double("grid_size"),
-                        font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"))
+                        font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"),
+                        textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") })
     }
 
     /// A list of {x, y} points.

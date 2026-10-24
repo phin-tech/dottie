@@ -256,6 +256,8 @@ extension DottieScript {
             text?: string;
             /** With text: its size in points. */
             fontSize?: number;
+            /** A shape's or connector's label color; absent follows `stroke`. */
+            textColor?: Color;
             /** Absent for Helvetica Neue. */
             font?: string;
             /** Absent when the element has no fill. */
@@ -315,6 +317,9 @@ extension DottieScript {
             font?: string;
             /** Text size in points, 4-200. */
             fontSize?: number;
+            /** A shape's or connector's label color; "" follows the stroke again. Setting `stroke` with update
+             * recolors the label too, as in Excalidraw. */
+            textColor?: Color;
         }
 
         /** A shape an installed extension generates from parameters. */
