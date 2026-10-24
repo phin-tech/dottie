@@ -168,7 +168,7 @@ struct ShapeTool: CanvasTool {
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
         guard let layer = c.startPress() else { return }
-        let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: kind == .note ? Note.style(from: c.style) : c.style,
+        let e = Element(kind: kind, frame: CGRect(origin: p, size: .zero), style: kind == .note ? Note.style(from: c.style.forTextBox) : c.style,
                         layerID: layer)
         c.gesture = .creating(e)
         c.model.elements.append(e)
@@ -186,7 +186,7 @@ struct TextTool: CanvasTool {
 
     func press(_ c: CanvasNSView, at p: CGPoint, event: NSEvent) {
         guard let layer = c.startPress() else { return }
-        var e = Element(kind: .text, frame: CGRect(x: p.x, y: p.y, width: 180, height: 28), style: c.style, layerID: layer, text: "")
+        var e = Element(kind: .text, frame: CGRect(x: p.x, y: p.y, width: 180, height: 28), style: c.style.forTextBox, layerID: layer, text: "")
         e.style.roughness = 0
         c.model.elements.append(e)
         c.selection = [e.id]

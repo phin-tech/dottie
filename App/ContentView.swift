@@ -312,10 +312,22 @@ struct Inspector: View {
                 Text("Clean").tag(false)
             }
             .pickerStyle(.segmented)
-            ColorPicker("Stroke", selection: style.stroke)
-            if style.hasFill {
-                ColorPicker("Fill", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true)
-                Picker("Fill pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {
+            ValueSlider(title: "Opacity", value: style.binding(\.opacityLevel, "Change Opacity"), range: 0...1, format: Self.percent)
+        }
+        // Each part with its own color: the outline, the fill, the text.
+        if !style.onlyTextBoxes {
+            Section("Stroke") {
+                ColorPicker("Color", selection: style.stroke)
+                ValueSlider(title: "Width", value: style.binding(\.strokeWidth, "Change Stroke Width"), range: 1...12, format: Self.points)
+                Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
+                    ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
+                }
+            }
+        }
+        if style.hasFill && !style.onlyTextBoxes && !(tool == .note || (!selected.isEmpty && selected.allSatisfy { $0.kind == .note })) {
+            Section("Fill") {
+                ColorPicker("Color", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true)
+                Picker("Pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {
                     ForEach(StyleChoices.fills, id: \.0) { Text($0.1).tag($0.0) }
                 }
                 if style.binding(\.fillStyle, "").wrappedValue == .grid {
@@ -325,14 +337,14 @@ struct Inspector: View {
                     }
                 }
             }
-            ValueSlider(title: "Width", value: style.binding(\.strokeWidth, "Change Stroke Width"), range: 1...12, format: Self.points)
-            ValueSlider(title: "Opacity", value: style.binding(\.opacityLevel, "Change Opacity"), range: 0...1, format: Self.percent)
-            Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
-                ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
-            }
         }
         if style.hasText {
             Section("Text") {
+                ColorPicker("Color", selection: style.text)
+                if style.hasLabels && !style.onlyTextBoxes {
+                    Toggle("Same as stroke", isOn: style.textFollowsStroke)
+                        .help("Labels take the stroke color until you pick one for them")
+                }
                 LabeledContent("Font") { FontMenu(font: style.binding(\.font, "Change Font")) }
                 let size = style.binding(\.fontSize, "Change Text Size")
                 ValueSlider(title: "Size", value: Binding(get: { size.wrappedValue }, set: { size.wrappedValue = $0.rounded() }),

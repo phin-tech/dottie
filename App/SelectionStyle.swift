@@ -61,16 +61,8 @@ struct SelectionStyle {
     }
 
     /// The stroke color, which also colors the labels of the shapes and connectors it is set on (clearing their
-    /// own text color), as in Excalidraw. While a label is being typed it colors only that label.
+    /// own text color), as in Excalidraw.
     var stroke: Binding<Color> {
-        if let id = document.editingText, let e = shown.elements.first(where: { $0.id == id }),
-           e.kind != .text, e.kind != .note {
-            return color(Binding(get: { e.labelColor }, set: { value in
-                edit("Change Text Color") { next in
-                    if let i = next.elements.firstIndex(where: { $0.id == id }) { next.elements[i].style.textColor = value }
-                }
-            }))
-        }
         let raw = binding(\.stroke, "Change Stroke Color")
         return color(Binding(get: { raw.wrappedValue }, set: { value in
             newStyle.wrappedValue.stroke = value
@@ -84,6 +76,49 @@ struct SelectionStyle {
             }
         }))
     }
+
+    /// The color text is drawn in: a shape's or connector's label color, which follows the stroke until set, and a
+    /// text box's or note's stroke, which is its text.
+    var text: Binding<Color> {
+        color(Binding(
+            get: {
+                guard let e = selected.first else { return newStyle.wrappedValue.textColor ?? newStyle.wrappedValue.stroke }
+                return e.labelColor
+            },
+            set: { value in
+                newStyle.wrappedValue.textColor = value
+                guard !selection.isEmpty else { return }
+                edit("Change Text Color") { next in
+                    for i in next.elements.indices where selection.contains(next.elements[i].id) {
+                        if [.text, .note].contains(next.elements[i].kind) { next.elements[i].style.stroke = value }
+                        else { next.elements[i].style.textColor = value }
+                    }
+                }
+            }))
+    }
+
+    /// Whether labels take the stroke color. Turning it off gives them the stroke's color as their own, to change.
+    var textFollowsStroke: Binding<Bool> {
+        let labelled = selected.filter { ![.text, .note].contains($0.kind) }
+        return Binding(
+            get: { selected.isEmpty ? newStyle.wrappedValue.textColor == nil : labelled.allSatisfy { $0.style.textColor == nil } },
+            set: { follow in
+                newStyle.wrappedValue.textColor = follow ? nil : newStyle.wrappedValue.stroke
+                guard !labelled.isEmpty else { return }
+                edit(follow ? "Match Text to Stroke" : "Separate Text Color") { next in
+                    for i in next.elements.indices where selection.contains(next.elements[i].id)
+                        && ![.text, .note].contains(next.elements[i].kind) {
+                        next.elements[i].style.textColor = follow ? nil : next.elements[i].style.stroke
+                    }
+                }
+            })
+    }
+
+    /// Whether anything selected (or the next shape) has a label that can follow its stroke.
+    var hasLabels: Bool { selected.isEmpty || selected.contains { ![.text, .note, .image, .freehand, .symbol].contains($0.kind) } }
+
+    /// Whether the selection is only text boxes, which have no outline: their one color is their text's.
+    var onlyTextBoxes: Bool { !selected.isEmpty && selected.allSatisfy { $0.kind == .text } }
 
     private func color(_ raw: Binding<RGBA>) -> Binding<Color> {
         Binding(
