@@ -26,8 +26,8 @@ wheels = [
 
 [[package]]
 name = "app-release"
-version = "1.6.1"
-source = { git = "https://git.phin.tech/sam/app-release?tag=v1.6.1#e1af135dc820264bf37a1bd94578a00b3ac9258d" }
+version = "1.9.0"
+source = { git = "https://git.phin.tech/sam/app-release?tag=v1.9.0#19026a2145deb32a63b30ee43a880e037af828cc" }
 dependencies = [
     { name = "bump-my-version" },
     { name = "cyclopts" },
@@ -137,7 +137,7 @@ dependencies = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "app-release", git = "https://git.phin.tech/sam/app-release?tag=v1.6.1" }]
+requires-dist = [{ name = "app-release", git = "https://git.phin.tech/sam/app-release?tag=v1.9.0" }]
 
 [[package]]
 name = "h11"
