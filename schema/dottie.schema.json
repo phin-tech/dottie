@@ -37,9 +37,11 @@
         "guidesY": { "type": "array", "items": { "type": "number" } },
         "guidesLocked": { "type": "boolean" },
         "timeline": { "$ref": "#/$defs/timeline" },
-        "symbols": { "type": "array", "description": "Drawings placed by symbol elements, each with its own animation.", "items": { "$ref": "#/$defs/symbol" } }
+        "symbols": { "type": "array", "description": "Drawings placed by symbol elements, each with its own animation.", "items": { "$ref": "#/$defs/symbol" } },
+        "variables": { "type": "object", "description": "Page variables and their starting values. Clicks set and toggle them on the web; elements with a when follow them.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } }
       }
     },
+    "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
     "symbol": {
       "type": "object",
       "required": ["id"],
@@ -130,6 +132,7 @@
         "anchor": { "type": "string" },
         "click": { "$ref": "#/$defs/click" },
         "hover": { "$ref": "#/$defs/hover" },
+        "when": { "type": "string", "description": "A condition on the page's variables: names, each optionally after !, joined by && and || (&& binds tighter), like \"down\" or \"east && !west\". The element, and connectors attached to it, is drawn only while it holds; a missing variable is false, and a condition that can't be read never holds." },
         "symbol": { "$ref": "#/$defs/uuid", "description": "For a symbol element: the page's symbol it shows." },
         "playback": { "enum": ["loop", "once", "still", "click"], "description": "How a symbol element plays its symbol's timeline; loop by default. click rests at the start and plays once when clicked in <dottie-player>." },
         "offset": { "type": "number", "description": "Seconds into its symbol's timeline a symbol element is when the page's starts." },
@@ -326,7 +329,8 @@
       "additionalProperties": false,
       "properties": {
         "t": { "type": "number" },
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "loop": { "type": "boolean", "description": "A looping scene: the web players don't stop on reaching it, and at its end go back to its start." }
       }
     },
     "click": {
@@ -335,7 +339,9 @@
       "additionalProperties": false,
       "properties": {
         "scene": { "type": "string", "description": "A marker's name: jump there and play on to the next scene." },
-        "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." }
+        "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." },
+        "set": { "type": "object", "description": "Page variables to give these values, without touching the playhead.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
+        "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] }
       }
     },
     "hover": {

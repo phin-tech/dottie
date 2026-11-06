@@ -9,7 +9,7 @@ dottie \(version): render and manage Dottie drawings from the command line.
 
 USAGE
   dottie render <file.dottie | file.mmd>... [-o <out>] [options]
-  dottie inspect <file.dottie> [-p <page>] [--at <seconds>]...
+  dottie inspect <file.dottie> [-p <page>] [--at <seconds>]... [--disk]
   dottie library list
   dottie library install <file.dottielib>...
   dottie script-types [<dir>]
@@ -24,6 +24,8 @@ RENDER
   The format comes from the extension of -o, or --format.
   With no -o the result is written next to the input (drawing.dottie -> drawing.png).
   A Mermaid flowchart (.mmd, .mermaid, or flowchart text on stdin) is laid out and rendered too.
+  When the Dottie app has a .dottie file open, its unsaved edits (an agent's MCP edits too) are what render
+  and inspect read, with a note on stderr when they differ from the saved file.
 
   -o, --output <path>   Output file, or "-" for stdout. Needs a single input.
   -d, --out-dir <dir>   Directory for the results of one or more inputs.
@@ -39,6 +41,7 @@ RENDER
       --transparent     No page background (png, apng, svg, html, lottie).
       --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
                         unless set). An html export becomes a still; gif, apng, mp4 and lottie ignore it.
+      --disk            Read the saved file, not the app's open copy with its unsaved edits.
 
 INSPECT
   Prints, as JSON, what each page resolves to with no drawing: every element's frame, rotation,
@@ -48,6 +51,7 @@ INSPECT
 
   -p, --page <page>     Only this page, by name or 1-based number (default every page).
       --at <seconds>    A time to inspect; repeat for several.
+      --disk            Read the saved file, not the app's open copy with its unsaved edits.
 
 LIBRARY
   list      Shows the libraries installed for the Dottie app.
@@ -100,6 +104,27 @@ struct RenderOptions {
     var transparent = false
     var at: Double?
     var lottieMode = Exporter.LottieMode.smooth
+    /// Read the file on disk even when the app has it open with unsaved edits.
+    var disk = false
+}
+
+/// The drawing at `url`: the app's open copy unless `disk` (see `LiveClient.current`), with a note on stderr when
+/// that has edits the file doesn't. `onDisk` is the file's bytes, nil when it can't be read.
+func drawing(at url: URL, named input: String, onDisk: Data?, disk: Bool, verb: String) throws -> DottieFile {
+    var saved: DottieFile?
+    var problem: CLIError?
+    if let onDisk {
+        do { saved = try DottieFile.decode(onDisk) }
+        catch { problem = CLIError(message: "\(input): not a Dottie drawing (\(error.localizedDescription))") }
+    } else {
+        problem = CLIError(message: "\(input): cannot read file")
+    }
+    if !disk, let (file, unsaved) = LiveClient.current(path: url.path, disk: saved) {
+        if unsaved { warn("\(url.lastPathComponent) is open in Dottie; \(verb) its unsaved state (--disk for the saved file)") }
+        return file
+    }
+    if let saved { return saved }
+    throw problem!
 }
 
 func parseRender(_ args: [String]) throws -> RenderOptions {
@@ -129,6 +154,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--clean": o.roughness = 0
         case "--sketchy": o.roughness = 1
         case "--transparent": o.transparent = true
+        case "--disk": o.disk = true
         case "--lottie-mode":
             let v = try value(a)
             guard let m = Exporter.LottieMode(rawValue: v) else { throw CLIError(message: "--lottie-mode is smooth or exact", code: 2) }
@@ -228,7 +254,7 @@ func runRender(_ args: [String]) -> Int32 {
     var failures = 0
     for input in o.inputs {
         do {
-            let data: Data
+            let data: Data?
             var name: String
             var directory: URL
             if input == "-" {
@@ -236,21 +262,22 @@ func runRender(_ args: [String]) -> Int32 {
                 name = "drawing"; directory = absolute(".")
             } else {
                 let url = absolute(input)
-                guard let d = try? Data(contentsOf: url) else { throw CLIError(message: "\(input): cannot read file") }
-                data = d
+                data = try? Data(contentsOf: url)
                 name = url.deletingPathExtension().lastPathComponent
                 directory = url.deletingLastPathComponent()
             }
             let file: DottieFile
-            let text = String(decoding: data, as: UTF8.self)
-            let isMermaid = input == "-" ? MermaidImporter.isFlowchart(text)
+            let isMermaid = input == "-" ? MermaidImporter.isFlowchart(String(decoding: data ?? Data(), as: UTF8.self))
                 : MermaidImporter.fileExtensions.contains(absolute(input).pathExtension.lowercased())
             if isMermaid {
-                do { file = try MermaidImporter.file(from: text, roughness: o.roughness ?? 1) }
+                guard let data else { throw CLIError(message: "\(input): cannot read file") }
+                do { file = try MermaidImporter.file(from: String(decoding: data, as: UTF8.self), roughness: o.roughness ?? 1) }
                 catch { throw CLIError(message: "\(input): \(error.localizedDescription)") }
-            } else {
-                do { file = try DottieFile.decode(data) }
+            } else if input == "-" {
+                do { file = try DottieFile.decode(data ?? Data()) }
                 catch { throw CLIError(message: "\(input): not a Dottie drawing (\(error.localizedDescription))") }
+            } else {
+                file = try drawing(at: absolute(input), named: input, onDisk: data, disk: o.disk, verb: "rendering")
             }
             var doc = file.pages[0]
             if let spec = o.page {
@@ -281,7 +308,7 @@ func runRender(_ args: [String]) -> Int32 {
 }
 
 func runInspect(_ args: [String]) -> Int32 {
-    var input: String?, page: String?, times: [Double] = []
+    var input: String?, page: String?, times: [Double] = [], disk = false
     var i = 0
     while i < args.count {
         let a = args[i]
@@ -297,6 +324,7 @@ func runInspect(_ args: [String]) -> Int32 {
             guard let n = Double(v), n.isFinite, n >= 0 else { fail("--at must be a time in seconds", code: 2) }
             times.append(n)
         case "--json": break   // the only output there is
+        case "--disk": disk = true
         default:
             if a.hasPrefix("-") || input != nil { fail("unknown option \(a)", code: 2) }
             input = a
@@ -304,9 +332,11 @@ func runInspect(_ args: [String]) -> Int32 {
         i += 1
     }
     guard let input else { fail("inspect needs a .dottie file", code: 2) }
-    guard let data = try? Data(contentsOf: absolute(input)) else { fail("\(input): cannot read file") }
     let file: DottieFile
-    do { file = try DottieFile.decode(data) } catch { fail("\(input): not a Dottie drawing (\(error.localizedDescription))") }
+    do {
+        file = try drawing(at: absolute(input), named: input, onDisk: try? Data(contentsOf: absolute(input)), disk: disk,
+                           verb: "inspecting")
+    } catch let e as CLIError { fail(e.message) } catch { fail("\(error)") }
     var pages: [Int]?
     if let page {
         guard let p = file.pageIndex(matching: page) else { fail("\(input): no page '\(page)'") }
@@ -352,6 +382,7 @@ func runLibrary(_ args: [String]) -> Int32 {
 
 func runScriptTypes(_ args: [String]) -> Int32 {
     guard args.count <= 1 else { fail("script-types takes at most one directory", code: 2) }
+    if let a = args.first, a.hasPrefix("-") { fail("unknown option '\(a)' for script-types. Run 'dottie --help'.", code: 2) }
     let dir = args.first.map(absolute) ?? DottieScript.scriptsDirectory
     do {
         for url in try DottieScript.writeTypes(to: dir) { print("Wrote \(url.path)") }
@@ -448,6 +479,11 @@ func runExtension(_ args: [String]) -> Int32 {
 }
 
 let argv = Array(CommandLine.arguments.dropFirst())
+// `dottie <command> --help` prints the usage, rather than reading --help as a file or folder.
+if argv.count > 1, argv.dropFirst().contains(where: { $0 == "-h" || $0 == "--help" }) {
+    print(usage, terminator: "")
+    exit(0)
+}
 switch argv.first {
 case nil, "-h", "--help", "help":
     print(usage, terminator: "")

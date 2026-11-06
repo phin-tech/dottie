@@ -349,6 +349,13 @@ struct TimelinePanel: View {
         if let t = pointer.marker, let m = rows.markers.first(where: { $0.t == t }) {
             Button("Go to “\(m.name)”") { scrub(to: m.t) }
             Button("Rename Scene…") { renameScene(m) }
+            // A looping scene plays round on the web until a click or next leaves it, instead of stopping.
+            Button(m.loop == true ? "Stop at This Scene" : "Loop This Scene") {
+                let on = m.loop != true
+                onEdit(on ? "Loop Scene" : "Stop at Scene") { tl in
+                    if let i = tl.markers?.firstIndex(where: { $0.t == m.t }) { tl.markers![i].loop = on ? true : nil }
+                }
+            }
             Divider()
             Button("Delete Scene") { onEdit("Delete Scene") { $0.removeMarker(at: m.t) } }
         } else {

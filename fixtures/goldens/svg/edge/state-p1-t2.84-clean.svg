@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="428" height="368" viewBox="16 16 428 368">
+<rect x="16" y="16" width="428" height="368" fill="#ffffff"/>
+<path d="M40 40 L160 40 L160 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="76.48">east</tspan></text>
+<path d="M300 40 L420 40 L420 100 L300 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="360" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="360" y="76.48">west</tspan></text>
+<path d="M40 180 L160 180 L160 240 L40 240 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="216.48">maint</tspan></text>
+<path d="M360 330 C360 346.57 346.57 360 330 360 C313.43 360 300 346.57 300 330 C300 313.43 313.43 300 330 300 C346.57 300 360 313.43 360 330 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="330" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="330" y="336.48">unknown</tspan></text>
+<path d="M160 70 L300 70 M290.99 65.66 L300 70 M290.99 74.34 L300 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="208" y="56.5" width="44" height="27" fill="#ffffff"/>
+<text x="230" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="230" y="76.48">live</tspan></text>
+<path d="M307 70 C307 73.87 303.87 77 300 77 C296.13 77 293 73.87 293 70 C293 66.13 296.13 63 300 63 C303.87 63 307 66.13 307 70 Z" fill="#3380ff" stroke="none"/>
+<path d="M307 70 C307 73.87 303.87 77 300 77 C296.13 77 293 73.87 293 70 C293 66.13 296.13 63 300 63 C303.87 63 307 66.13 307 70 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

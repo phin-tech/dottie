@@ -15,6 +15,7 @@ extension DottieDocument {
         let markers = timeline?.markers ?? []
         var out: [UUID: ClickTarget] = [:]
         for e in elements {
+            // A click that only changes variables is played by dottie.js (DottieDocument.usesState), not here.
             if let name = e.click?.scene, !name.isEmpty, let i = Self.scene(named: name, in: markers) {
                 out[e.id] = .scene(i)
             } else if let url = e.click?.url.flatMap(ClickAction.allowed) ?? e.outsideLink?.webAddress {
@@ -67,12 +68,12 @@ extension DottieDocument {
 }
 
 extension DiagramOps {
-    /// Renames, moves or removes the scene `scene` names (see `sceneTime`), for scripts and the MCP tool. A rename
-    /// keeps the clicks that play it; removing it leaves them pointing nowhere, as the timeline's Delete Scene does.
-    /// Returns what it did, for a reply.
+    /// Renames, moves, loops or removes the scene `scene` names (see `sceneTime`), for scripts and the MCP tool. A
+    /// rename keeps the clicks that play it; removing it leaves them pointing nowhere, as the timeline's Delete Scene
+    /// does. `loop` makes it a looping scene (`Marker.loop`) or not. Returns what it did, for a reply.
     @discardableResult
     public static func editScene(_ doc: inout DottieDocument, scene: String, rename: String? = nil, moveTo: Double? = nil,
-                                 remove: Bool = false) throws -> String {
+                                 loop: Bool? = nil, remove: Bool = false) throws -> String {
         guard let t = doc.sceneTime(scene), let name = doc.timeline?.markers?.first(where: { $0.t == t })?.name else {
             let names = (doc.timeline?.markers ?? []).map { "'\($0.name)'" }
             throw OpsError.notFound("No scene '\(scene)'" + (names.isEmpty ? " (the page has none)" : "; scenes: \(names.joined(separator: ", "))"))
@@ -81,7 +82,9 @@ extension DiagramOps {
             doc.timeline!.removeMarker(at: t)
             return "Removed scene '\(name)'"
         }
-        guard rename != nil || moveTo != nil else { throw OpsError.invalid("Give a new name, a new time, or remove") }
+        guard rename != nil || moveTo != nil || loop != nil else {
+            throw OpsError.invalid("Give a new name, a new time, loop, or remove")
+        }
         var next = doc
         var done: [String] = []
         if let rename {
@@ -97,18 +100,38 @@ extension DiagramOps {
             }
             done.append("moved to \(moveTo)s")
         }
+        if let loop {
+            let at = moveTo.map(Timeline.clampTime) ?? t
+            if let i = next.timeline!.markers?.firstIndex(where: { abs($0.t - at) < 1e-6 }) {
+                next.timeline!.markers![i].loop = loop ? true : nil
+            }
+            done.append(loop ? "loops" : "stops")
+        }
         doc = next
         return "Scene " + done.joined(separator: ", ")
     }
 
-    /// A click from tool or script arguments: a scene name or a link, "" for neither (which removes it).
-    public static func click(scene: String?, url: String?) throws -> ClickAction? {
-        if let scene, !scene.isEmpty { return ClickAction(scene: scene) }
-        guard let url, !url.isEmpty else { return nil }
-        guard let ok = ClickAction.allowed(url) else {
-            throw OpsError.invalid("A click link must start with http://, https:// or mailto:, got '\(url)'")
+    /// A click from tool or script arguments: a scene name or a link, and variables to set and flip; nil for none of
+    /// them ("" for a scene or link is none), which removes it.
+    public static func click(scene: String?, url: String?, set: [String: Bool]? = nil, toggle: [String]? = nil) throws -> ClickAction? {
+        for name in Array((set ?? [:]).keys) + (toggle ?? []) where !PageState.isName(name) {
+            throw OpsError.invalid("A variable name is a letter or _, then letters, digits or _, got '\(name)'")
         }
-        return ClickAction(url: ok)
+        let set = (set ?? [:]).isEmpty ? nil : set, toggle = (toggle ?? []).isEmpty ? nil : toggle
+        if let scene, !scene.isEmpty { return ClickAction(scene: scene, set: set, toggle: toggle) }
+        if let url, !url.isEmpty {
+            guard let ok = ClickAction.allowed(url) else {
+                throw OpsError.invalid("A click link must start with http://, https:// or mailto:, got '\(url)'")
+            }
+            return ClickAction(url: ok, set: set, toggle: toggle)
+        }
+        return set == nil && toggle == nil ? nil : ClickAction(set: set, toggle: toggle)
+    }
+
+    /// Gives element `id` the condition `when` (see `PageState`); nil or "" removes it.
+    public static func setWhen(_ doc: inout DottieDocument, id: UUID, _ when: String?) throws {
+        guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        doc.elements[i].when = try when.flatMap(PageState.checked)
     }
 
     /// `base` with the hover colors and opacity given; "" for a color (or a negative opacity) clears it.

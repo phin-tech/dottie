@@ -113,7 +113,8 @@ public enum LiveClient {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return nil }
         defer { close(fd) }
-        var tv = timeval(tv_sec: Int(timeout), tv_usec: 0)
+        let whole = max(timeout, 0.001).rounded(.down)
+        var tv = timeval(tv_sec: Int(whole), tv_usec: Int32((max(timeout, 0.001) - whole) * 1_000_000))
         setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size))
         var one: Int32 = 1
@@ -127,9 +128,18 @@ public enum LiveClient {
         return try? JSONDecoder().decode(LiveResponse.self, from: line)
     }
 
-    public static func get(path: String) -> DottieFile? {
-        let r = send(LiveRequest(op: .get, path: LiveSocket.key(forPath: path)))
+    public static func get(path: String, timeout: TimeInterval = 5) -> DottieFile? {
+        let r = send(LiveRequest(op: .get, path: LiveSocket.key(forPath: path)), timeout: timeout)
         return r?.open == true ? r?.file : nil
+    }
+
+    /// What the `dottie` command reads for the drawing at `path`: the app's copy when the app has it open, so
+    /// unsaved edits (an agent's MCP edits among them) are included, else `disk`. `unsaved` is true when the app's
+    /// copy differs from `disk` (or there is no readable file on disk). A missing socket, or an app that doesn't
+    /// answer within `timeout`, quietly gives `disk`.
+    public static func current(path: String, disk: DottieFile?, timeout: TimeInterval = 1.5) -> (file: DottieFile, unsaved: Bool)? {
+        if let live = get(path: path, timeout: timeout) { return (live, live != disk) }
+        return disk.map { ($0, false) }
     }
 
     /// True when the open document accepted the edit; otherwise the caller writes the file.

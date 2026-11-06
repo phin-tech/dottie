@@ -63,3 +63,21 @@ _Avoid_: reference, jump target
 **Outside link**:
 Where a shape leads out of the drawing (`url`): a web or mail address, or another drawing with an optional `#anchor` or page.
 _Avoid_: URL link, hyperlink, external link
+
+### Playing on the web
+
+**Scene**:
+A named moment on a page's timeline (a marker) where a click-through presentation stops, and what a click can jump to.
+_Avoid_: slide, step, chapter
+
+**Looping scene**:
+A scene the players don't stop at: on reaching its end they go back to its start, until a click or next leaves it.
+_Avoid_: loop marker, hold
+
+**Variable**:
+A named true-or-false value on a page (`variables`) that clicks set or toggle without touching the playhead.
+_Avoid_: state flag, toggle (that is what a click does to one)
+
+**Condition**:
+An element's `when`: variable names joined by `!`, `&&` and `||`; the element is drawn only while it holds.
+_Avoid_: rule, predicate, visibility expression

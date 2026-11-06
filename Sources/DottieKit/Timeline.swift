@@ -183,7 +183,10 @@ public struct CameraKey: Codable, Equatable, Sendable {
 public struct Marker: Codable, Equatable, Sendable {
     public var t: Double
     public var name: String
-    public init(t: Double, name: String) { self.t = t; self.name = name }
+    /// A looping scene: the web players don't stop on reaching it, and at its end (the next scene, or the end of
+    /// the timeline) go back to its start, so it plays until a click or next/back leaves it. nil stops as usual.
+    public var loop: Bool?
+    public init(t: Double, name: String, loop: Bool? = nil) { self.t = t; self.name = name; self.loop = loop == true ? true : nil }
 }
 
 /// A page's animation. The page's elements are the base pose; tracks override their properties over time.
@@ -284,10 +287,10 @@ public struct Timeline: Codable, Equatable, Sendable {
     }
 
     /// Adds a scene marker (replacing one at the same time), growing the timeline to fit.
-    public mutating func addMarker(at t: Double, name: String) {
+    public mutating func addMarker(at t: Double, name: String, loop: Bool? = nil) {
         let t = Self.clampTime(t)
         var list = (markers ?? []).filter { abs($0.t - t) >= 1e-6 }
-        list.append(Marker(t: t, name: name))
+        list.append(Marker(t: t, name: name, loop: loop))
         markers = list.sorted { $0.t < $1.t }
         duration = max(duration, t)
     }
@@ -552,14 +555,21 @@ extension DottieDocument {
     /// The page as a still drawing at time `t` seconds, with every symbol instance expanded into what it shows
     /// then (see `expandingSymbols(at:)`). Every renderer and exporter draws the result unchanged; a page with
     /// no timeline and no instances is returned as is.
-    public func resolved(at t: Double) -> DottieDocument {
-        posed(at: t).expandingSymbols(at: Timeline.clampTime(t))
+    /// `state` picks which of the elements with a `when` are drawn (the variables' starting values unless given).
+    public func resolved(at t: Double, state: StateChoice) -> DottieDocument {
+        posed(at: t, state: state).expandingSymbols(at: Timeline.clampTime(t))
     }
 
-    /// The page posed at time `t` seconds: its keys applied, symbol instances kept as instances. What the editor
-    /// shows and edits while stopped on the timeline; a page without a timeline is returned as is.
-    public func posed(at t: Double) -> DottieDocument {
-        guard let timeline else { return self }
+    /// `resolved(at:state:)` with the variables' starting values.
+    public func resolved(at t: Double) -> DottieDocument { resolved(at: t, state: .initial) }
+
+    /// The page posed at time `t` seconds: its keys applied, symbol instances kept as instances, and the elements
+    /// whose `when` doesn't hold under `state` left out, with the connectors attached to them. What the editor
+    /// shows and edits while stopped on the timeline (with `.all`); a page without a timeline or hidden elements
+    /// is returned as is.
+    public func posed(at t: Double, state: StateChoice = .initial) -> DottieDocument {
+        let off = stateHidden(state)
+        guard let timeline = timeline ?? (off.isEmpty ? nil : Timeline(duration: 0)) else { return self }
         let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
@@ -568,7 +578,7 @@ extension DottieDocument {
             // t and fps are both clamped, so this frame number is always a small finite integer.
             UInt32(truncatingIfNeeded: (Int((t * Timeline.clampFPS(timeline.fps) + 1e-9).rounded(.down)) / max(1, n)) % Timeline.boilDrawings)
         }
-        let hidden = Set(tracks.values.filter { !$0.isVisible(at: t) }.map(\.element))
+        let hidden = Set(tracks.values.filter { !$0.isVisible(at: t) }.map(\.element)).union(off)
         let moving: Set<UUID>? = timeline.settle == true
             ? Set(tracks.values.filter { $0.isChanging(at: t) }.map(\.element)) : nil
         func boils(_ e: Element) -> Bool {
@@ -595,12 +605,14 @@ extension DottieDocument {
         }
         // A connector goes with either shape it is attached to, unless it has visible keys of its own. Then
         // both its ends are pinned where they are now, so it draws the same route without the hidden shape.
+        // A shape the page's state leaves out always takes its connectors: that path isn't there.
         let index = copy.elementIndex
         var gone = hidden
         for i in copy.elements.indices {
             guard let c = copy.elements[i].connector,
                   [c.start.elementID, c.end.elementID].contains(where: { $0.map(hidden.contains) ?? false }) else { continue }
-            guard tracks[copy.elements[i].id]?.keys.contains(where: { $0.visible != nil }) == true else {
+            guard tracks[copy.elements[i].id]?.keys.contains(where: { $0.visible != nil }) == true,
+                  ![c.start.elementID, c.end.elementID].contains(where: { $0.map(off.contains) ?? false }) else {
                 gone.insert(copy.elements[i].id); continue
             }
             let (a, b) = Connector.endpoints(of: copy.elements[i], in: copy, index: index)
@@ -622,7 +634,7 @@ extension DottieDocument {
     /// The page as a still picture: its poster frame when it is animated, the end unless set otherwise.
     /// The editor works on the page itself; exports, previews and thumbnails show this.
     public var still: DottieDocument {
-        guard let timeline else { return expandingSymbols(at: 0) }
+        guard let timeline else { return posed(at: 0).expandingSymbols(at: 0) }
         return resolved(at: timeline.poster ?? timeline.duration)
     }
 

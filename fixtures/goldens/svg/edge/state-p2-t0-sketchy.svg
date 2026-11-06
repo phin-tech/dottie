@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="168" height="248" viewBox="16 16 168 248">
+<rect x="16" y="16" width="168" height="248" fill="#ffffff"/>
+<path d="M38.73 38.24 C71.07 41.39 123.71 40.59 159.18 40.19 M40.51 39.78 C89.44 41.67 137.01 41.92 160.63 40.64 M160.82 38.77 C160.81 58.77 160.62 83.25 158.74 101.58 M159.28 39.86 C159.98 54.31 159.37 80.64 160 99.03 M160.36 98.7 C132.57 98.3 77.93 97.58 41.86 99.88 M159.51 99.05 C134.68 100.64 81.25 100.88 39.41 99.93 M39.93 98.46 C40.24 74.02 40.71 51.52 40.32 40.11 M40.83 100.75 C39.88 86.82 39.51 60.16 39.3 39.44" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="76.48">on</tspan></text>
+<path d="M100.17 159.12 C122.87 176.68 146.84 193.13 160.06 200.94 M99.24 159.2 C119.15 173.66 143.93 190.42 160.01 200.71 M160.25 200.55 C134.94 216.49 110.96 233.43 99.09 241.01 M160.93 200.15 C145.34 208.87 118.67 226.03 99.76 240.73 M101.17 241.3 C71.81 222.04 48.28 205.46 40.87 199.6 M100.1 240.86 C85.1 231.57 58.45 213 40.95 199.32 M40.4 201.73 C63.69 184.96 87.31 167.96 98.69 158.76 M39.48 200.16 C61.62 184.1 85.99 167.63 99.27 160.51" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="206.48">flip</tspan></text>
+</svg>

@@ -222,6 +222,16 @@ the web players draw each clickable copy as one focusable group holding its part
 too, with a layer on top that takes the clicks (the `hit` scene's shapes, invisible, or the copy's frame). Both
 draw the states by expanding with `times`, which puts a copy on the page at a moment of its own symbol; dottie.js
 uses the same to replay a copy whose playback is `click`.
+A page's `variables` are named booleans with their starting values (`State.swift`, `web/src/state.ts`). A click's
+`set` and `toggle` change them, alone or with a scene or link, and an element's `when` (a condition: names, each
+optionally after `!`, joined by `&&` and `||`) draws it only while it holds. `posed(at:state:)` leaves out what
+the state hides, with the connectors attached to it, even ones with visible keys of their own; a condition that
+can't be read never holds, and inside a symbol `when` sees no variables. Everything that draws a still, an export
+or the editor's playback uses the starting values; the editor shows every element while posing (`.all`), so each
+state stays editable. Only the web players change them: `<dottie-player>` redraws and fires `state`, and the HTML
+export of a page that uses state (`usesState`) is dottie.js's player in a page (`Exporter.statefulPlayer`), since
+the drawn-ahead player can't know which frames to draw. A marker with `loop: true` is a looping scene: both
+players play into it without stopping and go round from its end (the next scene, or the timeline's end) to its start.
 A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
 bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right
 angles, adding a corner between any two that are out of line and dropping any that fall into line
@@ -325,5 +335,7 @@ dottie ext check my.dottieext                     # load an extension and try it
 
 `dottie render diagram.dottie -f js` writes the page and dottie.js's player as one script (see dottie.js below).
 `dottie inspect diagram.dottie --at 1.5` prints the page's resolved geometry as JSON (see dottie.js above).
-`--clean` / `--sketchy` override the look and `--transparent` drops the background. It reads the file on disk,
-not unsaved edits in the app.
+`--clean` / `--sketchy` override the look and `--transparent` drops the background. When the app has the file
+open, `render` and `inspect` read that window over the live socket (`LiveClient.current`), unsaved and MCP edits
+included, and say so on stderr when it differs from the file; `--disk` reads the saved file. `just goldens` passes
+`--disk`, so a fixture open in the app can't leak into the goldens.

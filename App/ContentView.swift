@@ -833,7 +833,7 @@ final class FrameCache {
 
     func frame(of page: DottieDocument, at t: Double) -> DottieDocument {
         if let frame, t == time, page == self.page { return frame }
-        let f = page.posed(at: t)
+        let f = page.posed(at: t, state: .all)
         self.page = page; time = t; frame = f
         return f
     }

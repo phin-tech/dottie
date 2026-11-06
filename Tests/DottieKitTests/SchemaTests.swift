@@ -42,7 +42,8 @@ final class SchemaTests: XCTestCase {
         box.path = [0, 0, 1, 1, 1, 1, 1, 1]
         box.subpaths = [PathSubpath(closed: true, coords: [0, 0, 1, 0, 1, 1, 1, 1])]
         box.evenOdd = true; box.rotation = 0.5; box.link = UUID(); box.anchor = "a"; box.reveal = 0.5
-        box.click = ClickAction(scene: "m", url: "https://example.com")
+        box.click = ClickAction(scene: "m", url: "https://example.com", set: ["down": true], toggle: ["east"])
+        box.when = "down && !east"
         box.hover = HoverLook(stroke: .black, fill: .clear, opacity: 0.5)
         box.symbol = UUID(); box.playback = .once; box.offset = 0.5
         box.image = EmbeddedImage(data: Data([1, 2, 3]), format: "png")
@@ -51,6 +52,7 @@ final class SchemaTests: XCTestCase {
         line.connector?.startHead = .dot
         var page = DottieDocument(name: "P", layers: [layer], elements: [box, line])
         page.theme = "midnight"; page.guidesX = [1]; page.guidesY = [2]; page.guidesLocked = true
+        page.variables = ["down": false, "east": true]
         var tl = Timeline(fps: 24, duration: 3, boil: 2, settle: true)
         tl.poster = 1
         tl.setKey(Keyframe(t: 0, x: 1, y: 2, width: 3, height: 4, rotation: 0.1, strokeWidth: 2, stroke: .black, fill: .clear,
@@ -59,7 +61,7 @@ final class SchemaTests: XCTestCase {
         tl.addFollow(Follow(path: line.id, start: 0, end: 1, ease: .easeIn, reverse: true, orient: true, laps: 2), for: box.id)
         tl.addRepeat(for: box.id, from: 0, to: 1, count: 2)
         tl.setCamera(CameraKey(t: 0, rect: CGRect(x: 0, y: 0, width: 10, height: 10), ease: .linear))
-        tl.addMarker(at: 1, name: "m")
+        tl.addMarker(at: 1, name: "m", loop: true)
         page.timeline = tl
         page.symbols = [Symbol(name: "S", width: 10, height: 10, elements: [Element(kind: .rectangle, frame: .zero, layerID: layer.id)],
                                timeline: Timeline(duration: 1), button: true)]

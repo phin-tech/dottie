@@ -47,6 +47,9 @@ fixture, so the gap is visible rather than silent.
 | Symbol parameters (`{{name}}` in a symbol's text, filled per copy) | Supported | [edge/params](../fixtures/edge/params.dottie) | Defaults, undeclared names left as written, values passed into nested copies, filled before text types out |
 | Copies that play when clicked | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | `<dottie-player>` only: the HTML export is drawn ahead of time and shows them at rest |
 | Clicks: play a scene, open a link, hover looks, keyboard | Supported | [edge/clicks](../fixtures/edge/clicks.dottie) | As the HTML export does; only http, https and mailto links are followed |
+| Page variables and conditions (`variables`, `when`) | Supported | [edge/state](../fixtures/edge/state.dottie) | Starting values in every still and export; connectors go with a shape the state hides |
+| Clicks that set and toggle variables | Supported | [edge/state](../fixtures/edge/state.dottie) | Change what shows without touching the playhead. The HTML export of a page with state is this player |
+| Looping scenes (`loop` on a marker) | Supported | [edge/state](../fixtures/edge/state.dottie) | As the HTML export plays them: no stop on entering, round from the scene's end to its start |
 | Links out of the drawing (`url`) | Supported | [edge/links](../fixtures/edge/links.dottie) | A web or mail `url` opens when clicked if there is no `click`, and SVG export wraps it in `<a>`; a link to another drawing does nothing on the web |
 | Links between shapes and pages | Partial | [edge/clicks](../fixtures/edge/clicks.dottie) | A link to a shape on another page shows that page; one on the same page does nothing. The HTML export holds one page, so it has neither |
 | Editing | Missing | | |

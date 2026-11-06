@@ -229,11 +229,19 @@ extension DottieScript {
 
         /** What clicking a shape does when the drawing plays on the web (HTML export, <dottie-player>). */
         interface Click {
-            /** A scene's name: jump there and play on to the next one. */
+            /** A scene's name (what dottie.scene returns): jump there and play on to the next one. */
             scene?: string;
             /** An http, https or mailto link, opened in a new tab. */
             url?: string;
+            /** Page variables to give these values, without stopping or moving the animation. */
+            set?: Record<string, boolean>;
+            /** Page variables to flip, after set. */
+            toggle?: string | string[];
         }
+
+        /** A condition on page variables: names, each optionally after !, joined by && and ||, like "down" or
+         * "east && !west". The element, and the connectors attached to it, is drawn only while it holds. */
+        type Condition = string;
 
         /** How a clickable shape looks under the pointer. */
         interface Hover {
@@ -284,6 +292,7 @@ extension DottieScript {
             to?: string;
             click?: Click;
             hover?: Hover;
+            when?: Condition;
             /** A symbol's copy: the symbol's id, how it plays, and seconds into it at the page's start. */
             symbol?: string;
             playback?: Playback;
@@ -343,6 +352,8 @@ extension DottieScript {
             sketchy?: boolean;
             /** A hidden label for finding and linking to the element; never drawn. */
             anchor?: string;
+            /** Drawn only while this holds. */
+            when?: Condition;
         }
 
         interface ConnectOptions extends Look {
@@ -355,6 +366,8 @@ extension DottieScript {
             fromPort?: Port | number;
             /** Pins the end, like fromPort. */
             toPort?: Port | number;
+            /** Drawn only while this holds (and while both its shapes are). */
+            when?: Condition;
         }
 
         interface Changes extends Look {
@@ -376,6 +389,8 @@ extension DottieScript {
             anchor?: string;
             /** What clicking it does on the web; null removes it. */
             click?: Click | null;
+            /** Drawn only while this holds; "" or null removes it. */
+            when?: Condition | null;
             /** Its look under the pointer when clickable; null removes it. Not for a symbol's copies: draw a button's over state. */
             hover?: Hover | null;
             /** A symbol's copy only. */
@@ -396,7 +411,8 @@ extension DottieScript {
             height?: number;
         }
 
-        interface BuildEdge {
+        /** Look fields (dash, strokeWidth, endHead, …) style the connector as it is made. */
+        interface BuildEdge extends Look {
             /** Node keys. */
             from: string;
             to: string;
@@ -512,8 +528,16 @@ extension DottieScript {
             camera(t: number, view: Rect | Ref | Ref[], options?: { ease?: Ease; padding?: number }): Rect;
             /** Removes the camera. */
             camera(t: null): void;
-            /** A scene marker: the HTML player stops at each. */
-            scene(t: number, name?: string): void;
+            /** A scene marker: the HTML player stops at each, unless loop makes it a looping scene that plays round
+             * until something leaves it. Returns its name, which is what click: {scene} takes. */
+            scene(t: number, name?: string, options?: { loop?: boolean }): string;
+            scene(t: number, options: { loop?: boolean }): string;
+            /** Makes a scene (named by its name or its time) loop, or with false stop as usual. */
+            loopScene(scene: string | number, loop?: boolean): void;
+            /** A page variable and its starting value (default false); null removes it. Returns every variable. */
+            variable(name: string, value?: boolean | null): Record<string, boolean>;
+            /** The page's variables and their starting values. */
+            variables(): Record<string, boolean>;
             /** Renames a scene (named by its name or its time); clicks that play it follow the new name. */
             renameScene(scene: string | number, name: string): void;
             /** Moves a scene (named by its name or its time) to t seconds. */
@@ -523,7 +547,7 @@ extension DottieScript {
             /** The element's center travels along path (a connector's route or a shape's outline) from t. */
             follow(id: Ref, path: Ref, t: number, options?: { duration?: number; ease?: Ease; reverse?: boolean; orient?: boolean; laps?: number }): void;
             /** A dot, or a pill with a label, that runs along the connector; returns it. */
-            packet(connector: Ref, t: number, options?: { duration?: number; color?: Color; size?: number; label?: string }): Element;
+            packet(connector: Ref, t: number, options?: { duration?: number; color?: Color; size?: number; label?: string; when?: Condition }): Element;
             /** Reveals every shape in connector order. */
             animateBuild(options?: { transition?: TransitionName; start?: number; stagger?: number; packets?: boolean; drawArrows?: boolean; travel?: number }): void;
         }

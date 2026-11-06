@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -85,6 +85,8 @@ class Page:
             kw["connector"]["hops"] = hops
         if text:
             kw["text"] = text
+        if when is not None:
+            kw["when"] = when
         return self.add("connector", 0, 0, 0, 0, style=st or style(), layer=layer, **kw)
 
     def animate(self, duration, fps=12, **kw):
@@ -562,6 +564,39 @@ def clicks():
     write(JS_ONLY / "hostile-clicks.dottie", [h])
 
 
+def state():
+    """Page variables and looping scenes: elements with a `when` drawn only while it holds (at the variables' starting
+    values here), connectors and packets that go with them, clicks that set and toggle, a looping scene, and a page
+    with no timeline whose state still hides things."""
+    p = Page("Regions")
+    p.animate(4, fps=10)
+    p.timeline["markers"] = [{"t": 0, "name": "Live", "loop": True}, {"t": 2, "name": "Outage"}]
+    p.extra = {"variables": {"down": False, "maint": True}}
+    east = p.add("rectangle", 40, 40, 120, 60, text="east", click={"toggle": "down"})
+    west = p.add("rectangle", 300, 40, 120, 60, text="west", when="!down")
+    backup = p.add("rectangle", 300, 180, 120, 60, text="backup", when="down",
+                   click={"set": {"maint": False}, "scene": "outage"})
+    p.add("rectangle", 40, 180, 120, 60, text="maint", when="down || maint && !down", click={"toggle": ["down", "maint"]})
+    p.add("rectangle", 40, 300, 120, 60, text="broken", when="down |")
+    p.add("ellipse", 300, 300, 60, 60, text="unknown", when="!nobody")
+    live = p.connect(east, west, text="live")
+    p.connect(east, backup, text="standby")
+    keyed = p.connect(east, backup, routing="curved", when="!down")
+    p.track(keyed, [{"t": 0, "visible": True}, {"t": 3, "visible": False}])
+    dot = p.add("ellipse", 0, 0, 14, 14, style=style(fill=rgba(0.2, 0.5, 1)), when="!down")
+    p.track(dot, [{"t": 0, "visible": True}], follow=[{"path": live, "start": 0, "end": 2}])
+    gone = p.add("ellipse", 0, 0, 14, 14, style=style(fill=rgba(1, 0.4, 0.2)), when="down")
+    p.track(gone, [{"t": 0, "visible": True}], follow=[{"path": live, "start": 1, "end": 3}])
+
+    q = Page("Still")
+    q.extra = {"variables": {"on": True}}
+    a = q.add("rectangle", 40, 40, 120, 60, text="on", when="on")
+    b = q.add("rectangle", 240, 40, 120, 60, text="off", when="!on")
+    q.connect(a, b, text="between")
+    q.add("diamond", 40, 160, 120, 80, text="flip", click={"toggle": "on"})
+    write(EDGE / "state.dottie", [p, q])
+
+
 def links():
     """Links out of the drawing (`url`): web and mail addresses become <a> in SVG and clicks in the web players, faded
     and turned shapes keep their link around the whole element, a symbol's parts keep theirs, and links that must do
@@ -934,6 +969,7 @@ def main():
     fonts()
     waypoints()
     text_colors()
+    state()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

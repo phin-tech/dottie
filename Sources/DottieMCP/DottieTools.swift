@@ -51,6 +51,39 @@ private let lookProps: [String: Value] = [
                         + "update_element recolors the label too, as in Excalidraw"),
 ]
 
+/// The look fields a connector takes, for build_diagram's edges.
+private let edgeLookProps = lookProps.filter { ["dash", "stroke_width", "bowing", "start_head", "end_head", "font", "font_size", "hops",
+                                                 "text_color"].contains($0.key) }
+
+/// build_diagram's edge fields: what a connector is made with, and its look.
+private let buildEdgeProps: [String: Value] = {
+    let own: [String: Value] = [
+        "from": prop("string", "Source node key"),
+        "to": prop("string", "Target node key"),
+        "routing": prop("string", "Default elbow", enum: routingValues),
+        "arrow": prop("boolean", "Arrowhead at the target, default true"),
+        "label": prop("string", "Text shown on the connector, e.g. \"yes\""),
+        "stroke": prop("string", "Hex line color, e.g. #888888"),
+        "when": whenProp,
+    ]
+    return own.merging(edgeLookProps) { a, _ in a }
+}()
+
+private let clickSetDescription = "When played on the web, clicking this element gives these page variables (see "
+    + "set_variable) these values, e.g. {\"down\": true}, without stopping or moving the animation. "
+    + "Combines with click_scene or click_url. Any click_ field replaces the whole click"
+private let clickSetProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+                                           "description": .string(clickSetDescription)])
+private let clickToggleDescription = "Page variables a click flips, e.g. \"down\": a button that takes a region down "
+    + "and back while packets keep flowing"
+private let clickToggleProp: Value = .object(["type": .array(["string", "array"]), "items": .object(["type": "string"]),
+                                              "description": .string(clickToggleDescription)])
+
+private let whenProp = prop("string", "A condition on the page's variables (see set_variable), like \"down\", \"!down\" or "
+    + "\"east && !west || maint\": the element, and connectors attached to it, is drawn only while it holds. On the web a click "
+    + "that sets or toggles a variable shows and hides it without stopping the animation; exports show the starting values. "
+    + "Empty string removes it")
+
 private struct ToolFailure: Error { var message: String }
 
 extension Tool.Content {
@@ -77,6 +110,25 @@ private struct Args {
             else { throw ToolFailure(message: "'\(k).\(name)' must be text") }
         }
         return out.isEmpty ? nil : out
+    }
+
+    /// Variable names to true or false (click_set).
+    func flags(_ k: String) throws -> [String: Bool]? {
+        guard let v = raw[k], !v.isNull else { return nil }
+        guard let d = v.objectValue else { throw ToolFailure(message: "'\(k)' must be an object of variable names to true or false") }
+        return try d.mapValues { x in
+            guard let b = x.boolValue else { throw ToolFailure(message: "'\(k)' values must be true or false") }
+            return b
+        }
+    }
+    /// One name or a list of them (click_toggle).
+    func names(_ k: String) throws -> [String]? {
+        guard let v = raw[k], !v.isNull else { return nil }
+        if let one = v.stringValue { return one.isEmpty ? [] : [one] }
+        guard let list = v.arrayValue?.compactMap(\.stringValue), list.count == v.arrayValue?.count else {
+            throw ToolFailure(message: "'\(k)' must be a variable name or a list of them")
+        }
+        return list
     }
 
     func require(_ k: String) throws -> String {
@@ -179,13 +231,7 @@ actor DottieTools {
                 ])]),
                 "edges": .object(["type": "array", "description": "Connectors between node keys", "items": .object([
                     "type": "object",
-                    "properties": .object([
-                        "from": prop("string", "Source node key"),
-                        "to": prop("string", "Target node key"),
-                        "routing": prop("string", "Default elbow", enum: routingValues),
-                        "arrow": prop("boolean", "Arrowhead at the target, default true"),
-                        "label": prop("string", "Text shown on the connector, e.g. \"yes\""),
-                    ]),
+                    "properties": .object(buildEdgeProps),
                     "required": ["from", "to"],
                 ])]),
                 "direction": prop("string", "TB = top to bottom (default), LR = left to right", enum: ["TB", "LR"]),
@@ -216,6 +262,7 @@ actor DottieTools {
                 "text": prop("string", "Label (Markdown for a note)"),
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
+                "when": whenProp,
              ].merging(lookProps) { a, _ in a }, required: ["path", "x", "y"])),
         Tool(name: "add_image",
              description: "Place a picture (PNG, JPEG, HEIC, GIF, TIFF, …) from a file with its top-left corner at x, y. "
@@ -239,6 +286,7 @@ actor DottieTools {
                 "from_port": prop("string", "Pins the start: top, right, bottom or left, or the number of one of an extension "
                     + "shape's connection points (\"0\" up, in the order the shape declares them). Default: follows the edge"),
                 "to_port": prop("string", "Pins the end, like from_port"),
+                "when": whenProp,
              ].merging(lookProps) { a, _ in a }, required: ["path", "from_id", "to_id"])),
         Tool(name: "update_element",
              description: "Change text (a connector's text is its label), position, size, colors, look or routing of an element, "
@@ -262,6 +310,9 @@ actor DottieTools {
                     + "jumps to the scene of this name (see add_scene) and plays on to the next one. Empty string removes the click"),
                 "click_url": prop("string", "When played on the web, clicking this element opens this http(s) or mailto link in a "
                     + "new tab. Empty string removes the click"),
+                "click_set": clickSetProp,
+                "click_toggle": clickToggleProp,
+                "when": whenProp,
                 "hover_stroke": prop("string", "Hex stroke color while the pointer is over a clickable element; empty string clears it"),
                 "hover_fill": prop("string", "Hex fill color while the pointer is over a clickable element; empty string clears it"),
                 "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
@@ -270,6 +321,18 @@ actor DottieTools {
                 "args": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                  "description": "For a symbol instance: its values for the symbol's params, replacing the ones it had ({} clears them)"]),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "set_variable",
+             description: "Add, change or remove a page variable: a true-or-false value that clicks change on the web "
+                + "(update_element click_set / click_toggle) and elements follow (update_element when, send_packet when). "
+                + "This is how a diagram that keeps looping reacts to clicks: \"take a region down\" hides its shapes, "
+                + "connectors and packets, shows others, and the animation never stops. Exports and previews show the "
+                + "starting values; the HTML export and <dottie-player> change them on click.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "name": prop("string", "Letters, digits and _, not starting with a digit, e.g. eastDown"),
+                "value": prop("boolean", "Its starting value (default false)"),
+                "remove": prop("boolean", "Remove the variable instead (elements and clicks that name it are left as they are)"),
+             ], required: ["path", "name"])),
         Tool(name: "list_extensions",
              description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
                 + "commands, or why it did not load. Shapes are added with add_shape (extension, shape, params); commands run with run_command.",
@@ -494,6 +557,7 @@ actor DottieTools {
                 "color": prop("string", "Hex color (default orange-red)"),
                 "label": prop("string", "Text to carry, short"),
                 "every": prop("number", "Send it again every this many seconds, forever"),
+                "when": whenProp,
              ], required: ["path", "connector_id", "t"])),
         Tool(name: "set_camera",
              description: "Point the exported view (GIF, MP4, HTML) at part of the page from time t, easing from the previous "
@@ -515,7 +579,10 @@ actor DottieTools {
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "t": prop("number", "Second of the scene"),
-                "name": prop("string", "What the scene shows; default Scene n"),
+                "name": prop("string", "What the scene shows; default Scene n. Clicks (click_scene) play it by this name"),
+                "loop": prop("boolean", "A looping scene: playing doesn't stop on entering it, and at its end (the next scene, "
+                    + "or the end) goes back to its start, until a click or next leaves it. For clicks that switch between "
+                    + "states that keep moving; set_variable is usually simpler"),
              ], required: ["path", "t"])),
         Tool(name: "update_scene",
              description: "Rename, move or remove one of the page's scenes (see add_scene). Renaming keeps the clicks that "
@@ -525,6 +592,7 @@ actor DottieTools {
                 "scene": prop("string", "The scene: its name, or the second it is at"),
                 "name": prop("string", "Its new name"),
                 "t": prop("number", "The second to move it to"),
+                "loop": prop("boolean", "true makes it a looping scene (see add_scene), false stops at it again"),
                 "remove": prop("boolean", "Remove the scene instead"),
              ], required: ["path", "scene"])),
         Tool(name: "clear_animation",
@@ -544,11 +612,12 @@ actor DottieTools {
                 + "you can check it.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
-                "out_path": prop("string", "Absolute path ending in .gif, .apng, .mp4, .json (Lottie) or .html"),
+                "out_path": prop("string", "Absolute path ending in .gif, .apng, .mp4, .json (Lottie) or .html; or .png for a "
+                    + "still of the poster frame (or of `preview`), e.g. a thumbnail"),
                 "lottie_mode": prop("string", "For .json: smooth (default; tweened, lines held steady) or exact "
                                     + "(every frame as the GIF draws it, boil included)", enum: Exporter.LottieMode.allCases.map(\.rawValue)),
-                "scale": prop("number", "Pixel scale for gif, apng and mp4, 0.25 to 4 (default 1.5)"),
-                "transparent": prop("boolean", "No page background (apng and json only)"),
+                "scale": prop("number", "Pixel scale for gif, apng, mp4 and png, 0.25 to 4 (default 1.5)"),
+                "transparent": prop("boolean", "No page background (apng, png and json only)"),
                 "sketchy": prop("boolean", "Override the look for this export only"),
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
              ], required: ["path", "out_path"])),
@@ -737,7 +806,8 @@ actor DottieTools {
             }
             let edges = try (a.array("edges") ?? []).map { e in
                 DiagramOps.EdgeSpec(from: try e.require("from"), to: try e.require("to"),
-                                    routing: try e.routing("routing"), arrow: e.bool("arrow") ?? true, label: e.string("label"))
+                                    routing: try e.routing("routing"), arrow: e.bool("arrow") ?? true, label: e.string("label"),
+                                    look: try e.look(), stroke: try e.color("stroke"), when: e.string("when"))
             }
             let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
             let ids: [String: UUID]
@@ -785,6 +855,9 @@ actor DottieTools {
                                             text: a.string("text"), fill: try a.color("fill"), stroke: try a.color("stroke"),
                                             roughness: a.roughness, look: try a.look())
             }
+            if let w = a.string("when") {
+                do { try DiagramOps.setWhen(&file.pages[p], id: e.id, w) } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
 
@@ -819,6 +892,7 @@ actor DottieTools {
                                                 routing: try a.routing("routing") ?? .straight, arrow: a.bool("arrow") ?? true,
                                                 port: (start.0, end.0), portIndex: (start.1, end.1),
                                                 roughness: a.roughness, label: a.string("label"), look: try a.look())
+                if let w = a.string("when") { try DiagramOps.setWhen(&file.pages[p], id: c.id, w) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("id: \(c.id.uuidString)")
@@ -833,8 +907,9 @@ actor DottieTools {
             if let s = a.string("link") { link = .some(s.isEmpty ? nil : try a.uuid("link")) }
             do {
                 var click: ClickAction?? = nil
-                if a.string("click_scene") != nil || a.string("click_url") != nil {
-                    click = .some(try DiagramOps.click(scene: a.string("click_scene"), url: a.string("click_url")))
+                if a.string("click_scene") != nil || a.string("click_url") != nil || a.raw["click_set"] != nil || a.raw["click_toggle"] != nil {
+                    click = .some(try DiagramOps.click(scene: a.string("click_scene"), url: a.string("click_url"),
+                                                       set: try a.flags("click_set"), toggle: try a.names("click_toggle")))
                 }
                 var hover: HoverLook?? = nil
                 if a.string("hover_stroke") != nil || a.string("hover_fill") != nil || a.double("hover_opacity") != nil {
@@ -857,11 +932,24 @@ actor DottieTools {
                                       url: a.string("url").map { Optional($0) },
                                       anchor: a.string("anchor").map { Optional($0) }, click: click, hover: hover,
                                       otherPages: file.pages)
+                if let w = a.string("when") { try DiagramOps.setWhen(&file.pages[p], id: id, w) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
             let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
             try save(file, to: url)
             return text((["Updated"] + problems).joined(separator: "\n"))
+
+        case "set_variable":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let name = try a.require("name")
+            do {
+                try file.pages[p].setVariable(name, to: a.bool("remove") == true ? nil : (a.bool("value") ?? false))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let vars = (file.pages[p].variables ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
+            return text("Variables: " + (vars.isEmpty ? "none" : vars.joined(separator: ", ")) + on(file, p))
 
         case "script_api":
             if a.string("format") == "typescript" { return text(DottieScript.typeDefinitions) }
@@ -1073,7 +1161,11 @@ actor DottieTools {
         case "list_elements":
             let file = try load(try fileURL(a))
             let p = try pageIndex(file, a)
-            let list = try json(DiagramOps.summarize(file.pages[p]))
+            var list = try json(DiagramOps.summarize(file.pages[p]))
+            if let vars = file.pages[p].variables, !vars.isEmpty {
+                list = "Variables (starting values): " + vars.sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
+                    .joined(separator: ", ") + "\n" + list
+            }
             guard file.pages.count > 1 else { return text(list) }
             return text("Page \"\(file.pages[p].name)\" (\(p + 1) of \(file.pages.count); see list_pages for the others).\n" + list)
 
@@ -1169,8 +1261,8 @@ actor DottieTools {
             }
             let raw = try a.require("out_path")
             let ext = URL(fileURLWithPath: raw).pathExtension.lowercased()
-            guard ["gif", "apng", "mp4", "json", "html"].contains(ext) else {
-                throw ToolFailure(message: "'out_path' must end in .gif, .apng, .mp4, .json or .html")
+            guard ["gif", "apng", "mp4", "json", "html", "png"].contains(ext) else {
+                throw ToolFailure(message: "'out_path' must end in .gif, .apng, .mp4, .json, .html or .png (a still of the poster frame, or of preview)")
             }
             let lottieMode = try a.string("lottie_mode").map { s -> Exporter.LottieMode in
                 guard let m = Exporter.LottieMode(rawValue: s) else { throw ToolFailure(message: "'lottie_mode' must be smooth or exact") }
@@ -1181,7 +1273,9 @@ actor DottieTools {
             guard !Exporter.animationTooLong(doc) else {
                 throw ToolFailure(message: "The animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
             }
+            let frame = a.double("preview").map(doc.resolved) ?? doc.still
             let data: Data? = switch ext {
+            case "png": Exporter.png(frame, scale: scale, background: a.bool("transparent") == true ? nil : CGColor(gray: 1, alpha: 1))
             case "gif": Exporter.gif(doc, scale: scale)
             case "apng": Exporter.apng(doc, scale: scale, background: a.bool("transparent") == true ? nil : CGColor(gray: 1, alpha: 1))
             case "mp4": Exporter.mp4(doc, scale: scale)
@@ -1191,9 +1285,9 @@ actor DottieTools {
             guard let data else { throw ToolFailure(message: "Rendering failed") }
             try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: out, options: .atomic)
-            let frame = a.double("preview").map(doc.resolved) ?? doc.still
-            var content: [Tool.Content] = [.plain("Exported \(timeline.frameCount) frames (\(timeline.duration)s at \(timeline.fps) fps) "
-                                                  + "to \(out.path)")]
+            let what = ext == "png" ? "the frame at \(Self.secs(a.double("preview") ?? timeline.poster ?? timeline.duration))"
+                : "\(timeline.frameCount) frames (\(timeline.duration)s at \(timeline.fps) fps)"
+            var content: [Tool.Content] = [.plain("Exported \(what) to \(out.path)")]
             if !frame.elements.isEmpty, let png = Exporter.png(frame, scale: 1) { content.insert(.png(png), at: 0) }
             return .init(content: content)
 
@@ -1292,6 +1386,7 @@ extension DottieTools {
                 if let every = a.double("every"), every.isFinite, every > 0.1 {
                     doc.timeline!.addRepeat(for: dot.id, from: t, to: t + every)
                 }
+                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: dot.id, w) }
                 reply = "id: \(dot.id.uuidString)"
             case "set_camera":
                 ensure()
@@ -1325,11 +1420,12 @@ extension DottieTools {
                 let t = try a.time("t")
                 ensure()
                 let label = a.string("name").flatMap { $0.isEmpty ? nil : $0 } ?? "Scene \((doc.timeline!.markers?.count ?? 0) + 1)"
-                doc.timeline!.addMarker(at: t, name: label)
-                reply = "Scene \"\(label)\" at \(Self.secs(t))"
+                doc.timeline!.addMarker(at: t, name: label, loop: a.bool("loop"))
+                reply = "Scene \"\(label)\" at \(Self.secs(t))" + (a.bool("loop") == true ? ", looping" : "")
             case "update_scene":
                 reply = try DiagramOps.editScene(&doc, scene: try a.require("scene"), rename: a.string("name"),
-                                                 moveTo: a.raw["t"] == nil ? nil : try a.time("t"), remove: a.bool("remove") ?? false)
+                                                 moveTo: a.raw["t"] == nil ? nil : try a.time("t"), loop: a.bool("loop"),
+                                                 remove: a.bool("remove") ?? false)
             default:  // clear_animation
                 if let ids = try a.uuids("ids"), !ids.isEmpty {
                     doc.clearAnimation(of: Set(ids))
@@ -1360,7 +1456,7 @@ extension DottieTools {
             }
         }
         if let cam = tl.camera, !cam.isEmpty { lines.append("camera keys at " + cam.map { secs($0.t) }.joined(separator: ", ")) }
-        if let m = tl.markers, !m.isEmpty { lines.append("scenes: " + m.map { "\(secs($0.t)) \"\($0.name)\"" }.joined(separator: ", ")) }
+        if let m = tl.markers, !m.isEmpty { lines.append("scenes: " + m.map { "\(secs($0.t)) \"\($0.name)\"" + ($0.loop == true ? " (loops)" : "") }.joined(separator: ", ")) }
         return lines.joined(separator: "\n")
     }
 }

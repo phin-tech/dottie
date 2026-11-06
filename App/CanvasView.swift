@@ -2429,7 +2429,7 @@ struct CanvasView: NSViewRepresentable {
             if v.poseSource != document.model || v.poseTime != t {
                 v.poseSource = document.model
                 v.poseTime = t
-                let frame = document.model.posed(at: t)
+                let frame = document.model.posed(at: t, state: .all)
                 if v.model != frame { v.model = frame }
             }
         } else {
