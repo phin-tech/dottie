@@ -35,7 +35,9 @@ final class ScriptTests: XCTestCase {
             return [c.waypoints, c.hops, changed.waypoints.length];
             """, &doc)
         XCTAssertNil(r.error)
-        XCTAssertEqual(r.value, ##"[[{"x":150,"y":120}],true,2]"##)
+        // Dictionaries serialize in any order, so compare what the JSON says rather than its text.
+        let value = try? JSONSerialization.jsonObject(with: Data((r.value ?? "").utf8)) as? NSArray
+        XCTAssertEqual(value, [[["x": 150, "y": 120]], true, 2] as NSArray)
         XCTAssertEqual(doc.elements[2].connector?.waypoints, [Waypoint(x: 150, y: -80), Waypoint(x: 200, y: -80)])
         XCTAssertEqual(doc.elements[2].connector?.hops, true)
         let cleared = run("dottie.update(dottie.elements()[2].id, {waypoints: [], hops: false});", &doc)

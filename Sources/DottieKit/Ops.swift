@@ -51,8 +51,14 @@ public enum DiagramOps {
         public var label: String?
         /// Dash, width and arrowheads beyond `arrow` (e.g. both ends for a two-way link).
         public var look: Look
-        public init(from: String, to: String, routing: Routing? = nil, arrow: Bool = true, label: String? = nil, look: Look = Look()) {
+        /// The line's color; nil is the automatic ink.
+        public var stroke: RGBA?
+        /// A condition on page variables (`Element.when`); nil is always drawn.
+        public var when: String?
+        public init(from: String, to: String, routing: Routing? = nil, arrow: Bool = true, label: String? = nil, look: Look = Look(),
+                    stroke: RGBA? = nil, when: String? = nil) {
             self.from = from; self.to = to; self.routing = routing; self.arrow = arrow; self.label = label; self.look = look
+            self.stroke = stroke; self.when = when
         }
     }
 
@@ -284,6 +290,7 @@ public enum DiagramOps {
         for e in edges where !seen.contains(e.from) || !seen.contains(e.to) {
             throw OpsError.invalid("Edge \(e.from) -> \(e.to) references an unknown node key")
         }
+        let whens = try edges.map { try $0.when.flatMap(PageState.checked) }
 
         let top = doc.elements.isEmpty ? 40 : Exporter.bounds(of: doc, padding: 0).maxY + 80
         let layerID = activeLayerID(&doc)
@@ -329,8 +336,10 @@ public enum DiagramOps {
             }
             let c = try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: routing,
                                      arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label, look: looks[k])
-            if !bends.isEmpty, let i = doc.elements.lastIndex(where: { $0.id == c.id }) {
-                doc.elements[i].connector?.waypoints = bends.map { Waypoint($0) }
+            if let i = doc.elements.lastIndex(where: { $0.id == c.id }) {
+                if !bends.isEmpty { doc.elements[i].connector?.waypoints = bends.map { Waypoint($0) } }
+                if let stroke = edge.stroke { doc.elements[i].style.stroke = stroke }
+                doc.elements[i].when = whens[k]
             }
         }
         return ids
@@ -419,13 +428,17 @@ public enum DiagramOps {
         /// For a connector: the bends it runs through, and whether it hops the lines beneath it.
         public var waypoints: [Waypoint]?
         public var hops: Bool?
+        /// The page variables a click sets and flips, and the condition the element is drawn under.
+        public var clickSet: [String: Bool]? = nil
+        public var clickToggle: [String]? = nil
+        public var when: String? = nil
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
         let index = doc.elementIndex
         return doc.elements.map { e in
             let b = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.frame
-            return ElementSummary(id: e.id.uuidString, kind: e.kind.rawValue,
+            var s = ElementSummary(id: e.id.uuidString, kind: e.kind.rawValue,
                                   x: (b.minX * 10).rounded() / 10, y: (b.minY * 10).rounded() / 10,
                                   width: (b.width * 10).rounded() / 10, height: (b.height * 10).rounded() / 10,
                                   text: e.text, from: e.connector?.start.elementID?.uuidString,
@@ -439,6 +452,8 @@ public enum DiagramOps {
                                   symbol: e.symbol.map { id in doc.symbolIndex[id]?.name ?? id.uuidString },
                                   playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil, args: e.args,
                                   waypoints: e.connector?.waypoints, hops: e.connector?.hops)
+            s.clickSet = e.click?.set; s.clickToggle = e.click?.toggle; s.when = e.when
+            return s
         }
     }
 }

@@ -33,11 +33,16 @@ Elements the drawing makes clickable work with the mouse and the keyboard (Tab, 
 a named scene on to the next one, opens a link in a new tab (only `http`, `https` and `mailto`), or shows the page a
 shape's link points at. Each shows its hover look under the pointer; button symbols show their over and down looks
 and take clicks on their hit area, and a symbol's copy set to play when clicked plays its animation through. Every
-click first fires a cancelable `action` event whose `detail` is `{element, scene | url | page, replay?}`; call
-`preventDefault()` to handle it yourself.
+click first fires a cancelable `action` event whose `detail` is `{element, scene | url | page | state, set?, toggle?,
+replay?}`; call `preventDefault()` to handle it yourself.
+
+A click can also set or toggle the page's variables, which show and hide the elements with a `when` while the
+animation keeps playing: a diagram you leave running that people poke. A looping scene plays round until a click
+or next leaves it, instead of stopping.
 
 The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(elementId)`, `currentTime`
-(settable), `duration`, `paused`, and fires `load`, `frame`, `action` and `error` events. Its page color comes from the drawing's theme; set
+(settable), `duration`, `paused`, `variables` and `setState({name: value})`, and fires `load`, `frame`, `action`,
+`state` (with `{variables}`, after a change) and `error` events. Its page color comes from the drawing's theme; set
 `--dottie-radius` to round it, and style its parts with `::part(stage)` and `::part(controls)`.
 
 Without modules, `dist/dottie-player.min.js` is a classic script that registers the element and sets

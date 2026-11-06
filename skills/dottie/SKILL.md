@@ -71,10 +71,17 @@ Any page can move. Most animations come from a few tools:
 - `add_transition`: an entrance, exit or emphasis for chosen shapes (pop, grow, wipe, draw, fade, pulse, …).
 - `send_packet`: a dot, or a labelled pill such as `POST /orders`, travels along a connector.
 - `set_camera` and `add_scene`: pan and zoom across a large diagram, and stop at named scenes; the HTML export then
-  steps through the scenes like slides.
+  steps through the scenes like slides. `loop: true` makes a scene play round instead of stopping.
 - `add_keyframe` and `set_timeline` for anything else, and `clear_animation` to start over.
 
-`export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page. Watch the GIF before calling
+A diagram that keeps looping and reacts to clicks ("take us-east-1 down while packets keep flowing") uses page
+variables rather than scenes: `set_variable` adds one, `update_element` with `click_toggle` (or `click_set`) makes a
+shape flip it, and `when` on shapes, connectors and `send_packet` packets (`"down"`, `"!down"`) shows each only while
+it holds. Connectors go with a shape the state hides. Exports show the starting values; the HTML export and
+`<dottie-player>` change them on click without stopping.
+
+`export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page, or with `.png` a still of
+the poster frame. Watch the GIF before calling
 an animation finished: timing that reads well in a description often runs too fast or overlaps.
 
 ## The command line

@@ -532,7 +532,8 @@ public enum DottieScript {
                 let edges = try (a.list("edges") ?? []).map { e in
                     DiagramOps.EdgeSpec(from: try e.require("from"), to: try e.require("to"),
                                         routing: try e.enumValue("routing", as: Routing.self),
-                                        arrow: e.bool("arrow") ?? true, label: e.string("label"))
+                                        arrow: e.bool("arrow") ?? true, label: e.string("label"), look: try e.look(),
+                                        stroke: try e.color("stroke"), when: e.string("when"))
                 }
                 let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
                 let ids = try DiagramOps.build(&doc, nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,

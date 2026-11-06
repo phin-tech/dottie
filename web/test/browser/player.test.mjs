@@ -527,3 +527,32 @@ test("the HTML export keeps a hovered button's look steady while it plays", asyn
   assert.equal(seen.join(""), "H".repeat(20));
   await context.close();
 });
+
+test("a click flips a page variable while the page keeps playing; a looping scene goes round", async () => {
+  const { page, errors, close } = await open(`<dottie-player src="/fixtures/edge/state.dottie"></dottie-player>`);
+  await ready(page);
+  const texts = () => page.evaluate(() => [...document.querySelector("dottie-player").shadowRoot.querySelectorAll("svg text")].map((t) => t.textContent));
+  // The first scene loops, so it autoplays and wraps before the second (frame 20) instead of stopping there.
+  let s = await state(page);
+  assert.equal(s.paused, false);
+  await page.waitForFunction(() => document.querySelector("dottie-player").playback.frame >= 15, null, { timeout: 5000 });
+  await page.waitForFunction(() => document.querySelector("dottie-player").playback.frame < 5, null, { timeout: 5000 });
+  assert.equal((await state(page)).paused, false);
+  assert.ok((await texts()).includes("west"));
+  assert.ok(!(await texts()).includes("backup"));
+  // Clicking east toggles down: west goes, backup comes, and it never stops.
+  const changed = page.evaluate(() => new Promise((resolve) => document.querySelector("dottie-player")
+    .addEventListener("state", (e) => resolve(e.detail.variables), { once: true })));
+  await page.evaluate(() => {
+    const p = document.querySelector("dottie-player");
+    p.shadowRoot.querySelector(`[aria-label="east"]`).dispatchEvent(new MouseEvent("click", { bubbles: true, composed: true }));
+  });
+  assert.deepEqual(await changed, { down: true, maint: true });
+  assert.ok((await texts()).includes("backup"));
+  assert.ok(!(await texts()).includes("west"));
+  s = await state(page);
+  assert.equal(s.paused, false);
+  assert.deepEqual(await page.evaluate(() => document.querySelector("dottie-player").variables), { down: true, maint: true });
+  assert.deepEqual(errors, []);
+  await close();
+});

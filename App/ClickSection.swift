@@ -38,8 +38,20 @@ struct ClickSection: View {
             .help(markers.isEmpty ? "Add Scene Marker names the moments a click can play from"
                   : "In the exported web page and <dottie-player>, a click plays this scene on to the next one")
             if choice.wrappedValue == .link {
-                LinkField(url: shared?.url ?? "") { url in set(url.isEmpty ? nil : ClickAction(url: url), "Set Click Link") }
+                LinkField(url: shared?.url ?? "") { url in set(keepingState(ClickAction(url: url.isEmpty ? nil : url)), "Set Click Link") }
             }
+            // Page variables: a click flips them while the page keeps playing, and shapes show only while their
+            // condition holds (see PageState).
+            CommitField(label: "Toggles", prompt: "variable names", value: (shared?.toggle ?? []).joined(separator: " "),
+                        problem: { names($0) == nil ? "Names are letters, digits and _, not starting with a digit." : nil }) { text in
+                setToggles(names(text) ?? [])
+            }
+            .help("On the web, a click flips these page variables without stopping the animation")
+            CommitField(label: "Shown when", prompt: "e.g. !down", value: sharedWhen ?? "",
+                        problem: { (try? PageState.checked($0)) == nil ? "Variable names, each optionally after !, joined by && or ||." : nil }) { text in
+                edit(text.isEmpty ? "Always Show" : "Show When") { $0.when = try? PageState.checked(text) }
+            }
+            .help("Drawn only while this holds; exports and previews use the variables' starting values")
             // A symbol's copy shows its button's over state instead (see the Symbol section).
             if shared != nil, !selected.contains(where: { $0.kind == .symbol }) {
                 Toggle("Highlight on hover", isOn: hoverOn)
@@ -64,11 +76,43 @@ struct ClickSection: View {
             set: { c in
                 choosingLink = c == .link
                 switch c {
-                case .none: set(nil, "Remove Click")
-                case .scene(let name): set(ClickAction(scene: name), "Click Plays Scene")
-                case .link: if shared?.url == nil, shared != nil { set(nil, "Remove Click") }
+                case .none: set(keepingState(ClickAction()), "Remove Click")
+                case .scene(let name): set(keepingState(ClickAction(scene: name)), "Click Plays Scene")
+                case .link: if shared?.url == nil, shared != nil { set(keepingState(ClickAction()), "Remove Click") }
                 }
             })
+    }
+
+    /// The condition the selection shares, if every selected element has the same one.
+    private var sharedWhen: String? {
+        guard let first = selected.first?.when, selected.allSatisfy({ $0.when == first }) else { return nil }
+        return first
+    }
+
+    /// `click` with the variables the shared click sets and toggles, or nil when that leaves it doing nothing.
+    private func keepingState(_ click: ClickAction) -> ClickAction? {
+        var c = click
+        c.set = shared?.set; c.toggle = shared?.toggle
+        return c.isEmpty ? nil : c
+    }
+
+    /// Names typed apart by spaces or commas; nil when one isn't a variable name.
+    private func names(_ text: String) -> [String]? {
+        let list = text.split(whereSeparator: { $0 == "," || $0.isWhitespace }).map(String.init)
+        return list.allSatisfy(PageState.isName) ? list : nil
+    }
+
+    /// Makes the selection's clicks flip `toggles`, adding any variable the page doesn't have yet (starting false).
+    private func setToggles(_ toggles: [String]) {
+        var next = document.model
+        for name in toggles where next.variables?[name] == nil { try? next.setVariable(name, to: false) }
+        for i in next.elements.indices where selection.contains(next.elements[i].id) {
+            var c = next.elements[i].click ?? ClickAction()
+            c.toggle = toggles.isEmpty ? nil : toggles
+            next.elements[i].click = c.isEmpty ? nil : c
+            if next.elements[i].click == nil { next.elements[i].hover = nil }
+        }
+        document.commit(next, actionName: toggles.isEmpty ? "Remove Toggle" : "Click Toggles", undoManager: undoManager)
     }
 
     private func set(_ click: ClickAction?, _ name: String) {
@@ -111,6 +155,35 @@ struct ClickSection: View {
                     e.hover = look
                 }
             })
+    }
+}
+
+/// Text committed on Return or when the field loses focus, and only when `problem` has nothing to say about it.
+private struct CommitField: View {
+    var label: String
+    var prompt: String
+    var value: String
+    var problem: (String) -> String?
+    var commit: (String) -> Void
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var issue: String? { trimmed.isEmpty ? nil : problem(trimmed) }
+
+    var body: some View {
+        TextField(label, text: $text, prompt: Text(prompt))
+            .focused($focused)
+            .onSubmit(save)
+            .onChange(of: focused) { _, now in if !now { save() } }
+            .onAppear { text = value }
+            .onChange(of: value) { _, n in if !focused { text = n } }
+        if let issue { Text(issue).font(.caption).foregroundStyle(.red) }
+    }
+
+    private func save() {
+        guard issue == nil, trimmed != value else { return }
+        commit(trimmed)
     }
 }
 
