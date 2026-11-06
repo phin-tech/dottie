@@ -303,39 +303,70 @@ public enum DiagramOps {
             added.append(e)
         }
         var tmp = DottieDocument(layers: doc.layers, elements: added)
-        let pairs = edges.map { (ids[$0.from]!, ids[$0.to]!) }
-        Layout.layered(&tmp, edges: pairs, direction: direction)
+        let looks = edges.map { edge -> Look in var l = edge.look; l.font = l.font ?? font; return l }
+        let laid = edges.enumerated().map { k, edge in
+            Layout.Edge(from: ids[edge.from]!, to: ids[edge.to]!, label: labelSize(edge.label, look: looks[k], layerID: layerID))
+        }
+        let lanes = Layout.layered(&tmp, edges: laid, direction: direction)
         var origin = Exporter.bounds(of: tmp, padding: 0).origin
         if tmp.elements.isEmpty { origin = .zero }
+        let shift = CGPoint(x: 40 - origin.x, y: top - origin.y)
         for var e in tmp.elements {
-            e.x += 40 - origin.x; e.y += top - origin.y
+            e.x += shift.x; e.y += shift.y
             doc.elements.append(e)
         }
-        let placed = doc.elementIndex
-        for edge in edges {
-            // Ports follow the flow direction so laid-out diagrams read as clean flowcharts. An edge that goes
-            // back up the flow (a loop) leaves and enters from the side instead of cutting through the shapes between.
+        let pairs = Set(laid.map { [$0.from, $0.to] })
+        for (k, edge) in edges.enumerated() {
+            // Ports follow the flow direction so laid-out diagrams read as clean flowcharts, and an edge that skips
+            // ranks runs through its lane between them (see Layout.layered).
+            let routing = edge.routing ?? defaultRouting
             var ports: (Port?, Port?) = direction == .topToBottom ? (.bottom, .top) : (.right, .left)
-            if let a = placed[ids[edge.from]!]?.frame, let b = placed[ids[edge.to]!]?.frame,
-               direction == .topToBottom ? b.minY < a.maxY : b.minX < a.maxX {
-                ports = direction == .topToBottom ? (.right, .right) : (.bottom, .bottom)
+            var bends: [CGPoint] = []
+            if let lane = lanes[k] {
+                let r = Layout.route(lane, routing: routing, direction: direction, twin: pairs.contains([laid[k].to, laid[k].from]))
+                ports = (r.0, r.1)
+                bends = r.2.map { CGPoint(x: $0.x + shift.x, y: $0.y + shift.y) }
             }
-            try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: edge.routing ?? defaultRouting,
-                             arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label,
-                             look: { var l = edge.look; l.font = l.font ?? font; return l }())
+            let c = try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: routing,
+                                     arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label, look: looks[k])
+            if !bends.isEmpty, let i = doc.elements.lastIndex(where: { $0.id == c.id }) {
+                doc.elements[i].connector?.waypoints = bends.map { Waypoint($0) }
+            }
         }
         return ids
     }
 
-    /// Re-lays out every shape using the existing connectors as edges. Their bends were placed for the old layout,
-    /// so they go.
+    /// The size a connector label `text` takes with `look` (nil for no label), for making room for it.
+    private static func labelSize(_ text: String?, look: Look, layerID: UUID) -> CGSize? {
+        guard let text, !text.isEmpty else { return nil }
+        var probe = Element(kind: .connector, frame: .zero, layerID: layerID, text: text)
+        look.apply(to: &probe)
+        return Renderer.labelSize(for: probe)
+    }
+
+    /// Re-lays out every shape using the existing connectors as edges. Their bends and ports were placed for the old
+    /// layout, so they go: a connector between two shapes is pinned along the new flow and runs through its lane, as
+    /// `build` lays one out. An end on an extension shape's numbered connection point keeps it.
     public static func autoLayout(_ doc: inout DottieDocument, direction: LayoutDirection = .topToBottom) {
-        let edges: [(UUID, UUID)] = doc.elements.compactMap { e in
-            guard let c = e.connector, let a = c.start.elementID, let b = c.end.elementID else { return nil }
-            return (a, b)
+        let connectors = doc.elements.indices.filter {
+            doc.elements[$0].connector?.start.elementID != nil && doc.elements[$0].connector?.end.elementID != nil
         }
-        Layout.layered(&doc, edges: edges, direction: direction)
+        let laid = connectors.map { i -> Layout.Edge in
+            let e = doc.elements[i]
+            return Layout.Edge(from: e.connector!.start.elementID!, to: e.connector!.end.elementID!,
+                               label: (e.text ?? "").isEmpty ? nil : Renderer.labelSize(for: e))
+        }
+        let lanes = Layout.layered(&doc, edges: laid, direction: direction)
         for i in doc.elements.indices where doc.elements[i].connector?.waypoints != nil { doc.elements[i].connector?.waypoints = nil }
+        let pairs = Set(laid.map { [$0.from, $0.to] })
+        for (k, i) in connectors.enumerated() {
+            guard let lane = lanes[k], var c = doc.elements[i].connector else { continue }
+            let r = Layout.route(lane, routing: c.routing, direction: direction, twin: pairs.contains([laid[k].to, laid[k].from]))
+            if c.start.portIndex == nil { c.start.port = r.0 }
+            if c.end.portIndex == nil { c.end.port = r.1 }
+            c.waypoints = r.2.isEmpty ? nil : r.2.map { Waypoint($0) }
+            doc.elements[i].connector = c
+        }
     }
 
     // MARK: Inspection
@@ -412,96 +443,3 @@ public enum DiagramOps {
     }
 }
 
-/// Simple layered (Sugiyama-lite) layout: longest-path ranks, barycenter ordering, centered ranks.
-public enum Layout {
-    public static func layered(_ doc: inout DottieDocument, edges: [(UUID, UUID)], direction: LayoutDirection,
-                               rankGap: Double = 90, nodeGap: Double = 50) {
-        let nodeIdx = doc.elements.indices.filter { doc.elements[$0].kind != .connector }
-        guard !nodeIdx.isEmpty else { return }
-        let ids = nodeIdx.map { doc.elements[$0].id }
-        let pos = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
-
-        // Keep edges between known nodes; drop self-loops and duplicates.
-        var seenEdge = Set<[Int]>()
-        var out = [[Int]](repeating: [], count: ids.count)
-        for (a, b) in edges {
-            guard let i = pos[a], let j = pos[b], i != j, seenEdge.insert([i, j]).inserted else { continue }
-            out[i].append(j)
-        }
-
-        // Break cycles with DFS: ignore back edges.
-        var state = [Int](repeating: 0, count: ids.count) // 0 new, 1 on stack, 2 done
-        var dag = [[Int]](repeating: [], count: ids.count)
-        func visit(_ u: Int) {
-            state[u] = 1
-            for v in out[u] {
-                if state[v] == 1 { continue }
-                dag[u].append(v)
-                if state[v] == 0 { visit(v) }
-            }
-            state[u] = 2
-        }
-        for u in ids.indices where state[u] == 0 { visit(u) }
-
-        // Longest-path ranking in topological order.
-        var indeg = [Int](repeating: 0, count: ids.count)
-        for u in dag.indices { for v in dag[u] { indeg[v] += 1 } }
-        var rank = [Int](repeating: 0, count: ids.count)
-        var queue = ids.indices.filter { indeg[$0] == 0 }
-        var head = 0
-        while head < queue.count {
-            let u = queue[head]; head += 1
-            for v in dag[u] {
-                rank[v] = max(rank[v], rank[u] + 1)
-                indeg[v] -= 1
-                if indeg[v] == 0 { queue.append(v) }
-            }
-        }
-
-        let maxRank = rank.max() ?? 0
-        var layers = [[Int]](repeating: [], count: maxRank + 1)
-        for u in ids.indices { layers[rank[u]].append(u) }
-
-        // Barycenter sweeps to cut crossings.
-        var preds = [[Int]](repeating: [], count: ids.count)
-        for u in dag.indices { for v in dag[u] { preds[v].append(u) } }
-        var order = [Int](repeating: 0, count: ids.count)
-        func reindex() { for l in layers { for (k, u) in l.enumerated() { order[u] = k } } }
-        reindex()
-        for _ in 0..<4 {
-            for r in 1..<max(layers.count, 1) where r < layers.count {
-                layers[r].sort { a, b in
-                    func bc(_ n: Int) -> Double {
-                        preds[n].isEmpty ? Double(order[n]) : preds[n].map { Double(order[$0]) }.reduce(0, +) / Double(preds[n].count)
-                    }
-                    let (x, y) = (bc(a), bc(b))
-                    return x == y ? a < b : x < y
-                }
-                reindex()
-            }
-        }
-
-        // Coordinates: along-rank axis is "breadth", across ranks is "depth".
-        func size(_ u: Int) -> (breadth: Double, depth: Double) {
-            let f = doc.elements[nodeIdx[u]].frame
-            return direction == .topToBottom ? (f.width, f.height) : (f.height, f.width)
-        }
-        let breadths = layers.map { l in l.map { size($0).breadth }.reduce(0, +) + Double(max(l.count - 1, 0)) * nodeGap }
-        let widest = breadths.max() ?? 0
-        var depthCursor = 0.0
-        for (r, l) in layers.enumerated() {
-            let layerDepth = l.map { size($0).depth }.max() ?? 0
-            var cursor = (widest - breadths[r]) / 2
-            for u in l {
-                let s = size(u)
-                let depth = depthCursor + (layerDepth - s.depth) / 2
-                var f = doc.elements[nodeIdx[u]].frame
-                if direction == .topToBottom { f.origin = CGPoint(x: cursor, y: depth) }
-                else { f.origin = CGPoint(x: depth, y: cursor) }
-                doc.elements[nodeIdx[u]].frame = f
-                cursor += s.breadth + nodeGap
-            }
-            depthCursor += layerDepth + rankGap
-        }
-    }
-}

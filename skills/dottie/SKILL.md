@@ -90,6 +90,9 @@ dottie inspect diagram.dottie                      # every element's resolved fr
 dottie script-types ./types                        # dottie.d.ts, the types of the scripting API
 ```
 
+With the drawing open in the app, `render` and `inspect` read the app's copy, so MCP edits show up before the file
+is saved; `--disk` reads the saved file instead.
+
 ## On a web page
 
 `dottie render diagram.dottie -f js` writes one script holding the drawing and the player: `<script

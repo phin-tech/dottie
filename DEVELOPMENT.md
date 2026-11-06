@@ -325,5 +325,7 @@ dottie ext check my.dottieext                     # load an extension and try it
 
 `dottie render diagram.dottie -f js` writes the page and dottie.js's player as one script (see dottie.js below).
 `dottie inspect diagram.dottie --at 1.5` prints the page's resolved geometry as JSON (see dottie.js above).
-`--clean` / `--sketchy` override the look and `--transparent` drops the background. It reads the file on disk,
-not unsaved edits in the app.
+`--clean` / `--sketchy` override the look and `--transparent` drops the background. When the app has the file
+open, `render` and `inspect` read that window over the live socket (`LiveClient.current`), unsaved and MCP edits
+included, and say so on stderr when it differs from the file; `--disk` reads the saved file. `just goldens` passes
+`--disk`, so a fixture open in the app can't leak into the goldens.
