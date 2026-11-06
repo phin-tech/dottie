@@ -352,6 +352,7 @@ func runLibrary(_ args: [String]) -> Int32 {
 
 func runScriptTypes(_ args: [String]) -> Int32 {
     guard args.count <= 1 else { fail("script-types takes at most one directory", code: 2) }
+    if let a = args.first, a.hasPrefix("-") { fail("unknown option '\(a)' for script-types. Run 'dottie --help'.", code: 2) }
     let dir = args.first.map(absolute) ?? DottieScript.scriptsDirectory
     do {
         for url in try DottieScript.writeTypes(to: dir) { print("Wrote \(url.path)") }
@@ -448,6 +449,11 @@ func runExtension(_ args: [String]) -> Int32 {
 }
 
 let argv = Array(CommandLine.arguments.dropFirst())
+// `dottie <command> --help` prints the usage, rather than reading --help as a file or folder.
+if argv.count > 1, argv.dropFirst().contains(where: { $0 == "-h" || $0 == "--help" }) {
+    print(usage, terminator: "")
+    exit(0)
+}
 switch argv.first {
 case nil, "-h", "--help", "help":
     print(usage, terminator: "")
