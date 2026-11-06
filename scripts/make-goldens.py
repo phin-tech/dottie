@@ -50,7 +50,7 @@ def generate(out, dottie):
         shutil.copyfile(src, design / src.name)
     for group in GROUPS:
         for f in sorted((out / group).glob("*.dottie")):
-            inspected = subprocess.run([dottie, "inspect", f], check=True, capture_output=True, text=True).stdout
+            inspected = subprocess.run([dottie, "inspect", f, "--disk"], check=True, capture_output=True, text=True).stdout
             target = out / "goldens" / group / (f.stem + ".json")
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(inspected)
@@ -59,7 +59,7 @@ def generate(out, dottie):
                     for look in ["clean", "sketchy"]:
                         svg = out / "goldens" / "svg" / group / f"{f.stem}-p{page['page']}-t{stamp(t)}-{look}.svg"
                         svg.parent.mkdir(parents=True, exist_ok=True)
-                        cmd = [dottie, "render", f, "-f", "svg", "-p", str(page["page"]), "--at", str(t), "-o", svg]
+                        cmd = [dottie, "render", f, "-f", "svg", "-p", str(page["page"]), "--at", str(t), "-o", svg, "--disk"]
                         if look == "clean":
                             cmd.append("--clean")
                         subprocess.run(cmd, check=True, capture_output=True)
@@ -67,7 +67,7 @@ def generate(out, dottie):
     html = out / "goldens" / "html"
     html.mkdir(parents=True, exist_ok=True)
     for name in ["clicks", "links", "symbols", "buttons"]:
-        subprocess.run([dottie, "render", out / "edge" / f"{name}.dottie", "-f", "html", "-o", html / f"{name}.html"],
+        subprocess.run([dottie, "render", out / "edge" / f"{name}.dottie", "-f", "html", "-o", html / f"{name}.html", "--disk"],
                        check=True, capture_output=True)
 
 
