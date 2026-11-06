@@ -415,10 +415,15 @@ public enum Renderer {
     /// Where a connector's label sits (and where its in-place editor goes).
     public static func labelRect(for e: Element, in doc: DottieDocument, index: [UUID: Element]? = nil) -> CGRect {
         let m = midpoint(of: e, in: doc, index: index)
+        let s = labelSize(for: e)
+        return CGRect(x: m.x - s.width / 2, y: m.y - s.height / 2, width: s.width, height: s.height)
+    }
+
+    /// How big a connector's label is, wherever it sits.
+    public static func labelSize(for e: Element) -> CGSize {
         let text = e.text ?? ""
         let size = textSize(text.isEmpty ? "Label" : text, fontSize: e.style.fontSize, font: e.style.font, maxWidth: 200)
-        let w = max(size.width + 12, 44), h = size.height + 6
-        return CGRect(x: m.x - w / 2, y: m.y - h / 2, width: w, height: h)
+        return CGSize(width: max(size.width + 12, 44), height: size.height + 6)
     }
 
     static func textSize(_ s: String, fontSize: Double, font family: String? = nil, maxWidth: Double) -> CGSize {
