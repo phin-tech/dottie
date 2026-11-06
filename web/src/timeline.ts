@@ -9,6 +9,7 @@ import {
 } from "./model.ts";
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
+import { type StateChoice, stateHidden } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
 
@@ -213,13 +214,18 @@ function trackMap(tl: Timeline): Map<string, Track> {
 
 /** The page as a still drawing at `t` seconds, symbol instances expanded (DottieDocument.resolved(at:)). A page with
  * no timeline and no instances is returned as is. */
-export function resolved(page: Page, t: number): Page {
-  return expandingSymbols(posed(page, t), clampTime(t));
+export function resolved(page: Page, t: number, state: StateChoice = "initial"): Page {
+  return expandingSymbols(posed(page, t, state), clampTime(t));
 }
 
-/** The page posed at `t` seconds, instances kept (DottieDocument.posed(at:)). */
-export function posed(page: Page, t: number): Page {
-  const timeline = page.timeline;
+/** What a page without a timeline is posed with when its state hides something (Timeline(duration: 0)). */
+const EMPTY_TIMELINE: Timeline = { fps: 12, duration: 0, boil: null, settle: null, poster: null, tracks: [], camera: null, markers: null };
+
+/** The page posed at `t` seconds, instances kept, and the elements whose `when` doesn't hold under `state` left out
+ * with their connectors (DottieDocument.posed(at:state:)). */
+export function posed(page: Page, t: number, state: StateChoice = "initial"): Page {
+  const off = stateHidden(page, state);
+  const timeline = page.timeline ?? (off.size === 0 ? null : EMPTY_TIMELINE);
   if (!timeline) return page;
   t = clampTime(t);
   const tracks = trackMap(timeline);
@@ -227,6 +233,7 @@ export function posed(page: Page, t: number): Page {
     : (Math.trunc(Math.floor(t * clampFPS(timeline.fps) + 1e-9) / Math.max(1, timeline.boil)) % BOIL_DRAWINGS) >>> 0;
   const hidden = new Set<string>();
   for (const tr of tracks.values()) if (!isVisible(tr, t)) hidden.add(tr.element);
+  for (const id of off) hidden.add(id);
   let moving: Set<string> | null = null;
   if (timeline.settle === true) {
     moving = new Set();
@@ -262,14 +269,15 @@ export function posed(page: Page, t: number): Page {
     return track ? following(track, e, t, posed) : e;
   });
   // A connector goes with either shape it is attached to, unless it has visible keys of its own; then both its
-  // ends are pinned where they are now.
+  // ends are pinned where they are now. A shape the page's state leaves out always takes its connectors.
   const current: Page = { ...page, elements, timeline: null };
   const index = indexOf(current);
   const gone = new Set(hidden);
   elements = elements.map((e) => {
     const c = e.connector;
     if (!c || ![c.start.elementID, c.end.elementID].some((id) => id !== null && hidden.has(id))) return e;
-    if (!(tracks.get(e.id)?.keys.some((k) => k.visible !== undefined) ?? false)) { gone.add(e.id); return e; }
+    if (!(tracks.get(e.id)?.keys.some((k) => k.visible !== undefined) ?? false)
+      || [c.start.elementID, c.end.elementID].some((id) => id !== null && off.has(id))) { gone.add(e.id); return e; }
     const [a, b] = endpoints(e, index);
     const pinned = cloneElement(e);
     pinned.connector!.start = { elementID: null, port: c.start.port, x: a.x, y: a.y };
@@ -286,7 +294,7 @@ export function posterTime(page: Page): number {
 
 /** The page as a still picture (its poster frame when animated). */
 export function still(page: Page): Page {
-  return page.timeline ? resolved(page, posterTime(page)) : expandingSymbols(page, 0);
+  return page.timeline ? resolved(page, posterTime(page)) : expandingSymbols(posed(page, 0), 0);
 }
 
 // MARK: Camera, frames and scenes

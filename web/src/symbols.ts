@@ -70,7 +70,7 @@ export function filled(s: Symbol, args: Record<string, string> | null): Symbol {
 
 /** The symbol as a page of its own (Symbol.page). */
 export function symbolPage(s: Symbol): Page {
-  return { id: s.id, name: s.name, layers: s.layers, elements: s.elements, theme: null, timeline: s.timeline, symbols: null };
+  return { id: s.id, name: s.name, layers: s.layers, elements: s.elements, theme: null, timeline: s.timeline, symbols: null, variables: null };
 }
 
 export function hasInstances(page: Page): boolean {

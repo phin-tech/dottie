@@ -281,19 +281,52 @@ extension Exporter {
     .dottie-b:active .dottie-d, .dottie-b.dottie-press .dottie-d { display: inline; }
     """
 
+    /// A self-contained web page that shows the page with dottie.js's player (`script`), which keeps the page's
+    /// variables and redraws as clicks change them.
+    static func statefulPlayer(_ doc: DottieDocument, title: String) -> String? {
+        guard let script = try? script(doc, options: ScriptOptions(label: doc.name)) else { return nil }
+        let page = doc.resolvedTheme?.background ?? RGBA(r: 1, g: 1, b: 1)
+        func h(_ v: Double) -> String { String(format: "%02x", Int((min(max(v, 0), 1) * 255).rounded())) }
+        let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+        return """
+        <!doctype html>
+        <html lang="en">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>\(safeTitle)</title>
+        <style>
+        html, body { margin: 0; min-height: 100%; background: #\(h(page.r))\(h(page.g))\(h(page.b)); }
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; box-sizing: border-box; }
+        dottie-player { width: min(100%, 1200px); }
+        </style>
+        </head>
+        <body>
+        <script>
+        \(script.replacingOccurrences(of: "</script", with: "<\\/script"))</script>
+        </body>
+        </html>
+
+        """
+    }
+
     /// A self-contained web page that plays the page's timeline: every frame as inline SVG, with play/pause,
     /// a scrubber, and the space and arrow keys. It loops, and stays sharp at any size. With scene markers it
     /// becomes a click-through presentation: playing stops at each scene, and next/back (or the arrow keys)
     /// move between scenes. Clickable elements (`Element.click`) jump to their scene or open their link, by
-    /// mouse or keyboard. nil when the animation is too long to export (see `maxAnimationFrames`).
+    /// mouse or keyboard. A looping scene (`Marker.loop`) plays round instead of stopping. A page with variables
+    /// (`DottieDocument.usesState`) is played by dottie.js instead (`statefulPlayer`), since what it shows depends on
+    /// clicks and can't be drawn ahead of time. nil when the animation is too long to export (see `maxAnimationFrames`).
     public static func player(_ doc: DottieDocument, title: String = "Dottie animation") -> String? {
+        if doc.usesState { return statefulPlayer(doc, title: title) }
         guard let plan = animation(doc) else { return nil }
         let timeline = plan.timeline, times = plan.times
         // With reduced motion the player rests on the frame a still would show.
         let poster = timeline.poster ?? timeline.duration
         func nearest(_ t: Double) -> Int { times.indices.min { abs(times[$0] - t) < abs(times[$1] - t) } ?? 0 }
         let posterIndex = nearest(poster)
-        let scenes = (timeline.markers ?? []).map { (frame: nearest($0.t), name: $0.name) }
+        let scenes = (timeline.markers ?? []).map { (frame: nearest($0.t), name: $0.name, loop: $0.loop == true) }
         let page = doc.resolvedTheme?.background ?? RGBA(r: 1, g: 1, b: 1)
         let ink = doc.resolvedTheme?.ink ?? .black
         func hex(_ c: RGBA) -> String {
@@ -368,7 +401,7 @@ extension Exporter {
         </div>
         <script>
         (function () {
-          var times = \(js(times)), scenes = \(js(scenes.map(\.frame))), names = \(js(scenes.map(\.name)));
+          var times = \(js(times)), scenes = \(js(scenes.map(\.frame))), names = \(js(scenes.map(\.name))), loops = \(js(scenes.map(\.loop)));
           var frames = document.querySelectorAll(".f"), n = frames.length, step = 1000 / \(timeline.fps);
           var play = document.getElementById("play"), scrub = document.getElementById("scrub"), time = document.getElementById("time");
           var sceneLabel = document.getElementById("scene"), acts = \(js(actions));
@@ -388,12 +421,17 @@ extension Exporter {
             playing = p && n > 1; play.textContent = playing ? "❚❚" : "▶";
             play.setAttribute("aria-label", playing ? "Pause" : "Play"); last = 0; acc = 0;
           }
-          // With scenes, playing stops on the next scene (and at the end, rather than looping).
+          // The frame after scene s's last: the next scene's, or n after the last.
+          function sceneEnd(s) { for (var j = s + 1; j < scenes.length; j++) if (scenes[j] > scenes[s]) return scenes[j]; return n; }
+          // With scenes, playing stops on the next scene (and at the end, rather than looping). A looping scene
+          // goes round to its start instead, and playing into one doesn't stop.
           function advance() {
-            var next = i + 1;
+            var next = i + 1, s = sceneAt(i);
+            if (s >= 0 && loops[s] && next >= sceneEnd(s)) { show(scenes[s]); return true; }
             if (scenes.length && next >= n) { setPlaying(false); return false; }
             show(next);
-            if (scenes.indexOf(i) >= 0) { setPlaying(false); return false; }
+            var entered = scenes.indexOf(i);
+            if (entered >= 0 && !loops[entered]) { setPlaying(false); return false; }
             return true;
           }
           function tick(now) {
@@ -404,7 +442,12 @@ extension Exporter {
             }
             requestAnimationFrame(tick);
           }
-          function nextScene() { if (i >= n - 1) show(0); setPlaying(true); }
+          function nextScene() {
+            var s = sceneAt(i);
+            if (s >= 0 && loops[s]) show(s + 1 < scenes.length ? scenes[s + 1] : 0);
+            else if (i >= n - 1) show(0);
+            setPlaying(true);
+          }
           function prevScene() {
             var s = sceneAt(i);
             if (s >= 0 && scenes[s] === i) s -= 1;
@@ -418,7 +461,7 @@ extension Exporter {
             if (x.u) { if (/^(https?:|mailto:)/i.test(x.u)) window.open(x.u, "_blank", "noopener"); return; }
             var s = +x.s;
             if (!(s >= 0 && s < scenes.length)) return;
-            if (reduced || n < 2) { setPlaying(false); show(s + 1 < scenes.length ? scenes[s + 1] : n - 1); return; }
+            if (reduced || n < 2) { setPlaying(false); show(loops[s] ? scenes[s] : s + 1 < scenes.length ? scenes[s + 1] : n - 1); return; }
             show(scenes[s]); setPlaying(true);
           }
           function button(t) { return t && t.closest ? t.closest(".dottie-a") : null; }
@@ -472,7 +515,7 @@ extension Exporter {
             else if (e.key === ",") { setPlaying(false); show(i - 1); }
           });
           show(0);
-          if (scenes.indexOf(0) >= 0) playing = false;
+          if (scenes.indexOf(0) >= 0 && !loops[scenes.indexOf(0)]) playing = false;
           if (reduced) { playing = false; show(\(posterIndex)); }
           setPlaying(playing);
           requestAnimationFrame(tick);

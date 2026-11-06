@@ -242,6 +242,27 @@ public enum DottieScript {
                 return out.isEmpty ? nil : out
             }
 
+            /// Variable names to values, keys as written (`ClickAction.set`).
+            func flags(_ k: String) throws -> [String: Bool]? {
+                guard let v = raw[Args.normalize(k)] else { return nil }
+                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to true or false") }
+                var out: [String: Bool] = [:]
+                for (name, x) in d {
+                    guard let n = x as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else {
+                        throw OpsError.invalid("'\(k).\(name)' must be true or false")
+                    }
+                    out[name] = n.boolValue
+                }
+                return out
+            }
+            /// One name or a list of them (`ClickAction.toggle`).
+            func names(_ k: String) throws -> [String]? {
+                guard let v = raw[Args.normalize(k)] else { return nil }
+                if let one = v as? String { return [one] }
+                guard let list = v as? [Any], list.allSatisfy({ $0 is String }) else { throw OpsError.invalid("'\(k)' must be a name or a list of names") }
+                return list as? [String]
+            }
+
             func require(_ k: String) throws -> String {
                 guard let s = string(k), !s.isEmpty else { throw OpsError.invalid("Missing required argument '\(k)'") }
                 return s
@@ -337,8 +358,11 @@ public enum DottieScript {
                 var o: [String: Any] = [:]
                 if let s = c.scene { o["scene"] = s }
                 if let u = c.url { o["url"] = u }
+                if let v = c.set { o["set"] = v }
+                if let v = c.toggle { o["toggle"] = v }
                 d["click"] = o
             }
+            if let w = e.when { d["when"] = w }
             if let id = e.symbol {
                 d["symbol"] = id.uuidString
                 if let p = e.playback { d["playback"] = p.rawValue }
@@ -422,6 +446,7 @@ public enum DottieScript {
                                                 fill: try a.color("fill"), stroke: try a.color("stroke"),
                                                 roughness: a.roughness, look: try a.look())
                 if let n = a.string("anchor"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].anchor = n }
+                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: e.id, w) }
                 return describe(try element(e.id))
 
             case "connector":
@@ -431,6 +456,7 @@ public enum DottieScript {
                                                     arrow: a.bool("arrow") ?? true, port: (start.0, end.0),
                                                     portIndex: (start.1, end.1), roughness: a.roughness,
                                                     label: a.string("label"), look: try a.look())
+                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w); return describe(try element(c.id)) }
                 return describe(c)
 
             case "update":
@@ -441,7 +467,8 @@ public enum DottieScript {
                 var click: ClickAction?? = nil
                 if a.has("click") {
                     let c = a.object("click")
-                    click = .some(try DiagramOps.click(scene: c?.string("scene"), url: c?.string("url")))
+                    click = .some(try DiagramOps.click(scene: c?.string("scene"), url: c?.string("url"),
+                                                       set: try c?.flags("set"), toggle: try c?.names("toggle")))
                 }
                 var hover: HoverLook?? = nil
                 if a.has("hover") {
@@ -463,6 +490,7 @@ public enum DottieScript {
                                       link: link, url: a.has("url") ? .some(a.string("url")) : nil,
                                       anchor: a.has("anchor") ? .some(a.string("anchor")) : nil,
                                       click: click, hover: hover, otherPages: otherPages)
+                if a.has("when") { try DiagramOps.setWhen(&doc, id: id, a.string("when")) }
                 return describe(try element(id))
 
             case "pages":
@@ -644,14 +672,29 @@ public enum DottieScript {
             case "scene":
                 guard let t = a.double("t"), t.isFinite, t >= 0 else { throw OpsError.invalid("'t' (seconds) is required") }
                 var tl = doc.timeline ?? Timeline(duration: t)
-                tl.addMarker(at: t, name: a.string("name") ?? "Scene \((tl.markers?.count ?? 0) + 1)")
+                let name = a.string("name").flatMap { $0.isEmpty ? nil : $0 } ?? tl.nextSceneName
+                tl.addMarker(at: t, name: name, loop: a.bool("loop"))
                 doc.timeline = tl
-                return nil
+                // The name is what a click plays: dottie.update(id, {click: {scene: dottie.scene(2)}}).
+                return name
 
             case "editScene":
                 try DiagramOps.editScene(&doc, scene: a.string("scene") ?? "", rename: a.string("name"), moveTo: a.double("to"),
-                                         remove: a.bool("remove") ?? false)
+                                         loop: a.bool("loop"), remove: a.bool("remove") ?? false)
                 return nil
+
+            case "variable":
+                let name = try a.require("name")
+                if a.has("value") {
+                    guard let v = a.bool("value") else { throw OpsError.invalid("A variable's value must be true or false (null removes it)") }
+                    try doc.setVariable(name, to: v)
+                } else {
+                    try doc.setVariable(name, to: nil)
+                }
+                return doc.variables ?? [:]
+
+            case "variables":
+                return doc.variables ?? [:]
 
             case "follow":
                 try doc.addFollow(try a.uuid("id"), along: try a.uuid("path"), at: max(0, a.double("t") ?? 0),
@@ -664,6 +707,7 @@ public enum DottieScript {
                                             duration: a.double("duration") ?? 0.6,
                                             color: try a.color("color") ?? RGBA(r: 0.95, g: 0.36, b: 0.33),
                                             size: min(max(a.double("size") ?? 14, 2), 200), label: a.string("label"))
+                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: dot.id, w); return describe(try element(dot.id)) }
                 return describe(dot)
 
             case "animateBuild":
@@ -763,7 +807,15 @@ public enum DottieScript {
         var r = __dottie(name, JSON.stringify(args === undefined ? {} : args));
         return r === "" ? undefined : JSON.parse(r);
       };
-      var idOf = function (x) { return x !== null && typeof x === "object" ? x.id : x; };
+      // A missing id is usually a lookup that found nothing, often in a snapshot taken before an update changed it.
+      var idOf = function (x) {
+        var id = x !== null && typeof x === "object" ? x.id : x;
+        if (id === undefined || id === null || id === "") {
+          throw new Error("Expected an element or its id, got " + (x === undefined ? "undefined" : JSON.stringify(x))
+            + ". Objects from dottie.elements() and dottie.get() are snapshots: after dottie.update(), look the element up again.");
+        }
+        return id;
+      };
       var merge = function (a, b) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) o[k] = b[k]; return o; };
       var kind = function (k) { return function (o) { return call("shape", merge(o, { kind: k })); }; };
       g.dottie = {
@@ -820,7 +872,13 @@ public enum DottieScript {
             : (view && view.x === undefined && (typeof view === "string" || view.id)) ? { ids: [idOf(view)] } : view;
           return call("camera", merge(merge(o, target), { t: t }));
         },
-        scene: function (t, name) { call("scene", { t: t, name: name }); },
+        scene: function (t, name, o) {
+          if (name && typeof name === "object") { o = name; name = undefined; }
+          return call("scene", merge(o, { t: t, name: name }));
+        },
+        loopScene: function (scene, loop) { call("editScene", { scene: String(scene), loop: loop !== false }); },
+        variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
+        variables: function () { return call("variables"); },
         renameScene: function (scene, name) { call("editScene", { scene: String(scene), name: name }); },
         moveScene: function (scene, t) { call("editScene", { scene: String(scene), to: t }); },
         removeScene: function (scene) { call("editScene", { scene: String(scene), remove: true }); },
@@ -921,6 +979,7 @@ public enum DottieScript {
     Reading
       dottie.elements({kind?, text?, anchor?})  all elements: {id, kind, x, y, width, height, text, fill, stroke, from, to, ...}
       dottie.get(id)                   one element
+      Elements returned by any call are snapshots, not live views: after dottie.update(id, {text}) an earlier     dottie.elements() result still holds the old text. Keep ids (they never change) and call dottie.get(id) or     dottie.elements() again to see an element as it is now.
       dottie.selection                 ids selected in the app (empty when run from an agent)
       dottie.pages()                   every page (tab) in order: {id, name, current, shapes: [{id, kind, text?, anchor?}]}; \
     the script edits only the current page
@@ -947,8 +1006,13 @@ public enum DottieScript {
     PDF and SVG exports make web links clickable, and the web players open them; null removes it. Setting url clears \
     link, and the other way round
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
-      click: {scene} or {url}: when the drawing plays on the web (HTML export, <dottie-player>), clicking the element \
-    jumps to that scene (see dottie.scene) and plays on to the next, or opens an http(s) or mailto link; null removes it
+      click: {scene?, url?, set?, toggle?}: when the drawing plays on the web (HTML export, <dottie-player>), clicking \
+    the element jumps to that scene (its name, which dottie.scene returns) and plays on to the next, or opens an http(s) \
+    or mailto link. set: {name: true|false} and toggle: name or [names] change page variables (dottie.variable) without \
+    stopping or moving the animation, alone or with a scene or link; null removes the click
+      when: a condition on page variables, like "down", "!down" or "east && !west || maint": the element (and the \
+    connectors attached to it) is drawn only while it holds; "" or null removes it. Packets, shapes and connectors \
+    all take it, also as an option when made
       hover: {stroke?, fill?, opacity?}: how a clickable element looks under the pointer; null removes it
       dottie.remove(id | [ids])        deletes; connectors on a deleted shape stay as free arrows
 
@@ -998,13 +1062,27 @@ public enum DottieScript {
       dottie.camera(t, view, {ease?, padding?})  where exports look from t on: view is {x, y, width, height}, an \
     element, or a list of elements to frame (padding default 40). Views ease between keys; the first key's shape \
     sets the export's. dottie.camera(null) removes the camera
-      dottie.scene(t, name?)  a scene marker: the HTML player stops at each, and next/back step through them
-      dottie.renameScene(scene, name), dottie.moveScene(scene, t), dottie.removeScene(scene)  change a scene, named \
-    by its name or its time; a rename keeps the clicks that play it
+      dottie.scene(t, name?, {loop?})  a scene marker: the HTML player stops at each, and next/back step through them. \
+    Returns its name, which is what click: {scene} takes. loop: true makes a looping scene: playing doesn't stop on \
+    entering it, and at its end (the next scene or the end) it goes back to its start, until a click or next leaves it
+      dottie.renameScene(scene, name), dottie.moveScene(scene, t), dottie.removeScene(scene), dottie.loopScene(scene, \
+    loop?)  change a scene, named by its name or its time; a rename keeps the clicks that play it
+
+    State (diagrams people poke while they keep playing)
+      dottie.variable(name, value?)  a page variable and its starting value (default false; null removes it); \
+    returns every variable. Names are letters, digits and _, not starting with a digit. Clicks set and toggle them \
+    on the web, elements with a when follow them, and the timeline keeps looping. Exports and previews show the \
+    starting values; the editor shows every element while stopped. Inside a symbol, when sees no variables (all false)
+      dottie.variables()               {name: startingValue}
+      Example: a click that takes a region down while packets keep flowing:
+        dottie.variable("down", false);
+        dottie.update(region, {click: {toggle: "down"}});
+        dottie.update(dimmed, {when: "down"});
+        dottie.packet(eastLink, 0, {when: "!down"}); dottie.packet(westLink, 0, {when: "down"});
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
     path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
     face along the path; laps > 1 goes round a closed outline more than once
-      dottie.packet(connector, t, {duration?, color?, size?, label?})  a dot (or with a label, a pill carrying that \
+      dottie.packet(connector, t, {duration?, color?, size?, label?, when?})  a dot (or with a label, a pill carrying that \
     text, like "POST /orders") that runs along the connector, shown only while it travels; returns it
       dottie.animateBuild({transition?, start?, stagger?, packets?, drawArrows?, travel?})  reveals every shape in \
     connector order with an entrance (default popIn). With packets a dot runs down each arrow, with drawArrows each \

@@ -178,6 +178,9 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var click: ClickAction?
     /// How the element looks under the pointer, or with keyboard focus, when it is clickable on the web.
     public var hover: HoverLook?
+    /// A condition on the page's variables (`PageState`), like `down` or `!down && east`: the element is drawn only
+    /// while it holds, and connectors attached to it go with it. nil is always drawn.
+    public var when: String?
     /// Only set for `.symbol`: the id of the page's symbol it shows.
     public var symbol: UUID?
     /// Only for `.symbol`: how it plays the symbol's timeline; nil loops.
@@ -282,18 +285,30 @@ public struct ClickAction: Codable, Equatable, Sendable {
     /// A web or mail link, opened in a new tab. Only `http:`, `https:` and `mailto:` links are kept, since a
     /// drawing can play on someone else's site.
     public var url: String? { didSet { url = url.flatMap(Self.allowed) } }
+    /// Page variables (`DottieDocument.variables`) to give these values, without touching the playhead.
+    public var set: [String: Bool]?
+    /// Page variables to flip, after `set`.
+    public var toggle: [String]?
 
-    public init(scene: String? = nil, url: String? = nil) {
+    public init(scene: String? = nil, url: String? = nil, set: [String: Bool]? = nil, toggle: [String]? = nil) {
         self.scene = scene
         self.url = url.flatMap(Self.allowed)
+        self.set = set.flatMap { $0.isEmpty ? nil : $0 }
+        self.toggle = toggle.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    private enum CodingKeys: String, CodingKey { case scene, url }
+    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        // One variable to toggle may be written on its own, not in a list.
+        let toggle: [String]?
+        if let list = try? c.decodeIfPresent([String].self, forKey: .toggle) { toggle = list }
+        else { toggle = try c.decodeIfPresent(String.self, forKey: .toggle).map { [$0] } }
         self.init(scene: try c.decodeIfPresent(String.self, forKey: .scene),
-                  url: try c.decodeIfPresent(String.self, forKey: .url))
+                  url: try c.decodeIfPresent(String.self, forKey: .url),
+                  set: try c.decodeIfPresent([String: Bool].self, forKey: .set)?.filter { PageState.isName($0.key) },
+                  toggle: toggle?.filter(PageState.isName))
     }
 
     /// `url` trimmed, if it is a link a page may open.
@@ -306,7 +321,7 @@ public struct ClickAction: Codable, Equatable, Sendable {
     }
 
     /// Nothing to do.
-    public var isEmpty: Bool { (scene ?? "").isEmpty && url == nil }
+    public var isEmpty: Bool { (scene ?? "").isEmpty && url == nil && !changesState }
 }
 
 /// The look of a clickable element under the pointer: the colors and opacity it takes; nil keeps its own.
@@ -347,6 +362,9 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var timeline: Timeline?
     /// Drawings defined once and placed by `.symbol` elements, each with its own animation (see `Symbol`).
     public var symbols: [Symbol]?
+    /// The page's variables and their starting values (see `PageState`): clicks change them on the web, and
+    /// elements with a `when` follow them.
+    public var variables: [String: Bool]?
 
     public init(id: UUID = UUID(), name: String = "Page 1", layers: [Layer]? = nil, elements: [Element] = []) {
         self.id = id

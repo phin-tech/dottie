@@ -1,11 +1,14 @@
 // Clickable elements in a played drawing (Clicks.swift): what a click does, and how an element looks hovered.
 
 import { type DottieFile, type Element, type Marker, type Page, allowedURL, webLink } from "./model.ts";
+import { changesState } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 
 /** Jump to scene `scene` (an index into the page's markers) and play on to the next; open `url` in a new tab; or,
- * in <dottie-player> only, show page `page` (an index into the file's pages), where the element's link points. */
-export type Click = { scene: number } | { url: string } | { page: number };
+ * in <dottie-player> only, show page `page` (an index into the file's pages), where the element's link points. Any
+ * of them may first `set` and `toggle` page variables (ClickAction.set, .toggle), and a click may do only that. */
+export type Click = ({ scene: number } | { url: string } | { page: number } | { state: true })
+  & { set?: Record<string, boolean>; toggle?: string[] };
 
 /** The marker called `name`: an exact match, else one that differs only in case. */
 export function sceneNamed(name: string, markers: Marker[]): number {
@@ -22,12 +25,14 @@ export function clickTargets(page: Page, file?: DottieFile): Map<string, Click> 
   let pageOf: Map<string, number> | null = null;
   for (const e of page.elements) {
     const c = e.click;
+    const state = c && changesState(c) ? { ...(c.set ? { set: c.set } : {}), ...(c.toggle ? { toggle: c.toggle } : {}) } : null;
     if (c?.scene) {
       const i = sceneNamed(c.scene, markers);
-      if (i >= 0) { out.set(e.id, { scene: i }); continue; }
+      if (i >= 0) { out.set(e.id, { scene: i, ...state }); continue; }
     }
     const url = (c?.url ? allowedURL(c.url) : null) ?? webLink(e.url);
-    if (url) { out.set(e.id, { url }); continue; }
+    if (url) { out.set(e.id, { url, ...state }); continue; }
+    if (state) { out.set(e.id, { state: true, ...state }); continue; }
     if (e.link && file && file.pages.length > 1) {
       if (!pageOf) {
         pageOf = new Map();

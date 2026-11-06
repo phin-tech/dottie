@@ -9,8 +9,10 @@
 // accessible name). The file can also be inline: <dottie-player><script type="application/json">{…}</script>.
 //
 // Clickable elements (`click` in the file, or a `link` to another page) play their scene, open their link or show
-// that page, by mouse or keyboard. Each click first fires a cancelable `action` event with the element and what it
-// does, so a page can handle it itself.
+// that page, by mouse or keyboard, and set or flip the page's variables, which show and hide the elements with a
+// `when` without touching the playhead. Each click first fires a cancelable `action` event with the element and
+// what it does, so a page can handle it itself; a change of variables then fires `state`. A looping scene
+// (`loop` on a marker) plays round until a click or next/back leaves it, instead of stopping.
 
 import { addFonts, usedFonts } from "./fonts.ts";
 import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, partsOf } from "./clicks.ts";
@@ -20,6 +22,7 @@ import { buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
 import { type Plan, plan, svgParts } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { themeNamed } from "./theme.ts";
+import { applyClick } from "./state.ts";
 import { posed, posterTime } from "./timeline.ts";
 
 const WHITE: RGBA = { r: 1, g: 1, b: 1, a: 1 };
@@ -61,6 +64,10 @@ export class Playback {
   readonly plan: Plan;
   readonly scenes: number[];
   readonly sceneNames: string[];
+  /** Whether each scene loops (Marker.loop). */
+  readonly sceneLoops: boolean[];
+  /** The page's variables now: their starting values until clicks change them. */
+  state: Record<string, boolean>;
   readonly background: RGBA;
   readonly ink: RGBA;
   /** What clicking each clickable element does, by element id. */
@@ -121,6 +128,8 @@ export class Playback {
     };
     this.scenes = (page.timeline?.markers ?? []).map((m) => near(m.t));
     this.sceneNames = (page.timeline?.markers ?? []).map((m) => m.name);
+    this.sceneLoops = (page.timeline?.markers ?? []).map((m) => m.loop === true);
+    this.state = { ...(page.variables ?? {}) };
     const theme = themeNamed(page.theme);
     this.background = theme?.background ?? WHITE;
     this.ink = theme?.ink ?? { r: 0.12, g: 0.12, b: 0.13, a: 1 };
@@ -170,7 +179,7 @@ export class Playback {
     const times = new Map<string, number>();
     for (const [id, start] of this.replayStarts) times.set(id, Math.min((now - start) / 1000, this.replays.get(id) ?? 0));
     const tc = clampTime(t);
-    const pose = posed(this.page, tc);
+    const pose = posed(this.page, tc, this.state);
     const frame = expandingSymbols(pose, tc, true, times);
     const { parts } = svgParts(frame, this.background, r);
     const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
@@ -271,6 +280,22 @@ export class Playback {
     let s = -1;
     this.scenes.forEach((f, j) => { if (f <= i) s = j; });
     return s;
+  }
+
+  /** The frame after scene `s`'s last: the next scene's, or the frame count after the last scene. */
+  sceneEnd(s: number): number {
+    return this.scenes.find((f, j) => j > s && f > this.scenes[s]) ?? this.frameCount;
+  }
+
+  /** Where playing goes from frame `i`, and whether it stops there: on into a looping scene, round to the start of
+   * the looping scene `i` ends, or a stop at a scene or the end (`loops`: whether the timeline loops at its end). */
+  step(i: number, loops: boolean): { frame: number; stop: boolean } {
+    const next = i + 1;
+    const s = this.sceneAt(i);
+    if (s >= 0 && this.sceneLoops[s] && next >= this.sceneEnd(s)) return { frame: this.scenes[s], stop: false };
+    if (next >= this.frameCount) return { frame: 0, stop: !loops || this.scenes.length > 0 };
+    const entered = this.scenes.indexOf(next);
+    return { frame: next, stop: entered >= 0 && !this.sceneLoops[entered] };
   }
 }
 
@@ -424,7 +449,7 @@ export class DottiePlayer extends ElementBase {
     p.show(0);
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) { p.show(p.posterFrame); this.setPlaying(false); return; }
-    this.setPlaying(!this.hasAttribute("no-autoplay") && !p.scenes.includes(0));
+    this.setPlaying(!this.hasAttribute("no-autoplay") && (!p.scenes.includes(0) || p.sceneLoops[p.scenes.indexOf(0)]));
   }
 
   // MARK: Playback
@@ -437,11 +462,13 @@ export class DottiePlayer extends ElementBase {
   play(): void { this.setPlaying(true); }
   pause(): void { this.setPlaying(false); }
 
-  /** Plays on to the next scene (from the start after the last). */
+  /** Plays on to the next scene (from the start after the last). Out of a looping scene it jumps to the next. */
   nextScene(): void {
     const p = this.playback;
     if (!p) return;
-    if (p.frame >= p.frameCount - 1) p.show(0);
+    const s = p.sceneAt(p.frame);
+    if (s >= 0 && p.sceneLoops[s]) p.show(s + 1 < p.scenes.length ? p.scenes[s + 1] : 0);
+    else if (p.frame >= p.frameCount - 1) p.show(0);
     this.setPlaying(true);
   }
 
@@ -473,6 +500,8 @@ export class DottiePlayer extends ElementBase {
       this.scheduleReplay();
     }
     if (!click) return;
+    if (click.set || click.toggle) this.setState(applyClick({ scene: null, url: null, set: click.set ?? null, toggle: click.toggle ?? null }, p.state));
+    if ("state" in click) return;
     if ("url" in click) {
       if (/^(https?:|mailto:)/i.test(click.url)) window.open(click.url, "_blank", "noopener");
     } else if ("page" in click) {
@@ -480,12 +509,28 @@ export class DottiePlayer extends ElementBase {
     } else if (click.scene >= 0 && click.scene < p.scenes.length) {
       if (reduced || this.hasAttribute("at") || p.frameCount < 2) {
         this.setPlaying(false);
-        p.show(click.scene + 1 < p.scenes.length ? p.scenes[click.scene + 1] : p.frameCount - 1);
+        // A looping scene rests where it starts; another where playing it would stop.
+        p.show(p.sceneLoops[click.scene] ? p.scenes[click.scene]
+          : click.scene + 1 < p.scenes.length ? p.scenes[click.scene + 1] : p.frameCount - 1);
       } else {
         p.show(p.scenes[click.scene]);
         this.setPlaying(true);
       }
     }
+  }
+
+  /** The page's variables now. */
+  get variables(): Record<string, boolean> { return { ...(this.playback?.state ?? {}) }; }
+
+  /** Gives the page's variables these values (the others keep theirs), redraws, and fires `state`. */
+  setState(values: Record<string, boolean>): void {
+    const p = this.playback;
+    if (!p) return;
+    const next = { ...p.state, ...values };
+    if (Object.keys(next).every((k) => next[k] === p.state[k])) return;
+    p.state = next;
+    p.redraw();
+    this.dispatchEvent(new CustomEvent("state", { detail: { variables: { ...next } } }));
   }
 
   /** Redraws, while the page itself stands still, as long as a clicked copy is playing through. */
@@ -516,7 +561,8 @@ export class DottiePlayer extends ElementBase {
     if (this.playing && this.visible && !this.raf && this.isConnected) this.raf = requestAnimationFrame((now) => this.tick(now));
   }
 
-  /** Steps whole frames at the timeline's rate; with scenes, playing stops at each one and at the end. */
+  /** Steps whole frames at the timeline's rate; with scenes, playing stops at each one and at the end, except that a
+   * looping scene plays round (Playback.step). */
   private tick(now: number): void {
     this.raf = 0;
     const p = this.playback;
@@ -527,11 +573,11 @@ export class DottiePlayer extends ElementBase {
     let advanced = false;
     while (this.playing && this.acc >= step) {
       this.acc -= step;
-      const next = p.frame + 1;
-      if (next >= p.frameCount && (p.scenes.length || this.hasAttribute("no-loop"))) { this.setPlaying(false); break; }
-      p.frame = next % p.frameCount;
+      const { frame, stop } = p.step(p.frame, !this.hasAttribute("no-loop"));
+      if (stop && frame === 0 && p.frame + 1 >= p.frameCount) { this.setPlaying(false); break; }
+      p.frame = frame;
       advanced = true;
-      if (p.scenes.includes(p.frame)) { this.setPlaying(false); break; }
+      if (stop) { this.setPlaying(false); break; }
     }
     if (advanced) p.show(p.frame);
     if (this.playing && !this.visible) this.last = 0;

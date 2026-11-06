@@ -2,6 +2,8 @@
 // damaged or hand-written file means the same thing in both. Anything dottie.js doesn't know (a newer kind,
 // fill or field) is kept and reported through `warnings` instead of failing the whole file.
 
+import { isName } from "./state.ts";
+
 export interface RGBA { r: number; g: number; b: number; a: number }
 export type FillStyle = "solid" | "hachure" | "crossHatch" | "grid";
 export type DashStyle = "solid" | "dashed" | "dotted";
@@ -51,8 +53,9 @@ export interface ConnectorData {
 export interface PathSubpath { closed: boolean; coords: number[] }
 export interface StrokePoint { x: number; y: number }
 export interface EmbeddedImage { data: string; format: string }
-/** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link. */
-export interface ClickAction { scene: string | null; url: string | null }
+/** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link; and page
+ * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
+export interface ClickAction { scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null }
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
 export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
 
@@ -79,6 +82,8 @@ export interface Element {
   anchor: string | null;
   click: ClickAction | null;
   hover: HoverLook | null;
+  /** A condition on the page's variables: drawn only while it holds (Element.when; see state.ts). */
+  when: string | null;
   /** For a `symbol` element: the page's symbol it shows, how it plays it, and from how far in. */
   symbol: string | null;
   playback: SymbolPlayback | null;
@@ -130,7 +135,8 @@ export interface Track {
 }
 
 export interface CameraKey { t: number; x: number; y: number; width: number; height: number; ease: Ease | null }
-export interface Marker { t: number; name: string }
+/** A scene; `loop` plays it round until something leaves it, instead of stopping on it (Marker.loop). */
+export interface Marker { t: number; name: string; loop: boolean | null }
 
 export interface Timeline {
   fps: number;
@@ -151,6 +157,8 @@ export interface Page {
   theme: string | null;
   timeline: Timeline | null;
   symbols: Symbol[] | null;
+  /** The page's variables and their starting values (DottieDocument.variables). */
+  variables: Record<string, boolean> | null;
 }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
@@ -184,13 +192,13 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols"],
+  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "symbol", "playback", "offset", "args", "image", "reveal",
+    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
@@ -207,8 +215,8 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   follow: ["path", "start", "end", "ease", "reverse", "orient", "laps"],
   repeat: ["start", "end", "count"],
   cameraKey: ["t", "x", "y", "width", "height", "ease"],
-  marker: ["t", "name"],
-  click: ["scene", "url"],
+  marker: ["t", "name", "loop"],
+  click: ["scene", "url", "set", "toggle"],
   hover: ["stroke", "fill", "opacity"],
 };
 
@@ -381,6 +389,7 @@ class Reader {
       anchor: str(v.anchor) ?? null,
       click: this.click(v.click),
       hover: this.hover(v.hover),
+      when: str(v.when) ?? null,
       symbol: uuid(v.symbol) ?? null,
       playback: this.playback(v.playback),
       offset: num(v.offset) ?? null,
@@ -416,13 +425,29 @@ class Reader {
     return { id, shape, version, params };
   }
 
+  variables(v: unknown): Record<string, boolean> | null {
+    if (!isObj(v)) return null;
+    const out: Record<string, boolean> = {};
+    for (const [k, b] of Object.entries(v)) if (typeof b === "boolean") out[k] = b;
+    return Object.keys(out).length > 0 ? out : null;
+  }
+
   click(v: unknown): ClickAction | null {
     if (!isObj(v)) return null;
     this.fields(v, "click");
     const url = str(v.url);
     const safe = url === undefined ? null : allowedURL(url);
     if (url !== undefined && safe === null) this.warn("Skipped a click link that isn't http, https or mailto");
-    return { scene: str(v.scene) ?? null, url: safe };
+    // As DottieKit reads them: names that aren't variable names are dropped, and one toggle may stand alone.
+    let set: Record<string, boolean> | null = null;
+    if (isObj(v.set)) {
+      set = {};
+      for (const [k, b] of Object.entries(v.set)) if (typeof b === "boolean" && isName(k)) set[k] = b;
+      if (Object.keys(set).length === 0) set = null;
+    }
+    const raw = typeof v.toggle === "string" ? [v.toggle] : Array.isArray(v.toggle) && v.toggle.every((x) => typeof x === "string") ? v.toggle as string[] : null;
+    const toggle = raw ? raw.filter(isName) : null;
+    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null };
   }
 
   playback(v: unknown): SymbolPlayback | null {
@@ -525,7 +550,7 @@ class Reader {
     const markers = Array.isArray(v.markers)
       ? v.markers.filter(isObj).flatMap((m): Marker[] => {
         const t = num(m.t);
-        return t !== undefined && t >= 0 ? [{ t, name: str(m.name) ?? "" }] : [];
+        return t !== undefined && t >= 0 ? [{ t, name: str(m.name) ?? "", loop: bool(m.loop) ?? null }] : [];
       })
       : null;
     if (markers) stableSortBy(markers, (m) => m.t);
@@ -558,6 +583,7 @@ class Reader {
       theme: str(v.theme) ?? null,
       timeline: this.timeline(v.timeline),
       symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
+      variables: this.variables(v.variables),
     };
   }
 }
