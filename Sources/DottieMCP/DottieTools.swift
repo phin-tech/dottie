@@ -396,6 +396,51 @@ actor DottieTools {
                 "turned_on_by": idListProp("Elements whose click sets it true"),
                 "turned_off_by": idListProp("Elements whose click sets it false"),
              ], required: ["path", "name"])),
+        Tool(name: "add_button",
+             description: "Add a clean button that changes page variables when clicked on the web (HTML export, <dottie-player>): "
+                + "toggles flips one, sets gives several values. It looks pressed (filled, and on_text as its label) while it is on. "
+                + "Variables it names are added, starting false, if missing. Pair with define_state for what the variable does.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "text": prop("string", "The label"), "x": prop("number", "Left"), "y": prop("number", "Top"),
+                "width": prop("number", "Width (default fits the label, at least 100)"), "height": prop("number", "Height (default 40)"),
+                "toggles": prop("string", "The variable a click flips"),
+                "sets": .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+                                 "description": "Variables a click sets, name to true or false"]),
+                "on_text": prop("string", "The label while pressed, e.g. \"Bring east back\""),
+                "color": prop("string", "Hex color of its outline and label, and its fill while pressed (default blue)"),
+             ], required: ["path", "text"])),
+        Tool(name: "add_choice",
+             description: "Add a row (or column) of buttons of which exactly one is on: one variable per option, named "
+                + "<name>_<option>, clicking an option sets it true and the others false. For exclusive scenarios "
+                + "(normal, region down, traffic spike); give each variable its meaning with define_state.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "name": prop("string", "The prefix of the options' variables, e.g. scenario"),
+                "options": .object(["type": "array", "items": .object(["type": "string"]), "description": "The options' labels, in order"]),
+                "x": prop("number", "Left"), "y": prop("number", "Top"),
+                "direction": prop("string", "row (default) or column", enum: ["row", "column"]),
+                "initial": prop("string", "The option on at the start (default the first)"),
+                "color": prop("string", "Hex color (default blue)"),
+             ], required: ["path", "name", "options"])),
+        Tool(name: "add_reset",
+             description: "Add a button that sets every page variable back to its starting value. Variables added later "
+                + "aren't covered: call again with id (the button) to bring it up to date.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "x": prop("number", "Left"), "y": prop("number", "Top"), "text": prop("string", "The label (default Reset)"),
+                "id": prop("string", "An existing reset button to update instead of adding one"),
+                "color": prop("string", "Hex color (default grey)"),
+             ], required: ["path"])),
+        Tool(name: "add_legend",
+             description: "Add a legend of the page's flows: a swatch in each flow's color and a label. Clicking a row on "
+                + "the web hides or shows that flow (a variable show_<n>, starting true, joined onto its when).",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "x": prop("number", "Left"), "y": prop("number", "Top"),
+                "labels": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                                   "description": "Flow id to its label (default \"from → to\")"]),
+             ], required: ["path"])),
         Tool(name: "add_flow",
              description: "Send traffic from one shape to the first of a list of destinations (preferred first) it can reach "
                 + "over the connectors drawn: a packet every `every` seconds, routed afresh in every frame by every renderer. When "
@@ -1116,6 +1161,48 @@ actor DottieTools {
             do { summary = try DiagramOps.defineState(&file.pages[p], spec) } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("State " + summary + on(file, p))
+
+        case "add_button", "add_choice", "add_reset", "add_legend":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let summary: String
+            do {
+                switch currentTool {
+                case "add_button":
+                    var spec = ButtonSpec(text: try a.require("text"))
+                    spec.x = a.double("x") ?? 0; spec.y = a.double("y") ?? 0
+                    spec.width = a.double("width"); spec.height = a.double("height")
+                    spec.toggles = a.string("toggles"); spec.onText = a.string("on_text"); spec.color = try a.color("color")
+                    spec.sets = try a.flags("sets") ?? [:]
+                    let b = try DiagramOps.addButton(&file.pages[p], spec)
+                    summary = "Added button \(b.id.uuidString)"
+                case "add_choice":
+                    guard let options = a.raw["options"]?.arrayValue?.compactMap(\.stringValue), !options.isEmpty else {
+                        throw ToolFailure(message: "'options' must be a list of labels")
+                    }
+                    let made = try DiagramOps.addChoice(&file.pages[p], name: try a.require("name"), options: options,
+                                                        x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                        row: a.string("direction") != "column", initial: a.string("initial"),
+                                                        color: try a.color("color"))
+                    summary = "Added a choice: " + made.map { "\($0.variable) (button \($0.button.id.uuidString))" }.joined(separator: ", ")
+                case "add_reset":
+                    let r = try DiagramOps.addReset(&file.pages[p], x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                    text: a.string("text") ?? "Reset",
+                                                    replacing: a.string("id") == nil ? nil : try a.uuid("id"), color: try a.color("color"))
+                    summary = "Reset button \(r.id.uuidString) sets " + (file.pages[p].variables ?? [:]).keys.sorted().joined(separator: ", ")
+                default:
+                    var labels: [UUID: String] = [:]
+                    for (k, v) in a.raw["labels"]?.objectValue ?? [:] {
+                        guard let id = UUID(uuidString: k), let s = v.stringValue else { throw ToolFailure(message: "'labels' maps flow ids to text") }
+                        labels[id] = s
+                    }
+                    let rows = try DiagramOps.addLegend(&file.pages[p], x: a.double("x") ?? 0, y: a.double("y") ?? 0, labels: labels)
+                    summary = "Added a legend of \(rows.count) flow\(rows.count == 1 ? "" : "s") (variables show_1…show_\(rows.count))"
+                }
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            return text(summary + on(file, p))
 
         case "script_api":
             if a.string("format") == "typescript" { return text(DottieScript.typeDefinitions) }

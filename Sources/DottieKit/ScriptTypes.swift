@@ -615,6 +615,20 @@ extension DottieScript {
             flows(): FlowInfo[];
             /** Removes a flow; returns whether there was one. */
             removeFlow(flow: Ref): boolean;
+            /** A clean button whose click (on the web) flips `toggles` or sets `sets`; it looks pressed (filled, and
+             * `onText` as its label) while on. Variables it names are added, starting false. */
+            button(options: { text: string; x?: number; y?: number; width?: number; height?: number; toggles?: string;
+                sets?: Record<string, boolean>; onText?: string; color?: Color }): Element;
+            /** Buttons of which exactly one is on: one variable per option (`<name>_<option>`), each click setting its own
+             * true and the others false. `initial` (default the first) starts on. Each button comes with its variable. */
+            choice(name: string, options: string[], o?: { x?: number; y?: number; direction?: "row" | "column";
+                initial?: string; color?: Color }): (Element & { variable: string })[];
+            /** A button that sets every variable back to its starting value; with `id`, updates that button instead
+             * (run it again after adding variables). */
+            resetButton(o?: { x?: number; y?: number; text?: string; id?: Ref; color?: Color }): Element;
+            /** One row per flow: a swatch in its color and a label; clicking it hides or shows the flow (variable
+             * `show_<n>`, starting true, joined onto its when). `labels`: flow to text. */
+            legend(o?: { x?: number; y?: number; labels?: Record<string, string> | [Ref, string][] }): { swatch: Element; label: Element }[];
             /** Renames a scene (named by its name or its time); clicks that play it follow the new name. */
             renameScene(scene: string | number, name: string): void;
             /** Moves a scene (named by its name or its time) to t seconds. */

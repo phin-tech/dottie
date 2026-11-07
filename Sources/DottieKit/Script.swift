@@ -779,6 +779,46 @@ public enum DottieScript {
             case "removeFlow":
                 return DiagramOps.removeFlow(&doc, try a.uuid("id"))
 
+            case "button":
+                var spec = ButtonSpec(text: try a.require("text"))
+                spec.x = a.double("x") ?? 0; spec.y = a.double("y") ?? 0
+                spec.width = a.double("width"); spec.height = a.double("height")
+                spec.toggles = a.string("toggles"); spec.onText = a.string("onText"); spec.color = try a.color("color")
+                if let s = a.object("sets") {
+                    for (k, v) in s.raw {
+                        guard let b = (v as? NSNumber).map(\.boolValue) else { throw OpsError.invalid("'sets' maps variable names to true or false") }
+                        spec.sets[k] = b
+                    }
+                }
+                let b = try DiagramOps.addButton(&doc, spec)
+                return describe(try element(b.id))
+
+            case "choice":
+                guard let options = a.raw["options"] as? [String] else { throw OpsError.invalid("'options' is a list of names") }
+                let made = try DiagramOps.addChoice(&doc, name: try a.require("name"), options: options,
+                                                    x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                    row: a.string("direction") != "column", initial: a.string("initial"),
+                                                    color: try a.color("color"))
+                return try made.map { m -> [String: Any] in
+                    var d = describe(try element(m.button.id)); d["variable"] = m.variable; return d
+                }
+
+            case "reset":
+                let r = try DiagramOps.addReset(&doc, x: a.double("x") ?? 0, y: a.double("y") ?? 0, text: a.string("text") ?? "Reset",
+                                                replacing: a.has("id") ? try a.uuid("id") : nil, color: try a.color("color"))
+                return describe(try element(r.id))
+
+            case "legend":
+                var labels: [UUID: String] = [:]
+                for (k, v) in a.object("labels")?.raw ?? [:] {
+                    guard let id = UUID(uuidString: k), let s = v as? String else { throw OpsError.invalid("'labels' maps flow ids to text") }
+                    labels[id] = s
+                }
+                let rows = try DiagramOps.addLegend(&doc, x: a.double("x") ?? 0, y: a.double("y") ?? 0, labels: labels)
+                return try rows.map { r -> [String: Any] in
+                    ["swatch": describe(try element(r.swatch.id)), "label": describe(try element(r.label.id))]
+                }
+
             case "defineState":
                 var spec = StateSpec(name: try a.require("name"))
                 if let v = a.bool("initial") { spec.initial = v }
@@ -999,6 +1039,13 @@ public enum DottieScript {
         },
         flows: function () { return call("flows"); },
         removeFlow: function (flow) { return call("removeFlow", { id: idOf(flow) }); },
+        button: function (o) { return call("button", o); },
+        choice: function (name, options, o) { return call("choice", merge(o, { name: name, options: options })); },
+        resetButton: function (o) { return call("reset", merge(o, { id: o && o.id ? idOf(o.id) : undefined })); },
+        legend: function (o) {
+          o = o || {};
+          return call("legend", merge(o, { labels: pairs(o.labels, function (x) { return x; }) }));
+        },
         defineState: function (name, o) {
           o = o || {};
           return call("defineState", merge(o, {
@@ -1219,6 +1266,18 @@ public enum DottieScript {
     shapes they pass through and come out the other side. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
     loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
       dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
+      Controls, made of ordinary shapes, clicks and overrides (clicks work on the web):
+      dottie.button({text, x, y, toggles?, sets?, onText?, width?, height?, color?})  a button that flips toggles or sets \
+    sets ({name: bool}); filled, and labelled onText, while on. Returns it
+      dottie.choice(name, [options], {x, y, direction?, initial?, color?})  exactly one on: variables name_option, each \
+    click sets its own true and the rest false. Returns the buttons, each with its variable
+      dottie.resetButton({x, y, text?, id?})  sets every variable back to its starting value; run again with id after \
+    adding variables
+      dottie.legend({x, y, labels?})  a swatch and label per flow; clicking one hides or shows that flow (show_1, show_2…)
+      Example: scenarios, each described once:
+        const [normal, eastOut] = dottie.choice("scenario", ["normal", "east out"], {x: 40, y: 400});
+        dottie.defineState(eastOut.variable, {down: east});
+        dottie.resetButton({x: 300, y: 400}); dottie.legend({x: 600, y: 400});
       Example: failover: api sends to east, or west when east is down:
         dottie.flow(api, [east, west]);
         dottie.defineState("eastDown", {down: east, toggledBy: east});   // east fades, and traffic goes to west

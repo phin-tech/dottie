@@ -62,6 +62,7 @@ More of the MCP tools, by purpose:
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
 | Interactive pages: traffic and states | `add_flow`, `define_state`, `set_variable` |
+| Controls for an interactive page | `add_button`, `add_choice`, `add_reset`, `add_legend` |
 | Exports, and checking an interactive page | `export_svg`, `export_mermaid`, `export_animation`, `simulate` |
 
 ## Animating
@@ -88,6 +89,9 @@ variables rather than scenes, and is easiest in two calls:
 2. `define_state` describes one variable at once: what it takes `down` (faded, and traffic goes round it), `hide`s
    (connectors go with a hidden shape), `show`s, `dim`s or `restyle`s (a new label, a red stroke), connectors whose `send_packet` packets
    `reroute`, and which elements' clicks flip it (`toggled_by`).
+3. Controls make it something to play with: `add_choice` for exclusive scenarios (one variable per option, give each
+   its meaning with `define_state`), `add_button` for one switch with a pressed look, `add_reset` to go back to the
+   start (call it again with `id` after adding variables), and `add_legend` to hide and show each flow.
 
 Lower level: `set_variable`, `update_element` with `click_toggle` / `click_set`, and `when` on shapes, connectors and
 packets (`"down"`, `"!down"`). Exports show the starting values; the HTML export and `<dottie-player>` change them on
