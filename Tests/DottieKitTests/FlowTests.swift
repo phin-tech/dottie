@@ -20,6 +20,15 @@ final class FlowTests: XCTestCase {
 
     private func packets(_ frame: DottieDocument) -> [Element] { frame.elements.filter { $0.kind == .ellipse } }
 
+    /// The connectors one flow from `from` to `to` travels, as the simulation routes it; nil when it gets nowhere.
+    private func route(_ doc: DottieDocument, from: UUID, to: [UUID], state: StateChoice = .initial) -> Set<UUID>? {
+        var d = doc
+        d.flows = [Flow(from: from, to: to)]
+        let m = d.metrics(at: 1, state: state)
+        let used = Set(d.elements.filter { $0.kind == .connector && (m.elements[$0.id]?.throughput ?? 0) > 0 }.map(\.id))
+        return used.isEmpty ? nil : used
+    }
+
     func testTrafficFailsOverWhenAStateHidesTheWay() throws {
         var (doc, client, _, east, west) = page()
         let flow = try DiagramOps.addFlow(&doc, from: client, to: [east, west], every: 0.5, speed: 100)
@@ -86,9 +95,9 @@ final class FlowTests: XCTestCase {
     func testArrowsSayWhichWayTrafficGoes() {
         var (doc, client, api, _, _) = page()
         // Only client → api exists; api can't send back unless the start has an arrowhead.
-        XCTAssertNil(DottieDocument.flowRoute(from: api, to: [client], in: doc))
+        XCTAssertNil(route(doc, from: api, to: [client]))
         doc.elements[4].connector?.startHead = .arrow
-        XCTAssertEqual(DottieDocument.flowRoute(from: api, to: [client], in: doc)?.map(\.1), [true])
+        XCTAssertEqual(route(doc, from: api, to: [client]), [doc.elements[4].id], "backwards along it")
     }
 
     func testTheCheapestRouteWins() throws {
@@ -97,27 +106,26 @@ final class FlowTests: XCTestCase {
         // A direct line client → east: one hop, so it wins until it costs more than the two-hop way.
         var direct = Element(kind: .connector, frame: .zero, layerID: layer, connector: ConnectorData(start: .bound(client), end: .bound(east)))
         doc.elements.append(direct)
-        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [east], in: doc)?.map(\.0), [direct.id])
+        XCTAssertEqual(route(doc, from: client, to: [east]), [direct.id])
         DiagramOps.Look(cost: 2.5).apply(to: &direct)
         XCTAssertEqual(direct.connector?.cost, 2.5)
         doc.elements[doc.elements.count - 1] = direct
-        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [east], in: doc)?.count, 2)
+        XCTAssertEqual(route(doc, from: client, to: [east])?.count, 2)
         // A tie goes to the route found first: cost 2 ties, and the direct line was found first.
         doc.elements[doc.elements.count - 1].connector?.cost = 2
-        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [east], in: doc)?.map(\.0), [direct.id])
+        XCTAssertEqual(route(doc, from: client, to: [east]), [direct.id])
         // Out of range is clamped; 1 clears it.
         DiagramOps.Look(cost: -4).apply(to: &direct)
         XCTAssertEqual(direct.connector?.cost, 0)
         DiagramOps.Look(cost: 1).apply(to: &direct)
         XCTAssertNil(direct.connector?.cost)
         // The preference order still picks the destination; cost only picks the way there.
-        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [west, east], in: doc)?.count, 2)
-        // The fixture: the five-cost direct line loses to the way round.
+        XCTAssertEqual(route(doc, from: client, to: [west, east])?.count, 2)
+        // The fixture, unjammed: the five-cost direct line loses to the way round.
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../fixtures/edge/flows.dottie")
         let costPage = try DottieFile.decode(Data(contentsOf: url)).pages[2]
         let first = try XCTUnwrap(costPage.flows?.first)
-        let route = try XCTUnwrap(DottieDocument.flowRoute(from: first.from, to: first.to, in: costPage))
-        XCTAssertEqual(route.count, 2)
+        XCTAssertEqual(route(costPage, from: first.from, to: first.to, state: .values(["jam": false]))?.count, 2)
     }
 
     func testFlowsFromOneShapeTakeTurns() throws {
@@ -167,10 +175,8 @@ final class FlowTests: XCTestCase {
         let costPage = try DottieFile.decode(Data(contentsOf: url)).pages[2]
         let red = try XCTUnwrap(costPage.flows?.first)
         let direct = try XCTUnwrap(costPage.elements.first { $0.connector?.cost == 5 })
-        func route(jam: Bool) throws -> [UUID] {
-            let frame = costPage.posed(at: 1, state: .values(["jam": jam]))
-            let offline = Set<UUID>()
-            return try XCTUnwrap(DottieDocument.flowRoute(from: red.from, to: red.to, in: frame, offline: offline)).map(\.0)
+        func route(jam: Bool) throws -> Set<UUID> {
+            try XCTUnwrap(self.route(costPage, from: red.from, to: red.to, state: .values(["jam": jam])))
         }
         XCTAssertNotEqual(try route(jam: false), [direct.id])
         XCTAssertEqual(try route(jam: true), [direct.id])   // hub → dst jammed at cost 10: the direct line (5) wins

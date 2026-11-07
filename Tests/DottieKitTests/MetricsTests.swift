@@ -182,7 +182,7 @@ final class MetricsTests: XCTestCase {
         let backs = frame.elements.filter { $0.kind == .path && $0.text != nil }
         XCTAssertEqual(backs.count, 3)
         XCTAssertTrue(backs.allSatisfy { $0.text == "load workers\n75%" && $0.gauge == nil })
-        XCTAssertEqual(backs[0].style.textColor, DottieDocument.gaugeAmber)   // 0.75: past the 0.7 warning
+        XCTAssertEqual(backs[0].style.textColor, RGBA(hex: "#d97706")!)   // 0.75: past the 0.7 warning
         XCTAssertEqual(frame.elements.filter { $0.kind == .path }.count, 3 + 2 + 3)   // number; bar track and fill; dial arc, value, needle
         XCTAssertEqual(DottieDocument.formatted("throughput", 12.345), "12.3")
         XCTAssertEqual(DottieDocument.formatted("transit", 0.125), "0.13s")

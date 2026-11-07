@@ -1,4 +1,5 @@
-// Capacity, metrics and gauges (Metrics.swift, ADR 0003; font metrics are metrics.ts). Each frame, the page's flows are assigned to routes in
+// Capacity, metrics and gauges (ADR 0003; font metrics are metrics.ts). The only implementation: Dottie runs this in
+// JavaScriptCore (sim-entry.ts, SimulationEngine.swift, ADR 0004). Each frame, the page's flows are assigned to routes in
 // page order, as much as each route has room for; the packets drawn and the metrics shown both come from that
 // assignment, so a frame stays a pure function of the page, the time and the variables.
 
@@ -68,7 +69,7 @@ interface Way { line: Polyline; length: number; inside: [number, number, number]
 export const queueKey = (shape: string, flow: string): string => shape + "|" + flow;
 
 /** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs),
- * and the frame's metrics (DottieDocument.flowFrame). `since` is the seconds since the page's state last changed
+ * and the frame's metrics. `since` is the seconds since the page's state last changed
  * (null: `t`), and `carried` how much each flow's queue held at that moment: since then a queue grows by its
  * backlog, or drains at the room its way on has left. */
 export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
@@ -451,7 +452,7 @@ export function formatNumber(v: number, places: number): string {
   return (v < 0 && n > 0 ? "-" : "") + s;
 }
 
-/** A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial (DottieDocument.gauge). */
+/** A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial. */
 export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, flows: Flow[]): Element[] {
   const target = frame.elements.find((x) => x.id === g.of);
   const full = g.max ?? (g.metric === "load" ? 1 : target?.capacity ?? value ?? 1);

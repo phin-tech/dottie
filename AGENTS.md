@@ -21,8 +21,13 @@ connectors, labels, the model or the file format is one change across both:
    `web/src/model.ts`.
 2. Add a case to `scripts/make-fixtures.py` that would fail without the change.
 3. `just goldens`, and commit the regenerated goldens with the change.
-4. After any `web/src` change, `just player-script`: HTML and js exports embed a minified dottie.js
-   (`Sources/DottieKit/PlayerScript.swift`).
+4. After any `web/src` change, `just player-script`: HTML and js exports embed a minified dottie.js, and Dottie runs
+   its simulation from there (`Sources/DottieKit/PlayerScript.swift`).
+
+The simulation (flows' routing and assignment, packets, metrics, the overrides that compare them, gauges) is the
+exception: it exists only in `web/src/measure.ts` and `flows.ts`, and Dottie runs it in JavaScriptCore
+(`SimulationEngine`, ADR 0004). Change it there, add a fixture or behaviour test, then `just player-script` and
+`just goldens`; there is no Swift copy to mirror.
 
 `fixtures/design/` holds copies of `Design/`, so a change to a drawing in `Design/` also needs `just goldens`.
 

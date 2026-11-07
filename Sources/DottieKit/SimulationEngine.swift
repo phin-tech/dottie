@@ -1,9 +1,10 @@
 import Foundation
 import JavaScriptCore
 
-/// Runs dottie.js's simulation (`flowFrame` in web/src/measure.ts, bundled as `PlayerScript.simulation`) in
-/// JavaScriptCore, so the app, the CLI and dottie.js share one implementation of flows' assignment, packets and
-/// metrics (ADR 0003). One context, used by one caller at a time.
+/// Runs dottie.js's simulation (web/src/measure.ts, bundled as `PlayerScript.simulation`) in JavaScriptCore, so the
+/// app, the CLI, QuickLook and dottie.js share one implementation of flows' assignment and packets, the metrics,
+/// the overrides that compare them, and gauges (ADRs 0003 and 0004). One context, used by one caller at a time.
+/// If it can't run (a bug in the bundled script), the frame is drawn without traffic, and debug builds stop.
 final class SimulationEngine: @unchecked Sendable {
     static let shared = SimulationEngine()
 
@@ -13,9 +14,8 @@ final class SimulationEngine: @unchecked Sendable {
     private var pageFunction: JSValue?
     /// The page the context holds (`DottieSim.page`), sent again only when the posed page changes.
     private var lastPage: DottieDocument?
+    /// Why the last frame couldn't be worked out, if it couldn't.
     private(set) var failure: String?
-    private(set) var calls = 0
-    private var lastFailed = false
 
     private init() {}
 
@@ -148,10 +148,8 @@ final class SimulationEngine: @unchecked Sendable {
         let text = String(decoding: data, as: UTF8.self)
 
         lock.lock(); defer { lock.unlock() }
-        let strict = ProcessInfo.processInfo.environment["DOTTIE_SIM"] == "js-strict"
-        calls += 1
-        defer { if strict && lastFailed { fatalError("SimulationEngine fell back: \(failure ?? "bad response")") } }
-        lastFailed = true
+        failure = "bad response"
+        defer { if let failure { assertionFailure("The simulation failed: \(failure)") } }
         guard let f = load() else { return nil }
         if page != lastPage {
             lastPage = nil
@@ -187,14 +185,9 @@ final class SimulationEngine: @unchecked Sendable {
             packets.append(Element(id: id, kind: .ellipse, frame: CGRect(x: x, y: y, width: size, height: size),
                                    style: styles[key.prefix(24)] ?? Style(), seed: 1, layerID: layer))
         }
-        lastFailed = false
+        failure = nil
         return Frame(packets: packets, metrics: metrics,
                      finish: Dictionary(response.finish.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
     }
 }
 
-extension DottieDocument {
-    /// Whether posing runs flows through `SimulationEngine` rather than Swift's `flowFrame`: set `DOTTIE_SIM=js`.
-    /// `DOTTIE_SIM=js-strict` stops instead of falling back to Swift when the simulation fails, for testing.
-    nonisolated(unsafe) static var simulatesInJavaScript = ProcessInfo.processInfo.environment["DOTTIE_SIM"]?.hasPrefix("js") == true
-}

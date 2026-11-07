@@ -659,17 +659,10 @@ extension DottieDocument {
         var metrics = FrameMetrics()
         if measuring {
             let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
-            if Self.simulatesInJavaScript,
-               let out = SimulationEngine.shared.frame(copy, at: t, values: values, offline: offline, since: since, carried: carried) {
+            // dottie.js's simulation, in JavaScriptCore (ADR 0004).
+            if let out = SimulationEngine.shared.frame(copy, at: t, values: values, offline: offline, since: since, carried: carried) {
                 metrics = out.metrics
                 copy.elements = out.finished(copy.elements)
-            } else {
-                let (packets, m) = flowFrame(in: copy, at: t, values: values, offline: offline, since: since, carried: carried)
-                let finished = Self.finishing(copy.elements, metrics: m, values: values, frame: copy, flows: flows ?? [],
-                                              since: max(0, min(since ?? t, 1e6)), carried: carried)
-                metrics = m
-                metrics.carry.merge(finished.readings) { _, new in new }
-                copy.elements = finished.elements + packets
             }
             copy.flows = nil
         }
