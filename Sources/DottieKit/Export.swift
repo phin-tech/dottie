@@ -33,15 +33,23 @@ public enum Exporter {
     /// A page without a timeline is a one-frame GIF.
     /// nil when the animation is too long to export (see `maxAnimationFrames`).
     public static func gif(_ doc: DottieDocument, scale: Double = 1) -> Data? {
-        guard let plan = animation(doc) else { return nil }
+        animation(doc).flatMap { gif(plan: $0, scale: scale) }
+    }
+
+    /// A run of the page clicked through (`Simulation.record`) as a looping animated GIF.
+    public static func gif(_ recording: Simulation.Recording, scale: Double = 1) -> Data? {
+        animation(recording).flatMap { gif(plan: $0, scale: scale) }
+    }
+
+    static func gif(plan: Plan, scale: Double) -> Data? {
         let size = (width: max(1, Int((plan.size.width * scale).rounded())), height: max(1, Int((plan.size.height * scale).rounded())))
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.gif.identifier as CFString, plan.times.count, nil)
         else { return nil }
         let loop = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]]
         CGImageDestinationSetProperties(dest, loop as CFDictionary)
-        for (i, t) in plan.times.enumerated() {
-            guard let img = bitmap(doc.resolved(at: t), bounds: plan.rects[i], scale: scale,
+        for i in plan.times.indices {
+            guard let img = bitmap(plan.pose(i), bounds: plan.rects[i], scale: scale,
                                    background: CGColor(gray: 1, alpha: 1), pixels: size) else { return nil }
             let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: plan.durations[i]]]
             CGImageDestinationAddImage(dest, img, delay as CFDictionary)
@@ -53,15 +61,24 @@ public enum Exporter {
     /// `background: nil` for a transparent page (a themed drawing keeps its page color otherwise).
     /// nil when the animation is too long to export (see `maxAnimationFrames`).
     public static func apng(_ doc: DottieDocument, scale: Double = 1, background: CGColor? = CGColor(gray: 1, alpha: 1)) -> Data? {
-        guard let plan = animation(doc) else { return nil }
+        animation(doc).flatMap { apng(plan: $0, scale: scale, background: background) }
+    }
+
+    /// A run of the page clicked through (`Simulation.record`) as a looping animated PNG.
+    public static func apng(_ recording: Simulation.Recording, scale: Double = 1,
+                            background: CGColor? = CGColor(gray: 1, alpha: 1)) -> Data? {
+        animation(recording).flatMap { apng(plan: $0, scale: scale, background: background) }
+    }
+
+    static func apng(plan: Plan, scale: Double, background: CGColor?) -> Data? {
         let size = (width: max(1, Int((plan.size.width * scale).rounded())), height: max(1, Int((plan.size.height * scale).rounded())))
         let data = NSMutableData()
         guard let dest = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, plan.times.count, nil)
         else { return nil }
         let loop = [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGLoopCount: 0]]
         CGImageDestinationSetProperties(dest, loop as CFDictionary)
-        for (i, t) in plan.times.enumerated() {
-            guard let img = bitmap(doc.resolved(at: t), bounds: plan.rects[i], scale: scale, background: background, pixels: size)
+        for i in plan.times.indices {
+            guard let img = bitmap(plan.pose(i), bounds: plan.rects[i], scale: scale, background: background, pixels: size)
             else { return nil }
             let delay = [kCGImagePropertyPNGDictionary: [kCGImagePropertyAPNGDelayTime: plan.durations[i]]]
             CGImageDestinationAddImage(dest, img, delay as CFDictionary)

@@ -122,7 +122,9 @@ click without stopping.
 
 Check an interactive page before calling it done; you can't click the HTML export yourself. `simulate` plays it as
 the player would: give it steps like `{"click": "east"}`, `{"wait": 2}` and `{"snapshot": true}`, and it reports the
-time, the scene, the variables and what their conditions hide after each, with a PNG per snapshot. `export_png` and
+time, the scene, the variables and what their conditions hide after each, with a PNG per snapshot. Give it
+`record_path` (`.mp4`, `.gif` or `.png`) to also write the whole run as a looping video, for a README or slides where
+the page can't be clicked; end the steps with a wait so the last click's result shows. `export_png` and
 `export_svg` take `state: {"down": true}` to draw one state, and `export_animation` takes it as starting values.
 
 `export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page, or with `.png` a still of
@@ -141,6 +143,7 @@ dottie render flow.mmd -o flow.svg                 # a Mermaid flowchart, laid o
 dottie inspect diagram.dottie                      # every element's resolved frame and connector route, as JSON
 dottie render diagram.dottie --state down -o down.png   # the page with variable down true
 dottie simulate diagram.dottie --click east --wait 2 --snapshot after.png   # play it as the web player would
+dottie simulate diagram.dottie --wait 1 --click east --wait 3 --record east.mp4   # a video of that run
 dottie script-types ./types                        # dottie.d.ts, the types of the scripting API
 ```
 

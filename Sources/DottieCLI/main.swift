@@ -11,6 +11,7 @@ USAGE
   dottie render <file.dottie | file.mmd>... [-o <out>] [options]
   dottie inspect <file.dottie> [-p <page>] [--at <seconds>]... [--state <vars>] [--disk]
   dottie simulate <file.dottie> [-p <page>] [--scene <name>] [--click <element> | --wait <s> | --snapshot <out.png>]...
+                  [--record <out.mp4|gif|png>]
   dottie library list
   dottie library install <file.dottielib>...
   dottie script-types [<dir>]
@@ -70,7 +71,10 @@ SIMULATE
       --wait <seconds>  Let it play this long.
       --next            Press Next: on to the next scene.
       --snapshot <png>  Write a PNG of what is drawn now.
-      --scale <n>       Snapshot pixel scale (default 2).
+      --record <out>    (Repeatable.) Record the whole run, every frame a viewer would see from the start to the last step,
+                        as a looping .mp4, .gif or animated .png. End with a --wait, or the last click's
+                        result never shows.
+      --scale <n>       Snapshot and recording pixel scale (default 2; 1 for a GIF).
       --disk            Read the saved file, not the app's open copy with its unsaved edits.
 
 LIBRARY
@@ -384,7 +388,8 @@ func runInspect(_ args: [String]) -> Int32 {
 
 func runSimulate(_ args: [String]) -> Int32 {
     enum Step { case click(String), wait(Double), next, snapshot(String) }
-    var input: String?, page: String?, scene: String?, disk = false, state: [String: Bool] = [:], scale = 2.0
+    var input: String?, page: String?, scene: String?, disk = false, state: [String: Bool] = [:], scale: Double?
+    var records: [String] = []
     var steps: [Step] = []
     var i = 0
     while i < args.count {
@@ -407,6 +412,12 @@ func runSimulate(_ args: [String]) -> Int32 {
             guard let n = Double(v), n.isFinite, n >= 0, n <= Timeline.maxDuration * 10 else { fail("--wait must be seconds", code: 2) }
             steps.append(.wait(n))
         case "--snapshot": steps.append(.snapshot(value()))
+        case "--record":
+            let out = value()
+            guard ["mp4", "gif", "png", "apng"].contains(URL(fileURLWithPath: out).pathExtension.lowercased()) else {
+                fail("--record writes .mp4, .gif or .png", code: 2)
+            }
+            records.append(out)
         case "-s", "--scale":
             guard let n = Double(value()), n > 0 else { fail("--scale must be a positive number", code: 2) }
             scale = min(max(n, 0.25), 8)
@@ -429,6 +440,7 @@ func runSimulate(_ args: [String]) -> Int32 {
     }
     var sim: Simulation
     do { sim = try Simulation(doc.starting(with: state), scene: scene) } catch { fail("\(error)") }
+    if !records.isEmpty { sim.record() }
     print("start: \(sim.summary)")
     var failures = 0
     for step in steps {
@@ -445,7 +457,7 @@ func runSimulate(_ args: [String]) -> Int32 {
                 print("next: \(sim.summary)")
             case .snapshot(let path):
                 let picture = sim.picture
-                guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale, background: CGColor(gray: 1, alpha: 1))
+                guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale ?? 2, background: CGColor(gray: 1, alpha: 1))
                 else { throw CLIError(message: "snapshot: nothing is drawn now") }
                 let url = absolute(path)
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -457,6 +469,25 @@ func runSimulate(_ args: [String]) -> Int32 {
         } catch {
             warn("\(error)"); failures += 1
         }
+    }
+    for record in records {
+        guard let recording = sim.recording else { break }
+        let url = absolute(record)
+        let data: Data? = switch url.pathExtension.lowercased() {
+        case "mp4": Exporter.mp4(recording, scale: scale ?? 2)
+        case "gif": Exporter.gif(recording, scale: scale ?? 1)
+        default: Exporter.apng(recording, scale: scale ?? 2)
+        }
+        guard let data else {
+            warn(recording.frames.count > Exporter.maxAnimationFrames
+                 ? "record: more than \(Exporter.maxAnimationFrames) frames; wait less" : "record: rendering failed")
+            failures += 1; continue
+        }
+        do {
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: url, options: .atomic)
+        } catch { warn("record: \(error)"); failures += 1; continue }
+        print(String(format: "recorded %@: %d frames, %.1fs", url.path, recording.frames.count, Double(recording.frames.count) / recording.fps))
     }
     return failures == 0 ? 0 : 1
 }

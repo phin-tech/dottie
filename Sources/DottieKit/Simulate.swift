@@ -26,6 +26,8 @@ public struct Simulation: Sendable {
     public private(set) var sinceChange = 0.0
     /// What each queue held when the variables last changed, which it drains from (`FrameMetrics.carry`).
     public private(set) var carried: [String: Double] = [:]
+    /// Every frame shown since `record()`, for a video of the run (`Exporter.gif(_:)`, `mp4(_:)`); nil when not recording.
+    public private(set) var recording: Recording?
 
     /// Starts as the player does: at the start, playing unless the first scene is there and doesn't loop. With
     /// `scene`, at that scene, playing on from it.
@@ -91,8 +93,30 @@ public struct Simulation: Sendable {
         return (next, false)
     }
 
-    /// Plays for `seconds` (whole frames at the timeline's rate), as the player's tick does.
+    /// Starts recording: from now on, every frame shown is kept, this one first (`recording`).
+    public mutating func record() {
+        recording = Recording(doc: doc, fps: Timeline.clampFPS(doc.timeline?.fps ?? Recording.stillFPS), frames: [])
+        recording!.frames.append(snapshot)
+    }
+
+    /// The moment drawn now, as a recording keeps it.
+    var snapshot: Recording.Frame { Recording.Frame(time: time, state: state, since: sinceChange, carried: carried) }
+
+    /// Plays for `seconds` (whole frames at the timeline's rate), as the player's tick does. While recording, each
+    /// frame shown is kept, played or held.
     public mutating func wait(_ seconds: Double) {
+        guard var r = recording, seconds > 0 else { play(seconds); return }
+        recording = nil
+        let frames = Int((seconds * r.fps + 1e-9).rounded(.down))
+        for _ in 0..<min(frames, Exporter.maxAnimationFrames) {
+            play(1 / r.fps)
+            r.frames.append(snapshot)
+        }
+        play(seconds - Double(frames) / r.fps)
+        recording = r
+    }
+
+    private mutating func play(_ seconds: Double) {
         guard let tl = doc.timeline, seconds > 0 else { return }
         if playing { sinceChange += seconds }
         var steps = Int((seconds * Timeline.clampFPS(tl.fps) + 1e-9).rounded(.down))
@@ -200,6 +224,33 @@ public struct Simulation: Sendable {
         if let t = e.text?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty { return "\"\(t.prefix(30))\"" }
         if let a = e.anchor, !a.isEmpty { return a }
         return "\(e.kind.rawValue) \(e.id.uuidString.prefix(8))"
+    }
+}
+
+extension Simulation {
+    /// A run of a page as a viewer would see it, frame by frame (`Simulation.record`): what a GIF or movie of
+    /// clicking through it draws.
+    public struct Recording: Sendable {
+        /// The rate a page without a timeline is recorded at.
+        static let stillFPS = 12.0
+        public let doc: DottieDocument
+        /// Frames a second: the timeline's.
+        public let fps: Double
+        public var frames: [Frame]
+
+        /// One frame: the moment, the variables, and the queues' inputs (ADR 0003).
+        public struct Frame: Sendable, Equatable {
+            public var time: Double
+            public var state: [String: Bool]
+            public var since: Double
+            public var carried: [String: Double]
+        }
+
+        /// Frame `i` as drawn.
+        public func picture(_ i: Int) -> DottieDocument {
+            let f = frames[i]
+            return doc.resolved(at: f.time, state: .values(f.state), since: f.since, carried: f.carried)
+        }
     }
 }
 
