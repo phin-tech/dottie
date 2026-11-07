@@ -279,11 +279,11 @@ const hex = (h: string): RGBA => {
 export const GAUGE_GREEN = hex("#16a34a"), GAUGE_AMBER = hex("#d97706"), GAUGE_RED = hex("#dc2626");
 export const GAUGE_BLUE = hex("#2f6fdf"), GAUGE_TRACK = hex("#e5e7eb"), GAUGE_GRAY = hex("#9ca3af");
 
-/** A metric's value as a gauge shows it: a percentage for load, seconds for transit and delay. */
+/** A metric's value as a gauge shows it: a percentage for load and backup, seconds for transit and delay. */
 export function formatted(metric: string, v: number | null): string {
   if (v === null || !Number.isFinite(v)) return "–";
   switch (metric) {
-    case "load": return formatNumber(v * 100, 0) + "%";
+    case "load": case "backup": return formatNumber(v * 100, 0) + "%";
     case "transit": case "delay": return formatNumber(v, Math.abs(v) >= 10 ? 1 : 2) + "s";
     default: return formatNumber(v, Math.abs(v) >= 100 ? 0 : Math.abs(v) >= 10 ? 1 : 2);
   }

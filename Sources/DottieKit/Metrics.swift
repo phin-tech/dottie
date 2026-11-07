@@ -315,11 +315,11 @@ extension DottieDocument {
     static let gaugeGreen = RGBA(hex: "#16a34a")!, gaugeAmber = RGBA(hex: "#d97706")!, gaugeRed = RGBA(hex: "#dc2626")!
     static let gaugeBlue = RGBA(hex: "#2f6fdf")!, gaugeTrack = RGBA(hex: "#e5e7eb")!, gaugeGray = RGBA(hex: "#9ca3af")!
 
-    /// A metric's value as a gauge shows it: a percentage for load, seconds for transit and delay.
+    /// A metric's value as a gauge shows it: a percentage for load and backup, seconds for transit and delay.
     static func formatted(_ metric: String, _ v: Double?) -> String {
         guard let v, v.isFinite else { return "–" }
         switch metric {
-        case "load": return number(v * 100, places: 0) + "%"
+        case "load", "backup": return number(v * 100, places: 0) + "%"
         case "transit", "delay": return number(v, places: abs(v) >= 10 ? 1 : 2) + "s"
         default: return number(v, places: abs(v) >= 100 ? 0 : abs(v) >= 10 ? 1 : 2)
         }
