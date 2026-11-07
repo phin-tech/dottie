@@ -44,7 +44,7 @@ final class ReviewRegressionTests: XCTestCase {
         doc.timeline = Timeline(fps: 60, duration: 1e7)
         XCTAssertTrue(Exporter.animationTooLong(doc))
         XCTAssertNil(Exporter.gif(doc))
-        XCTAssertNil(Exporter.player(doc))
+        XCTAssertNotNil(Exporter.player(doc), "the web page draws frames as it plays, so it has none to refuse")
     }
 
     // 3. Frames before anything enters don't stretch the canvas.

@@ -78,37 +78,6 @@ final class ButtonTests: XCTestCase {
         XCTAssertEqual(b.timeline?.markers?.map(\.t), [0, 0.5, 1])
     }
 
-    func testTheExportDrawsEachClickableCopyAsOneButton() throws {
-        let (doc, button, play, idle) = try page()
-        let html = try XCTUnwrap(Exporter.player(doc))
-        XCTAssertTrue(html.contains(#"aria-label="Go button""#), "labelled by its symbol's name")
-        let plan = try XCTUnwrap(Exporter.animation(doc))
-        let (holder, frames) = Exporter.playerFrames(doc, plan: plan, clickable: [play.id.uuidString: 0])
-        let parts = Set(button.elements.map { DottieDocument.derivedID(play.id, $0.id).uuidString })
-        XCTAssertFalse(parts.contains { holder.contains($0) }, "never shared")
-        _ = idle
-        for (i, frame) in frames.enumerated() {
-            let groups = frame.components(separatedBy: "<g class=\"dottie-a").count - 1
-            XCTAssertEqual(groups, 1, "frame \(i): one button, the clickable copy; the click-to-play copy isn't one here")
-            let inside = try XCTUnwrap(frame.components(separatedBy: "<g class=\"dottie-a").last)
-            XCTAssertTrue(inside.hasPrefix(" dottie-b\""), "it has a down state")
-            for state in ["dottie-n", "dottie-h", "dottie-d", "dottie-hit"] { XCTAssertTrue(inside.contains("class=\"\(state)\""), "\(state), frame \(i)") }
-            XCTAssertTrue(inside.contains("#6699ff"), "over is blue")
-            XCTAssertTrue(inside.contains("#1a3399"), "down is dark blue")
-        }
-        XCTAssertTrue(html.contains(".dottie-b:active .dottie-d, .dottie-b.dottie-press .dottie-d { display: inline; }"))
-    }
-
-    func testAPlainCopyTakesClicksOnItsFrame() throws {
-        var (page, symbol, _, _) = try plainGear()
-        var inst = try XCTUnwrap(page.placeSymbol(symbol.id, at: CGPoint(x: 0, y: 0)))
-        inst.click = ClickAction(url: "https://example.com")
-        page.elements[0] = inst
-        let frames = Exporter.playerFrames(page, plan: try XCTUnwrap(Exporter.animation(page)), clickable: [inst.id.uuidString: 0]).frames
-        XCTAssertTrue(frames[0].contains("<path class=\"dottie-hit\""), "its frame takes the clicks")
-        XCTAssertFalse(frames[0].contains("dottie-b"), "no down state: it nudges instead")
-    }
-
     private func plainGear() throws -> (DottieDocument, Symbol, Element, Element) {
         let layer = Layer(name: "L")
         let a = Element(kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 20, height: 20), layerID: layer.id)

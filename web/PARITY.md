@@ -27,7 +27,7 @@ fixture, so the gap is visible rather than silent.
 | Waypoints (bends) on every routing, and hops | Supported | [edge/waypoints](../fixtures/edge/waypoints.dottie), [edge/waypoints-symbol](../fixtures/edge/waypoints-symbol.dottie) | Hops need the page, so `connectorParts` takes it; without one a line draws none. |
 | Arrowheads: arrow, triangle, dot, bar | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Label colors (`textColor`, apart from the stroke) | Supported | [edge/text-colors](../fixtures/edge/text-colors.dottie) | Text boxes and notes ignore it, as in Dottie |
-| Connector labels | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | Label boxes sized with CoreText's measurements. The player paints them on the page color, like the app; Dottie's flipbook export leaves them unpainted |
+| Connector labels | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | Label boxes sized with CoreText's measurements. The player paints them on the page color, like the app |
 | Keys and eases (linear, in, out, in-out, hold, spring, bounce, elastic) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie), [edge/eases](../fixtures/edge/eases.dottie) | Unknown ease names play linear, with a warning |
 | Visibility, reveal (draw-on, typing), opacity | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
 | Transitions | Supported | [edge/transitions](../fixtures/edge/transitions.dottie) | They are ordinary keys in the file |
@@ -37,22 +37,22 @@ fixture, so the gap is visible rather than silent.
 | Repeats (counted and forever) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
 | Boil (three drawings) and settle | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | Boiled seeds match bit for bit |
 | Camera views | Supported | [edge/camera](../fixtures/edge/camera.dottie), [design/zoom](../fixtures/design/zoom.dottie) | |
-| Scenes (markers) and click-through | Supported | [design/tour](../fixtures/design/tour.dottie) | Stops at each scene, as the HTML export does |
+| Scenes (markers) and click-through | Supported | [design/tour](../fixtures/design/tour.dottie) | Stops at each scene. The HTML export is this player |
 | Poster frame, reduced motion | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | |
 | Damaged timelines (clamped, filtered, sorted) | Supported | [edge/timeline](../fixtures/edge/timeline.dottie) | Read the way DottieKit's decoders read them |
 | Unknown kinds, fields and newer versions | Partial | [js-only/future](../fixtures/js-only/future.dottie) | Drawn as labelled placeholders, reported in `warnings`; Dottie refuses such files |
 | Text fonts | Partial | [edge/fonts](../fixtures/edge/fonts.dottie) | Measured with CoreText's metrics for Helvetica Neue and the bundled handwriting fonts (Caveat, Patrick Hand, Architects Daughter), which the player loads from `dist/fonts` and a compiled drawing carries; browsers without Helvetica Neue draw Helvetica or Arial in the same places, so runs of mixed styles may sit slightly apart. A font of one's own is laid out as Helvetica Neue and drawn in that font where the viewer has it |
 | Symbols: instances on their own clocks (loop, once, still, offset), nested, scaled and turned | Supported | [edge/symbols](../fixtures/edge/symbols.dottie) | Expanded as DottieKit expands them, with the same ids, seeds and limits ([js-only/hostile-symbols](../fixtures/js-only/hostile-symbols.dottie)) |
-| Button symbols (up, over, down, hit) and clickable copies | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | As the HTML export draws them |
+| Button symbols (up, over, down, hit) and clickable copies | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | Up, over, down and hit, in the player and the HTML export alike |
 | Symbol parameters (`{{name}}` in a symbol's text, filled per copy) | Supported | [edge/params](../fixtures/edge/params.dottie) | Defaults, undeclared names left as written, values passed into nested copies, filled before text types out |
-| Copies that play when clicked | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | `<dottie-player>` only: the HTML export is drawn ahead of time and shows them at rest |
-| Clicks: play a scene, open a link, hover looks, keyboard | Supported | [edge/clicks](../fixtures/edge/clicks.dottie) | As the HTML export does; only http, https and mailto links are followed |
+| Copies that play when clicked | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | In the player and the HTML export |
+| Clicks: play a scene, open a link, hover looks, keyboard | Supported | [edge/clicks](../fixtures/edge/clicks.dottie) | Only http, https and mailto links are followed |
 | Page variables and conditions (`variables`, `when`) | Supported | [edge/state](../fixtures/edge/state.dottie) | Starting values in every still and export; connectors go with a shape the state hides |
 | Overrides (`overrides`: restyle and reroute under a condition) | Supported | [edge/state](../fixtures/edge/state.dottie) | Opacity multiplies; a reroute or key that isn't an id is dropped as DottieKit drops it |
 | Traffic flows (`flows`) | Supported | [edge/flows](../fixtures/edge/flows.dottie) | Routed each frame over the connectors drawn, cheapest by connector `cost` (ADR 0002); packet ids derive from the flow's |
 | Volume, capacity, delay, metrics, gauges | Supported | [edge/flows](../fixtures/edge/flows.dottie) (Capacity page) | `measure.ts` mirrors `Metrics.swift` (ADR 0003): assignment in page order, backlog piles, conditions on metrics, gauges expanded to `.path` elements |
-| Clicks that set and toggle variables | Supported | [edge/state](../fixtures/edge/state.dottie) | Change what shows without touching the playhead. The HTML export of a page with state is this player |
-| Looping scenes (`loop` on a marker) | Supported | [edge/state](../fixtures/edge/state.dottie) | As the HTML export plays them: no stop on entering, round from the scene's end to its start |
+| Clicks that set and toggle variables | Supported | [edge/state](../fixtures/edge/state.dottie) | Change what shows without touching the playhead |
+| Looping scenes (`loop` on a marker) | Supported | [edge/state](../fixtures/edge/state.dottie) | No stop on entering, round from the scene's end to its start |
 | Links out of the drawing (`url`) | Supported | [edge/links](../fixtures/edge/links.dottie) | A web or mail `url` opens when clicked if there is no `click`, and SVG export wraps it in `<a>`; a link to another drawing does nothing on the web |
 | Links between shapes and pages | Partial | [edge/clicks](../fixtures/edge/clicks.dottie) | A link to a shape on another page shows that page; one on the same page does nothing. The HTML export holds one page, so it has neither |
 | Editing | Missing | | |

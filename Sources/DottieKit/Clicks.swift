@@ -1,30 +1,6 @@
 import Foundation
 
-/// What a click on an element does in the web players, worked out against its page.
-public enum ClickTarget: Equatable, Sendable {
-    /// Jump to scene `n` (an index into the page's markers) and play on to the next.
-    case scene(Int)
-    /// Open a link in a new tab.
-    case url(String)
-}
-
 extension DottieDocument {
-    /// The page's clickable elements and what each click does. A scene named by no marker on the page, or a link
-    /// that isn't allowed, makes nothing clickable. An element with no `click` opens its `url` when that is a web link.
-    public var clickTargets: [UUID: ClickTarget] {
-        let markers = timeline?.markers ?? []
-        var out: [UUID: ClickTarget] = [:]
-        for e in elements {
-            // A click that only changes variables is played by dottie.js (DottieDocument.usesState), not here.
-            if let name = e.click?.scene, !name.isEmpty, let i = Self.scene(named: name, in: markers) {
-                out[e.id] = .scene(i)
-            } else if let url = e.click?.url.flatMap(ClickAction.allowed) ?? e.outsideLink?.webAddress {
-                out[e.id] = .url(url)
-            }
-        }
-        return out
-    }
-
     /// The marker called `name`: an exact match, else one that differs only in case.
     static func scene(named name: String, in markers: [Marker]) -> Int? {
         markers.firstIndex { $0.name == name }
@@ -57,14 +33,6 @@ extension DottieDocument {
         return markers.first { abs($0.t - t) < 1e-6 }?.t
     }
 
-    /// `self` with `ids` drawn as they look hovered.
-    func hovered(_ ids: Set<UUID>) -> DottieDocument {
-        var copy = self
-        for i in copy.elements.indices where ids.contains(copy.elements[i].id) {
-            if let look = copy.elements[i].hover { copy.elements[i] = look.apply(to: copy.elements[i]) }
-        }
-        return copy
-    }
 }
 
 extension DiagramOps {
@@ -146,48 +114,5 @@ extension DiagramOps {
         if let fill { look.fill = try color(fill, "hover fill") }
         if let opacity { look.opacity = opacity < 0 || !opacity.isFinite ? nil : min(opacity, 1) }
         return look.isEmpty ? nil : look
-    }
-}
-
-extension Element {
-    /// What a screen reader calls the element when it is a button: the first line of its text, else its anchor,
-    /// else, for a symbol's copy, the symbol's name (`symbolName`), else its kind.
-    func buttonLabel(symbolName: String? = nil) -> String {
-        if let t = text?.split(separator: "\n").first.map(String.init), !t.isEmpty { return t }
-        if let a = anchor, !a.isEmpty { return a }
-        if let n = symbolName, !n.isEmpty { return n }
-        return kind.rawValue
-    }
-}
-
-extension DottieDocument {
-    /// For each of `instances` (copies of symbols on this page), the ids of every element it can expand to, mapped
-    /// to it: how the web players gather a clickable copy's drawing into one button.
-    func parts(of instances: Set<UUID>) -> [String: UUID] {
-        var out: [String: UUID] = [:]
-        for e in elements where instances.contains(e.id) && e.kind == .symbol {
-            var alone = DottieDocument(id: id, layers: [Layer(id: e.layerID, name: "")], elements: [e])
-            alone.symbols = symbols
-            for part in alone.expandingSymbols(at: 0, posing: false).elements { out[part.id.uuidString] = e.id }
-        }
-        return out
-    }
-
-    /// The moment of each button state for the button copies among `ids`; empty when none is a button.
-    func buttonTimes(_ state: Symbol.ButtonState, of ids: Set<UUID>) -> [UUID: Double] {
-        let table = symbolIndex
-        var out: [UUID: Double] = [:]
-        for e in elements where ids.contains(e.id) {
-            if let s = e.symbol.flatMap({ table[$0] }), s.isButton, let t = s.buttonTime(state) { out[e.id] = t }
-        }
-        return out
-    }
-}
-
-extension String {
-    /// Safe inside a double-quoted XML or HTML attribute.
-    var attributeEscaped: String {
-        replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;")
-            .replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
     }
 }

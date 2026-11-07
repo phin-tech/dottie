@@ -327,45 +327,41 @@ test("links from a hostile file never run script", async () => {
   await close();
 });
 
-// The HTML export (Exporter.player) is its own player, drawn ahead of time; its golden is made by `just goldens`.
-async function exported(options = {}) {
+// The HTML export is <dottie-player> in a page, with the drawing compiled in (Exporter.player); its goldens are made by `just goldens`.
+async function exported(name, options = {}) {
   const context = await browser.newContext({ reducedMotion: options.reducedMotion ?? "no-preference" });
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await serve(page);
-  await page.goto("http://dottie.test/fixtures/goldens/html/clicks.html");
-  const frame = () => page.evaluate(() => [...document.querySelectorAll(".f")].findIndex((f) => f.classList.contains("on")));
-  const inFrame = (label) => `.f.on .dottie-a[aria-label="${label}"]`;
-  return { page, errors, frame, inFrame, close: () => context.close() };
+  await page.goto(`http://dottie.test/fixtures/goldens/html/${name}.html`);
+  await ready(page);
+  return { page, errors, close: () => context.close() };
 }
 
-test("the HTML export plays a clicked element's scene, with hover and keyboard", async () => {
-  const { page, errors, frame, inFrame, close } = await exported();
-  assert.equal(await frame(), 0);
-  await page.hover(inFrame("Auth"));
-  assert.equal(await page.evaluate((s) => getComputedStyle(document.querySelector(s + " .dottie-h")).display, inFrame("Auth")), "inline");
-  await page.click(inFrame("Auth"));
-  await page.waitForFunction(() => document.querySelector("#play").textContent === "▶" && document.querySelectorAll(".f")[20].classList.contains("on"), null, { timeout: 5000 });
-  assert.equal(await page.evaluate(() => document.querySelector("#scene").textContent), "Done");
-  await page.focus(inFrame("Back"));
+test("the HTML export is <dottie-player>: a click plays its scene, with hover, keyboard and links", async () => {
+  const { page, errors, close } = await exported("clicks");
+  assert.equal((await state(page)).frame, 0);
+  await page.hover(button("Auth"));
+  assert.equal(await shown(page, "Auth"), "hover");
+  await page.click(button("Auth"));
+  await page.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 20; }, null, { timeout: 5000 });
+  assert.equal((await state(page)).scene, "Done");
+  await page.focus(button("Back"));
   await page.keyboard.press("Enter");
-  await page.waitForFunction(() => document.querySelector("#play").textContent === "▶" && document.querySelectorAll(".f")[10].classList.contains("on"), null, { timeout: 5000 });
-  assert.equal(await page.evaluate(() => document.activeElement?.getAttribute("aria-label")), "Back", "focus follows to the frame shown");
+  await page.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 10; }, null, { timeout: 5000 });
   await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
-  await page.click(inFrame("Docs"));
+  await page.click(button("Docs"));
   assert.deepEqual(await page.evaluate(() => window.__opened), [["https://example.com/docs", "_blank", "noopener"]]);
-  assert.equal(await page.locator('.dottie-a[aria-label="Details"]').count(), 0, "one page: no page links");
-  assert.equal(await page.locator('.dottie-a[aria-label="Script"]').count(), 0);
-  assert.equal(await page.locator("defs .dottie-a").count(), 0, "never inside shared <use> markup");
+  assert.equal(await page.locator(button("Script")).count(), 0, "javascript: is never followed");
   assert.deepEqual(errors, []);
   await close();
 });
 
 test("the HTML export with reduced motion jumps straight to the stop", async () => {
-  const { page, frame, inFrame, close } = await exported({ reducedMotion: "reduce" });
-  await page.click(inFrame("Auth"));
-  assert.equal(await frame(), 20);
+  const { page, close } = await exported("clicks", { reducedMotion: "reduce" });
+  await page.click(button("Auth"));
+  assert.equal((await state(page)).frame, 20);
   await close();
 });
 
@@ -380,30 +376,10 @@ test("symbols play, and a hostile nest of them doesn't hang the player", async (
   await close();
 });
 
-test("the HTML export draws symbols", async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await serve(page);
-  await page.goto("http://dottie.test/fixtures/goldens/html/symbols.html");
-  // Frame 15 (1.5 s): every placed copy of Gear shows its labelled box.
-  const labels = await page.evaluate(() => {
-    const f = document.querySelectorAll(".f")[15];
-    const own = [...f.querySelectorAll("tspan")].map((t) => t.textContent);
-    const shared = [...f.querySelectorAll("use")].flatMap((u) => [...document.querySelectorAll(u.getAttribute("href") + " tspan")].map((t) => t.textContent));
-    return [...own, ...shared].filter((t) => t === "g").length;
-  });
-  assert.ok(labels >= 4, `${labels} copies of the symbol's label`);
-  assert.deepEqual(errors, []);
-  await context.close();
-});
-
 // MARK: Buttons
 
 const shows = (page, root, label) => page.evaluate(([root, label]) => {
-  const base = root ? document.querySelector(root).shadowRoot : document;
-  const g = base.querySelector(`${root ? "" : ".f.on "}.dottie-a[aria-label="${label}"]`);
+  const g = document.querySelector(root).shadowRoot.querySelector(`.dottie-a[aria-label="${label}"]`);
   const on = (c) => { const x = g.querySelector(`:scope > .${c}`); return !!x && getComputedStyle(x).display !== "none"; };
   return ["dottie-n", "dottie-h", "dottie-d"].filter(on).join(" ");
 }, [root, label]);
@@ -421,10 +397,7 @@ async function buttonChecks(page, root, sel, frame) {
   await page.mouse.down();
   assert.equal(await shows(page, root, "Go"), "dottie-d", "down");
   await page.mouse.up();
-  await page.waitForFunction(([root]) => {
-    if (root) { const p = document.querySelector(root); return p.paused && p.playback.frame === 20; }
-    return document.querySelector("#play").textContent === "▶" && document.querySelectorAll(".f")[20].classList.contains("on");
-  }, [root], { timeout: 5000 });
+  await page.waitForFunction((root) => { const p = document.querySelector(root); return p.paused && p.playback.frame === 20; }, root, { timeout: 5000 });
   assert.equal(await page.locator(`${sel}[aria-label="Go button"], ${sel}[aria-label="Go"]`).count(), 1, "the button with no action isn't one");
 }
 
@@ -458,41 +431,18 @@ test("a clip set to play on click replays in <dottie-player>, and jumps to its e
   }
 });
 
-test("a button symbol in the HTML export: up, over, down, hit area, click; no play-on-click there", async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  const errors = [];
-  page.on("pageerror", (e) => errors.push(e.message));
-  await serve(page);
-  await page.goto("http://dottie.test/fixtures/goldens/html/buttons.html");
-  const frame = () => page.evaluate(() => [...document.querySelectorAll(".f")].findIndex((f) => f.classList.contains("on")));
-  await buttonChecks(page, null, ".f.on .dottie-a", frame);
-  assert.equal(await page.locator('.dottie-a[aria-label="spinner"]').count(), 0, "can't replay here, so it isn't a button");
-  assert.equal(await page.locator("defs .dottie-a, defs .dottie-hit").count(), 0);
-  await page.focus('.f.on .dottie-a[aria-label="Docs button"]');
+test("a button symbol in the HTML export: up, over, down, hit area, click", async () => {
+  const { page, errors, close } = await exported("buttons");
+  await buttonChecks(page, "dottie-player", "dottie-player .dottie-a", async () => (await state(page)).frame);
   await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
+  await page.focus('dottie-player .dottie-a[aria-label="Docs button"]');
   await page.keyboard.press("Enter");
   assert.deepEqual(await page.evaluate(() => window.__opened), [["https://example.com/docs", "_blank", "noopener"]]);
   assert.deepEqual(errors, []);
-  await context.close();
+  await close();
 });
 
-test("a press held across frames while playing still clicks, in both players; Enter works on a button", async () => {
-  // The export swaps whole frames, so the press and the release land on different copies of the button.
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await serve(page);
-  await page.goto("http://dottie.test/fixtures/goldens/html/buttons.html");
-  await page.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; });
-  await page.click("#play");
-  const docs = await page.locator('.f.on .dottie-a[aria-label="Docs button"]').boundingBox();
-  await page.mouse.move(docs.x + docs.width / 2, docs.y + docs.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(250);
-  await page.mouse.up();
-  assert.equal((await page.evaluate(() => window.__opened)).length, 1, "the export");
-  await context.close();
-
+test("a press held across frames while playing still clicks; Enter works on a button", async () => {
   const { page: p2, close } = await open(`<dottie-player src="/fixtures/edge/buttons.dottie"></dottie-player>`);
   await ready(p2);
   await p2.evaluate(() => { window.__opened = []; window.open = (...a) => { window.__opened.push(a); return null; }; document.querySelector("dottie-player").play(); });
@@ -507,25 +457,6 @@ test("a press held across frames while playing still clicks, in both players; En
   await p2.keyboard.press("Enter");
   await p2.waitForFunction(() => { const p = document.querySelector("dottie-player"); return p.paused && p.playback.frame === 20; }, null, { timeout: 5000 });
   await close();
-});
-
-test("the HTML export keeps a hovered button's look steady while it plays", async () => {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await serve(page);
-  await page.goto("http://dottie.test/fixtures/goldens/html/clicks.html");
-  const box = await page.locator('.f.on .dottie-a[aria-label="Auth"]').boundingBox();
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);   // plays on, the pointer still over it
-  const seen = [];
-  for (let i = 0; i < 20; i++) {
-    await page.waitForTimeout(40);
-    seen.push(await page.evaluate(() => {
-      const h = document.querySelector('.f.on .dottie-a[aria-label="Auth"] > .dottie-h');
-      return h && getComputedStyle(h).display !== "none" ? "H" : "n";
-    }));
-  }
-  assert.equal(seen.join(""), "H".repeat(20));
-  await context.close();
 });
 
 test("a click flips a page variable while the page keeps playing; a looping scene goes round", async () => {

@@ -1661,7 +1661,7 @@ actor DottieTools {
             } ?? .smooth
             let out = try fileURL(a, key: "out_path", ext: ext)
             let scale = min(max(a.double("scale") ?? 1.5, 0.25), 4)
-            guard !Exporter.animationTooLong(doc) else {
+            guard ext == "html" || !Exporter.animationTooLong(doc) else {
                 throw ToolFailure(message: "The animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
             }
             let frame = a.double("preview").map(doc.resolved) ?? doc.still

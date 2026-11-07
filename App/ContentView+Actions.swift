@@ -171,7 +171,7 @@ extension ContentView {
     private func exportAnimation(_ format: AnimationExportFormat) {
         let model = document.model
         guard model.timeline != nil, !model.elements.isEmpty else { NSSound.beep(); return }
-        guard !Exporter.animationTooLong(model) else {
+        guard format == .player || !Exporter.animationTooLong(model) else {
             Alerts.show("This animation is too long to export",
                         "It has more than \(Exporter.maxAnimationFrames) frames. Shorten it or lower its frame rate.")
             return

@@ -222,9 +222,10 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
         guard !doc.elements.isEmpty else { throw CLIError(message: "the drawing is empty; nothing to render") }
         return Data(try Exporter.script(doc, options: Exporter.ScriptOptions(at: o.at, clean: o.roughness == 0)).utf8)
     }
-    let plays = format == .gif || format == .apng || format == .mp4 || format == .lottie || (format == .html && doc.timeline != nil && o.at == nil)
+    let plays = format == .gif || format == .apng || format == .mp4 || format == .lottie || (format == .html && (doc.timeline != nil || doc.usesState) && o.at == nil)
     var doc = plays ? doc : o.at.map(doc.resolved) ?? doc.still
-    if plays, Exporter.animationTooLong(doc) {
+    // The web page draws its frames as it plays, so only the formats that bake frames in have a limit.
+    if plays, format != .html, Exporter.animationTooLong(doc) {
         throw CLIError(message: "the animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
     }
     if let r = o.roughness { doc = doc.withRoughness(r) }

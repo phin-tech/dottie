@@ -108,10 +108,8 @@ final class WalkthroughTests: XCTestCase {
         XCTAssertNil(r.error)
         XCTAssertEqual(doc.timeline?.markers?.map(\.name), ["First", "Then </script><b>this"])
         let html = try XCTUnwrap(Exporter.player(doc))
-        XCTAssertTrue(html.contains("id=\"next\""))
         XCTAssertFalse(html.contains("</script><b>"), "names can't break out of the script")
         XCTAssertTrue(html.contains("Then <\\/script>"))
-        XCTAssertFalse(try XCTUnwrap(Exporter.player(DottieDocument(elements: doc.elements))).contains("id=\"next\""))
         let back = try DottieDocument.decode(doc.encoded())
         XCTAssertEqual(back.timeline?.markers, doc.timeline?.markers)
     }
