@@ -84,11 +84,13 @@ private let exportStateProp: Value = .object(["type": "object", "additionalPrope
 private let simulateStepItem: Value = .object(["type": "object", "properties": .object([
     "click": .object(["type": "string"]), "wait": .object(["type": "number"]),
     "next": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
+    "metrics": .object(["type": "boolean"]),
 ])])
 private let simulateStepsProp: Value = .object(["type": "array", "items": simulateStepItem,
     "description": .string("In order. Each is one of {\"click\": element id, its first characters, its text or anchor}, "
         + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"snapshot\": true} (return a PNG) or "
-        + "{\"snapshot\": \"/abs/path.png\"} (also save it)")])
+        + "{\"snapshot\": \"/abs/path.png\"} (also save it) or {\"metrics\": true} (the throughput, load, backlog and "
+        + "transit of what has a capacity, delay or traffic, now)")])
 private let stateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
     "description": .string("Draw the page with its variables (set_variable) at these values instead of their starting "
         + "ones, e.g. {\"down\": true}, to check each state of an interactive page; the others keep their starting values")])
@@ -106,12 +108,13 @@ private func idListProp(_ description: String) -> Value {
 private let stateRestyleProp: Value = .object([
     "type": "object",
     "description": .string("Element id to how it looks while it is true: {stroke, fill, text_color (hex), opacity (multiplies), stroke_width, "
-        + "dash, text, cost (a connector's cost for add_flow traffic: a degraded link)}"),
+        + "dash, text, cost (a connector's cost for add_flow traffic: a degraded link), capacity, delay (half the workers down, a "
+        + "slow step)}"),
     "additionalProperties": .object(["type": "object", "properties": .object([
         "stroke": .object(["type": "string"]), "fill": .object(["type": "string"]), "text_color": .object(["type": "string"]),
         "opacity": .object(["type": "number"]), "stroke_width": .object(["type": "number"]),
         "dash": .object(["enum": .array(["solid", "dashed", "dotted"])]), "text": .object(["type": "string"]),
-        "cost": .object(["type": "number"]),
+        "cost": .object(["type": "number"]), "capacity": .object(["type": "number"]), "delay": .object(["type": "number"]),
     ])]),
 ])
 
@@ -340,6 +343,11 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Hand-drawn look"),
                 "routing": prop("string", "Connector routing", enum: routingValues),
                 "anchor": prop("string", "Hidden label for finding and linking to the element; never drawn. Empty string removes it"),
+                "capacity": prop("number", "The most add_flow volume it carries (a worker pool's throughput, a rate limit, a lane's "
+                    + "trucks a day); flows are placed in page order, each on its cheapest route with room, the rest on the next, "
+                    + "and what fits nowhere is backlog waiting in front of the bottleneck. null removes it"),
+                "delay": prop("number", "Shapes: seconds add_flow traffic stays inside when passing through (processing, queueing). "
+                    + "null removes it"),
                 "link": prop("string", "Id of a shape this element jumps to when its link badge is clicked in the app, on any page "
                     + "(the app switches tabs to follow it); an empty string removes the link"),
                 "url": prop("string", "Where the link badge goes outside the drawing, instead of link: an http(s) or mailto link, or "
@@ -464,9 +472,32 @@ actor DottieTools {
                 "when": prop("string", "A condition on page variables: nothing flows while it fails"),
                 "spread": prop("boolean", "While the first destination can't be reached, deal packets in turn across every other "
                                + "destination that can (a downed region's traffic shared by the rest), rather than all to the next"),
+                "volume": prop("number", "How much it carries, in the page's own unit (requests a second, messages, trucks a day; "
+                               + "default 1). Shapes and connectors with a capacity (update_element) limit it; the biggest flow "
+                               + "draws a packet every `every`, the rest proportionally fewer"),
                 "id": prop("string", "An existing flow's id, to change or remove it"),
                 "remove": prop("boolean", "Remove the flow named by id"),
              ], required: ["path"])),
+        Tool(name: "add_gauge",
+             description: "Add a gauge: a box showing a metric of a shape, connector or flow as a number, a bar or a dial, green, "
+                + "amber at warn and red at alarm (load defaults to 0.7 and 0.9), drawn by every renderer and updated as states "
+                + "change. Metrics come from add_flow traffic and capacities: throughput (volume through it), load (throughput "
+                + "over capacity), delay, backlog (volume waiting at a shape: how fast its queue grows), inFlight (packets on a "
+                + "connector now), and for a flow transit (seconds end to end) and backup (share not reaching its first "
+                + "destination). To recolor a shape by a metric instead, give it an anchor and an override like {when: "
+                + "\"load(workers) >= 0.9\", stroke: \"#dc2626\"} (run_script dottie.update); such overrides change only looks.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "metric": prop("string", "What it shows", enum: PageState.metricNames),
+                "of": prop("string", "Id of the shape, connector or flow it measures"),
+                "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
+                "width": prop("number", "Width (default 160)"), "height": prop("number", "Height (default 80, 110 for a dial)"),
+                "style": prop("string", "How it shows it (default number)", enum: Gauge.Style.allCases.map(\.rawValue)),
+                "max": prop("number", "What a full bar or dial stands for (default 1 for load, else the target's capacity)"),
+                "warn": prop("number", "At or past this it turns amber"),
+                "alarm": prop("number", "At or past this it turns red"),
+                "label": prop("string", "Its title (default the metric and the target's name)"),
+             ], required: ["path", "metric", "of", "x", "y"])),
         Tool(name: "list_extensions",
              description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
                 + "commands, or why it did not load. Shapes are added with add_shape (extension, shape, params); commands run with run_command.",
@@ -1083,6 +1114,13 @@ actor DottieTools {
                                       anchor: a.string("anchor").map { Optional($0) }, click: click, hover: hover,
                                       otherPages: file.pages)
                 if let w = a.string("when") { try DiagramOps.setWhen(&file.pages[p], id: id, w) }
+                func measure(_ k: String) -> Double?? {
+                    guard let v = a.raw[k] else { return nil }
+                    if case .null = v { return .some(nil) }
+                    return a.double(k).map { .some($0) } ?? .some(.nan)
+                }
+                let capacity = measure("capacity"), delay = measure("delay")
+                if capacity != nil || delay != nil { try DiagramOps.setCapacity(&file.pages[p], id: id, capacity: capacity, delay: delay) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
             let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
@@ -1120,6 +1158,7 @@ actor DottieTools {
                                                   return c
                                               },
                                               size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
+                                              volume: a.double("volume"),
                                               replacing: a.string("id") == nil ? nil : try a.uuid("id"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
@@ -1147,6 +1186,7 @@ actor DottieTools {
                                                  strokeWidth: o.double("stroke_width"),
                                                  dash: o.string("dash").flatMap(DashStyle.init(rawValue:)), text: o.string("text"),
                                                  cost: o.double("cost"))
+                spec.restyle[id]?.capacity = o.double("capacity"); spec.restyle[id]?.delay = o.double("delay")
             }
             for (k, v) in a.raw["reroute"]?.objectValue ?? [:] {
                 guard let from = UUID(uuidString: k), let to = v.stringValue.flatMap(UUID.init(uuidString:)) else {
@@ -1417,6 +1457,10 @@ actor DottieTools {
             var list = try json(DiagramOps.summarize(file.pages[p]))
             let flows = DiagramOps.describeFlows(file.pages[p])
             if !flows.isEmpty { list = "Flows:\n" + flows.map { "  " + $0 }.joined(separator: "\n") + "\n" + list }
+            let measured = DiagramOps.describeMetrics(file.pages[p])
+            if !measured.isEmpty, !flows.isEmpty {
+                list = "Metrics (starting values):\n" + measured.map { "  " + $0 }.joined(separator: "\n") + "\n" + list
+            }
             if let vars = file.pages[p].variables, !vars.isEmpty {
                 list = "Variables (starting values): " + vars.sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
                     .joined(separator: ", ") + "\n" + list
@@ -1549,6 +1593,25 @@ actor DottieTools {
         case "simulate":
             return try simulate(a)
 
+        case "add_gauge":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let e: Element
+            do {
+                e = try DiagramOps.addGauge(&file.pages[p], metric: try a.require("metric"), of: try a.uuid("of"),
+                                            frame: CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                          width: a.double("width") ?? 0, height: a.double("height") ?? 0),
+                                            style: try a.string("style").map { s in
+                                                guard let v = Gauge.Style(rawValue: s) else { throw ToolFailure(message: "'style' must be number, bar or dial") }
+                                                return v
+                                            },
+                                            max: a.double("max"), warn: a.double("warn"), alarm: a.double("alarm"), label: a.string("label"))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let shown = file.pages[p].posed(at: 0).elements.first { $0.id == e.id }?.text?.replacingOccurrences(of: "\n", with: ": ") ?? ""
+            return text("Added gauge \(e.id.uuidString) (\(shown) at the starting values)" + on(file, p))
+
         default:
             throw ToolFailure(message: "Unknown tool '\(name)'")
         }
@@ -1579,6 +1642,9 @@ actor DottieTools {
             } else if step.bool("next") == true {
                 sim.nextScene()
                 log.append("next: \(sim.summary)")
+            } else if step.bool("metrics") == true {
+                let lines = DiagramOps.describeMetrics(sim.doc, at: sim.time, state: .values(sim.state))
+                log.append("metrics: " + (lines.isEmpty ? "no traffic" : "\n  " + lines.joined(separator: "\n  ")))
             } else if step.raw["snapshot"] != nil, step.bool("snapshot") != false {
                 let picture = sim.picture
                 guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale) else {
@@ -1594,7 +1660,7 @@ actor DottieTools {
                 log.append("\(line): \(sim.summary)")
                 images.append(.png(png))
             } else {
-                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true} or {snapshot}")
+                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot} or {metrics: true}")
             }
         }
         return .init(content: images + [.plain(log.joined(separator: "\n"))])

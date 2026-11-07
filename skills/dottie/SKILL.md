@@ -61,7 +61,7 @@ More of the MCP tools, by purpose:
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
-| Interactive pages: traffic and states | `add_flow`, `define_state`, `set_variable` |
+| Interactive pages: traffic and states | `add_flow`, `define_state`, `set_variable`, `add_gauge` |
 | Controls for an interactive page | `add_button`, `add_choice`, `add_reset`, `add_legend` |
 | Exports, and checking an interactive page | `export_svg`, `export_mermaid`, `export_animation`, `simulate` |
 
@@ -89,6 +89,12 @@ variables rather than scenes, and is easiest in two calls:
 2. `define_state` describes one variable at once: what it takes `down` (faded, and traffic goes round it), `hide`s
    (connectors go with a hidden shape), `show`s, `dim`s or `restyle`s (a new label, a red stroke), connectors whose `send_packet` packets
    `reroute`, and which elements' clicks flip it (`toggled_by`).
+3. For how much, not just where: `add_flow` `volume`, and `capacity` (and a shape's `delay`) on `update_element`. Flows
+   fill their cheapest route in page order; what doesn't fit takes the next route, and what fits nowhere is backlog,
+   piled at the shape in front of the bottleneck (a queue in front of busy workers, a hub in front of a full lane).
+   `add_gauge` shows a metric (load, throughput, backlog, transit, …) as a number, bar or dial, and
+   `simulate` with `{"metrics": true}` prints them; an override like `{when: "load(workers) >= 0.9", stroke: ...}`
+   (by anchor) recolors whatever is saturated.
 3. Controls make it something to play with: `add_choice` for exclusive scenarios (one variable per option, give each
    its meaning with `define_state`), `add_button` for one switch with a pressed look, `add_reset` to go back to the
    start (call it again with `id` after adding variables), and `add_legend` to hide and show each flow.

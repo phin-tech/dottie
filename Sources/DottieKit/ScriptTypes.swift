@@ -262,6 +262,18 @@ extension DottieScript {
             offline?: boolean;
             /** A connector's cost for flow traffic meanwhile: a degraded link. */
             cost?: number;
+            /** Its capacity and delay meanwhile: half the workers down, a slow step. */
+            capacity?: number;
+            delay?: number;
+        }
+
+        type Metric = "throughput" | "load" | "delay" | "backlog" | "inFlight" | "transit" | "backup";
+        type GaugeStyle = "number" | "bar" | "dial";
+
+        /** The page's metrics in one frame (dottie.metrics): by element id and flow id. */
+        interface Metrics {
+            elements: Record<string, { throughput: number; load?: number; delay: number; backlog: number; inFlight: number }>;
+            flows: Record<string, { volume: number; placed: number; backlog: number; backup: number; transit?: number }>;
         }
 
         /** A flow as dottie.flow and dottie.flows return it, defaults filled in. */
@@ -275,6 +287,7 @@ extension DottieScript {
             color?: Color;
             when?: Condition;
             spread?: boolean;
+            volume?: number;
         }
 
         /** One variable described at once (dottie.defineState): what changes while it is true, and which clicks change it. */
@@ -346,6 +359,11 @@ extension DottieScript {
             hops?: boolean;
             /** Connectors: what a flow's traffic pays to take it, when not 1. */
             cost?: number;
+            /** The most flow volume it carries, and a shape's delay in seconds (ADR 0003). */
+            capacity?: number;
+            delay?: number;
+            /** A gauge: the metric it shows and of what. */
+            gauge?: { metric: Metric; of: string; style: GaugeStyle; max?: number; warn?: number; alarm?: number; label?: string };
             /** Connectors: the shape at each end, when attached. */
             from?: string;
             to?: string;
@@ -382,6 +400,11 @@ extension DottieScript {
             hops?: boolean;
             /** Connectors only: what a flow's traffic pays to take this line, default 1; flows take the cheapest route. */
             cost?: number;
+            /** The most flow volume it carries (a worker pool's throughput, a lane's); what doesn't fit takes the next
+             * cheapest route or waits as backlog. null removes it (on update). */
+            capacity?: number | null;
+            /** Shapes only: seconds flow traffic stays inside when passing through. null removes it (on update). */
+            delay?: number | null;
             /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
              * (named in exports, not embedded), or "" for Helvetica Neue. */
             font?: string;
@@ -610,7 +633,15 @@ extension DottieScript {
              * it has none and rounds `every` so it loops. With `id`, changes that flow. */
             flow(from: Ref, to: Ref | Ref[], options?: { every?: number; speed?: number; color?: Color; size?: number; when?: Condition;
                 /** While the first destination is down, deal packets across every other one that can be reached. */
-                spread?: boolean; id?: Ref }): FlowInfo;
+                spread?: boolean;
+                /** How much it carries, in the page's own unit (default 1); the biggest flow draws a packet every `every`. */
+                volume?: number; id?: Ref }): FlowInfo;
+            /** A gauge showing a metric of an element or flow: a number, bar or dial, drawn by every renderer. load
+             * defaults to warn 0.7 and alarm 0.9. */
+            gauge(target: Ref, options: { metric: Metric; x: number; y: number; width?: number; height?: number; style?: GaugeStyle;
+                max?: number; warn?: number; alarm?: number; label?: string }): Element;
+            /** The page's metrics at a time (default 0) and state (default the starting values). */
+            metrics(options?: { at?: number; state?: Record<string, boolean> }): Metrics;
             /** The page's flows. */
             flows(): FlowInfo[];
             /** Removes a flow; returns whether there was one. */

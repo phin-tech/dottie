@@ -428,3 +428,70 @@ extension DottieDocument {
         return [back] + parts
     }
 }
+
+// MARK: Editing
+
+extension DiagramOps {
+    /// Sets an element's capacity and a shape's delay (ADR 0003): nil leaves one as it is, `.some(nil)` clears it.
+    public static func setCapacity(_ doc: inout DottieDocument, id: UUID, capacity: Double??, delay: Double??) throws {
+        guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        if let capacity {
+            if let c = capacity, !(c.isFinite && c >= 0) { throw OpsError.invalid("'capacity' is a number, 0 or more") }
+            doc.elements[i].capacity = capacity
+        }
+        if let delay {
+            if let d = delay, !(d.isFinite && d >= 0) { throw OpsError.invalid("'delay' is seconds, 0 or more") }
+            if delay != nil, doc.elements[i].kind == .connector { throw OpsError.invalid("'delay' is for shapes; traffic waits inside them") }
+            doc.elements[i].delay = delay
+        }
+    }
+
+    /// Adds a gauge showing `metric` of the element or flow `of` (ADR 0003): a clean rectangle that every renderer
+    /// draws as a number, bar or dial. Returns it.
+    @discardableResult
+    public static func addGauge(_ doc: inout DottieDocument, metric: String, of: UUID, frame: CGRect, style: Gauge.Style? = nil,
+                                max: Double? = nil, warn: Double? = nil, alarm: Double? = nil, label: String? = nil) throws -> Element {
+        guard PageState.metricNames.contains(metric) else {
+            throw OpsError.invalid("'metric' is one of \(PageState.metricNames.joined(separator: ", ")), got '\(metric)'")
+        }
+        guard doc.elements.contains(where: { $0.id == of }) || (doc.flows ?? []).contains(where: { $0.id == of }) else {
+            throw OpsError.notFound("No element or flow \(of.uuidString) to measure")
+        }
+        let w = frame.width > 0 ? frame.width : 160, h = frame.height > 0 ? frame.height : (style == .dial ? 110 : 80)
+        var s = Style()
+        s.roughness = 0; s.fill = RGBA(r: 1, g: 1, b: 1); s.fillStyle = .solid; s.stroke = RGBA(r: 0.8, g: 0.82, b: 0.85); s.strokeWidth = 1
+        var e = Element(kind: .rectangle, frame: CGRect(x: frame.minX, y: frame.minY, width: w, height: h), style: s,
+                        layerID: doc.layers.first?.id ?? UUID())
+        e.gauge = Gauge(metric: metric, of: of, max: max, warn: warn, alarm: alarm, style: style, label: label)
+        doc.elements.append(e)
+        return e
+    }
+
+    /// One line per element and flow with something to show, at the starting values: for a listing or a step of
+    /// `simulate`.
+    public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial) -> [String] {
+        let m = doc.metrics(at: t, state: state)
+        let names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0.components(separatedBy: "\n")[0])\"" } ?? $0.anchor ?? $0.id.uuidString) },
+                               uniquingKeysWith: { a, _ in a })
+        func n(_ v: Double) -> String { DottieDocument.number(v, places: 2) }
+        var out: [String] = []
+        for e in doc.elements {
+            guard let x = m.elements[e.id], x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 else { continue }
+            var parts = ["throughput \(n(x.throughput))"]
+            if let l = x.load { parts.append("load \(DottieDocument.formatted("load", l))") }
+            if x.backlog > 0 { parts.append("backlog \(n(x.backlog))") }
+            if x.delay > 0 { parts.append("delay \(n(x.delay))s") }
+            out.append("\(names[e.id] ?? "?"): " + parts.joined(separator: ", "))
+        }
+        for f in doc.flows ?? [] {
+            guard let x = m.flows[f.id] else { continue }
+            var parts = ["placed \(n(x.placed)) of \(n(x.volume))"]
+            if x.backlog > 0 { parts.append("backlog \(n(x.backlog))") }
+            if x.backup > 0 { parts.append("\(DottieDocument.formatted("load", x.backup)) via backup") }
+            if let tr = x.transit { parts.append("transit \(DottieDocument.formatted("transit", tr))") }
+            out.append("flow \(f.id.uuidString.prefix(8)) \(names[f.from] ?? "?") → \(f.to.map { names[$0] ?? "?" }.joined(separator: " or ")): "
+                       + parts.joined(separator: ", "))
+        }
+        return out
+    }
+}

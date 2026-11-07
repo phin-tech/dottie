@@ -296,8 +296,20 @@ public enum DottieScript {
                 let r = try idMap("reroute")
                 if !r.isEmpty { o.reroute = Dictionary(uniqueKeysWithValues: r.map { ($0.key.uuidString, $0.value) }) }
                 if bool("offline") == true { o.offline = true }
-                o.cost = double("cost")
+                o.cost = double("cost"); o.capacity = double("capacity"); o.delay = double("delay")
                 return o
+            }
+
+            /// Sets `capacity` and `delay` on `id` when given; "" (null in the prelude) clears one.
+            func measure(_ doc: inout DottieDocument, _ id: UUID) throws {
+                func value(_ k: String) throws -> Double?? {
+                    guard has(k) else { return nil }
+                    if let s = raw[Args.normalize(k)] as? String, s.isEmpty { return .some(nil) }
+                    guard let d = double(k) else { throw OpsError.invalid("'\(k)' is a number, or null to remove it") }
+                    return .some(d)
+                }
+                let c = try value("capacity"), d = try value("delay")
+                if c != nil || d != nil { try DiagramOps.setCapacity(&doc, id: id, capacity: c, delay: d) }
             }
 
             func require(_ k: String) throws -> String {
@@ -378,6 +390,7 @@ public enum DottieScript {
             if let c = f.color { d["color"] = String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
             if let w = f.when { d["when"] = w }
             if f.spread == true { d["spread"] = true }
+            if let v = f.volume { d["volume"] = v }
             return d
         }
 
@@ -410,6 +423,16 @@ public enum DottieScript {
                 d["click"] = o
             }
             if let w = e.when { d["when"] = w }
+            if let v = e.capacity { d["capacity"] = v }
+            if let v = e.delay { d["delay"] = v }
+            if let g = e.gauge {
+                var o: [String: Any] = ["metric": g.metric, "of": g.of.uuidString, "style": (g.style ?? .number).rawValue]
+                if let v = g.max { o["max"] = v }
+                if let v = g.warn { o["warn"] = v }
+                if let v = g.alarm { o["alarm"] = v }
+                if let v = g.label { o["label"] = v }
+                d["gauge"] = o
+            }
             if let id = e.symbol {
                 d["symbol"] = id.uuidString
                 if let p = e.playback { d["playback"] = p.rawValue }
@@ -429,6 +452,8 @@ public enum DottieScript {
                     if let r = o.reroute { x["reroute"] = r.mapValues(\.uuidString) }
                     if o.offline == true { x["offline"] = true }
                     if let v = o.cost { x["cost"] = v }
+                    if let v = o.capacity { x["capacity"] = v }
+                    if let v = o.delay { x["delay"] = v }
                     return x
                 }
             }
@@ -511,6 +536,7 @@ public enum DottieScript {
                                                 roughness: a.roughness, look: try a.look())
                 if let n = a.string("anchor"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].anchor = n }
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: e.id, w) }
+                try a.measure(&doc, e.id)
                 return describe(try element(e.id))
 
             case "connector":
@@ -520,8 +546,9 @@ public enum DottieScript {
                                                     arrow: a.bool("arrow") ?? true, port: (start.0, end.0),
                                                     portIndex: (start.1, end.1), roughness: a.roughness,
                                                     label: a.string("label"), look: try a.look())
-                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w); return describe(try element(c.id)) }
-                return describe(c)
+                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w) }
+                try a.measure(&doc, c.id)
+                return describe(try element(c.id))
 
             case "update":
                 let id = try a.uuid("id")
@@ -560,6 +587,7 @@ public enum DottieScript {
                     let parsed = try list.map { try $0.override() }
                     doc.elements[i].overrides = parsed.isEmpty ? nil : parsed
                 }
+                try a.measure(&doc, id)
                 return describe(try element(id))
 
             case "pages":
@@ -769,9 +797,36 @@ public enum DottieScript {
             case "flow":
                 let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
                                                speed: a.double("speed"), color: try a.color("color"), size: a.double("size"),
-                                               when: a.string("when"), spread: a.bool("spread"),
+                                               when: a.string("when"), spread: a.bool("spread"), volume: a.double("volume"),
                                                replacing: a.has("id") ? try a.uuid("id") : nil)
                 return Self.describe(f)
+
+            case "gauge":
+                let style = try a.enumValue("style", as: Gauge.Style.self)
+                let e = try DiagramOps.addGauge(&doc, metric: try a.require("metric"), of: try a.uuid("of"),
+                                                frame: CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                              width: a.double("width") ?? 0, height: a.double("height") ?? 0),
+                                                style: style, max: a.double("max"), warn: a.double("warn"), alarm: a.double("alarm"),
+                                                label: a.string("label"))
+                return describe(e)
+
+            case "metrics":
+                let state: StateChoice = a.object("state").map { o in
+                    .values(o.raw.compactMapValues { $0 as? Bool })
+                } ?? .initial
+                let m = doc.metrics(at: a.double("at") ?? 0, state: state)
+                var elements: [String: Any] = [:], flows: [String: Any] = [:]
+                for (id, x) in m.elements where x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 || x.inFlight > 0 {
+                    var o: [String: Any] = ["throughput": x.throughput, "delay": x.delay, "backlog": x.backlog, "inFlight": x.inFlight]
+                    if let l = x.load { o["load"] = l }
+                    elements[id.uuidString] = o
+                }
+                for (id, x) in m.flows {
+                    var o: [String: Any] = ["volume": x.volume, "placed": x.placed, "backlog": x.backlog, "backup": x.backup]
+                    if let tr = x.transit { o["transit"] = tr }
+                    flows[id.uuidString] = o
+                }
+                return ["elements": elements, "flows": flows]
 
             case "flows":
                 return (doc.flows ?? []).map(Self.describe)
@@ -975,6 +1030,8 @@ public enum DottieScript {
           var o = merge(changes, { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
           if (o.overrides === null) o.overrides = [];
+          if (o.capacity === null) o.capacity = "";
+          if (o.delay === null) o.delay = "";
           if (Array.isArray(o.overrides)) o.overrides = o.overrides.map(function (x) {
             if (!x || !x.reroute) return x;
             var r = {}, k;
@@ -1038,6 +1095,8 @@ public enum DottieScript {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
         flows: function () { return call("flows"); },
+        gauge: function (target, o) { return call("gauge", merge(o, { of: idOf(target) })); },
+        metrics: function (o) { return call("metrics", o || {}); },
         removeFlow: function (flow) { return call("removeFlow", { id: idOf(flow) }); },
         button: function (o) { return call("button", o); },
         choice: function (name, options, o) { return call("choice", merge(o, { name: name, options: options })); },
@@ -1255,7 +1314,7 @@ public enum DottieScript {
     traffic while true (a region that's down: flows go round it); restyle: {id: look} while true; \
     reroute: {fromConnector: toConnector}, so the same packets take a detour while true; toggledBy, turnedOnBy, \
     turnedOffBy: elements whose click flips, sets or clears it. Running it again changes nothing more; returns a summary
-      dottie.flow(from, to, {every?, speed?, color?, size?, when?, spread?, id?})  traffic from a shape to the first of to (a shape or \
+      dottie.flow(from, to, {every?, speed?, color?, size?, when?, spread?, volume?, id?})  traffic from a shape to the first of to (a shape or \
     a list, preferred first) it can reach over the connectors drawn: a packet every every seconds (0.5) at speed \
     points per second (160), routed afresh each frame, so when a state hides a shape or connector the traffic goes \
     round it with nothing more drawn. A connector carries traffic from its start to its end, and back too when its \
@@ -1266,6 +1325,29 @@ public enum DottieScript {
     shapes they pass through and come out the other side. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
     loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
       dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
+      Capacity (ADR 0003): volume on a flow is how much it carries in the page's own unit (requests a second, \
+    messages, trucks a day; default 1); the biggest flow draws a packet every `every`, the rest proportionally fewer. \
+    capacity on a shape or connector (in dottie.rect/connect/update; null removes it) is the most volume it carries: \
+    flows are placed in page order (earlier flows first), each on its cheapest route as far as it has room, the rest \
+    on the next cheapest, and what fits nowhere is backlog, piled at the shape in front of the first full thing (a \
+    queue in front of busy workers). delay on a shape is seconds traffic stays inside it when passing through. \
+    Overrides may set capacity and delay too (half the workers down); a traffic spike is an extra flow with a when.
+      dottie.metrics({at?, state?})  {elements: {id: {throughput, load?, delay, backlog, inFlight}}, flows: {id: \
+    {volume, placed, backlog, backup, transit?}}}: load is throughput over capacity, backlog the rate a queue grows \
+    at, backup the share not reaching the first destination, transit seconds end to end
+      dottie.gauge(target, {metric, x, y, width?, height?, style?, max?, warn?, alarm?, label?})  a gauge showing a \
+    metric (throughput, load, delay, backlog, inFlight, transit, backup) of an element or flow as a number, bar or \
+    dial, green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it
+      An override's condition can compare metrics, naming an element by its anchor or an element or flow by id: \
+    {when: "load(workers) >= 0.9", stroke: "#dc2626"}; such an override changes only looks (no offline, cost, \
+    capacity, delay or reroute), and a when on an element can't compare metrics
+      Example: a queue in front of workers that take 2 a second:
+        const api = dottie.rect({x: 0, y: 100, text: "api"}), q = dottie.rect({x: 200, y: 100, text: "queue", delay: 0.5});
+        const w = dottie.rect({x: 400, y: 100, text: "workers", anchor: "workers", capacity: 2});
+        dottie.connect(api, q); dottie.connect(q, w);
+        dottie.flow(api, w, {volume: 3});   // 2 placed, 1 backlog in the queue
+        dottie.gauge(w, {metric: "load", x: 400, y: 0, style: "bar"});
+        dottie.update(w, {overrides: [{when: "load(workers) >= 1", stroke: "#dc2626", text: "workers (saturated)"}]});
       Controls, made of ordinary shapes, clicks and overrides (clicks work on the web):
       dottie.button({text, x, y, toggles?, sets?, onText?, width?, height?, color?})  a button that flips toggles or sets \
     sets ({name: bool}); filled, and labelled onText, while on. Returns it
@@ -1282,7 +1364,7 @@ public enum DottieScript {
         dottie.flow(api, [east, west]);
         dottie.defineState("eastDown", {down: east, toggledBy: east});   // east fades, and traffic goes to west
       overrides (on dottie.update): [{when, stroke?, fill?, textColor?, opacity?, strokeWidth?, dash?, text?, \
-    reroute?, offline?, cost?}]: changes to one element while a condition holds, in order; opacity multiplies; cost: a \
+    reroute?, offline?, cost?, capacity?, delay?}]: changes to one element while a condition holds, in order; opacity multiplies; cost: a \
     connector's cost meanwhile (a degraded link); offline: still \
     drawn but carries no flow traffic. Prefer these to a \
     second copy of a shape with the opposite when
