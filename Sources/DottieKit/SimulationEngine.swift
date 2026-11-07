@@ -1,0 +1,113 @@
+import Foundation
+import JavaScriptCore
+
+/// Runs dottie.js's simulation (`flowFrame` in web/src/measure.ts, bundled as `PlayerScript.simulation`) in
+/// JavaScriptCore, so the app, the CLI and dottie.js share one implementation of flows' assignment, packets and
+/// metrics (ADR 0003). One context, used by one caller at a time.
+final class SimulationEngine: @unchecked Sendable {
+    static let shared = SimulationEngine()
+
+    private let lock = NSLock()
+    private var context: JSContext?
+    private var frameFunction: JSValue?
+    private(set) var failure: String?
+    private(set) var calls = 0
+    private var lastFailed = false
+
+    private init() {}
+
+    private func load() -> JSValue? {
+        if let frameFunction { return frameFunction }
+        guard let context = JSContext() else { failure = "JavaScript is unavailable"; return nil }
+        context.evaluateScript(PlayerScript.simulation)
+        if let e = context.exception { failure = "Simulation failed to load: \(e)"; return nil }
+        let f = context.objectForKeyedSubscript("DottieSim")?.objectForKeyedSubscript("frame")
+        guard let f, !f.isUndefined else { failure = "Simulation has no frame function"; return nil }
+        self.context = context
+        frameFunction = f
+        return f
+    }
+
+    private struct Request: Encodable {
+        var page: DottieDocument
+        var t: Double
+        var values: [String: Bool]?
+        var offline: [String]
+        var since: Double?
+        var carried: [String: Double]
+    }
+
+    private struct Response: Decodable {
+        struct Element: Decodable { var throughput: Double; var load: Double?; var delay: Double; var backlog: Double; var inFlight: Int; var depth: Double }
+        struct Flow: Decodable { var volume: Double; var placed: Double; var backlog: Double; var backup: Double; var transit: Double? }
+        var packets: [[Packet]]
+        var elements: [String: Element]
+        var flows: [String: Flow]
+        var carry: [String: Double]
+    }
+
+    /// One field of a packet: `[id, x, y, size, layer]`.
+    private enum Packet: Decodable {
+        case text(String), number(Double)
+        init(from decoder: Decoder) throws {
+            let c = try decoder.singleValueContainer()
+            if let n = try? c.decode(Double.self) { self = .number(n) } else { self = .text(try c.decode(String.self)) }
+        }
+        var text: String? { if case .text(let s) = self { s } else { nil } }
+        var number: Double? { if case .number(let n) = self { n } else { nil } }
+    }
+
+    /// `flowFrame` for `frame`, the page posed at `t` with its flows still on it; nil if the simulation can't run.
+    func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID>,
+                   since: Double?, carried: [String: Double]) -> (packets: [Element], metrics: FrameMetrics)? {
+        var page = frame
+        // Pictures don't affect traffic, and would cost an encoding every frame.
+        for i in page.elements.indices where page.elements[i].image != nil { page.elements[i].image = nil }
+        let request = Request(page: page, t: t, values: values, offline: offline.map(\.uuidString).sorted(),
+                              since: since, carried: carried)
+        guard let data = try? JSONEncoder().encode(request) else { return nil }
+        let text = String(decoding: data, as: UTF8.self)
+
+        lock.lock(); defer { lock.unlock() }
+        let strict = ProcessInfo.processInfo.environment["DOTTIE_SIM"] == "js-strict"
+        calls += 1
+        defer { if strict && lastFailed { fatalError("SimulationEngine fell back: \(failure ?? "bad response")") } }
+        lastFailed = true
+        guard let f = load() else { return nil }
+        let result = f.call(withArguments: [text])
+        if let e = context?.exception { failure = "\(e)"; context?.exception = nil; return nil }
+        guard let out = result?.toString(),
+              let response = try? JSONDecoder().decode(Response.self, from: Data(out.utf8)) else { return nil }
+
+        var metrics = FrameMetrics()
+        for (key, m) in response.elements {
+            guard let id = UUID(uuidString: key) else { continue }
+            metrics.elements[id] = ElementMetrics(throughput: m.throughput, load: m.load, delay: m.delay,
+                                                  backlog: m.backlog, inFlight: m.inFlight, depth: m.depth)
+        }
+        for (key, m) in response.flows {
+            guard let id = UUID(uuidString: key) else { continue }
+            metrics.flows[id] = FlowMetrics(volume: m.volume, placed: m.placed, backlog: m.backlog, backup: m.backup, transit: m.transit)
+        }
+        metrics.carry = response.carry
+
+        // A packet's id starts with its flow's first 24 digits (`Flow.packetID`), which gives its look.
+        var styles: [Substring: Style] = [:]
+        for flow in frame.flows ?? [] { styles[flow.id.uuidString.prefix(24)] = DottieDocument.packetStyle(flow) }
+        var packets: [Element] = []
+        for p in response.packets {
+            guard p.count == 5, let key = p[0].text, let id = UUID(uuidString: key), let x = p[1].number, let y = p[2].number,
+                  let size = p[3].number, let layer = p[4].text.flatMap(UUID.init(uuidString:)) else { continue }
+            packets.append(Element(id: id, kind: .ellipse, frame: CGRect(x: x, y: y, width: size, height: size),
+                                   style: styles[key.prefix(24)] ?? Style(), seed: 1, layerID: layer))
+        }
+        lastFailed = false
+        return (packets, metrics)
+    }
+}
+
+extension DottieDocument {
+    /// Whether posing runs flows through `SimulationEngine` rather than Swift's `flowFrame`: set `DOTTIE_SIM=js`.
+    /// `DOTTIE_SIM=js-strict` stops instead of falling back to Swift when the simulation fails, for testing.
+    nonisolated(unsafe) static var simulatesInJavaScript = ProcessInfo.processInfo.environment["DOTTIE_SIM"]?.hasPrefix("js") == true
+}
