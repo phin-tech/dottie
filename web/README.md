@@ -49,6 +49,13 @@ The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(ele
 Without modules, `dist/dottie-player.min.js` is a classic script that registers the element and sets
 `window.Dottie`.
 
+**Big animations.** Before it shows an animation without a camera, the player works out the view of every frame,
+which for a long, busy one takes long enough to hold up the page. So it does that in a worker, and the drawing
+appears, exactly as it would have, when the worker is done; `setFile()` returns at once, and the `load` event fires
+when it is showing. The classic script starts the worker from its own source (a `blob:` URL); the module player
+loads `dottie-player.min.js` from beside itself, so host the two together. Where a worker can't start, as under a
+`worker-src` policy that refuses it, the player works it out in place as before. Small drawings always do.
+
 **Fonts.** Text in Dottie's handwriting fonts (Caveat, Patrick Hand, Architects Daughter; SIL Open Font License)
 is drawn in them: the player loads the ones a drawing uses from `fonts/` beside its own script, as `dist/fonts` on
 npm and the CDNs. If you host the player yourself, copy that folder with it, or call `Dottie.setFontBase(url)`

@@ -109,7 +109,50 @@ test("a still page, a chosen page and moment, inline JSON, and clean drawing", a
   assert.equal(look.paged, "rgb(27, 58, 92)");
   assert.equal(look.inline, "sepia");
   assert.equal(look.roughness, true);
+  // A still reports the moment it shows.
+  assert.equal(await page.evaluate(() => document.querySelector("#at").currentTime), 3.2);
   assert.deepEqual(errors, []);
+  await close();
+});
+
+test("a file given while a load is in flight is not replaced when the load lands", async () => {
+  const { page, close } = await open(`<dottie-player id="other" src="/fixtures/design/example.dottie"></dottie-player>`);
+  await ready(page, "#other");
+  let release;
+  const held = new Promise((r) => { release = r; });
+  await page.route("http://dottie.test/slow.dottie", async (route) => {
+    await held;
+    route.fulfill({ path: new URL("../../../fixtures/design/tour.dottie", import.meta.url).pathname, contentType: "application/json" });
+  });
+  await page.evaluate(() => {
+    const p = document.createElement("dottie-player");
+    p.id = "slow";
+    p.setAttribute("src", "/slow.dottie");
+    document.body.append(p);
+    p.setFile(document.querySelector("#other").file);
+  });
+  const given = await page.evaluate(() => document.querySelector("#slow").playback.frameCount);
+  release();
+  await page.waitForTimeout(500);
+  assert.equal(await page.evaluate(() => document.querySelector("#slow").playback.frameCount), given);
+  assert.notEqual(given, 277, "the tour never replaces it");
+  await close();
+});
+
+test("a load that fails stops the drawing that was showing", async () => {
+  const { page, close } = await open(`<dottie-player src="/fixtures/design/live.dottie"></dottie-player>`);
+  await ready(page);
+  const got = await page.evaluate(async () => {
+    const p = document.querySelector("dottie-player");
+    let frames = 0;
+    p.addEventListener("frame", () => { frames++; });
+    p.setAttribute("src", "/nope.dottie");
+    while (!p.shadowRoot.querySelector(".error")) await new Promise((r) => setTimeout(r, 20));
+    frames = 0;
+    await new Promise((r) => setTimeout(r, 400));
+    return { frames, playback: p.playback, paused: p.paused, controls: !p.shadowRoot.querySelector(".bar").hidden };
+  });
+  assert.deepEqual(got, { frames: 0, playback: null, paused: true, controls: false });
   await close();
 });
 

@@ -11,7 +11,7 @@ import type { Face } from "./metrics.ts";
 import { DottieFormatError, parseDottie } from "./model.ts";
 import { pageIndex } from "./player.ts";
 
-/** What follows the runtime; DOTTIE_DATA and DOTTIE_OPTIONS are replaced with JSON. Plain ES5, unminified. */
+/** What follows the runtime; DOTTIE_DATA, DOTTIE_OPTIONS and DOTTIE_FONTS are replaced with JSON. Plain ES5, unminified. */
 export const LOADER = `;(function () {
   var data = DOTTIE_DATA, options = DOTTIE_OPTIONS, fonts = DOTTIE_FONTS;
   var script = document.currentScript;
@@ -91,6 +91,11 @@ export function compile(source: string | unknown, runtime: string, options: Comp
       if (b64) (fonts[family] ??= {})[face] = b64;
     }
   }
-  return runtime.trimEnd() + "\n" + LOADER.replace("DOTTIE_DATA", () => scriptJSON(data))
-    .replace("DOTTIE_OPTIONS", () => scriptJSON(playerAttributes(options))).replace("DOTTIE_FONTS", () => scriptJSON(fonts));
+  // One pass over the template, so a drawing's text that spells out a placeholder is never taken for one.
+  const fill: Record<string, () => string> = {
+    DOTTIE_DATA: () => scriptJSON(data),
+    DOTTIE_OPTIONS: () => scriptJSON(playerAttributes(options)),
+    DOTTIE_FONTS: () => scriptJSON(fonts),
+  };
+  return runtime.trimEnd() + "\n" + LOADER.replace(/\bDOTTIE_(?:DATA|OPTIONS|FONTS)\b/g, (m) => fill[m]());
 }

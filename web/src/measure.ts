@@ -8,6 +8,7 @@ import { clamp, DEFAULT_COLOR, DEFAULT_EVERY, DEFAULT_SIZE, DEFAULT_SPEED, flowT
 import { Polyline, type Point } from "./path.ts";
 import { applyOverride, holds, looksOnly, mentionsMetric, type MetricTerm } from "./state.ts";
 import { tracing } from "./timeline.ts";
+import { indexOf } from "./connector.ts";
 
 /** A connector's or shape's metrics in one frame (ElementMetrics). */
 export interface ElementMetrics { throughput: number; load: number | null; delay: number; backlog: number; inFlight: number; depth: number }
@@ -76,8 +77,14 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   offline: Set<string> = new Set(), sinceChange: number | null = null,
   carried: Record<string, number> = {}): { packets: Element[]; metrics: FrameMetrics } {
   const since = Math.max(0, Math.min(sinceChange ?? t, 1e6));
-  const byID = new Map<string, Element>();
-  for (const e of frame.elements) if (!byID.has(e.id)) byID.set(e.id, e);
+  const byID = indexOf(frame);
+  // Each connector's line, traced once however many ways go along it.
+  const traced = new Map<string, Point[]>();
+  const traceOf = (c: Element): Point[] => {
+    let pts = traced.get(c.id);
+    if (!pts) { pts = tracing(c, frame, byID).points; traced.set(c.id, pts); }
+    return pts;
+  };
   const metrics = emptyMetrics();
   for (const e of frame.elements) {
     if (e.kind === "connector" && !e.connector) continue;
@@ -105,7 +112,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     hops.forEach(([id, back], k) => {
       const c = byID.get(id);
       if (!c) return;
-      const line = back ? [...tracing(c, frame).points].reverse() : tracing(c, frame).points;
+      const line = back ? [...traceOf(c)].reverse() : traceOf(c);
       if (line.length === 0) return;
       const last = points[points.length - 1];
       if (last) {
@@ -147,10 +154,16 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   const everyOf = (flow: Flow) =>
     Math.min(Math.max(clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest / Math.max(amountIn(flow, values), TINY), 0.05), 60);
 
+  // The cheapest ways from a source, ignoring capacity, are the same for every flow leaving it.
+  const bases = new Map<string, FlowTree | null>();
+  const baseTree = (from: string): FlowTree | null => {
+    if (!bases.has(from)) bases.set(from, flowTree(from, frame, offline));
+    return bases.get(from)!;
+  };
   for (const [i, flow] of list.entries()) {
     if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
     const source = byID.get(flow.from);
-    const base = source ? flowTree(flow.from, frame, offline) : null;
+    const base = source ? baseTree(flow.from) : null;
     if (!source || !base) continue;
     const volume = amountIn(flow, values);
     const fm: FlowMetrics = { volume, placed: 0, backlog: 0, backup: 0, transit: null };
@@ -163,7 +176,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
       if (!(share > TINY)) continue;
       let left = share;
       for (let n = 0; n < 32 && left > TINY; n++) {
-        const tree = flowTree(flow.from, frame, union(offline, full()));
+        const tree = flowTree(flow.from, frame, union(offline, full()), candidates[0]);
         const goal = tree?.goals(candidates, false)[0];
         if (!tree || goal === undefined) break;
         const r = route(tree, goal);
@@ -251,10 +264,13 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   // Queues: each flow's at each shape, its own or carried over from before the state changed. One with backlog
   // grows by it; one without drains at the room left on its way on, and the drained traffic leaves as packets.
   const piles = new Map<string, number>();
+  // The queues carried over, so a flow without one doesn't look for it at every element.
+  const carriedKeys = Object.keys(carried).filter((k) => carried[k] > TINY);
   for (const flow of list) {
     const waiting = waitingBy.get(flow.id) ?? [];
     const shapes = waiting.map(([s]) => s);
-    for (const e of frame.elements) {
+    const suffix = "|" + flow.id;
+    if (carriedKeys.some((k) => k.endsWith(suffix))) for (const e of frame.elements) {
       const c = carried[queueKey(e.id, flow.id)];
       if (c !== undefined && c > TINY && !shapes.includes(e.id)) shapes.push(e.id);
     }
@@ -278,7 +294,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
         let total = 0;
         for (let n = 0; n < 32; n++) {
           const blocked = new Set([...trial].filter(([, v]) => v <= TINY).map(([id]) => id));
-          const tree = flowTree(at, frame, union(offline, blocked));
+          const tree = flowTree(at, frame, union(offline, blocked), flow.to[0]);
           const goal = tree?.goals(flow.to, false)[0];
           if (!tree || goal === undefined) break;
           const r = route(tree, goal);

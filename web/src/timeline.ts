@@ -1,7 +1,7 @@
 // Animation (Timeline.swift, Motion.swift): a page posed at a moment. `resolved(page, t)` is the still drawing
 // every renderer draws, exactly as DottieDocument.resolved(at:) works it out.
 
-import { endpoints, indexOf, routePoints, route } from "./connector.ts";
+import { type Index, endpoints, indexOf, routePoints, route } from "./connector.ts";
 import { angle, rotated } from "./element.ts";
 import {
   BOIL_DRAWINGS, type CameraKey, type Ease, type Element, type Follow, type Keyframe, type Page, type RGBA, type StateOverride, type Timeline,
@@ -159,9 +159,10 @@ export function followSpan(track: Track, t: number): Follow | null {
   return f;
 }
 
-/** The clean route of a connector, or the clean, rotated outline of any other element. */
-export function tracing(e: Element, page: Page): Polyline {
-  if (e.kind === "connector") return new Polyline(routePoints(route(e, indexOf(page))));
+/** The clean route of a connector, or the clean, rotated outline of any other element. `index` is the page's,
+ * passed by callers that already have it. */
+export function tracing(e: Element, page: Page, index: Index = indexOf(page)): Polyline {
+  if (e.kind === "connector") return new Polyline(routePoints(route(e, index)));
   const clean = cloneElement(e);
   clean.style.roughness = 0;
   const pts = outline(clean).contours()[0] ?? [];
@@ -173,9 +174,10 @@ export function following(track: Track, e: Element, t: number, page: Page): Elem
   const f = followSpan(track, t);
   if (!f) return e;
   t = localTime(track, t);
-  const pathElement = page.elements.find((x) => x.id === f.path);
+  const index = indexOf(page);
+  const pathElement = index.get(f.path);
   if (!pathElement || pathElement.id === e.id) return e;
-  const line = tracing(pathElement, page);
+  const line = tracing(pathElement, page, index);
   const span = f.end - f.start;
   // An overshooting ease stops at the end of the path rather than wrapping round to its start.
   let u = Math.min(Math.max(applyEase(f.ease ?? "easeInOut", span > 0 ? Math.min(1, (t - f.start) / span) : 1), 0), 1) * (f.laps ?? 1);

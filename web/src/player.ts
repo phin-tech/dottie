@@ -18,9 +18,10 @@ import { addFonts, usedFonts } from "./fonts.ts";
 import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, partsOf } from "./clicks.ts";
 import { type DottieFile, type Page, type RGBA, clampTime, luminance, parseDottie } from "./model.ts";
 import { Path, fmt, rotate } from "./path.ts";
-import { buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
-import { type Plan, plan, svgParts } from "./svg.ts";
+import { Expansions, buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
+import { type Plan, plan, svgParts, unchanged } from "./svg.ts";
 import { color } from "./svg-util.ts";
+import { planInWorker, plansInWorker } from "./planner.ts";
 import { themeNamed } from "./theme.ts";
 import { applyClick } from "./state.ts";
 import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
@@ -105,7 +106,7 @@ export class Playback {
 
   /** `file` is the drawing `page` belongs to, so links to its other pages are clickable. */
   constructor(page: Page, into: Element, options: { clean?: boolean; file?: DottieFile } = {}) {
-    this.page = options.clean ? withRoughness(page, 0) : page;
+    this.page = options.clean ? cleanCopy(page) : page;
     addFonts(usedFonts(this.page));
     this.plan = plan(this.page);
     this.clicks = clickTargets(page, options.file);
@@ -192,19 +193,22 @@ export class Playback {
     const tc = clampTime(t);
     // Backlog piles up for as long as the state has held; a still (no performance clock) draws the page time.
     const pose = posed(this.page, tc, this.state, this.sinceChange(now), this.carried);
-    const frame = expandingSymbols(pose, tc, true, times);
+    // The over, down and hit passes reuse what every other copy made here.
+    const made = new Expansions(pose, tc, true);
+    const frame = expandingSymbols(pose, tc, true, times, made);
     const { parts } = svgParts(frame, this.background, r);
     const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
       for (const p of parts) if (this.owner.has(p.key)) m.set(p.key, p.markup);
       return m;
     };
     // A state is drawn only for the copies that have it.
+    // Only those copies' parts are drawn again; the rest of the page is there for them to connect to.
     const state = (st: Map<string, number>) => st.size === 0 ? new Map<string, string>()
-      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st])), this.background, r).parts
-        .filter((p) => st.has(this.owner.get(p.key) ?? "")));
+      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st]), made), this.background, r, false,
+        (key) => st.has(this.owner.get(key) ?? "")).parts);
     // A clickable shape with a hover look holds both, a button its over and down states, and the stylesheet shows one.
     const hover = this.hoverIDs.size === 0 ? new Map<string, string>()
-      : owned(new Map(), svgParts(hovered(frame, this.hoverIDs), this.background, r).parts.filter((p) => this.hoverIDs.has(p.key)));
+      : owned(new Map(), svgParts(hovered(frame, this.hoverIDs), this.background, r, false, (key) => this.hoverIDs.has(key)).parts);
     const over = state(this.overTimes), down = state(this.downTimes), hit = state(this.hitTimes);
     const normal = owned(new Map(), parts);
     // Each clickable owner becomes one part, where its first piece is drawn.
@@ -311,6 +315,18 @@ export class Playback {
   }
 }
 
+const cleanCopies = new WeakMap<Page, { fields: Page; page: Page }>();
+
+/** `page` drawn precisely, the same copy each time it is asked for while the page is unchanged (so its plan is
+ * made once). */
+function cleanCopy(page: Page): Page {
+  const hit = cleanCopies.get(page);
+  if (hit && unchanged(page, hit.fields)) return hit.page;
+  const clean = withRoughness(page, 0);
+  cleanCopies.set(page, { fields: { ...page }, page: clean });
+  return clean;
+}
+
 /** HTMLElement where there is a DOM; a stand-in elsewhere, so the library still loads in Node (to render SVG). */
 const ElementBase: typeof HTMLElement = typeof HTMLElement === "undefined" ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
@@ -334,6 +350,10 @@ export class DottiePlayer extends ElementBase {
   private raf = 0;
   private replayRaf = 0;
   private loadToken = 0;
+  /** Counts mounts, so a plan that comes back from a worker after a newer one is dropped. */
+  private mountToken = 0;
+  /** The time a still shows; null while the drawing is animated. */
+  private stillTime: number | null = null;
   private visible = true;
   private observer: IntersectionObserver | null = null;
 
@@ -411,9 +431,20 @@ export class DottiePlayer extends ElementBase {
         text = inline.textContent ?? "";
       }
       if (token !== this.loadToken) return;
-      this.setFile(parseDottie(text));
+      this.showFile(parseDottie(text));
     } catch (err) {
       if (token !== this.loadToken) return;
+      // The drawing that was showing stops, and its controls go with it.
+      this.setPlaying(false);
+      cancelAnimationFrame(this.raf);
+      cancelAnimationFrame(this.replayRaf);
+      this.raf = 0;
+      this.replayRaf = 0;
+      this.playback = null;
+      this.file = null;
+      this.mountToken++;
+      this.stillTime = null;
+      this.bar.hidden = true;
       this.stage.innerHTML = "";
       const box = document.createElement("div");
       box.className = "error";
@@ -425,16 +456,35 @@ export class DottiePlayer extends ElementBase {
 
   /** Shows an already-parsed file. */
   setFile(file: DottieFile): void {
-    this.file = file;
-    for (const w of file.warnings) console.warn(`dottie-player: ${w}`);
-    this.mount();
-    this.dispatchEvent(new CustomEvent("load", { detail: { file } }));
+    // A load still in flight would otherwise replace this file when it lands.
+    this.loadToken++;
+    this.showFile(file);
   }
 
-  private mount(): void {
+  private showFile(file: DottieFile): void {
+    this.file = file;
+    for (const w of file.warnings) console.warn(`dottie-player: ${w}`);
+    this.mount(() => this.dispatchEvent(new CustomEvent("load", { detail: { file } })));
+  }
+
+  /** Shows the file's page; then `mounted`. A big animation is planned in a worker first (planner.ts), and what was
+   * showing stays until it is ready; a newer mount, file or failed load in the meantime wins. */
+  private mount(mounted?: () => void): void {
     const file = this.file!;
     const page = file.pages[pageIndex(file, this.getAttribute("page"))];
-    const p = new Playback(page, this.stage, { clean: this.hasAttribute("clean"), file });
+    const clean = this.hasAttribute("clean");
+    const token = ++this.mountToken;
+    const shown = clean ? cleanCopy(page) : page;
+    if (!plansInWorker(shown)) { this.mountPage(file, page, clean); mounted?.(); return; }
+    void planInWorker(shown).then(() => {
+      if (token !== this.mountToken || this.file !== file) return;
+      this.mountPage(file, page, clean);
+      mounted?.();
+    });
+  }
+
+  private mountPage(file: DottieFile, page: Page, clean: boolean): void {
+    const p = new Playback(page, this.stage, { clean, file });
     p.still = this.hasAttribute("at");
     this.playback = p;
     this.style.setProperty("--dottie-page", color(p.background));
@@ -455,10 +505,14 @@ export class DottiePlayer extends ElementBase {
       this.dispatchEvent(new CustomEvent("frame", { detail: { frame: i, time: p.plan.times[i] } }));
     };
     if (!animated) {
-      p.drawAt(at !== null ? Number(at) || 0 : posterTime(page), at !== null ? nearest(p, Number(at) || 0) : p.posterFrame);
+      const i = at !== null ? nearest(p, Number(at) || 0) : p.posterFrame;
+      this.stillTime = at !== null ? Number(at) || 0 : posterTime(page);
+      p.drawAt(this.stillTime, i);
+      p.frame = i;
       this.setPlaying(false);
       return;
     }
+    this.stillTime = null;
     p.show(0);
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) { p.show(p.posterFrame); this.setPlaying(false); return; }
@@ -468,7 +522,12 @@ export class DottiePlayer extends ElementBase {
   // MARK: Playback
 
   get paused(): boolean { return !this.playing; }
-  get currentTime(): number { const p = this.playback; return p && p.frame >= 0 ? p.plan.times[p.frame] : 0; }
+  /** The moment shown: a still's own time (its `at`, or the poster), else the current frame's. */
+  get currentTime(): number {
+    const p = this.playback;
+    if (p && this.stillTime !== null) return this.stillTime;
+    return p && p.frame >= 0 ? p.plan.times[p.frame] : 0;
+  }
   set currentTime(t: number) { const p = this.playback; if (p) { this.setPlaying(false); p.show(nearest(p, t)); } }
   get duration(): number { return this.playback?.page.timeline?.duration ?? 0; }
 

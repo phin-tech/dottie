@@ -84,6 +84,23 @@ function pieces(para: string): string[] {
   return out;
 }
 
+/** `measure` of each prefix of `chars`: entry n is the width of the first n characters. */
+function prefixWidths(chars: string[], fontSize: number, face: Face, font?: string | null): number[] {
+  const fam = familyMetrics(font);
+  const f = fam.faces[face] ?? fam.faces.regular;
+  const fallback = f.w["n"];
+  const out = [0];
+  let w = 0;
+  let prev = "";
+  for (const ch of chars) {
+    w += f.w[ch] ?? fallback;
+    if (prev) w += f.k[prev + ch] ?? 0;
+    prev = ch;
+    out.push((w * fontSize) / 1000);
+  }
+  return out;
+}
+
 /** Lines `s` wraps into within `maxWidth` (or inside a piece too long for a line). */
 export function wrap(s: string, fontSize: number, maxWidth: number, face: Face = "regular", font?: string | null): string[] {
   const width = (t: string): number => measure(t, fontSize, face, font);
@@ -95,10 +112,13 @@ export function wrap(s: string, fontSize: number, maxWidth: number, face: Face =
       if (line === "" || width(candidate.trimEnd()) <= maxWidth) { line = candidate; }
       else { out.push(line); line = piece; }
       // A piece wider than the line breaks between characters.
+      // It takes the longest prefix that fits (at least one character), found from the widths of every prefix,
+      // summed once in the order `measure` sums them, so they come out exactly as measuring each would.
       while (width(line.trimEnd()) > maxWidth && [...line.trimEnd()].length > 1) {
         const chars = [...line];
+        const prefix = prefixWidths(chars, fontSize, face, font);
         let n = chars.length - 1;
-        while (n > 1 && width(chars.slice(0, n).join("")) > maxWidth) n--;
+        while (n > 1 && prefix[n] > maxWidth) n--;
         out.push(chars.slice(0, n).join(""));
         line = chars.slice(n).join("");
       }
