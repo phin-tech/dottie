@@ -115,7 +115,7 @@ final class StateTests: XCTestCase {
         XCTAssertEqual(c?.when, "future")
     }
 
-    /// A page with state exports as dottie.js's player; a looping scene goes round in the drawn-ahead player.
+    /// Pages with state and pages with looping scenes both export as dottie.js's player.
     func testHTMLExports() throws {
         var doc = DottieDocument()
         let layer = doc.layers[0].id
@@ -133,8 +133,9 @@ final class StateTests: XCTestCase {
         tl.setKey(Keyframe(t: 2, x: 100), for: a.id)
         tl.addMarker(at: 0, name: "Live", loop: true)
         doc.timeline = tl
-        let drawn = try XCTUnwrap(Exporter.player(doc))
-        XCTAssertTrue(drawn.contains("loops = [true]"))
+        let looping = try XCTUnwrap(Exporter.player(doc))
+        XCTAssertTrue(looping.contains("dottie-player"))
+        XCTAssertTrue(looping.contains(#""loop":true"#), "the loop travels with the drawing")
     }
 
     func testEditSceneLoops() throws {

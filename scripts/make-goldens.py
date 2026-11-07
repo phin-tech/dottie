@@ -63,7 +63,7 @@ def generate(out, dottie):
                         if look == "clean":
                             cmd.append("--clean")
                         subprocess.run(cmd, check=True, capture_output=True)
-    # The HTML export's own player, for the browser tests of clicking (they run where Dottie can't).
+    # The HTML export (<dottie-player> with the drawing compiled in), for the browser tests of it (they run where Dottie can't).
     html = out / "goldens" / "html"
     html.mkdir(parents=True, exist_ok=True)
     for name in ["clicks", "links", "symbols", "buttons"]:

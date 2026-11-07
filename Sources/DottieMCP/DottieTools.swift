@@ -844,13 +844,16 @@ actor DottieTools {
                 + "browser, to check it does what you built: clicks set and flip variables and jump to scenes, waits play "
                 + "on (stopping at each scene unless it loops, round a looping scene), snapshots return a PNG of that "
                 + "moment. Returns one line per step (time, scene, playing or stopped, variables, elements their "
-                + "conditions hide) and each snapshot as an image. Links and other pages are reported, not followed.",
+                + "conditions hide) and each snapshot as an image. Links and other pages are reported, not followed. "
+                + "With record_path, also writes the whole run, every frame a viewer would see, as a looping movie or GIF "
+                + "(end with a wait, or the last click's result never shows).",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "steps": simulateStepsProp,
                 "start": prop("string", "Start at this scene, playing (default the start, as the player does)"),
                 "state": exportStateProp,
-                "scale": prop("number", "Snapshot pixel scale, 0.25 to 4 (default 1)"),
+                "scale": prop("number", "Snapshot and recording pixel scale, 0.25 to 4 (default 1)"),
+                "record_path": prop("string", "Record the run from the start to the last step: a .mp4, .gif or animated .png"),
              ], required: ["path", "steps"])),
     ]
 
@@ -1661,7 +1664,7 @@ actor DottieTools {
             } ?? .smooth
             let out = try fileURL(a, key: "out_path", ext: ext)
             let scale = min(max(a.double("scale") ?? 1.5, 0.25), 4)
-            guard !Exporter.animationTooLong(doc) else {
+            guard ext == "html" || !Exporter.animationTooLong(doc) else {
                 throw ToolFailure(message: "The animation has more than \(Exporter.maxAnimationFrames) frames; shorten it or lower its fps")
             }
             let frame = a.double("preview").map(doc.resolved) ?? doc.still
@@ -1771,6 +1774,12 @@ actor DottieTools {
         let scale = min(max(a.double("scale") ?? 1, 0.25), 4)
         var sim: Simulation
         do { sim = try Simulation(doc, scene: a.string("start")) } catch { throw ToolFailure(message: "\(error)") }
+        let recordURL = try a.string("record_path").map { path -> URL in
+            let ext = URL(fileURLWithPath: path).pathExtension.lowercased()
+            guard ["mp4", "gif", "png"].contains(ext) else { throw ToolFailure(message: "'record_path' must end in .mp4, .gif or .png") }
+            return try fileURL(a, key: "record_path", ext: ext)
+        }
+        if recordURL != nil { sim.record() }
         var log = ["start: \(sim.summary)"]
         var images: [Tool.Content] = []
         for (n, step) in steps.enumerated() {
@@ -1808,6 +1817,21 @@ actor DottieTools {
             } else {
                 throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot} or {metrics: true}")
             }
+        }
+        if let recordURL, let recording = sim.recording {
+            let data: Data? = switch recordURL.pathExtension.lowercased() {
+            case "mp4": Exporter.mp4(recording, scale: scale)
+            case "gif": Exporter.gif(recording, scale: scale)
+            default: Exporter.apng(recording, scale: scale)
+            }
+            guard let data else {
+                log.append(recording.frames.count > Exporter.maxAnimationFrames
+                           ? "record: more than \(Exporter.maxAnimationFrames) frames; wait less" : "record: rendering failed")
+                return .init(content: images + [.plain(log.joined(separator: "\n"))], isError: true)
+            }
+            try FileManager.default.createDirectory(at: recordURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: recordURL, options: .atomic)
+            log.append("recorded \(recordURL.path): \(recording.frames.count) frames, \(Self.secs(Double(recording.frames.count) / recording.fps))")
         }
         return .init(content: images + [.plain(log.joined(separator: "\n"))])
     }

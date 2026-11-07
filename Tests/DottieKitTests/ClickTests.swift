@@ -36,23 +36,12 @@ final class ClickTests: XCTestCase {
         XCTAssertThrowsError(try DiagramOps.click(scene: nil, url: "javascript:alert(1)"))
     }
 
-    func testClickTargetsFindScenesByName() throws {
-        var (doc, auth, docs, back) = try tour()
-        XCTAssertEqual(doc.clickTargets, [auth.id: .scene(1), docs.id: .url("https://example.com/docs"), back.id: .scene(0)])
-        // A scene that isn't there makes nothing clickable, unless there's a link to fall back on.
-        try DiagramOps.update(&doc, id: back.id, click: .some(ClickAction(scene: "Nowhere")))
-        try DiagramOps.update(&doc, id: docs.id, click: .some(ClickAction(scene: "Nowhere", url: "https://example.com")))
-        XCTAssertNil(doc.clickTargets[back.id])
-        XCTAssertEqual(doc.clickTargets[docs.id], .url("https://example.com"))
-    }
-
     func testRenamingASceneKeepsItsClicksPlayingIt() throws {
         var (doc, auth, _, back) = try tour()
         doc.renameScene(at: 1, to: "  Sign in  ")
         XCTAssertEqual(doc.timeline?.markers?.map(\.name), ["Overview", "Sign in"])
         XCTAssertEqual(doc.elements.first { $0.id == auth.id }?.click?.scene, "Sign in", "\"login flow\" played it, in any case")
         XCTAssertEqual(doc.elements.first { $0.id == back.id }?.click?.scene, "Overview", "other scenes' clicks stay")
-        XCTAssertEqual(doc.clickTargets[auth.id], .scene(1))
         let before = doc
         XCTAssertFalse(doc.renameScene(at: 1, to: "   "))
         XCTAssertFalse(doc.renameScene(at: 0.5, to: "Nowhere"))
@@ -134,30 +123,6 @@ final class ClickTests: XCTestCase {
         }
         XCTAssertEqual(Exporter.svg(doc.still), Exporter.svg(plain.still))
         XCTAssertEqual(Exporter.svg(doc.resolved(at: 1)), Exporter.svg(plain.resolved(at: 1)))
-    }
-
-    func testThePlayerDrawsClickablesInPlaceWithTheirHoverLook() throws {
-        let (doc, auth, _, back) = try tour()
-        let html = try XCTUnwrap(Exporter.player(doc))
-        XCTAssertTrue(html.contains(#"acts = [{"s":"1"},{"u":"https:\/\/example.com\/docs"},{"s":"0"}]"#)
-                      || html.contains(#"acts = [{"s":"1"},{"u":"https://example.com/docs"},{"s":"0"}]"#), "actions back to front")
-        XCTAssertTrue(html.contains(".dottie-a:hover .dottie-h"))
-        XCTAssertTrue(html.contains(#"aria-label="Auth &quot;service&quot;""#))
-
-        let plan = try XCTUnwrap(Exporter.animation(doc))
-        let clickable = [auth.id.uuidString: 0, back.id.uuidString: 2]
-        let (holder, frames) = Exporter.playerFrames(doc, plan: plan, clickable: clickable)
-        XCTAssertFalse(holder.contains("Auth"), "a clickable element is never shared through <use>")
-        for (i, frame) in frames.enumerated() {
-            let opened = frame.components(separatedBy: "<g class=\"dottie-a\" data-a=\"").dropFirst().map { $0.prefix { $0 != "\"" } }
-            XCTAssertEqual(opened, ["0", "2"], "frame \(i): each clickable in place, back to front")
-            let auth = try XCTUnwrap(frame.components(separatedBy: "data-a=\"0\"").last?.components(separatedBy: "</g>\n</g>\n").first)
-            XCTAssertTrue(auth.contains(">\n<g class=\"dottie-n\">\n"), "Auth has a hover look")
-            XCTAssertTrue(auth.contains("<g class=\"dottie-h\">\n") && auth.contains("#0000ff"))
-            XCTAssertFalse(auth.contains("<use"))
-            let backButton = try XCTUnwrap(frame.components(separatedBy: "data-a=\"2\"").last)
-            XCTAssertFalse(backButton.contains("dottie-h"), "the back button has none")
-        }
     }
 
     func testScriptsSetAndReadClicks() throws {

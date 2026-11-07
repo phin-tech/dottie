@@ -1,5 +1,5 @@
-// <dottie-player>: plays a .dottie file in the page, drawn live from its source, with the controls of Dottie's
-// HTML export (play, scrub, scenes, keys, reduced motion).
+// <dottie-player>: plays a .dottie file in the page, drawn live from its source, with play, scrub, scenes, keys and
+// reduced motion. Dottie's HTML export is this player with the drawing compiled in (Exporter.player).
 //
 //   <script type="module" src="https://…/dottie-player.js"></script>
 //   <dottie-player src="tour.dottie"></dottie-player>

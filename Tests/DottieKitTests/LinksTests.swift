@@ -78,18 +78,6 @@ final class LinksTests: XCTestCase {
         XCTAssertEqual(file.anchors.map(\.page), [file.pages[0].id, second])
     }
 
-    func testWebPlayersOpenAWebURLWhenThereIsNoClick() throws {
-        var doc = DottieDocument()
-        let a = try box(&doc, 0, 0), b = try box(&doc, 100, 0), c = try box(&doc, 200, 0)
-        try doc.setURL([a], to: "https://example.com/a")
-        try doc.setURL([b], to: "next.dottie")
-        try doc.setURL([c], to: "https://example.com/c")
-        doc.elements[2].click = ClickAction(url: "https://example.com/click")
-        XCTAssertEqual(doc.clickTargets[a], .url("https://example.com/a"))
-        XCTAssertNil(doc.clickTargets[b], "a link to another drawing does nothing on the web")
-        XCTAssertEqual(doc.clickTargets[c], .url("https://example.com/click"), "a click wins")
-    }
-
     func testSVGWrapsWebLinksAndEscapesThem() throws {
         var doc = DottieDocument()
         let a = try box(&doc, 0, 0, "A"), b = try box(&doc, 200, 0, "B")
