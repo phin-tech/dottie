@@ -235,7 +235,9 @@ players play into it without stopping and go round from its end (the next scene,
 An element's `overrides` change it while their own `when` holds (stroke, fill, text color, width, dash, text; opacity
 multiplies), applied in order after its keys, and `reroute` sends its follows along other connectors, so one dot
 detours instead of two being drawn. `DefineState.swift` (`define_state`, `dottie.defineState`) writes a variable's
-conditions, overrides and clicks from one description. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
+conditions, overrides and clicks from one description, and `Controls.swift` (`add_button`, `add_choice`,
+`add_reset`, `add_legend`, ADR 0003) writes buttons, exclusive choices, a reset and a flow legend as ordinary
+shapes, clicks and overrides, so they need nothing new from any renderer. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
 0002) are traffic no file stores: `posed` routes each one over the connectors left in the frame, cheapest by their `cost`
 (1 each unless set, so fewest hops; an override can change it), to the first destination it reaches (or, with
 `spread`, shared across the others while the first is down) and appends its packets, a pure function of the time and the values, with ids derived
