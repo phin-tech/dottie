@@ -48,6 +48,82 @@ final class SimulationEngine: @unchecked Sendable {
         var elements: [String: Element]
         var flows: [String: Flow]
         var carry: [String: Double]
+        var finish: [Finish]
+    }
+
+    /// What finishing does to one element (`finishPlan` in web/src/measure.ts): the overrides comparing metrics whose
+    /// looks apply, and a gauge's drawing.
+    struct Finish: Decodable {
+        var id: UUID
+        var applied: [Int]
+        var gauge: Drawn?
+        init(from decoder: Decoder) throws {
+            var c = try decoder.unkeyedContainer()
+            guard let id = UUID(uuidString: try c.decode(String.self)) else {
+                throw DecodingError.dataCorruptedError(in: c, debugDescription: "not an id")
+            }
+            self.id = id
+            applied = try c.decode([Int].self)
+            gauge = try c.decodeIfPresent(Drawn.self)
+        }
+    }
+
+    /// A gauge as drawn: its frame's label, label box, text color and outline, then each part.
+    struct Drawn: Decodable {
+        var text: String
+        var label: [Double]
+        var textColor: RGBA?
+        var subpaths: [PathSubpath]
+        var parts: [Part]
+        struct Part: Decodable {
+            var id: UUID, subpaths: [PathSubpath], stroke: RGBA, fill: RGBA?, width: Double
+            init(from decoder: Decoder) throws {
+                var c = try decoder.unkeyedContainer()
+                guard let id = UUID(uuidString: try c.decode(String.self)) else {
+                    throw DecodingError.dataCorruptedError(in: c, debugDescription: "not an id")
+                }
+                self.id = id
+                subpaths = try c.decode([PathSubpath].self)
+                stroke = try c.decode(RGBA.self)
+                fill = try c.decodeIfPresent(RGBA.self)
+                width = try c.decode(Double.self)
+            }
+        }
+    }
+
+    /// One frame as the simulation works it out: its packets and metrics, and how it finishes the page's elements.
+    struct Frame {
+        var packets: [Element]
+        var metrics: FrameMetrics
+        var finish: [UUID: Finish]
+
+        /// `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements
+        /// (ADR 0003), then the packets above them.
+        func finished(_ elements: [Element]) -> [Element] {
+            var out: [Element] = []
+            for var e in elements {
+                guard let f = finish[e.id] else { out.append(e); continue }
+                for k in f.applied where e.overrides?.indices.contains(k) == true { e = e.overrides![k].looksOnly.apply(to: e) }
+                guard let g = f.gauge else { out.append(e); continue }
+                var back = e
+                back.gauge = nil
+                back.kind = .path
+                back.subpaths = g.subpaths
+                back.text = g.text
+                if g.label.count == 4 { back.labelRect = NormalizedRect(x: g.label[0], y: g.label[1], width: g.label[2], height: g.label[3]) }
+                if let c = g.textColor { back.style.textColor = c }
+                out.append(back)
+                for p in g.parts {
+                    var s = Style()
+                    s.stroke = p.stroke; s.strokeWidth = p.width; s.roughness = 0; s.opacity = e.style.opacity
+                    if let fill = p.fill { s.fill = fill; s.fillStyle = .solid } else { s.fill = RGBA(r: 0, g: 0, b: 0, a: 0) }
+                    var part = Element(id: p.id, kind: .path, frame: e.frame, style: s, seed: 1, layerID: e.layerID)
+                    part.subpaths = p.subpaths
+                    out.append(part)
+                }
+            }
+            return out + packets
+        }
     }
 
     /// One field of a packet: `[id, x, y, size, layer]`.
@@ -61,9 +137,9 @@ final class SimulationEngine: @unchecked Sendable {
         var number: Double? { if case .number(let n) = self { n } else { nil } }
     }
 
-    /// `flowFrame` for `frame`, the page posed at `t` with its flows still on it; nil if the simulation can't run.
-    func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID>,
-                   since: Double?, carried: [String: Double]) -> (packets: [Element], metrics: FrameMetrics)? {
+    /// One frame of `frame`, the page posed at `t` with its flows still on it; nil if the simulation can't run.
+    func frame(_ frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID>,
+               since: Double?, carried: [String: Double]) -> Frame? {
         var page = frame
         // Pictures don't affect traffic, and would cost an encoding.
         for i in page.elements.indices where page.elements[i].image != nil { page.elements[i].image = nil }
@@ -112,7 +188,8 @@ final class SimulationEngine: @unchecked Sendable {
                                    style: styles[key.prefix(24)] ?? Style(), seed: 1, layerID: layer))
         }
         lastFailed = false
-        return (packets, metrics)
+        return Frame(packets: packets, metrics: metrics,
+                     finish: Dictionary(response.finish.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a }))
     }
 }
 

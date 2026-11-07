@@ -366,22 +366,27 @@ export function metricLookup(m: FrameMetrics, frame: Page): (t: MetricTerm, own:
   };
 }
 
-/** `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements; with
- * no values ("all", the editor), both are left as they are (DottieDocument.finishing). */
-export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
-  frame: Page, flows: Flow[], since = Infinity, carried: Record<string, number> = {}): { elements: Element[]; readings: Record<string, number> } {
+/** What finishing does to one element: which of its overrides that compare metrics hold (their looks apply, in
+ * order), and, for a gauge, the reading it shows. */
+export interface Finish { applied: number[]; gauge: { value: number | null } | null }
+
+/** For each of `elements`, the overrides that compare metrics that hold and the reading a gauge shows (easing, over
+ * `GAUGE_EASE` seconds since the state changed, from its reading then, `carried`); with no values ("all", the
+ * editor), nothing. The readings come back to carry over. */
+export function finishPlan(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
+  frame: Page, since = Infinity, carried: Record<string, number> = {}): { plan: Finish[]; readings: Record<string, number> } {
   const lookup = metricLookup(metrics, frame);
-  const out: Element[] = [], readings: Record<string, number> = {};
-  for (let e of elements) {
+  const plan: Finish[] = [], readings: Record<string, number> = {};
+  for (const e of elements) {
+    const applied: number[] = [];
     if (values !== null && e.overrides) {
-      for (const o of e.overrides) {
-        const own = e.id;
-        if (mentionsMetric(o.when) && holds(o.when, values, (m) => lookup(m, own))) e = applyOverride(looksOnly(o), e);
-      }
+      e.overrides.forEach((o, k) => {
+        if (mentionsMetric(o.when) && holds(o.when, values, (m) => lookup(m, e.id))) applied.push(k);
+      });
     }
     // The editor ("all", no values) edits the gauge itself, a rectangle.
-    if (!e.gauge || values === null) { out.push(e); continue; }
-    const g = e.gauge;
+    const g = values === null ? null : e.gauge;
+    if (!g) { plan.push({ applied, gauge: null }); continue; }
     let shown = metricValue(metrics, g.metric, g.of);
     const then = carried[gaugeKey(e.id)];
     if (shown !== null && then !== undefined && g.metric !== "depth" && g.metric !== "inFlight" && since < GAUGE_EASE) {
@@ -389,8 +394,22 @@ export function finishing(elements: Element[], metrics: FrameMetrics, values: Re
       shown = then + (shown - then) * smooth;
     }
     if (shown !== null) readings[gaugeKey(e.id)] = shown;
-    out.push(...gauge(e, g, shown, frame, flows));
+    plan.push({ applied, gauge: { value: shown } });
   }
+  return { plan, readings };
+}
+
+/** `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements; with
+ * no values ("all", the editor), both are left as they are (`finishPlan`). */
+export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
+  frame: Page, flows: Flow[], since = Infinity, carried: Record<string, number> = {}): { elements: Element[]; readings: Record<string, number> } {
+  const { plan, readings } = finishPlan(elements, metrics, values, frame, since, carried);
+  const out: Element[] = [];
+  elements.forEach((e, i) => {
+    for (const k of plan[i].applied) e = applyOverride(looksOnly(e.overrides![k]), e);
+    const g = plan[i].gauge;
+    if (g && e.gauge) out.push(...gauge(e, e.gauge, g.value, frame, flows)); else out.push(e);
+  });
   return { elements: out, readings };
 }
 
