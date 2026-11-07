@@ -36,14 +36,19 @@ public enum PageState {
         }
     }
 
-    /// `term` (trimmed) read as a metric comparison, or nil.
+    /// `term` (trimmed) read as a metric comparison, or nil. Without a target (`load >= 1`) it's the element's own.
     static func metricTerm(_ term: String) -> MetricTerm? {
         let t = Array(term.trimmingCharacters(in: .whitespaces).unicodeScalars)
+        if !t.contains("("), let op = t.firstIndex(where: { ">=<!".unicodeScalars.contains($0) }) {
+            let name = String(String.UnicodeScalarView(t[..<op])).trimmingCharacters(in: .whitespaces)
+            guard metricNames.contains(name) else { return nil }
+            return metricTerm(name + "() " + String(String.UnicodeScalarView(t[op...]))).map { var m = $0; m.target = ""; return m }
+        }
         guard let open = t.firstIndex(of: "("), let close = t.firstIndex(of: ")"), open < close else { return nil }
         let name = String(String.UnicodeScalarView(t[..<open])).trimmingCharacters(in: .whitespaces)
         let target = String(String.UnicodeScalarView(t[(open + 1)..<close])).trimmingCharacters(in: .whitespaces)
         var rest = String(String.UnicodeScalarView(t[(close + 1)...])).trimmingCharacters(in: .whitespaces)
-        guard metricNames.contains(name), !target.isEmpty, !target.contains("(") else { return nil }
+        guard metricNames.contains(name), !target.contains("(") else { return nil }
         guard let op = [">=", "<=", "==", "!=", ">", "<"].first(where: { rest.hasPrefix($0) }) else { return nil }
         rest = String(rest.dropFirst(op.count)).trimmingCharacters(in: .whitespaces)
         guard isNumber(rest), let value = Double(rest) else { return nil }

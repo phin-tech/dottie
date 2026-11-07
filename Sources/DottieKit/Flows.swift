@@ -26,12 +26,21 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
     /// How much it carries, in the page's own unit (ADR 0003); nil is 1. The page's biggest flow draws a packet
     /// every `every` seconds, and the rest proportionally fewer.
     public var volume: Double?
+    /// Its volume while a condition on the page's variables holds, the last that holds winning: a spike, peak season.
+    public var overrides: [FlowOverride]?
 
     public init(id: UUID = UUID(), from: UUID, to: [UUID], every: Double? = nil, speed: Double? = nil,
                 color: RGBA? = nil, size: Double? = nil, when: String? = nil, spread: Bool? = nil, volume: Double? = nil) {
         self.id = id; self.from = from; self.to = to; self.every = every; self.speed = speed
         self.color = color; self.size = size; self.when = when; self.spread = spread == true ? true : nil
         self.volume = volume
+    }
+
+    /// The volume it carries with these variable values (nil: its own).
+    func amount(_ values: [String: Bool]?) -> Double {
+        guard let values, let list = overrides else { return amount }
+        let v = list.last { $0.volume != nil && !PageState.mentionsMetric($0.when) && PageState.holds($0.when, in: values) }?.volume
+        return v.map { min(max($0.isFinite ? $0 : 1, 0), 1e12) } ?? amount
     }
 
     // Lenient, like the rest of the format: a flow with a missing or bad id, source or destination loads and sends
@@ -48,6 +57,7 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
         when = (try? c.decodeIfPresent(String.self, forKey: .when)) ?? nil
         spread = ((try? c.decodeIfPresent(Bool.self, forKey: .spread)) ?? nil) == true ? true : nil
         volume = number(.volume)
+        overrides = ((try? c.decodeIfPresent([FlowOverride].self, forKey: .overrides)) ?? nil).flatMap { $0.isEmpty ? nil : $0 }
     }
 
     public static let defaultEvery = 0.5, defaultSpeed = 160.0, defaultSize = 12.0
@@ -71,6 +81,18 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
     static func packetID(_ flow: UUID, _ k: Int) -> UUID {
         let n = UInt64(bitPattern: Int64(k) &+ (1 << 40)) & 0xFFFF_FFFF_FFFF
         return UUID(uuidString: String(flow.uuidString.prefix(24)) + String(format: "%012llX", n)) ?? flow
+    }
+}
+
+/// A flow's volume while a condition holds (`Flow.overrides`).
+public struct FlowOverride: Codable, Equatable, Sendable {
+    public var when: String
+    public var volume: Double?
+    public init(when: String, volume: Double? = nil) { self.when = when; self.volume = volume }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        when = ((try? c.decodeIfPresent(String.self, forKey: .when)) ?? nil) ?? ""
+        volume = ((try? c.decodeIfPresent(Double.self, forKey: .volume)) ?? nil).flatMap { $0.isFinite ? $0 : nil }
     }
 }
 
@@ -150,16 +172,24 @@ extension DiagramOps {
     @discardableResult
     public static func addFlow(_ doc: inout DottieDocument, from: UUID, to: [UUID], every: Double? = nil, speed: Double? = nil,
                                color: RGBA? = nil, size: Double? = nil, when: String? = nil, spread: Bool? = nil,
-                               volume: Double? = nil, replacing: UUID? = nil) throws -> Flow {
+                               volume: Double? = nil, overrides: [FlowOverride]? = nil, replacing: UUID? = nil) throws -> Flow {
         let shapes = Set(doc.elements.filter { $0.kind != .connector }.map(\.id))
         guard shapes.contains(from) else { throw OpsError.notFound("Traffic leaves from a shape on the page; no shape \(from.uuidString)") }
         guard !to.isEmpty else { throw OpsError.invalid("A flow needs at least one destination") }
         if let bad = to.first(where: { !shapes.contains($0) }) { throw OpsError.notFound("No shape \(bad.uuidString) to send traffic to") }
         let condition = try when.flatMap { try PageState.checked($0) }
+        let checkedOverrides = try overrides.map { list in
+            try list.map { o -> FlowOverride in
+                guard let w = try PageState.checked(o.when) else { throw OpsError.invalid("A flow override needs 'when'") }
+                if let v = o.volume, !(v.isFinite && v >= 0) { throw OpsError.invalid("A flow override's volume is 0 or more") }
+                return FlowOverride(when: w, volume: o.volume)
+            }
+        }
         if doc.timeline == nil { doc.timeline = Timeline(duration: 4) }
         let duration = max(doc.timeline!.duration, 0.05)
         var flow = Flow(id: replacing ?? UUID(), from: from, to: to, every: nil, speed: speed, color: color, size: size, when: condition, spread: spread,
                         volume: volume.flatMap { $0.isFinite ? max($0, 0) : nil })
+        flow.overrides = checkedOverrides.flatMap { $0.isEmpty ? nil : $0 }
         if let every, every.isFinite, every > 0 {
             let n = max(1, (duration / min(max(every, 0.05), 60)).rounded())
             flow.every = duration / n
@@ -199,6 +229,7 @@ extension DiagramOps {
             if let w = f.when { line += ", when \(w)" }
             if f.spread == true { line += ", spread when the first is down" }
             if let v = f.volume { line += ", volume \(DottieDocument.number(v, places: 2))" }
+            for o in f.overrides ?? [] { line += ", volume \(o.volume.map { DottieDocument.number($0, places: 2) } ?? "?") when \(o.when)" }
             if let hops = DottieDocument.flowRoute(from: f.from, to: f.to, in: frame, offline: offline) {
                 line += ", now \(hops.count) hop\(hops.count == 1 ? "" : "s")"
             } else {

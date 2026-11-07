@@ -92,17 +92,20 @@ or the resources `dottie://examples/<name>`. Run one with `run_script` on an emp
 2. **How much.** `add_flow` `volume`, and `capacity` (and a shape's `delay`) on `update_element`. Flows fill their
    cheapest route in page order (earlier flows first); what doesn't fit takes the next route, and what fits nowhere is
    backlog, piled at the shape in front of the bottleneck (a queue in front of busy workers, a hub in front of a full
-   lane). The pile grows while the scenario lasts and drains, as packets, when there's room again (the player
-   carries it across clicks). `add_gauge` shows a metric (load, throughput, backlog, depth, transit, backup, …) as a
+   lane), or at the nearest shape marked `queue: true` before it (SQS in front of workers and their table). The
+   pile grows while the scenario lasts and drains, as packets, when there's room again. A flow's `overrides:
+   [{when: "spike", volume: 12}]` changes its volume per scenario, so a spike is one flow. `add_gauge` shows a metric (load, throughput, backlog, depth, transit, backup, …) as a
    number, bar or dial.
 3. **States.** `define_state` describes one variable at once: what it takes `down` (faded, traffic goes round it),
    `hide`s, `show`s, `dim`s or `restyle`s (including `cost`, `capacity` and `delay`), connectors whose `send_packet`
    packets `reroute`, and which clicks flip it (`toggled_by`). `add_override` adds one change to one element under
-   a condition; a condition can compare a metric by anchor, like `load(workers) >= 0.9`, to turn whatever is
-   saturated red (such overrides change only looks).
+   a condition; a condition can compare a metric by anchor, like `load(workers) >= 0.9`, or the element's own
+   (`load >= 1`); `add_alarm` puts that on many elements at once, so whatever is saturated turns red. Capacity
+   overrides holding together take the tightest.
 4. **Controls.** `add_choice` for exclusive scenarios (one variable per option, named `<name>_<option>` with the
    option's capitals kept), `add_button` for one switch with a pressed look, `add_reset` to go back to the start, and
-   `add_legend` to hide and show each flow. A row of choice buttons (1×, 2×, 3× traffic, each adding a flow with a
+   `add_legend` to hide and show each flow. Controls take `after` (an element to sit right of) instead of x and y,
+   gauges take `near` (right, left, above or below their target), and `add_group` frames a region or account. A row of choice buttons (1×, 2×, 3× traffic, each adding a flow with a
    `when`) stands in for a slider.
 5. **Check it.** Edit tools end with **Warnings** when the wiring looks wrong: a condition reading a variable nothing
    sets (usually a typo; it suggests the right name), a metric comparison or gauge pointing at nothing.

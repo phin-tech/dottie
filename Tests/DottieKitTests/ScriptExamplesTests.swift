@@ -38,6 +38,16 @@ final class ScriptExamplesTests: XCTestCase {
         XCTAssertEqual(outage.elements[albWest]?.backlog, 4)
         let scaled = aws.metrics(at: 1, state: .values(["scenario_normal": false, "scenario_failover_scaled": true]))
         XCTAssertEqual(scaled.elements[albWest]?.backlog, 0)
+
+        var sl = DottieDocument()
+        XCTAssertNil(DottieScript.run(ScriptExamples.named("aws-serverless")!.code, on: &sl, libraries: [.starter], timeLimit: 10).error)
+        let sqs = try XCTUnwrap(sl.elements.first { $0.anchor == "sqs" }).id, worker = try XCTUnwrap(sl.elements.first { $0.anchor == "worker" }).id
+        // Throttled and a spike: 12 a second against 3, and it waits in SQS, not at the worker.
+        let both = sl.metrics(at: 1, state: .values(["spike": true, "throttled": true]))
+        XCTAssertEqual(both.elements[sqs]?.backlog, 9)
+        XCTAssertEqual(both.elements[worker]?.backlog, 0)
+        // The cap and throttling together: the worker's tighter capacity (2) wins.
+        XCTAssertEqual(sl.metrics(at: 1, state: .values(["concurrency": true, "throttled": true])).elements[worker]?.throughput, 2)
     }
 
     func testWarningsCatchTyposAndDanglingTargets() throws {

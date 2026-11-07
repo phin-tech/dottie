@@ -288,6 +288,7 @@ extension DottieScript {
             when?: Condition;
             spread?: boolean;
             volume?: number;
+            overrides?: { when: Condition; volume?: number }[];
         }
 
         /** One variable described at once (dottie.defineState): what changes while it is true, and which clicks change it. */
@@ -362,6 +363,7 @@ extension DottieScript {
             /** The most flow volume it carries, and a shape's delay in seconds (ADR 0003). */
             capacity?: number;
             delay?: number;
+            queue?: boolean;
             /** A gauge: the metric it shows and of what. */
             gauge?: { metric: Metric; of: string; style: GaugeStyle; max?: number; warn?: number; alarm?: number; label?: string };
             /** Connectors: the shape at each end, when attached. */
@@ -405,6 +407,8 @@ extension DottieScript {
             capacity?: number | null;
             /** Shapes only: seconds flow traffic stays inside when passing through. null removes it (on update). */
             delay?: number | null;
+            /** Shapes only: a queue, where traffic that can't go on waits (the nearest one before whatever is full). */
+            queue?: boolean;
             /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
              * (named in exports, not embedded), or "" for Helvetica Neue. */
             font?: string;
@@ -635,11 +639,19 @@ extension DottieScript {
                 /** While the first destination is down, deal packets across every other one that can be reached. */
                 spread?: boolean;
                 /** How much it carries, in the page's own unit (default 1); the biggest flow draws a packet every `every`. */
-                volume?: number; id?: Ref }): FlowInfo;
+                volume?: number;
+                /** Its volume while a condition on variables holds, the last that holds winning (a spike). */
+                overrides?: { when: Condition; volume?: number }[];
+                id?: Ref }): FlowInfo;
             /** A gauge showing a metric of an element or flow: a number, bar or dial, drawn by every renderer. load
              * defaults to warn 0.7 and alarm 0.9. */
-            gauge(target: Ref, options: { metric: Metric; x: number; y: number; width?: number; height?: number; style?: GaugeStyle;
+            gauge(target: Ref, options: { metric: Metric; x?: number; y?: number; near?: "right" | "left" | "above" | "below"; width?: number; height?: number; style?: GaugeStyle;
                 max?: number; warn?: number; alarm?: number; label?: string }): Element;
+            /** Each element turns `color` (default red) while its own `metric` (default load) is at or past `at` (default 1).
+             * Returns the condition it wrote. */
+            alarm(elements: Ref | Ref[], options?: { metric?: Metric; at?: number; color?: Color }): string;
+            /** A labelled dashed frame behind the elements: a region, an account, a VPC. */
+            group(elements: Ref | Ref[], options: { label: string; padding?: number; color?: Color }): { frame: Element; label: Element };
             /** Adds an override, keeping the element's others: merged into the one with the same `when`, else appended.
              * (`update` with `overrides` replaces the list.) */
             addOverride(target: Ref, override: Override): Element;
@@ -651,15 +663,15 @@ extension DottieScript {
             removeFlow(flow: Ref): boolean;
             /** A clean button whose click (on the web) flips `toggles` or sets `sets`; it looks pressed (filled, and
              * `onText` as its label) while on. Variables it names are added, starting false. */
-            button(options: { text: string; x?: number; y?: number; width?: number; height?: number; toggles?: string;
+            button(options: { text: string; x?: number; y?: number; after?: Ref; width?: number; height?: number; toggles?: string;
                 sets?: Record<string, boolean>; onText?: string; color?: Color }): Element;
             /** Buttons of which exactly one is on: one variable per option (`<name>_<option>`), each click setting its own
              * true and the others false. `initial` (default the first) starts on. Each button comes with its variable. */
-            choice(name: string, options: string[], o?: { x?: number; y?: number; direction?: "row" | "column";
+            choice(name: string, options: string[], o?: { x?: number; y?: number; after?: Ref; direction?: "row" | "column";
                 initial?: string; color?: Color }): (Element & { variable: string })[];
             /** A button that sets every variable back to its starting value; with `id`, updates that button instead
              * (run it again after adding variables). */
-            resetButton(o?: { x?: number; y?: number; text?: string; id?: Ref; color?: Color }): Element;
+            resetButton(o?: { x?: number; y?: number; after?: Ref; text?: string; id?: Ref; color?: Color }): Element;
             /** One row per flow: a swatch in its color and a label; clicking it hides or shows the flow (variable
              * `show_<n>`, starting true, joined onto its when). `labels`: flow to text. */
             legend(o?: { x?: number; y?: number; labels?: Record<string, string> | [Ref, string][] }): { swatch: Element; label: Element }[];

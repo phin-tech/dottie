@@ -141,3 +141,17 @@ test("a carried queue drains at the room left, holds with none, and its packets 
   assert.ok(draining.frame.elements.some((e) => e.id.startsWith(blue.id.slice(0, 24))));
   assert.equal(posedWithMetrics(roomy, 1, { busy: false }, 3, carried).metrics.elements.get(queue)?.depth, 0);
 });
+
+test("queues, flow volume overrides, combined capacities and alarms on an element's own load", () => {
+  const qp = parseDottie(read("edge", "flows.dottie")).pages.find((p) => p.name === "Queue")!;
+  const id = (t: string) => qp.elements.find((e) => e.text === t)!.id;
+  const { frame, metrics } = posedWithMetrics(qp, 1, {});
+  // spike: 5 against a table of 2; sqs is a queue, so the 3 waits there, not at the worker.
+  assert.equal(metrics.flows.get(qp.flows![0].id)?.volume, 5);
+  assert.equal(metrics.elements.get(id("sqs"))?.backlog, 3);
+  assert.equal(metrics.elements.get(id("worker"))?.backlog, 0);
+  assert.equal(frame.elements.find((e) => e.id === id("worker"))?.capacity, 10);
+  assert.equal(posed(qp, 1, { slow: true }).elements.find((e) => e.id === id("worker"))?.capacity, 1);
+  assert.equal(frame.elements.find((e) => e.id === id("table"))?.style.stroke.r, 0.86);
+  assert.equal(posedWithMetrics(qp, 1, { spike: false }).metrics.flows.get(qp.flows![0].id)?.volume, 2);
+});

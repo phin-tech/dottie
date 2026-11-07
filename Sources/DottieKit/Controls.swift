@@ -166,3 +166,69 @@ extension DiagramOps {
         if let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i] = e }
     }
 }
+
+// MARK: Layout helpers
+
+extension DiagramOps {
+    /// Where a control goes when the caller gives no position: right after `after` (12 points on, its top
+    /// aligned), or, with nothing to follow, above the top left of the page's content.
+    public static func controlOrigin(_ doc: DottieDocument, after: UUID?) throws -> CGPoint {
+        if let after {
+            guard let e = doc.elements.first(where: { $0.id == after }) else { throw OpsError.notFound("No element \(after.uuidString) to follow") }
+            return CGPoint(x: e.frame.maxX + 12, y: e.frame.minY)
+        }
+        let shapes = doc.elements.filter { $0.kind != .connector }
+        guard let first = shapes.first else { return CGPoint(x: 0, y: 0) }
+        let box = shapes.dropFirst().reduce(first.frame) { $0.union($1.frame) }
+        return CGPoint(x: box.minX, y: box.minY - 60)
+    }
+
+    /// A frame of `size` beside `target` on `side` (right, left, above, below), 16 points off, moved along that
+    /// side until it overlaps no gauge already there. A flow's gauge goes beside the flow's source.
+    public static func gaugeFrame(_ doc: DottieDocument, near target: UUID, side: String, size: CGSize) throws -> CGRect {
+        let id = doc.elements.contains { $0.id == target } ? target : (doc.flows ?? []).first { $0.id == target }?.from
+        guard let id, let t = doc.elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element or flow \(target.uuidString)") }
+        let f = t.kind == .connector ? Connector.bounds(of: t, in: doc) : t.frame
+        let gap = 16.0
+        var r: CGRect
+        switch side {
+        case "left": r = CGRect(x: f.minX - gap - size.width, y: f.midY - size.height / 2, width: size.width, height: size.height)
+        case "above": r = CGRect(x: f.midX - size.width / 2, y: f.minY - gap - size.height, width: size.width, height: size.height)
+        case "below": r = CGRect(x: f.midX - size.width / 2, y: f.maxY + gap, width: size.width, height: size.height)
+        case "right": r = CGRect(x: f.maxX + gap, y: f.midY - size.height / 2, width: size.width, height: size.height)
+        default: throw OpsError.invalid("'near' is right, left, above or below, got '\(side)'")
+        }
+        let taken = doc.elements.filter { $0.gauge != nil }.map(\.frame)
+        for _ in 0..<12 where taken.contains(where: { $0.intersects(r) }) {
+            if side == "left" || side == "right" { r.origin.y += size.height + 8 } else { r.origin.x += size.width + 8 }
+        }
+        return r
+    }
+
+    /// A labelled frame behind `ids`, `padding` points round them: a region, an account, a VPC. Returns the frame
+    /// and its label.
+    @discardableResult
+    public static func addGroup(_ doc: inout DottieDocument, ids: [UUID], label: String, padding: Double = 24,
+                                color: RGBA = RGBA(r: 0.6, g: 0.65, b: 0.72)) throws -> (frame: Element, label: Element) {
+        let members = doc.elements.filter { ids.contains($0.id) }
+        guard let first = members.first, members.count == Set(ids).count else { throw OpsError.notFound("Every id must name an element on the page") }
+        let box = members.dropFirst().reduce(first.kind == .connector ? Connector.bounds(of: first, in: doc) : first.frame) {
+            $0.union($1.kind == .connector ? Connector.bounds(of: $1, in: doc) : $1.frame)
+        }.insetBy(dx: -padding, dy: -padding)
+        let top = box.insetBy(dx: 0, dy: 0).offsetBy(dx: 0, dy: -22)
+        let layer = first.layerID
+        var s = Style()
+        s.roughness = 0; s.stroke = color; s.dash = .dashed; s.strokeWidth = 1.5
+        s.fill = RGBA(r: color.r, g: color.g, b: color.b, a: 0.08); s.fillStyle = .solid
+        let frame = Element(kind: .rectangle, frame: CGRect(x: top.minX, y: top.minY, width: top.width, height: top.height + 22),
+                            style: s, layerID: layer)
+        var ls = Style()
+        ls.roughness = 0; ls.stroke = color; ls.fontSize = 15
+        let text = Element(kind: .text, frame: CGRect(x: top.minX + 10, y: top.minY + 4, width: max(80, min(top.width - 20, 260)), height: 20),
+                           style: ls, layerID: layer, text: label)
+        // Behind the first member, so the members stay on top.
+        let at = doc.elements.firstIndex { ids.contains($0.id) } ?? 0
+        doc.elements.insert(contentsOf: [frame, text], at: at)
+        return (frame, text)
+    }
+}

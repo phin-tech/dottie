@@ -618,6 +618,13 @@ extension DottieDocument {
             let e = copy.elements[i]
             if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             for o in active[e.id] ?? [] { copy.elements[i] = o.apply(to: copy.elements[i]) }
+            // Overrides that hold together: the tightest capacity and the longest delay win (ADR 0003), whatever
+            // their order, so "half the workers down" still caps a scaled-out pool.
+            if let list = active[e.id] {
+                let caps = list.compactMap(\.capacity).filter(\.isFinite), delays = list.compactMap(\.delay).filter(\.isFinite)
+                if let c = caps.min() { copy.elements[i].capacity = max(c, 0) }
+                if let d = delays.max(), e.kind != .connector { copy.elements[i].delay = max(d, 0) }
+            }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
             if let speed = tracks[e.id]?.march, let pattern = Renderer.dashPattern(copy.elements[i].style.dash, width: copy.elements[i].style.strokeWidth) {
                 copy.elements[i].style.dashOffset = timeline.marchOffset(speed: speed, period: pattern.reduce(0, +), at: t)

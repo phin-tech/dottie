@@ -21,11 +21,20 @@ const OPS = [">=", "<=", "==", "!=", ">", "<"];
 /** `term` (trimmed) read as a metric comparison, or null. */
 export function metricTerm(term: string): MetricTerm | null {
   const t = trim(term);
+  // Without a target (`load >= 1`) it's the element's own.
+  if (!t.includes("(")) {
+    const op = t.search(/[>=<!]/);
+    if (op < 0) return null;
+    const name = trim(t.slice(0, op));
+    if (!METRIC_NAMES.includes(name)) return null;
+    const m = metricTerm(name + "() " + t.slice(op));
+    return m ? { ...m, target: "" } : null;
+  }
   const open = t.indexOf("("), close = t.indexOf(")");
   if (open < 0 || close < 0 || open >= close) return null;
   const name = trim(t.slice(0, open)), target = trim(t.slice(open + 1, close));
   let rest = trim(t.slice(close + 1));
-  if (!METRIC_NAMES.includes(name) || target === "" || target.includes("(")) return null;
+  if (!METRIC_NAMES.includes(name) || target.includes("(")) return null;
   const op = OPS.find((o) => rest.startsWith(o));
   if (op === undefined) return null;
   rest = trim(rest.slice(op.length));

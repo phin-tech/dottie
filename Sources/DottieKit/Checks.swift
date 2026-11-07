@@ -65,7 +65,7 @@ extension DiagramOps {
         var anchors = Set<String>()
         for e in doc.elements { if let a = e.anchor { anchors.insert(a) } }
         let ids = Set(doc.elements.map(\.id)).union((doc.flows ?? []).map(\.id))
-        func exists(_ target: String) -> Bool { anchors.contains(target) || UUID(uuidString: target).map(ids.contains) == true }
+        func exists(_ target: String) -> Bool { target.isEmpty || anchors.contains(target) || UUID(uuidString: target).map(ids.contains) == true }
         var seen = Set<String>()
         for e in doc.elements {
             let conditions = (e.when.map { [$0] } ?? []) + (e.overrides ?? []).map(\.when)

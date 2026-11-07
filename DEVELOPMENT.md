@@ -247,6 +247,11 @@ room under `capacity`, the rest is backlog at the shape in front of the bottlene
 inside it, and the same pass yields the frame's metrics. Then overrides whose condition compares a metric
 (`load(workers) >= 1`) apply their looks, and elements with a `gauge` become plain `.path` elements (frame and label,
 bar or dial), so no renderer draws a gauge itself. The editor (`.all`) leaves both alone.
+A shape with `queue: true` is where backlog waits (the nearest queue before the bottleneck); a flow's `overrides`
+set its volume per state; overrides holding together take the tightest capacity and longest delay; a metric
+comparison with no target means the element's own (`DiagramOps.addAlarm`). `DiagramOps.controlOrigin`,
+`gaugeFrame` and `addGroup` (Controls.swift) place controls after one another, gauges beside their targets, and
+frames behind groups.
 `Checks.swift` (`DiagramOps.stateWarnings`, `describeVariables`) finds wiring mistakes on an interactive page (a
 condition reading a variable nothing sets, a metric or gauge naming nothing); MCP appends them to edit tools' results
 and `list_elements`. `ScriptExamples.swift` holds worked run_script programs, served as `dottie://examples/<name>`

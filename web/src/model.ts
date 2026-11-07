@@ -128,6 +128,8 @@ export interface Element {
   /** The most flow volume it carries, and a shape's delay in seconds (ADR 0003). */
   capacity?: number | null;
   delay?: number | null;
+  /** A shape that is a queue: backlog waits at the nearest one before whatever is full. */
+  queue?: boolean | null;
   /** Shows a metric; drawn as plain paths and a label when the page is posed (metrics.ts). */
   gauge?: Gauge | null;
 }
@@ -221,6 +223,8 @@ export interface Flow {
   spread: boolean | null;
   /** How much it carries (ADR 0003); null is 1. */
   volume: number | null;
+  /** Its volume while a condition holds, the last that holds winning. */
+  overrides?: { when: string; volume: number | null }[] | null;
 }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
@@ -255,14 +259,15 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
   page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
-  flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume"],
+  flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume", "overrides"],
+  flowOverride: ["when", "volume"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "overrides", "symbol", "playback", "offset", "args", "image", "reveal",
-    "ports", "labelRect", "extension", "capacity", "delay", "gauge"],
+    "ports", "labelRect", "extension", "capacity", "delay", "queue", "gauge"],
   gauge: ["metric", "of", "max", "warn", "alarm", "style", "label"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
@@ -470,6 +475,7 @@ class Reader {
       extension: this.extension(v.extension),
       capacity: num(v.capacity) ?? null,
       delay: num(v.delay) ?? null,
+      queue: v.queue === true ? true : null,
       gauge: this.gauge(v.gauge),
     };
   }
@@ -715,6 +721,9 @@ class Reader {
       when: str(f.when) ?? null,
       spread: f.spread === true ? true : null,
       volume: finite(f.volume),
+      overrides: Array.isArray(f.overrides) && f.overrides.length > 0
+        ? f.overrides.filter(isObj).map((o) => { this.fields(o, "flowOverride"); return { when: str(o.when) ?? "", volume: finite(o.volume) }; })
+        : null,
     };
   }
 }

@@ -181,3 +181,19 @@ extension DiagramOps {
         return list
     }
 }
+
+extension DiagramOps {
+    /// Turns each element `color` (stroke and label) while its own `metric` is at or past `at` (ADR 0003): one
+    /// override, `"load >= 1"`, on each, so whatever is saturated shows it. Returns the condition.
+    @discardableResult
+    public static func addAlarm(_ doc: inout DottieDocument, ids: [UUID], metric: String = "load", at: Double = 1,
+                                color: RGBA = RGBA(r: 0.86, g: 0.15, b: 0.15)) throws -> String {
+        guard PageState.metricNames.contains(metric) else {
+            throw OpsError.invalid("'metric' is one of \(PageState.metricNames.joined(separator: ", ")), got '\(metric)'")
+        }
+        guard at.isFinite else { throw OpsError.invalid("'at' is a number") }
+        let when = "\(metric) >= \(DottieDocument.number(at, places: 2))"
+        for id in ids { try addOverride(&doc, id: id, StateOverride(when: when, stroke: color, textColor: color)) }
+        return when
+    }
+}

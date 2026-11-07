@@ -348,6 +348,8 @@ actor DottieTools {
                     + "and what fits nowhere is backlog waiting in front of the bottleneck. null removes it"),
                 "delay": prop("number", "Shapes: seconds add_flow traffic stays inside when passing through (processing, queueing). "
                     + "null removes it"),
+                "queue": prop("boolean", "Shapes: it's a queue (an SQS queue, a dock), so traffic that can't go on waits here, at the "
+                    + "nearest queue before whatever is full, rather than right in front of it"),
                 "link": prop("string", "Id of a shape this element jumps to when its link badge is clicked in the app, on any page "
                     + "(the app switches tabs to follow it); an empty string removes the link"),
                 "url": prop("string", "Where the link badge goes outside the drawing, instead of link: an http(s) or mailto link, or "
@@ -410,7 +412,7 @@ actor DottieTools {
                 + "Variables it names are added, starting false, if missing. Pair with define_state for what the variable does.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
-                "text": prop("string", "The label"), "x": prop("number", "Left"), "y": prop("number", "Top"),
+                "text": prop("string", "The label"), "x": prop("number", "Left"), "y": prop("number", "Top"), "after": prop("string", "Instead of x and y: an element id to sit 12 points to the right of (with neither, above the content)"),
                 "width": prop("number", "Width (default fits the label, at least 100)"), "height": prop("number", "Height (default 40)"),
                 "toggles": prop("string", "The variable a click flips"),
                 "sets": .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
@@ -426,7 +428,7 @@ actor DottieTools {
                 "path": pathProp, "page": pageProp,
                 "name": prop("string", "The prefix of the options' variables, e.g. scenario"),
                 "options": .object(["type": "array", "items": .object(["type": "string"]), "description": "The options' labels, in order"]),
-                "x": prop("number", "Left"), "y": prop("number", "Top"),
+                "x": prop("number", "Left"), "y": prop("number", "Top"), "after": prop("string", "Instead of x and y: an element id to sit 12 points to the right of (with neither, above the content)"),
                 "direction": prop("string", "row (default) or column", enum: ["row", "column"]),
                 "initial": prop("string", "The option on at the start (default the first)"),
                 "color": prop("string", "Hex color (default blue)"),
@@ -436,7 +438,7 @@ actor DottieTools {
                 + "true), including variables added later.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
-                "x": prop("number", "Left"), "y": prop("number", "Top"), "text": prop("string", "The label (default Reset)"),
+                "x": prop("number", "Left"), "y": prop("number", "Top"), "after": prop("string", "Instead of x and y: an element id to sit 12 points to the right of (with neither, above the content)"), "text": prop("string", "The label (default Reset)"),
                 "id": prop("string", "An existing reset button to update instead of adding one"),
                 "color": prop("string", "Hex color (default grey)"),
              ], required: ["path"])),
@@ -475,6 +477,10 @@ actor DottieTools {
                 "volume": prop("number", "How much it carries, in the page's own unit (requests a second, messages, trucks a day; "
                                + "default 1). Illustrative: pick numbers that make the scenario read clearly, not a forecast. Shapes and connectors with a capacity (update_element) limit it; the biggest flow "
                                + "draws a packet every `every`, the rest proportionally fewer"),
+                "overrides": .object(["type": "array", "items": .object(["type": "object", "required": .array(["when"]),
+                    "properties": .object(["when": .object(["type": "string"]), "volume": .object(["type": "number"])])]),
+                    "description": .string("Its volume while a condition on page variables holds, the last that holds winning, e.g. "
+                        + "[{\"when\": \"spike\", \"volume\": 12}]: one flow instead of an extra one per scenario")]),
                 "id": prop("string", "An existing flow's id, to change or remove it"),
                 "remove": prop("boolean", "Remove the flow named by id"),
              ], required: ["path"])),
@@ -482,8 +488,8 @@ actor DottieTools {
              description: "Add an override to an element, keeping the ones it has: how it looks (and, for conditions on "
                 + "variables, whether it carries traffic, its cost, capacity or delay, or where its packets go) while a condition "
                 + "holds. Merged into an existing override with the same `when`, else appended. The condition can compare a "
-                + "metric by anchor, like \"load(workers) >= 0.9\", to recolor whatever is saturated; such an override changes "
-                + "only looks. Prefer define_state for a variable's whole meaning at once.",
+                + "metric by anchor, like \"load(workers) >= 0.9\", or the element's own, like \"load >= 0.9\" (see add_alarm); "
+                + "such an override changes only looks. Prefer define_state for a variable's whole meaning at once.",
              inputSchema: schema([
                 "path": pathProp, "id": prop("string", "Element id (its page is found from it)"),
                 "when": prop("string", "The condition: variables with !, && and ||, or metric comparisons like load(workers) > 0.9"),
@@ -497,6 +503,26 @@ actor DottieTools {
                 "reroute": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                     "description": .string("Connector id to connector id: send_packet packets following the first take the second")]),
              ], required: ["path", "id", "when"])),
+        Tool(name: "add_group",
+             description: "Draw a labelled dashed frame behind some elements: a region, an account, a VPC, a site.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "ids": idListProp("The elements it frames"),
+                "label": prop("string", "Its label, top left"),
+                "padding": prop("number", "Points round the elements (default 24)"),
+                "color": prop("string", "Hex color"),
+             ], required: ["path", "ids", "label"])),
+        Tool(name: "add_alarm",
+             description: "Turn elements red (or color) while their own metric is at or past a threshold, e.g. every worker pool "
+                + "and table at load >= 1: an override with the condition \"load >= 1\" on each (a condition without a target means "
+                + "the element's own). Shows whatever is saturated as states and traffic change.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "ids": idListProp("The elements"),
+                "metric": prop("string", "The metric (default load)", enum: PageState.metricNames),
+                "at": prop("number", "At or past this (default 1)"),
+                "color": prop("string", "Hex color (default red)"),
+             ], required: ["path", "ids"])),
         Tool(name: "add_gauge",
              description: "Add a gauge, to present a scenario: a box showing a metric of a shape, connector or flow as a number, a bar or a dial, green, "
                 + "amber at warn and red at alarm (load defaults to 0.7 and 0.9), drawn by every renderer and updated as states "
@@ -510,13 +536,15 @@ actor DottieTools {
                 "metric": prop("string", "What it shows", enum: PageState.metricNames),
                 "of": prop("string", "Id of the shape, connector or flow it measures"),
                 "x": prop("number", "Left edge"), "y": prop("number", "Top edge"),
+                "near": prop("string", "Instead of x and y: beside its target (a flow's: its source), clear of other gauges",
+                             enum: ["right", "left", "above", "below"]),
                 "width": prop("number", "Width (default 160)"), "height": prop("number", "Height (default 80, 110 for a dial)"),
                 "style": prop("string", "How it shows it (default number)", enum: Gauge.Style.allCases.map(\.rawValue)),
                 "max": prop("number", "What a full bar or dial stands for (default 1 for load, else the target's capacity)"),
                 "warn": prop("number", "At or past this it turns amber"),
                 "alarm": prop("number", "At or past this it turns red"),
                 "label": prop("string", "Its title (default the metric and the target's name)"),
-             ], required: ["path", "metric", "of", "x", "y"])),
+             ], required: ["path", "metric", "of"])),
         Tool(name: "list_extensions",
              description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
                 + "commands, or why it did not load. Shapes are added with add_shape (extension, shape, params); commands run with run_command.",
@@ -848,8 +876,15 @@ actor DottieTools {
 
     /// The tools after which a page's wiring is checked.
     static let wiringTools: Set<String> = ["run_script", "update_element", "define_state", "set_variable", "add_flow", "add_gauge",
-                                           "add_button", "add_choice", "add_reset", "add_legend", "add_override", "delete_element",
+                                           "add_button", "add_choice", "add_reset", "add_legend", "add_override", "add_alarm", "delete_element",
                                            "add_shape", "add_connector"]
+
+    /// A control's position from a tool call: x and y, else after `after`, else above the page's content.
+    private func controlOrigin(_ doc: DottieDocument, _ a: Args) throws -> CGPoint {
+        if let x = a.double("x"), let y = a.double("y") { return CGPoint(x: x, y: y) }
+        do { return try DiagramOps.controlOrigin(doc, after: a.string("after") == nil ? nil : try a.uuid("after")) }
+        catch let e as OpsError { throw ToolFailure(message: e.description) }
+    }
 
     /// The wiring warnings for the page a tool call edited.
     private func wiringWarnings(_ a: Args) throws -> [String] {
@@ -1160,6 +1195,7 @@ actor DottieTools {
                 }
                 let capacity = measure("capacity"), delay = measure("delay")
                 if capacity != nil || delay != nil { try DiagramOps.setCapacity(&file.pages[p], id: id, capacity: capacity, delay: delay) }
+                if let q = a.bool("queue") { try DiagramOps.setQueue(&file.pages[p], id: id, q) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
             let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
@@ -1198,6 +1234,12 @@ actor DottieTools {
                                               },
                                               size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
                                               volume: a.double("volume"),
+                                              overrides: try a.array("overrides").map { list in
+                                                  try list.map { o -> FlowOverride in
+                                                      guard let w = o.string("when") else { throw ToolFailure(message: "Each flow override needs 'when'") }
+                                                      return FlowOverride(when: w, volume: o.double("volume"))
+                                                  }
+                                              },
                                               replacing: a.string("id") == nil ? nil : try a.uuid("id"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
@@ -1250,7 +1292,8 @@ actor DottieTools {
                 switch currentTool {
                 case "add_button":
                     var spec = ButtonSpec(text: try a.require("text"))
-                    spec.x = a.double("x") ?? 0; spec.y = a.double("y") ?? 0
+                    let origin = try controlOrigin(file.pages[p], a)
+                    spec.x = origin.x; spec.y = origin.y
                     spec.width = a.double("width"); spec.height = a.double("height")
                     spec.toggles = a.string("toggles"); spec.onText = a.string("on_text"); spec.color = try a.color("color")
                     spec.sets = try a.flags("sets") ?? [:]
@@ -1260,13 +1303,15 @@ actor DottieTools {
                     guard let options = a.raw["options"]?.arrayValue?.compactMap(\.stringValue), !options.isEmpty else {
                         throw ToolFailure(message: "'options' must be a list of labels")
                     }
+                    let origin = try controlOrigin(file.pages[p], a)
                     let made = try DiagramOps.addChoice(&file.pages[p], name: try a.require("name"), options: options,
-                                                        x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                                                        x: origin.x, y: origin.y,
                                                         row: a.string("direction") != "column", initial: a.string("initial"),
                                                         color: try a.color("color"))
                     summary = "Added a choice: " + made.map { "\($0.variable) (button \($0.button.id.uuidString))" }.joined(separator: ", ")
                 case "add_reset":
-                    let r = try DiagramOps.addReset(&file.pages[p], x: a.double("x") ?? 0, y: a.double("y") ?? 0,
+                    let origin = try controlOrigin(file.pages[p], a)
+                    let r = try DiagramOps.addReset(&file.pages[p], x: origin.x, y: origin.y,
                                                     text: a.string("text") ?? "Reset",
                                                     replacing: a.string("id") == nil ? nil : try a.uuid("id"), color: try a.color("color"))
                     summary = "Reset button \(r.id.uuidString) puts every variable back to its starting value"
@@ -1640,6 +1685,30 @@ actor DottieTools {
         case "simulate":
             return try simulate(a)
 
+        case "add_group":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let g: (frame: Element, label: Element)
+            do {
+                g = try DiagramOps.addGroup(&file.pages[p], ids: try a.uuids("ids") ?? [], label: try a.require("label"),
+                                            padding: a.double("padding") ?? 24, color: try a.color("color") ?? RGBA(r: 0.6, g: 0.65, b: 0.72))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            return text("Added group frame \(g.frame.id.uuidString) with label \(g.label.id.uuidString)" + on(file, p))
+
+        case "add_alarm":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let when: String
+            do {
+                when = try DiagramOps.addAlarm(&file.pages[p], ids: try a.uuids("ids") ?? [], metric: a.string("metric") ?? "load",
+                                               at: a.double("at") ?? 1, color: try a.color("color") ?? RGBA(r: 0.86, g: 0.15, b: 0.15))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            return text("Each turns its color while \(when)" + on(file, p))
+
         case "add_override":
             let url = try fileURL(a)
             var file = try load(url)
@@ -1673,9 +1742,11 @@ actor DottieTools {
             let p = try pageIndex(file, a)
             let e: Element
             do {
-                e = try DiagramOps.addGauge(&file.pages[p], metric: try a.require("metric"), of: try a.uuid("of"),
-                                            frame: CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0,
-                                                          width: a.double("width") ?? 0, height: a.double("height") ?? 0),
+                let dial = a.string("style") == "dial"
+                let size = CGSize(width: a.double("width") ?? 160, height: a.double("height") ?? (dial ? 110 : 80))
+                let frame = try a.string("near").map { try DiagramOps.gaugeFrame(file.pages[p], near: try a.uuid("of"), side: $0, size: size) }
+                    ?? CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: size.width, height: size.height)
+                e = try DiagramOps.addGauge(&file.pages[p], metric: try a.require("metric"), of: try a.uuid("of"), frame: frame,
                                             style: try a.string("style").map { s in
                                                 guard let v = Gauge.Style(rawValue: s) else { throw ToolFailure(message: "'style' must be number, bar or dial") }
                                                 return v

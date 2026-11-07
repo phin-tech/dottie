@@ -33,7 +33,13 @@ rather than queueing theory, a greedy assignment a reader can follow rather than
   processing time, time in a queue, time on a dock. Packets already vanish inside such a shape. With a delay they
   stay hidden that much longer, so a slow step is visibly slow. A flow's source and destinations have no delay.
   Delay is fixed: it doesn't grow with load (an override can raise it).
-- **Overrides** may set `capacity` and `delay`, as they already set `cost`: "half the workers down" or "lane at
+- **Queue** (`queue: true` on a shape): where traffic that can't go on waits, the nearest queue before whatever is
+  full rather than the shape right in front of it, so an SQS queue holds the work its workers or their table can't
+  take.
+- **A flow's overrides** (`[{when, volume}]`) set its volume while a condition on the variables holds, the last that
+  holds winning, so a spike is one flow, not two.
+- **Overrides** may set `capacity` and `delay`, as they already set `cost`. When several hold at once, the tightest
+  capacity and the longest delay win, whatever their order, so a scale-out and a degradation combine sensibly: "half the workers down" or "lane at
   half capacity" is one `defineState`. A "traffic spike" or "peak season" is an extra flow with `when: spike`.
 
 ### Assignment: where the volume goes
@@ -89,7 +95,8 @@ they're exact, they don't flicker, and they only change when the state does.
 ### Conditions on metrics, for looks only
 
 Conditions gain comparisons against metrics: `load(workers) > 0.9`, `backlog(orders) > 0` and so on. An element
-is named by its `anchor`, the hidden label that already exists for linking. That's how a saturated service or a full lane turns red: an
+is named by its `anchor`, the hidden label that already exists for linking, or left out (`load >= 1`) for the
+element the override is on, which is what an alarm is. That's how a saturated service or a full lane turns red: an
 override with that condition and a red stroke.
 
 To avoid a loop (a metric depends on what's drawn and routed, and the condition would change what's drawn and

@@ -46,6 +46,14 @@ const TINY = 1e-9;
 
 const amount = (f: Flow): number => clamp(f.volume, 1, 0, 1e12);
 
+/** The volume a flow carries with these values (Flow.amount(_:)): the last override that holds, else its own. */
+function amountIn(f: Flow, values: Record<string, boolean> | null): number {
+  if (values === null || !f.overrides) return amount(f);
+  let v: number | null = null;
+  for (const o of f.overrides) if (o.volume !== null && !mentionsMetric(o.when) && holds(o.when, values)) v = o.volume;
+  return v === null ? amount(f) : Math.min(Math.max(Number.isFinite(v) ? v : 1, 0), 1e12);
+}
+
 /** A shape's delay as traffic feels it: 0...3600 seconds. */
 export function delayOf(e: Element): number {
   const d = e.delay ?? null;
@@ -136,14 +144,14 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   const packets: Element[] = [];
   const waitingBy = new Map<string, [string, number][]>();
   const everyOf = (flow: Flow) =>
-    Math.min(Math.max(clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest / Math.max(amount(flow), TINY), 0.05), 60);
+    Math.min(Math.max(clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest / Math.max(amountIn(flow, values), TINY), 0.05), 60);
 
   for (const [i, flow] of list.entries()) {
     if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
     const source = byID.get(flow.from);
     const base = source ? flowTree(flow.from, frame, offline) : null;
     if (!source || !base) continue;
-    const volume = amount(flow);
+    const volume = amountIn(flow, values);
     const fm: FlowMetrics = { volume, placed: 0, backlog: 0, backup: 0, transit: null };
     const placements: Placement[] = [];
     const waiting: [string, number][] = [];
@@ -175,7 +183,15 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
         const sequence: [string, string][] = [[r.shapes[0], r.shapes[0]]];
         r.hops.forEach(([id], k) => { sequence.push([id, r.shapes[k]], [r.shapes[k + 1], r.shapes[k]]); });
         const first = sequence.find(([id]) => done.has(id));
-        if (first) at = first[1];
+        if (first) {
+          at = first[1];
+          // Or the nearest queue before that, on the way from the source.
+          const upTo = r.shapes.indexOf(at);
+          for (let q = upTo; q >= 0; q--) {
+            const s = byID.get(r.shapes[q]);
+            if (s && s.queue === true && s.kind !== "connector") { at = r.shapes[q]; break; }
+          }
+        }
         // It still travels as far as the queue it waits in.
         const n = r.shapes.indexOf(at);
         if (at !== flow.from && n >= 0) {
@@ -242,7 +258,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
       if (c !== undefined && c > TINY && !shapes.includes(e.id)) shapes.push(e.id);
     }
     if (shapes.length === 0) continue;
-    const volume = amount(flow);
+    const volume = amountIn(flow, values);
     const every = everyOf(flow);
     const unit = every * Math.max(volume, TINY);
     const speed = clamp(flow.speed, DEFAULT_SPEED, 1, 10000), size = clamp(flow.size, DEFAULT_SIZE, 2, 200);
@@ -339,12 +355,13 @@ function packet(id: string, x: number, y: number, size: number, color: RGBA, lay
 // MARK: Overrides that compare metrics, and gauges
 
 /** The frame's metric for a condition's comparison: its target an element's anchor, or an element's or flow's id. */
-export function metricLookup(m: FrameMetrics, frame: Page): (t: MetricTerm) => number | null {
+export function metricLookup(m: FrameMetrics, frame: Page): (t: MetricTerm, own: string | null) => number | null {
   const anchors = new Map<string, string>();
   for (const e of frame.elements) if (e.anchor !== null && !anchors.has(e.anchor)) anchors.set(e.anchor, e.id);
   const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
-  return (term) => {
-    const id = anchors.get(term.target) ?? (UUID.test(term.target) ? term.target.toUpperCase() : null);
+  return (term, own) => {
+    // No target: the element the condition is on.
+    const id = term.target === "" ? own : anchors.get(term.target) ?? (UUID.test(term.target) ? term.target.toUpperCase() : null);
     return id === null ? null : metricValue(m, term.metric, id);
   };
 }
@@ -358,7 +375,8 @@ export function finishing(elements: Element[], metrics: FrameMetrics, values: Re
   for (let e of elements) {
     if (values !== null && e.overrides) {
       for (const o of e.overrides) {
-        if (mentionsMetric(o.when) && holds(o.when, values, lookup)) e = applyOverride(looksOnly(o), e);
+        const own = e.id;
+        if (mentionsMetric(o.when) && holds(o.when, values, (m) => lookup(m, own))) e = applyOverride(looksOnly(o), e);
       }
     }
     // The editor ("all", no values) edits the gauge itself, a rectangle.

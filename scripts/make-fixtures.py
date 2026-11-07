@@ -728,7 +728,25 @@ def flows():
     cap.add("rectangle", 600, 220, 160, 100, gauge={"metric": "transit", "of": first, "style": "dial", "max": 4, "warn": 2, "alarm": 3})
     cap.add("rectangle", 600, 340, 160, 60, gauge={"metric": "load", "of": "nope", "style": "x"})
     cap.add("rectangle", 200, 260, 120, 60, gauge={"metric": "depth", "of": queue, "label": "piled up"})   # grows with t
-    write(EDGE / "flows.dottie", [p, q, c, sp, cap])
+
+    # Queue (ADR 0003): sqs is a queue, so with the table full the backlog waits there, not at the worker; the flow's
+    # volume follows its overrides (spike: 5; a damaged override and one with no condition never hold); the worker's
+    # capacity overrides combine to the tightest of those holding (scale alone: 10); alarms on their own load turn
+    # the full table red.
+    qp = Page("Queue")
+    qp.animate(2, fps=10)
+    qp.extra = {"variables": {"spike": True, "scale": True, "slow": False}}
+    api2 = qp.add("rectangle", 20, 100, 100, 60, text="api")
+    sqs = qp.add("rectangle", 200, 100, 100, 60, text="sqs", queue=True, overrides=[{"when": "backlog > 0", "stroke": rgba(0.85, 0.47, 0.02)}])
+    worker = qp.add("rectangle", 380, 100, 100, 60, text="worker", capacity=4, overrides=[
+        {"when": "slow", "capacity": 1}, {"when": "scale", "capacity": 10}, {"when": "load >= 1", "stroke": rgba(0.86, 0.15, 0.15)}])
+    table = qp.add("rectangle", 560, 100, 100, 60, text="table", capacity=2, overrides=[
+        {"when": "load >= 1", "stroke": rgba(0.86, 0.15, 0.15), "textColor": rgba(0.86, 0.15, 0.15)}])
+    qp.connect(api2, sqs); qp.connect(sqs, worker); qp.connect(worker, table)
+    qp.extra["flows"] = [{"id": uid(), "from": api2, "to": [table], "every": 0.3, "volume": 2,
+                          "overrides": [{"when": "spike", "volume": 5}, {"when": "nope ||", "volume": 99}, {"volume": 7}]}]
+    qp.add("rectangle", 200, 200, 120, 60, gauge={"metric": "backlog", "of": sqs, "label": "sqs backlog"})
+    write(EDGE / "flows.dottie", [p, q, c, sp, cap, qp])
 
 
 def links():

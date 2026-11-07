@@ -202,7 +202,7 @@ extension DottieDocument {
         for (i, flow) in flows.enumerated() {
             if let w = flow.when, let values, !PageState.holds(w, in: values) { continue }
             guard let source = byID[flow.from], let base = Self.flowTree(from: flow.from, in: frame, offline: offline) else { continue }
-            let volume = flow.amount
+            let volume = flow.amount(values)
             var fm = FlowMetrics(); fm.volume = volume
             var placements: [Placement] = []
             var waiting: [(UUID, Double)] = []
@@ -229,7 +229,12 @@ extension DottieDocument {
                     let r = route(base, goal), done = full()
                     var sequence: [(UUID, UUID)] = [(r.shapes[0], r.shapes[0])]   // (element, the shape before it)
                     for (k, hop) in r.hops.enumerated() { sequence += [(hop.0, r.shapes[k]), (r.shapes[k + 1], r.shapes[k])] }
-                    if let first = sequence.first(where: { done.contains($0.0) }) { at = first.1 }
+                    if let k = sequence.firstIndex(where: { done.contains($0.0) }) {
+                        at = sequence[k].1
+                        // Or the nearest queue before that, on the way from the source.
+                        if let n = r.shapes.firstIndex(of: at),
+                           let q = r.shapes[...n].last(where: { byID[$0]?.queue == true && byID[$0]?.kind != .connector }) { at = q }
+                    }
                     // It still travels as far as the queue it waits in.
                     if at != flow.from, let n = r.shapes.firstIndex(of: at) {
                         let shapes = Array(r.shapes[...n]), hops = Array(r.hops[..<n])
@@ -290,7 +295,7 @@ extension DottieDocument {
             let held = frame.elements.map(\.id).filter { carried[Self.queueKey(shape: $0, flow: flow.id)].map { $0 > tiny } == true }
             for s in held where !shapes.contains(s) { shapes.append(s) }
             guard !shapes.isEmpty else { continue }
-            let volume = flow.amount
+            let volume = flow.amount(values)
             let every = min(max(flow.interval * biggest / max(volume, tiny), 0.05), 60)
             let unit = every * max(volume, tiny)   // the volume one packet stands for, times a second
             let speed = flow.pace, size = flow.diameter, style = Self.packetStyle(flow)
@@ -386,11 +391,12 @@ extension DottieDocument {
 extension DottieDocument {
     /// The frame's metric for a condition's comparison: its target is an element's anchor, or an element's or a
     /// flow's id.
-    static func metricLookup(_ metrics: FrameMetrics, in frame: DottieDocument) -> (PageState.MetricTerm) -> Double? {
+    static func metricLookup(_ metrics: FrameMetrics, in frame: DottieDocument) -> (PageState.MetricTerm, UUID?) -> Double? {
         var anchors: [String: UUID] = [:]
         for e in frame.elements { if let a = e.anchor, anchors[a] == nil { anchors[a] = e.id } }
-        return { term in
-            guard let id = anchors[term.target] ?? UUID(uuidString: term.target) else { return nil }
+        return { term, own in
+            // No target: the element the condition is on.
+            guard let id = term.target.isEmpty ? own : anchors[term.target] ?? UUID(uuidString: term.target) else { return nil }
             return metrics.value(term.metric, of: id)
         }
     }
@@ -404,7 +410,8 @@ extension DottieDocument {
         var out: [Element] = [], readings: [String: Double] = [:]
         for var e in elements {
             if let values, let overrides = e.overrides {
-                for o in overrides where PageState.mentionsMetric(o.when) && PageState.holds(o.when, in: values, metric: lookup) {
+                let id = e.id
+                for o in overrides where PageState.mentionsMetric(o.when) && PageState.holds(o.when, in: values, metric: { lookup($0, id) }) {
                     e = o.looksOnly.apply(to: e)
                 }
             }
@@ -540,6 +547,13 @@ extension DottieDocument {
 // MARK: Editing
 
 extension DiagramOps {
+    /// Marks a shape as a queue, where traffic that can't go on waits (ADR 0003), or not.
+    public static func setQueue(_ doc: inout DottieDocument, id: UUID, _ on: Bool) throws {
+        guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        guard doc.elements[i].kind != .connector else { throw OpsError.invalid("'queue' is for shapes; traffic waits inside them") }
+        doc.elements[i].queue = on ? true : nil
+    }
+
     /// Sets an element's capacity and a shape's delay (ADR 0003): nil leaves one as it is, `.some(nil)` clears it.
     public static func setCapacity(_ doc: inout DottieDocument, id: UUID, capacity: Double??, delay: Double??) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }

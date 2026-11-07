@@ -98,6 +98,10 @@ _Avoid_: weight, rate, traffic amount
 The most volume a connector or shape carries; what doesn't fit takes the next cheapest route or is backlog.
 _Avoid_: limit, bandwidth
 
+**Queue**:
+A shape marked as where traffic waits: backlog collects at the nearest queue before whatever is full.
+_Avoid_: buffer, holding area
+
 **Backlog**:
 Volume a flow can't place on any route with room: the rate the queue in front of the bottleneck grows at.
 _Avoid_: blocked, dropped, overflow

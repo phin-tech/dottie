@@ -211,6 +211,9 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var capacity: Double?
     /// Only for a shape: seconds flow traffic stays inside it when passing through (ADR 0003). nil is 0.
     public var delay: Double?
+    /// Only for a shape: it's a queue, so traffic that can't go on waits here, the nearest queue before whatever is
+    /// full, rather than right in front of it (ADR 0003): an SQS queue in front of workers and the table they write to.
+    public var queue: Bool?
     /// Shows a metric (ADR 0003). When the page is posed, it's drawn as plain paths and a label in this frame.
     public var gauge: Gauge?
 

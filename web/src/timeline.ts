@@ -284,6 +284,14 @@ export function posedWithMetrics(page: Page, t: number, state: StateChoice = "in
     const track = tracks.get(e.id);
     let out = track ? applyTrack(track, e, t) : e;
     for (const o of active.get(e.id) ?? []) out = applyOverride(o, out);
+    // Overrides that hold together: the tightest capacity and the longest delay win, whatever their order.
+    const list = active.get(e.id);
+    if (list) {
+      const caps = list.map((o) => o.capacity).filter((c): c is number => c !== null && Number.isFinite(c));
+      const delays = list.map((o) => o.delay).filter((d): d is number => d !== null && Number.isFinite(d));
+      if (caps.length > 0) out.capacity = Math.max(Math.min(...caps), 0);
+      if (delays.length > 0 && out.kind !== "connector") out.delay = Math.max(Math.max(...delays), 0);
+    }
     if (reseed !== null && reseed > 0 && boils(e)) {
       if (out === e) out = cloneElement(e);
       out.seed = boiled(e.seed, reseed);
