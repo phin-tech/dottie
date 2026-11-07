@@ -14,6 +14,13 @@ final class SimulationEngineTests: XCTestCase {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let file = try JSONDecoder().decode(DottieFile.self, from: Data(contentsOf: root.appendingPathComponent("fixtures/edge/flows.dottie")))
         for (i, p) in file.pages.enumerated() { out.append(("flows.dottie p\(i + 1)", p)) }
+        // The worst case for the page cache: a shape that moves under the flows, so every frame's page differs.
+        var moving = out.first { $0.0 == "aws-outage" }!.1
+        XCTAssertNil(DottieScript.run("""
+            const s = dottie.elements().find((e) => e.anchor === "albWest");
+            dottie.key(s.id, 0, {x: s.x}); dottie.key(s.id, 9, {x: s.x + 200});
+            """, on: &moving, timeLimit: 10).error)
+        out.append(("aws-outage, moving", moving))
         return out
     }
 

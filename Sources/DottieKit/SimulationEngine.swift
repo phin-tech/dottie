@@ -10,6 +10,9 @@ final class SimulationEngine: @unchecked Sendable {
     private let lock = NSLock()
     private var context: JSContext?
     private var frameFunction: JSValue?
+    private var pageFunction: JSValue?
+    /// The page the context holds (`DottieSim.page`), sent again only when the posed page changes.
+    private var lastPage: DottieDocument?
     private(set) var failure: String?
     private(set) var calls = 0
     private var lastFailed = false
@@ -22,14 +25,15 @@ final class SimulationEngine: @unchecked Sendable {
         context.evaluateScript(PlayerScript.simulation)
         if let e = context.exception { failure = "Simulation failed to load: \(e)"; return nil }
         let f = context.objectForKeyedSubscript("DottieSim")?.objectForKeyedSubscript("frame")
-        guard let f, !f.isUndefined else { failure = "Simulation has no frame function"; return nil }
+        let p = context.objectForKeyedSubscript("DottieSim")?.objectForKeyedSubscript("page")
+        guard let f, !f.isUndefined, let p, !p.isUndefined else { failure = "Simulation has no frame function"; return nil }
         self.context = context
         frameFunction = f
+        pageFunction = p
         return f
     }
 
     private struct Request: Encodable {
-        var page: DottieDocument
         var t: Double
         var values: [String: Bool]?
         var offline: [String]
@@ -61,10 +65,9 @@ final class SimulationEngine: @unchecked Sendable {
     func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID>,
                    since: Double?, carried: [String: Double]) -> (packets: [Element], metrics: FrameMetrics)? {
         var page = frame
-        // Pictures don't affect traffic, and would cost an encoding every frame.
+        // Pictures don't affect traffic, and would cost an encoding.
         for i in page.elements.indices where page.elements[i].image != nil { page.elements[i].image = nil }
-        let request = Request(page: page, t: t, values: values, offline: offline.map(\.uuidString).sorted(),
-                              since: since, carried: carried)
+        let request = Request(t: t, values: values, offline: offline.map(\.uuidString).sorted(), since: since, carried: carried)
         guard let data = try? JSONEncoder().encode(request) else { return nil }
         let text = String(decoding: data, as: UTF8.self)
 
@@ -74,6 +77,13 @@ final class SimulationEngine: @unchecked Sendable {
         defer { if strict && lastFailed { fatalError("SimulationEngine fell back: \(failure ?? "bad response")") } }
         lastFailed = true
         guard let f = load() else { return nil }
+        if page != lastPage {
+            lastPage = nil
+            guard let json = try? JSONEncoder().encode(page) else { return nil }
+            pageFunction?.call(withArguments: [String(decoding: json, as: UTF8.self)])
+            if let e = context?.exception { failure = "\(e)"; context?.exception = nil; return nil }
+            lastPage = page
+        }
         let result = f.call(withArguments: [text])
         if let e = context?.exception { failure = "\(e)"; context?.exception = nil; return nil }
         guard let out = result?.toString(),
