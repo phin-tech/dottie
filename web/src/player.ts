@@ -334,6 +334,8 @@ export class DottiePlayer extends ElementBase {
   private raf = 0;
   private replayRaf = 0;
   private loadToken = 0;
+  /** The time a still shows; null while the drawing is animated. */
+  private stillTime: number | null = null;
   private visible = true;
   private observer: IntersectionObserver | null = null;
 
@@ -411,9 +413,19 @@ export class DottiePlayer extends ElementBase {
         text = inline.textContent ?? "";
       }
       if (token !== this.loadToken) return;
-      this.setFile(parseDottie(text));
+      this.showFile(parseDottie(text));
     } catch (err) {
       if (token !== this.loadToken) return;
+      // The drawing that was showing stops, and its controls go with it.
+      this.setPlaying(false);
+      cancelAnimationFrame(this.raf);
+      cancelAnimationFrame(this.replayRaf);
+      this.raf = 0;
+      this.replayRaf = 0;
+      this.playback = null;
+      this.file = null;
+      this.stillTime = null;
+      this.bar.hidden = true;
       this.stage.innerHTML = "";
       const box = document.createElement("div");
       box.className = "error";
@@ -425,6 +437,12 @@ export class DottiePlayer extends ElementBase {
 
   /** Shows an already-parsed file. */
   setFile(file: DottieFile): void {
+    // A load still in flight would otherwise replace this file when it lands.
+    this.loadToken++;
+    this.showFile(file);
+  }
+
+  private showFile(file: DottieFile): void {
     this.file = file;
     for (const w of file.warnings) console.warn(`dottie-player: ${w}`);
     this.mount();
@@ -455,10 +473,14 @@ export class DottiePlayer extends ElementBase {
       this.dispatchEvent(new CustomEvent("frame", { detail: { frame: i, time: p.plan.times[i] } }));
     };
     if (!animated) {
-      p.drawAt(at !== null ? Number(at) || 0 : posterTime(page), at !== null ? nearest(p, Number(at) || 0) : p.posterFrame);
+      const i = at !== null ? nearest(p, Number(at) || 0) : p.posterFrame;
+      this.stillTime = at !== null ? Number(at) || 0 : posterTime(page);
+      p.drawAt(this.stillTime, i);
+      p.frame = i;
       this.setPlaying(false);
       return;
     }
+    this.stillTime = null;
     p.show(0);
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) { p.show(p.posterFrame); this.setPlaying(false); return; }
@@ -468,7 +490,12 @@ export class DottiePlayer extends ElementBase {
   // MARK: Playback
 
   get paused(): boolean { return !this.playing; }
-  get currentTime(): number { const p = this.playback; return p && p.frame >= 0 ? p.plan.times[p.frame] : 0; }
+  /** The moment shown: a still's own time (its `at`, or the poster), else the current frame's. */
+  get currentTime(): number {
+    const p = this.playback;
+    if (p && this.stillTime !== null) return this.stillTime;
+    return p && p.frame >= 0 ? p.plan.times[p.frame] : 0;
+  }
   set currentTime(t: number) { const p = this.playback; if (p) { this.setPlaying(false); p.show(nearest(p, t)); } }
   get duration(): number { return this.playback?.page.timeline?.duration ?? 0; }
 
