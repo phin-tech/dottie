@@ -44,12 +44,13 @@ public enum ScriptExamples {
     static let queueWorkers = Example(
         name: "queue-workers",
         title: "A queue in front of workers",
-        summary: "Producers, a queue and two worker pools with capacities; scenario buttons add a traffic spike or halve "
-            + "the workers, and gauges show load and how fast the queue grows (volume, capacity, delay, backlog, "
-            + "metric overrides, gauges, choice).",
+        summary: "Producers, a queue and two worker pools with capacities; two toggles, which can be on together, add a "
+            + "traffic spike and halve the workers, and gauges show load and the queue filling and draining (volume, "
+            + "capacity, delay, backlog, depth, metric overrides, gauges, buttons).",
         code: #"""
-        // A queue in front of workers. Pick a scenario: the spike adds traffic, degraded halves workers A. What
-        // doesn't fit overflows to workers B, and what fits nowhere waits in the queue (backlog: how fast it grows).
+        // A queue in front of workers. Two toggles, on alone or together: the spike adds traffic, degraded halves
+        // workers A. What doesn't fit overflows to workers B; what fits nowhere piles up in the queue, and drains
+        // once there's room again.
         /** @param {number} x @param {number} y @param {string} text @param {object} [more] */
         const box = (x, y, text, more = {}) =>
           dottie.rect({x, y, width: 150, height: 64, text, anchor: text, fill: "#ffffff", strokeWidth: 2, ...more});
@@ -62,19 +63,23 @@ public enum ScriptExamples {
         dottie.connect(queue, a); dottie.connect(queue, b, {label: "overflow"});
         // Normal traffic (3 a second), and a spike (4 more) only in the spike scenario.
         const normal = dottie.flow(producers, [a, b], {volume: 3, every: 0.3, color: "#2f6fdf"});
-        dottie.flow(producers, [a, b], {volume: 4, every: 0.3, color: "#d97706", when: "scenario_spike"});
+        dottie.flow(producers, [a, b], {volume: 4, every: 0.3, color: "#d97706", when: "spike"});
         // addOverride keeps an element's other overrides (update with overrides would replace them).
-        dottie.addOverride(a, {when: "scenario_degraded", capacity: 2, text: "workers A (half down)", dash: "dashed"});
+        dottie.addOverride(a, {when: "degraded", capacity: 2, text: "workers A (half down)", dash: "dashed"});
         // An override comparing a metric, by anchor, changes looks only: saturated workers turn red.
         for (const name of ["workers A", "workers B"]) {
           dottie.addOverride(name === "workers A" ? a : b, {when: `load(${name}) >= 1`, stroke: "#dc2626", textColor: "#dc2626"});
         }
-        dottie.gauge(a, {metric: "load", x: 900, y: 120, width: 170, height: 110, style: "dial"});
-        dottie.gauge(b, {metric: "load", x: 900, y: 370, width: 170, height: 110, style: "dial"});
+        dottie.gauge(a, {metric: "load", x: 900, y: 120, width: 170, height: 110, style: "dial", label: "workers A load"});
+        dottie.gauge(b, {metric: "load", x: 900, y: 370, width: 170, height: 110, style: "dial", label: "workers B load"});
         dottie.gauge(queue, {metric: "backlog", x: 420, y: 380, width: 150, height: 70, style: "bar", max: 5,
                              warn: 0.01, alarm: 1, label: "queue growing /s"});
+        dottie.gauge(queue, {metric: "depth", x: 420, y: 460, width: 150, height: 60, warn: 0.01, alarm: 10,
+                             label: "messages waiting"});
         dottie.gauge(normal, {metric: "transit", x: 210, y: 380, width: 150, height: 70, label: "transit"});
-        dottie.choice("scenario", ["normal", "spike", "degraded"], {x: 220, y: 60});
+        // Independent toggles rather than a choice, so both can be on at once.
+        dottie.button({x: 220, y: 60, text: "traffic spike", toggles: "spike", onText: "spike: on"});
+        dottie.button({x: 400, y: 60, text: "workers degraded", toggles: "degraded", onText: "degraded: on"});
         dottie.resetButton({x: 760, y: 60});
         """#)
 

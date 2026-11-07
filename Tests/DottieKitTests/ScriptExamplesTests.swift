@@ -27,7 +27,9 @@ final class ScriptExamplesTests: XCTestCase {
         XCTAssertNil(DottieScript.run(ScriptExamples.named("queue-workers")!.code, on: &doc, libraries: [.starter], timeLimit: 10).error)
         let queue = try XCTUnwrap(doc.elements.first { $0.anchor == "queue" }).id
         XCTAssertEqual(doc.metrics(at: 1).elements[queue]?.backlog, 0)
-        XCTAssertEqual(doc.metrics(at: 1, state: .values(["scenario_normal": false, "scenario_spike": true])).elements[queue]?.backlog, 1)
+        XCTAssertEqual(doc.metrics(at: 1, state: .values(["spike": true])).elements[queue]?.backlog, 1)
+        // Both at once: 7 a second against 2 + 2 of workers, so 3 a second pile up.
+        XCTAssertEqual(doc.metrics(at: 1, state: .values(["spike": true, "degraded": true])).elements[queue]?.backlog, 3)
 
         var aws = DottieDocument()
         XCTAssertNil(DottieScript.run(ScriptExamples.named("aws-outage")!.code, on: &aws, libraries: [.starter], timeLimit: 10).error)
