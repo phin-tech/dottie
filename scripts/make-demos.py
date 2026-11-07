@@ -18,8 +18,15 @@ bin_dir = root / ".build" / "debug"
 drawings = root / "website" / "docs" / "drawings"
 compiled = root / "website" / "docs" / "compiled"
 examples = root / "website" / "docs" / "examples"
-# Demos also shown as File > Export Animation's web page, which needs nothing but itself.
-EXPORTED = {"flows"}
+# Demos also shown as File > Export Animation's web page, which needs nothing but itself (and carries this
+# checkout's dottie.js, where the site's <dottie-player> is the published one).
+EXPORTED = {"flows", "queue"}
+# Interactive demos whose GIF is a recorded run of clicks (`dottie simulate --record`) rather than the page at its
+# starting values.
+RECORDED = {
+    "queue": ["--wait", "2", "--click", "traffic spike", "--wait", "4", "--click", "workers degraded", "--wait", "3",
+              "--click", "reset", "--wait", "4"],
+}
 
 
 def run_script(script: pathlib.Path, page: pathlib.Path, after=None) -> None:
@@ -98,7 +105,11 @@ def demo(name: str) -> None:
     page = root / "Design" / "demos" / f"{name}.dottie"
     after = script.with_name(f"{name}.after.js")
     run_script(script, page, after if after.exists() else None)
-    render(page, page.with_suffix(".gif"), "1")
+    if name in RECORDED:
+        subprocess.run([str(bin_dir / "dottie"), "simulate", str(page), "--disk", *RECORDED[name],
+                        "--record", str(page.with_suffix(".gif")), "--scale", "1"], check=True, stdout=subprocess.DEVNULL)
+    else:
+        render(page, page.with_suffix(".gif"), "1")
     publish(page, name)
 
 

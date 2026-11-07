@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1098" height="508" viewBox="-4 36 1098 508">
+<rect x="-4" y="36" width="1098" height="508" fill="#ffffff"/>
+<path d="M160 295 C160 314.33 128.66 330 90 330 C51.34 330 20 314.33 20 295 C20 275.67 51.34 260 90 260 C128.66 260 160 275.67 160 295 Z" fill="#e8f0ff" stroke="none"/>
+<path d="M160 295 C160 314.33 128.66 330 90 330 C51.34 330 20 314.33 20 295 C20 275.67 51.34 260 90 260 C128.66 260 160 275.67 160 295 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="90" y="301.48">producers</tspan></text>
+<path d="M210 263 L360 263 L360 327 L210 327 Z" fill="#ffffff" stroke="none"/>
+<path d="M210 263 L360 263 L360 327 L210 327 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="285" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="285" y="301.48">API</tspan></text>
+<path d="M420 263 L570 263 L570 327 L420 327 Z" fill="#fff4d6" stroke="none"/>
+<path d="M420 263 L570 263 L570 327 L420 327 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="495" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="495" y="301.48">queue</tspan></text>
+<path d="M680 140 L830 140 L830 204 L680 204 Z" fill="#ffffff" stroke="none"/>
+<path d="M680 140 L830 140 L830 204 L680 204 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="755" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="755" y="178.48">workers A</tspan></text>
+<path d="M680 390 L830 390 L830 454 L680 454 Z" fill="#ffffff" stroke="none"/>
+<path d="M680 390 L830 390 L830 454 L680 454 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="755" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="755" y="428.48">workers B</tspan></text>
+<path d="M160 295 L210 295 M200.99 290.66 L210 295 M200.99 299.34 L210 295" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M360 295 L420 295 M410.99 290.66 L420 295 M410.99 299.34 L420 295" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M562.64 263 L687.36 204 M677.36 203.93 L687.36 204 M681.07 211.77 L687.36 204" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M560.51 327 L689.49 390 M683.3 382.15 L689.49 390 M679.49 389.94 L689.49 390" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="584.5" y="345" width="81" height="27" fill="#ffffff"/>
+<text x="625" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="625" y="364.98">overflow</tspan></text>
+<path d="M900 120 C956.67 120 1013.33 120 1070 120 C1070 156.67 1070 193.33 1070 230 C1013.33 230 956.67 230 900 230 C900 193.33 900 156.67 900 120 Z" fill="#ffffff" stroke="none"/>
+<path d="M900 120 C956.67 120 1013.33 120 1070 120 C1070 156.67 1070 193.33 1070 230 C1013.33 230 956.67 230 900 230 C900 193.33 900 156.67 900 120 Z" fill="none" stroke="#ccd1d9" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="985" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="985" y="200.38">workers A load</tspan><tspan x="985" y="221.98">75%</tspan></text>
+<path d="M941 175 C941 150.7 960.7 131 985 131 C1009.3 131 1029 150.7 1029 175" fill="none" stroke="#e5e7eb" stroke-width="7.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M941 175 C941 157.2 951.72 141.16 968.16 134.35 C984.6 127.54 1003.53 131.3 1016.11 143.89" fill="none" stroke="#d97706" stroke-width="7.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M985 175 C993.82 166.18 1002.63 157.37 1011.45 148.55" fill="none" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M900 370 C956.67 370 1013.33 370 1070 370 C1070 406.67 1070 443.33 1070 480 C1013.33 480 956.67 480 900 480 C900 443.33 900 406.67 900 370 Z" fill="#ffffff" stroke="none"/>
+<path d="M900 370 C956.67 370 1013.33 370 1070 370 C1070 406.67 1070 443.33 1070 480 C1013.33 480 956.67 480 900 480 C900 443.33 900 406.67 900 370 Z" fill="none" stroke="#ccd1d9" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="985" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="985" y="450.38">workers B load</tspan><tspan x="985" y="471.98">0%</tspan></text>
+<path d="M941 425 C941 400.7 960.7 381 985 381 C1009.3 381 1029 400.7 1029 425" fill="none" stroke="#e5e7eb" stroke-width="7.04" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M985 425 C972.53 425 960.07 425 947.6 425" fill="none" stroke="#333333" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M420 380 C470 380 520 380 570 380 C570 403.33 570 426.67 570 450 C520 450 470 450 420 450 C420 426.67 420 403.33 420 380 Z" fill="#ffffff" stroke="none"/>
+<path d="M420 380 C470 380 520 380 570 380 C570 403.33 570 426.67 570 450 C520 450 470 450 420 450 C420 426.67 420 403.33 420 380 Z" fill="none" stroke="#ccd1d9" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="495" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="495" y="398.78">queue growing /s</tspan><tspan x="495" y="420.38">0</tspan></text>
+<path d="M430 430.4 C473.33 430.4 516.67 430.4 560 430.4 C560 434.4 560 438.4 560 442.4 C516.67 442.4 473.33 442.4 430 442.4 C430 438.4 430 434.4 430 430.4 Z" fill="#e5e7eb" stroke="none"/>
+<path d="M430 430.4 C473.33 430.4 516.67 430.4 560 430.4 C560 434.4 560 438.4 560 442.4 C516.67 442.4 473.33 442.4 430 442.4 C430 438.4 430 434.4 430 430.4 Z" fill="none" stroke="#e5e7eb" stroke-width="0.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M420 460 C470 460 520 460 570 460 C570 480 570 500 570 520 C520 520 470 520 420 520 C420 500 420 480 420 460 Z" fill="#ffffff" stroke="none"/>
+<path d="M420 460 C470 460 520 460 570 460 C570 480 570 500 570 520 C520 520 470 520 420 520 C420 500 420 480 420 460 Z" fill="none" stroke="#ccd1d9" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="495" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#16a34a" text-anchor="middle"><tspan x="495" y="485.68">messages waiting</tspan><tspan x="495" y="507.28">0</tspan></text>
+<path d="M210 380 C260 380 310 380 360 380 C360 403.33 360 426.67 360 450 C310 450 260 450 210 450 C210 426.67 210 403.33 210 380 Z" fill="#ffffff" stroke="none"/>
+<path d="M210 380 C260 380 310 380 360 380 C360 403.33 360 426.67 360 450 C310 450 260 450 210 450 C210 426.67 210 403.33 210 380 Z" fill="none" stroke="#ccd1d9" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="285" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#2f6fdf" text-anchor="middle"><tspan x="285" y="410.68">transit</tspan><tspan x="285" y="432.28">3.8s</tspan></text>
+<path d="M220 60 L376.48 60 L376.48 100 L220 100 Z" fill="#ffffff" stroke="none"/>
+<path d="M220 60 L376.48 60 L376.48 100 L220 100 Z" fill="none" stroke="#2e70de" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="298.24" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#2e70de" text-anchor="middle"><tspan x="298.24" y="85.76">traffic spike</tspan></text>
+<path d="M400 60 L583.36 60 L583.36 100 L400 100 Z" fill="#ffffff" stroke="none"/>
+<path d="M400 60 L583.36 60 L583.36 100 L400 100 Z" fill="none" stroke="#2e70de" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="491.68" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#2e70de" text-anchor="middle"><tspan x="491.68" y="85.76">workers degraded</tspan></text>
+<path d="M760 60 L880 60 L880 100 L760 100 Z" fill="#ffffff" stroke="none"/>
+<path d="M760 60 L880 60 L880 100 L760 100 Z" fill="none" stroke="#595959" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="8 6"/>
+<text x="820" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#595959" text-anchor="middle"><tspan x="820" y="85.76">Reset</tspan></text>
+<path d="M654.35 222.45 C654.35 225.77 651.67 228.45 648.35 228.45 C645.04 228.45 642.35 225.77 642.35 222.45 C642.35 219.14 645.04 216.45 648.35 216.45 C651.67 216.45 654.35 219.14 654.35 222.45 Z" fill="#2f6fdf" stroke="none"/>
+<path d="M654.35 222.45 C654.35 225.77 651.67 228.45 648.35 228.45 C645.04 228.45 642.35 225.77 642.35 222.45 C642.35 219.14 645.04 216.45 648.35 216.45 C651.67 216.45 654.35 219.14 654.35 222.45 Z" fill="none" stroke="#2f6fdf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M595.02 250.52 C595.02 253.84 592.33 256.52 589.02 256.52 C585.7 256.52 583.02 253.84 583.02 250.52 C583.02 247.21 585.7 244.52 589.02 244.52 C592.33 244.52 595.02 247.21 595.02 250.52 Z" fill="#2f6fdf" stroke="none"/>
+<path d="M595.02 250.52 C595.02 253.84 592.33 256.52 589.02 256.52 C585.7 256.52 583.02 253.84 583.02 250.52 C583.02 247.21 585.7 244.52 589.02 244.52 C592.33 244.52 595.02 247.21 595.02 250.52 Z" fill="none" stroke="#2f6fdf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M402.8 295 C402.8 298.31 400.11 301 396.8 301 C393.49 301 390.8 298.31 390.8 295 C390.8 291.69 393.49 289 396.8 289 C400.11 289 402.8 291.69 402.8 295 Z" fill="#2f6fdf" stroke="none"/>
+<path d="M402.8 295 C402.8 298.31 400.11 301 396.8 301 C393.49 301 390.8 298.31 390.8 295 C390.8 291.69 393.49 289 396.8 289 C400.11 289 402.8 291.69 402.8 295 Z" fill="none" stroke="#2f6fdf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M205.88 295 C205.88 298.31 203.19 301 199.88 301 C196.56 301 193.88 298.31 193.88 295 C193.88 291.69 196.56 289 199.88 289 C203.19 289 205.88 291.69 205.88 295 Z" fill="#2f6fdf" stroke="none"/>
+<path d="M205.88 295 C205.88 298.31 203.19 301 199.88 301 C196.56 301 193.88 298.31 193.88 295 C193.88 291.69 196.56 289 199.88 289 C203.19 289 205.88 291.69 205.88 295 Z" fill="none" stroke="#2f6fdf" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

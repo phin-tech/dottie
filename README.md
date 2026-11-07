@@ -165,6 +165,12 @@ The Animate menu does the common things in one go:
 - **When Clicked on the Web**, in the inspector, makes a shape a button in the web page export and in
   `<dottie-player>`: a click plays a scene on to the next one, or opens a link. Give it a hover color too.
   A diagram can then wait for the reader to pick which request to follow.
+- **Systems you can poke.** Give a page traffic (flows from a shape to its destinations, with how much each
+  carries), capacities and queues, and buttons that take a region down or spike the load. As the reader clicks, the
+  web page export reroutes the traffic round what's down, backs it up in a queue, and moves gauges and alarms, with
+  nobody drawing those states. It's for telling the story, with numbers you choose, not for predicting a real system.
+  Ask your assistant: it knows worked examples of a region failover, [a queue backing up](Design/demos/queue.gif),
+  a multi-region outage and a serverless pipeline.
 
 The timeline under the canvas shows every animated shape with its keyframes. Press play to watch, or drag
 along it to scrub. Stop on any moment and change the drawing there, moving, resizing or recoloring a
@@ -184,7 +190,8 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
 [pop in one after another](Design/demos/stagger.gif), the same board two days on by
 [Magic Move](Design/demos/board.gif), an event stream whose arrows [march](Design/demos/stream.gif), a diagram that plays
 [the request you click](Design/demos/flows.dottie), and heartbeat lights and cogs placed as
-[symbols](Design/demos/symbols.gif), each on its own clock. Each is made by a short script in
+[symbols](Design/demos/symbols.gif), each on its own clock, and [a queue backing up](Design/demos/queue.gif) when you
+click for a traffic spike. Each is made by a short script in
 [scripts/demos](scripts/demos).
 
 ## Extras for power users
@@ -201,7 +208,9 @@ diagram above, [labelled requests and events](Design/demos/labels.gif) (`POST /o
   `dottie-extension` skill walks an assistant through writing one.
 - **Command line.** Homebrew installs a `dottie` command; otherwise Settings ▸ Command Line does, so you can turn drawings into images
   from Terminal: `dottie render diagram.dottie -o diagram.png`, or `-o diagram.gif` (or `.apng`,
-  `.mp4`, or `.json` for Lottie) for an animated page. Run `dottie --help` for more.
+  `.mp4`, or `.json` for Lottie) for an animated page. `dottie simulate` clicks through an interactive page and
+  reports what each step leaves it at, and with `--record run.mp4` (or `.gif`) records it as a video. Run
+  `dottie --help` for more.
 
 ## Help and feedback
 

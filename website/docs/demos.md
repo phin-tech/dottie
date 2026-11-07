@@ -59,6 +59,25 @@ script to install ([open it on its own](examples/flows.html)).
 
 <iframe class="player export" src="../examples/flows.html" title="Click to follow a request" loading="lazy"></iframe>
 
+## A queue backing up
+
+Producers, a queue and two pools of workers, each with a capacity. Click **traffic spike** and more arrives than the
+workers can take: the overflow goes to workers B, the rest waits in the queue, and the gauges show both pools flat out
+and the queue filling. Click it again and the queue drains. **workers degraded** halves workers A, alone or with the
+spike. Nobody drew those states: the page describes the system (how much each flow carries, what each shape can take)
+and works out each moment. The numbers are chosen to tell the story, not measured. Your assistant knows this one as
+the `queue-workers` example, beside a region failover, a multi-region outage and a serverless pipeline.
+
+This is the web page export too ([open it on its own](examples/queue.html)). For slides or a README, where nobody
+can click, `dottie simulate` records a run of clicks as a [GIF](https://github.com/phin-tech/dottie/blob/main/Design/demos/queue.gif)
+or an MP4:
+
+```
+dottie simulate queue.dottie --wait 2 --click "traffic spike" --wait 4 --click reset --wait 4 --record queue.gif
+```
+
+<iframe class="player export" src="../examples/queue.html" title="A queue backing up" loading="lazy"></iframe>
+
 ## Symbols
 
 A heartbeat light and a turning cog, each drawn and animated once as a symbol, Flash's movie clip: Arrange ▸
