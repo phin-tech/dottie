@@ -76,6 +76,20 @@ private let clickSetProp: Value = .object(["type": "object", "additionalProperti
                                            "description": .string(clickSetDescription)])
 private let clickToggleDescription = "Page variables a click flips, e.g. \"down\": a button that takes a region down "
     + "and back while packets keep flowing"
+private let exportStateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+    "description": .string("Starting values for the page's variables here, e.g. {\"down\": true}: frames show that state, "
+        + "and an HTML player starts in it")])
+private let simulateStepItem: Value = .object(["type": "object", "properties": .object([
+    "click": .object(["type": "string"]), "wait": .object(["type": "number"]),
+    "next": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
+])])
+private let simulateStepsProp: Value = .object(["type": "array", "items": simulateStepItem,
+    "description": .string("In order. Each is one of {\"click\": element id, its first characters, its text or anchor}, "
+        + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"snapshot\": true} (return a PNG) or "
+        + "{\"snapshot\": \"/abs/path.png\"} (also save it)")])
+private let stateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+    "description": .string("Draw the page with its variables (set_variable) at these values instead of their starting "
+        + "ones, e.g. {\"down\": true}, to check each state of an interactive page; the others keep their starting values")])
 private let clickToggleProp: Value = .object(["type": .array(["string", "array"]), "items": .object(["type": "string"]),
                                               "description": .string(clickToggleDescription)])
 
@@ -120,6 +134,14 @@ private struct Args {
             guard let b = x.boolValue else { throw ToolFailure(message: "'\(k)' values must be true or false") }
             return b
         }
+    }
+    /// `state`: variable values to draw a page with, names checked.
+    func state() throws -> [String: Bool] {
+        let v = try flags("state") ?? [:]
+        for name in v.keys where !PageState.isName(name) {
+            throw ToolFailure(message: "'state' names '\(name)', which can't name a variable (letters, digits and _, not starting with a digit)")
+        }
+        return v
     }
     /// One name or a list of them (click_toggle).
     func names(_ k: String) throws -> [String]? {
@@ -470,6 +492,7 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Override the look for this render only"),
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
+                "state": stateProp,
              ], required: ["path"])),
         Tool(name: "export_mermaid",
              description: "Export the diagram as Mermaid flowchart text: shapes become nodes and attached connectors links "
@@ -488,6 +511,7 @@ actor DottieTools {
                 "transparent": prop("boolean", "Omit the white page background"),
                 "out_path": prop("string", "Optional absolute path ending in .svg to write the file to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
+                "state": stateProp,
              ], required: ["path"])),
         Tool(name: "set_timeline",
              description: "Animate a page, or adjust its animation: frame rate, length, hand-drawn line boil and more. "
@@ -620,7 +644,21 @@ actor DottieTools {
                 "transparent": prop("boolean", "No page background (apng, png and json only)"),
                 "sketchy": prop("boolean", "Override the look for this export only"),
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
+                "state": exportStateProp,
              ], required: ["path", "out_path"])),
+        Tool(name: "simulate",
+             description: "Play an interactive page as the web player (<dottie-player>, the HTML export) would, without a "
+                + "browser, to check it does what you built: clicks set and flip variables and jump to scenes, waits play "
+                + "on (stopping at each scene unless it loops, round a looping scene), snapshots return a PNG of that "
+                + "moment. Returns one line per step (time, scene, playing or stopped, variables, elements their "
+                + "conditions hide) and each snapshot as an image. Links and other pages are reported, not followed.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "steps": simulateStepsProp,
+                "start": prop("string", "Start at this scene, playing (default the start, as the player does)"),
+                "state": exportStateProp,
+                "scale": prop("number", "Snapshot pixel scale, 0.25 to 4 (default 1)"),
+             ], required: ["path", "steps"])),
     ]
 
     func call(name: String, arguments: [String: Value]) -> CallTool.Result {
@@ -1207,7 +1245,7 @@ actor DottieTools {
 
         case "export_png":
             let file = try load(try fileURL(a))
-            let page = file.pages[try pageIndex(file, a)]
+            let page = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to render") }
@@ -1237,7 +1275,7 @@ actor DottieTools {
 
         case "export_svg":
             let file = try load(try fileURL(a))
-            let page = file.pages[try pageIndex(file, a)]
+            let page = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
@@ -1254,7 +1292,7 @@ actor DottieTools {
 
         case "export_animation":
             let file = try load(try fileURL(a))
-            var doc = file.pages[try pageIndex(file, a)]
+            var doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard let timeline = doc.timeline else {
                 throw ToolFailure(message: "This page has no animation; add one with run_script (dottie.timeline, dottie.key, ...)")
@@ -1291,9 +1329,58 @@ actor DottieTools {
             if !frame.elements.isEmpty, let png = Exporter.png(frame, scale: 1) { content.insert(.png(png), at: 0) }
             return .init(content: content)
 
+        case "simulate":
+            return try simulate(a)
+
         default:
             throw ToolFailure(message: "Unknown tool '\(name)'")
         }
+    }
+
+    /// The `simulate` tool: plays the page through the steps with `Simulation`.
+    fileprivate func simulate(_ a: Args) throws -> CallTool.Result {
+        let file = try load(try fileURL(a))
+        let doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
+        guard let steps = a.array("steps"), !steps.isEmpty else { throw ToolFailure(message: "Missing required argument 'steps'") }
+        guard steps.count <= 200 else { throw ToolFailure(message: "At most 200 steps") }
+        let scale = min(max(a.double("scale") ?? 1, 0.25), 4)
+        var sim: Simulation
+        do { sim = try Simulation(doc, scene: a.string("start")) } catch { throw ToolFailure(message: "\(error)") }
+        var log = ["start: \(sim.summary)"]
+        var images: [Tool.Content] = []
+        for (n, step) in steps.enumerated() {
+            if let target = step.string("click") {
+                do { log.append("click \(target): \(try sim.click(target)). \(sim.summary)") }
+                catch {
+                    log.append("click \(target): \(error)")
+                    return .init(content: images + [.plain(log.joined(separator: "\n"))], isError: true)
+                }
+            } else if let s = step.double("wait") {
+                guard s.isFinite, s >= 0 else { throw ToolFailure(message: "Step \(n + 1): 'wait' must be seconds") }
+                sim.wait(min(s, Timeline.maxDuration * 10))
+                log.append("wait \(Self.secs(s)): \(sim.summary)")
+            } else if step.bool("next") == true {
+                sim.nextScene()
+                log.append("next: \(sim.summary)")
+            } else if step.raw["snapshot"] != nil, step.bool("snapshot") != false {
+                let picture = sim.picture
+                guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale) else {
+                    log.append("snapshot: nothing is drawn now"); continue
+                }
+                var line = "snapshot \(images.count + 1)"
+                if step.string("snapshot") != nil {
+                    let out = try fileURL(step, key: "snapshot", ext: "png")
+                    try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try png.write(to: out, options: .atomic)
+                    line += " saved to \(out.path)"
+                }
+                log.append("\(line): \(sim.summary)")
+                images.append(.png(png))
+            } else {
+                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true} or {snapshot}")
+            }
+        }
+        return .init(content: images + [.plain(log.joined(separator: "\n"))])
     }
 }
 
