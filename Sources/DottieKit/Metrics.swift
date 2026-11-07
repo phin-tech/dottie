@@ -460,6 +460,7 @@ extension DiagramOps {
         let w = frame.width > 0 ? frame.width : 160, h = frame.height > 0 ? frame.height : (style == .dial ? 110 : 80)
         var s = Style()
         s.roughness = 0; s.fill = RGBA(r: 1, g: 1, b: 1); s.fillStyle = .solid; s.stroke = RGBA(r: 0.8, g: 0.82, b: 0.85); s.strokeWidth = 1
+        s.textColor = RGBA.black
         var e = Element(kind: .rectangle, frame: CGRect(x: frame.minX, y: frame.minY, width: w, height: h), style: s,
                         layerID: doc.layers.first?.id ?? UUID())
         e.gauge = Gauge(metric: metric, of: of, max: max, warn: warn, alarm: alarm, style: style, label: label)
@@ -471,8 +472,12 @@ extension DiagramOps {
     /// `simulate`.
     public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial) -> [String] {
         let m = doc.metrics(at: t, state: state)
-        let names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0.components(separatedBy: "\n")[0])\"" } ?? $0.anchor ?? $0.id.uuidString) },
+        var names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0.components(separatedBy: "\n")[0])\"" } ?? $0.anchor ?? $0.id.uuidString) },
                                uniquingKeysWith: { a, _ in a })
+        // An unlabelled connector is named by its ends.
+        for e in doc.elements where e.kind == .connector && e.text == nil && e.anchor == nil {
+            if let a = e.connector?.start.elementID, let b = e.connector?.end.elementID, let na = names[a], let nb = names[b] { names[e.id] = "\(na) → \(nb)" }
+        }
         func n(_ v: Double) -> String { DottieDocument.number(v, places: 2) }
         var out: [String] = []
         for e in doc.elements {
