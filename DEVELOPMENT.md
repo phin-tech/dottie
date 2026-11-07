@@ -335,6 +335,9 @@ dottie ext check my.dottieext                     # load an extension and try it
 
 `dottie render diagram.dottie -f js` writes the page and dottie.js's player as one script (see dottie.js below).
 `dottie inspect diagram.dottie --at 1.5` prints the page's resolved geometry as JSON (see dottie.js above).
+`--state down=true,east=false` on `render` and `inspect` gives the page's variables those starting values. `dottie
+simulate diagram.dottie --click east --wait 2 --snapshot out.png` plays a page as `<dottie-player>` would and prints
+what each step leaves it at (`Simulation` in `Sources/DottieKit/Simulate.swift`, also the MCP `simulate` tool).
 `--clean` / `--sketchy` override the look and `--transparent` drops the background. When the app has the file
 open, `render` and `inspect` read that window over the live socket (`LiveClient.current`), unsaved and MCP edits
 included, and say so on stderr when it differs from the file; `--disk` reads the saved file. `just goldens` passes

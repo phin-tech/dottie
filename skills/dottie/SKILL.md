@@ -61,7 +61,7 @@ More of the MCP tools, by purpose:
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
-| Exports | `export_svg`, `export_mermaid`, `export_animation` |
+| Exports, and checking an interactive page | `export_svg`, `export_mermaid`, `export_animation`, `simulate` |
 
 ## Animating
 
@@ -80,6 +80,11 @@ shape flip it, and `when` on shapes, connectors and `send_packet` packets (`"dow
 it holds. Connectors go with a shape the state hides. Exports show the starting values; the HTML export and
 `<dottie-player>` change them on click without stopping.
 
+Check an interactive page before calling it done; you can't click the HTML export yourself. `simulate` plays it as
+the player would: give it steps like `{"click": "east"}`, `{"wait": 2}` and `{"snapshot": true}`, and it reports the
+time, the scene, the variables and what their conditions hide after each, with a PNG per snapshot. `export_png` and
+`export_svg` take `state: {"down": true}` to draw one state, and `export_animation` takes it as starting values.
+
 `export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page, or with `.png` a still of
 the poster frame. Watch the GIF before calling
 an animation finished: timing that reads well in a description often runs too fast or overlaps.
@@ -94,6 +99,8 @@ dottie render diagram.dottie -o diagram.png        # or .svg .pdf .gif .apng .mp
 dottie render diagram.dottie --clean -p "Page 2"   # a precise look; a page by name or number
 dottie render flow.mmd -o flow.svg                 # a Mermaid flowchart, laid out and drawn
 dottie inspect diagram.dottie                      # every element's resolved frame and connector route, as JSON
+dottie render diagram.dottie --state down -o down.png   # the page with variable down true
+dottie simulate diagram.dottie --click east --wait 2 --snapshot after.png   # play it as the web player would
 dottie script-types ./types                        # dottie.d.ts, the types of the scripting API
 ```
 
