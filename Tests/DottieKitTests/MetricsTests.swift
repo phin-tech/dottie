@@ -44,6 +44,33 @@ final class MetricsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(doc.metrics(at: 1, since: 4).elements[queue]?.depth), 4, accuracy: 1e-9)
     }
 
+    func testAQueueDrainsAtTheRoomLeftOnceTheSpikeEnds() throws {
+        var (doc, api, queue, workers, _) = page()
+        set(&doc, workers) { $0.capacity = 2 }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 1)
+        let spike = try DiagramOps.addFlow(&doc, from: api, to: [workers], when: "spike", volume: 2)
+        try doc.setVariable("spike", to: false)
+        // In the spike, 1 a second more than the workers take piles up in the queue: 4 after 4s.
+        let during = doc.metrics(at: 1, state: .values(["spike": true]), since: 4)
+        XCTAssertEqual(try XCTUnwrap(during.queues[DottieDocument.queueKey(shape: queue, flow: spike.id)]), 4, accuracy: 1e-9)
+        // After it, the workers have 1 a second of room, so the queue drains at 1 a second, keeping them busy.
+        let after = doc.metrics(at: 1, state: .values(["spike": false]), since: 2, carried: during.queues)
+        XCTAssertEqual(try XCTUnwrap(after.elements[queue]?.depth), 2, accuracy: 1e-9)
+        XCTAssertEqual(after.elements[workers]?.load, 1)
+        let empty = doc.metrics(at: 1, state: .values(["spike": false]), since: 5, carried: during.queues)
+        XCTAssertEqual(empty.elements[queue]?.depth, 0)
+        XCTAssertEqual(empty.elements[workers]?.load, 0.5)
+        // The drained messages leave as packets of the spike's flow, though it no longer runs.
+        let prefix = String(spike.id.uuidString.prefix(24))
+        let drained = doc.posed(at: 1, state: .values(["spike": false]), since: 2, carried: during.queues).elements
+            .filter { $0.id.uuidString.hasPrefix(prefix) }
+        XCTAssertGreaterThan(drained.count, 2)
+        // A simulation carries the queue across the click itself.
+        var sim = try Simulation(doc)
+        _ = try? sim.click(workers.uuidString)   // no click there: nothing changes
+        XCTAssertTrue(sim.carried.isEmpty)
+    }
+
     func testOverflowTakesTheNextRouteAndPageOrderIsPriority() throws {
         var (doc, api, _, workers, spare) = page()
         set(&doc, workers) { $0.capacity = 2 }

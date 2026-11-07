@@ -53,6 +53,13 @@ Each frame, after state has been applied, the page's flows are assigned to route
    the variables: the player passes the time since the last click, `simulate` the time since its last click, and
    exports and goldens use the page time. So the pile of packets above the shape grows as you watch (up to 30 a
    flow), and every frame is still a pure function of its inputs.
+6. **Draining.** When the state changes, the player (and `simulate`) also hands posing what each flow's queue held
+   at that moment, **carried**, another explicit input (exports and goldens carry nothing). From there a queue with
+   backlog keeps growing; one without drains at the room left on the cheapest way on to its flow's first reachable
+   destination (all at once, over half a second, when nothing on the way has a capacity), using that room, so
+   the workers run full until it's empty. The drained traffic leaves as packets of that flow, even one that has
+   stopped (the spike's messages are still worked off after the spike). Depth is
+   `max(0, carried − drain rate × since)`, exact between clicks; a click mid-drain carries what's left.
 5. `spread` fits the same scheme: while the first destination is down, the volume is shared equally across the
    others that can be reached, each share placed as in 2 and 3.
 
@@ -132,7 +139,7 @@ None of them depends on this ADR. A legend or a button can show a gauge's metric
   between a 30 fps export and a 60 fps player.
 - **Queues and backlog carried between frames.** That's realistic, but any frame would depend on every frame
   before it, which ADR 0002 already rejected for packets. Depth grows from the time since the state last changed, an
-  explicit input, instead; it doesn't drain gradually when the state changes back, it resets.
+  explicit input, and draining from the carried depth, so nothing older than the last click is needed.
 - **Numeric variables and sliders.** These would need numeric conditions on variables, arithmetic in state, and a
   slider control. Metric comparisons cover the visual cases. A slider can be faked as a row of choice buttons.
 - **A gauge element kind.** Every renderer, the app's canvas and hit-testing included, would need to learn it.

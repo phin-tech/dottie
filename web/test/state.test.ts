@@ -6,6 +6,7 @@ import { clickTargets } from "../src/clicks.ts";
 import { parseDottie } from "../src/model.ts";
 import { applyClick, conditionNames, holds } from "../src/state.ts";
 import { flowRoute } from "../src/flows.ts";
+import { queueKey } from "../src/measure.ts";
 import { posed, posedWithMetrics, still } from "../src/timeline.ts";
 import { read } from "./helpers.ts";
 
@@ -120,4 +121,23 @@ test("spread deals a downed destination's packets across the rest; a jam overrid
   assert.deepEqual(route(true), [direct.id]);
   // A cost that isn't a number loads as none.
   assert.equal(cost.elements.filter((e) => e.connector && e.connector.cost === null).length, 3);
+});
+
+test("a carried queue drains at the room left, holds with none, and its packets leave (ADR 0003)", () => {
+  const cap = parseDottie(read("edge", "flows.dottie")).pages.find((p) => p.name === "Capacity")!;
+  const queue = cap.elements.find((e) => e.anchor === "queue")!.id;
+  const workers = cap.elements.find((e) => e.anchor === "workers")!;
+  const blue = cap.flows![1];
+  // Blue switched off, with 4 carried in the queue: the workers are full with red, so it holds.
+  const page = { ...cap, flows: [cap.flows![0], { ...blue, when: "busy" }] };
+  const carried = { [queueKey(queue, blue.id)]: 4 };
+  const held = posedWithMetrics(page, 1, { busy: false }, 2, carried).metrics;
+  assert.equal(held.elements.get(queue)?.depth, 4);
+  // With room for 2 more a second on the workers, it drains at 2 a second, and they run full meanwhile.
+  const roomy = { ...page, elements: page.elements.map((e) => (e.id === workers.id ? { ...e, capacity: 5 } : e)) };
+  const draining = posedWithMetrics(roomy, 1, { busy: false }, 1, carried);
+  assert.equal(draining.metrics.elements.get(queue)?.depth, 2);
+  assert.equal(draining.metrics.elements.get(workers.id)?.load, 1);
+  assert.ok(draining.frame.elements.some((e) => e.id.startsWith(blue.id.slice(0, 24))));
+  assert.equal(posedWithMetrics(roomy, 1, { busy: false }, 3, carried).metrics.elements.get(queue)?.depth, 0);
 });

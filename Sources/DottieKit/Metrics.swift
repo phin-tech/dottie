@@ -72,6 +72,9 @@ public struct FlowMetrics: Equatable, Sendable {
 public struct FrameMetrics: Equatable, Sendable {
     public var elements: [UUID: ElementMetrics] = [:]
     public var flows: [UUID: FlowMetrics] = [:]
+    /// How much each flow's queue at each shape holds (`DottieDocument.queueKey`): what a player carries over when
+    /// the state changes, so the queue drains from there.
+    public var queues: [String: Double] = [:]
 
     /// `metric` of the element or flow `id`, or nil when it has none.
     public func value(_ metric: String, of id: UUID) -> Double? {
@@ -110,11 +113,15 @@ extension DottieDocument {
         var amount: Double
     }
 
+    /// The key of a flow's queue at a shape in `FrameMetrics.queues` and `carried`.
+    public static func queueKey(shape: UUID, flow: UUID) -> String { shape.uuidString + "|" + flow.uuidString }
+
     /// The packets the page's flows draw in `frame` (the page posed at `t`), with these variable values (nil: every
-    /// flow runs), and the frame's metrics.
-    /// `since` is the seconds since the page's state last changed (nil: `t`), which backlog has been piling up for.
+    /// flow runs), and the frame's metrics. `since` is the seconds since the page's state last changed (nil: `t`),
+    /// and `carried` how much each flow's queue held at that moment (`FrameMetrics.queues` then; ADR 0003): since
+    /// then a queue grows by its backlog, or drains at the room its way on has left.
     func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID> = [],
-                   since: Double? = nil) -> (packets: [Element], metrics: FrameMetrics) {
+                   since: Double? = nil, carried: [String: Double] = [:]) -> (packets: [Element], metrics: FrameMetrics) {
         let since = max(0, min(since ?? t, 1e6))
         let byID = frame.elementIndex
         var metrics = FrameMetrics()
@@ -136,13 +143,54 @@ extension DottieDocument {
             shapes.append(at)
             return (hops.reversed(), shapes.reversed())
         }
+        // A route as drawn: its line, length, the stretches inside the shapes it passes (with their delays), and
+        // each hop's stretch.
+        struct Way { var line: Polyline; var length: Double; var inside: [(Double, Double, Double)]; var stretches: [(UUID, Double, Double)] }
+        func way(_ hops: [(UUID, Bool)], _ shapes: [UUID]) -> Way? {
+            var points: [CGPoint] = [], inside: [(Double, Double, Double)] = [], stretches: [(UUID, Double, Double)] = []
+            var length = 0.0
+            for (k, (id, back)) in hops.enumerated() {
+                guard let c = byID[id] else { continue }
+                var line = Polyline(tracing: c, in: frame).points
+                if back { line.reverse() }
+                guard let head = line.first else { continue }
+                if let last = points.last {
+                    let gap = Double(hypot(head.x - last.x, head.y - last.y))
+                    inside.append((length, length + gap, byID[shapes[k]].map(Self.delayOf) ?? 0))
+                    length += gap
+                }
+                let start = length
+                for (a, b) in zip(line, line.dropFirst()) { length += Double(hypot(b.x - a.x, b.y - a.y)) }
+                stretches.append((id, start, length))
+                points += line
+            }
+            return length > 0 ? Way(line: Polyline(points), length: length, inside: inside, stretches: stretches) : nil
+        }
+        // Where a packet is `elapsed` seconds after leaving along `w`: nil while hidden inside a shape or off the end.
+        func along(_ w: Way, _ elapsed: Double, speed: Double) -> Double? {
+            var elapsed = elapsed, d = 0.0
+            for (a, b, delay) in w.inside {
+                let reach = (a - d) / speed
+                if elapsed <= reach { break }
+                elapsed -= reach; d = a
+                let stay = (b - a) / speed + delay
+                if elapsed < stay { return nil }
+                elapsed -= stay; d = b
+            }
+            d += elapsed * speed
+            return d >= 0 && d <= w.length ? d : nil
+        }
+        func dot(_ id: UUID, _ center: CGPoint, _ size: Double, _ style: Style, _ layer: UUID) -> Element {
+            Element(id: id, kind: .ellipse, frame: CGRect(x: center.x - size / 2, y: center.y - size / 2, width: size, height: size),
+                    style: style, seed: 1, layerID: layer)
+        }
 
         // Flows leaving the same shape take turns; the page's biggest flow draws a packet every `every` seconds.
         var leaving: [UUID: Int] = [:], turn: [Int] = []
         for flow in flows { turn.append(leaving[flow.from, default: 0]); leaving[flow.from, default: 0] += 1 }
         let biggest = flows.map(\.amount).max() ?? 1
         var packets: [Element] = []
-        var piles: [UUID: Int] = [:]
+        var waitingBy: [UUID: [(UUID, Double)]] = [:]
 
         for (i, flow) in flows.enumerated() {
             if let w = flow.when, let values, !PageState.holds(w, in: values) { continue }
@@ -176,8 +224,9 @@ extension DottieDocument {
                     for (k, hop) in r.hops.enumerated() { sequence += [(hop.0, r.shapes[k]), (r.shapes[k + 1], r.shapes[k])] }
                     if let first = sequence.first(where: { done.contains($0.0) }) { at = first.1 }
                 }
-                waiting.append((at, left))
+                if let k = waiting.firstIndex(where: { $0.0 == at }) { waiting[k].1 += left } else { waiting.append((at, left)) }
             }
+            waitingBy[flow.id] = waiting
 
             // Metrics.
             for p in placements {
@@ -192,37 +241,16 @@ extension DottieDocument {
             let every = min(max(flow.interval * biggest / max(volume, tiny), 0.05), 60)
             let speed = flow.pace, size = flow.diameter
             let phase = Double(turn[i]) / Double(leaving[flow.from]!) * every
-            var style = Style()
-            let color = flow.color ?? Flow.defaultColor
-            style.fill = color; style.stroke = color; style.strokeWidth = 1.5; style.roughness = 0
+            let style = Self.packetStyle(flow)
             var cumulative: [Double] = []
             var sum = 0.0
             for p in placements { sum += p.amount / max(volume, tiny); cumulative.append(sum) }
             if let last = cumulative.indices.last, abs(cumulative[last] - 1) < 1e-9 { cumulative[last] = 1 }
             var transitSum = 0.0
             for (r, p) in placements.enumerated() {
-                // The route, the stretches inside the shapes it passes (with their delays), and each hop's stretch.
-                var points: [CGPoint] = [], inside: [(Double, Double, Double)] = [], stretches: [(UUID, Double, Double)] = []
-                var length = 0.0
-                for (k, (id, back)) in p.hops.enumerated() {
-                    guard let c = byID[id] else { continue }
-                    var line = Polyline(tracing: c, in: frame).points
-                    if back { line.reverse() }
-                    guard let head = line.first else { continue }
-                    if let last = points.last {
-                        let gap = Double(hypot(head.x - last.x, head.y - last.y))
-                        inside.append((length, length + gap, byID[p.shapes[k]].map(Self.delayOf) ?? 0))
-                        length += gap
-                    }
-                    let start = length
-                    for (a, b) in zip(line, line.dropFirst()) { length += Double(hypot(b.x - a.x, b.y - a.y)) }
-                    stretches.append((id, start, length))
-                    points += line
-                }
-                guard length > 0 else { continue }
-                let travel = length / speed + inside.reduce(0) { $0 + $1.2 }
+                guard let w = way(p.hops, p.shapes) else { continue }
+                let travel = w.length / speed + w.inside.reduce(0) { $0 + $1.2 }
                 transitSum += travel * p.amount
-                let polyline = Polyline(points)
                 let lo = Int(((t - phase - travel) / every).rounded(.up))
                 let hi = Int(((t - phase) / every).rounded(.down))
                 let below = r == 0 ? 0 : cumulative[r - 1], upTo = cumulative[r]
@@ -230,46 +258,75 @@ extension DottieDocument {
                 var k = max(lo, hi - 3999)
                 while k <= hi {
                     defer { k += 1 }
-                    guard dealt(upTo, k) - dealt(below, k) == 1 else { continue }
-                    // Where packet k is, `elapsed` seconds after it left: hidden inside a shape, or `d` along.
-                    var elapsed = t - Double(k) * every - phase, d = 0.0, hidden = false
-                    for (a, b, delay) in inside {
-                        let reach = (a - d) / speed
-                        if elapsed <= reach { break }
-                        elapsed -= reach; d = a
-                        let stay = (b - a) / speed + delay
-                        if elapsed < stay { hidden = true; break }
-                        elapsed -= stay; d = b
-                    }
-                    if hidden { continue }
-                    d += elapsed * speed
-                    guard d >= 0, d <= length else { continue }
-                    if let s = stretches.first(where: { d >= $0.1 && d <= $0.2 }) { metrics.elements[s.0]?.inFlight += 1 }
-                    let pt = polyline.point(at: d / length)
-                    packets.append(Element(id: Flow.packetID(flow.id, k), kind: .ellipse,
-                                           frame: CGRect(x: pt.x - size / 2, y: pt.y - size / 2, width: size, height: size),
-                                           style: style, seed: 1, layerID: source.layerID))
+                    guard dealt(upTo, k) - dealt(below, k) == 1, let d = along(w, t - Double(k) * every - phase, speed: speed) else { continue }
+                    if let s = w.stretches.first(where: { d >= $0.1 && d <= $0.2 }) { metrics.elements[s.0]?.inFlight += 1 }
+                    packets.append(dot(Flow.packetID(flow.id, k), w.line.point(at: d / w.length), size, style, source.layerID))
                 }
             }
             fm.transit = fm.placed > tiny ? transitSum / fm.placed : nil
-            // Backlog piles up above the shape it waits at: the packets that couldn't leave since the state last
-            // changed, so the pile grows (up to 30 a flow, in rows of 10, each flow's rows above the last's).
-            for (j, (at, amount)) in waiting.enumerated() {
-                metrics.elements[at]?.depth += amount * since
+            metrics.flows[flow.id] = fm
+        }
+
+        // Queues: each flow's at each shape, its own or carried over from before the state changed. One with backlog
+        // grows by it; one without drains at the room left on its way on, and the drained traffic leaves as packets,
+        // using that room. Drawn as a pile above the shape (up to 30 a flow, in rows of 10).
+        var piles: [UUID: Int] = [:]
+        for flow in flows {
+            let waiting = waitingBy[flow.id] ?? []
+            var shapes = waiting.map(\.0)
+            let held = frame.elements.map(\.id).filter { carried[Self.queueKey(shape: $0, flow: flow.id)].map { $0 > tiny } == true }
+            for s in held where !shapes.contains(s) { shapes.append(s) }
+            guard !shapes.isEmpty else { continue }
+            let volume = flow.amount
+            let every = min(max(flow.interval * biggest / max(volume, tiny), 0.05), 60)
+            let unit = every * max(volume, tiny)   // the volume one packet stands for, times a second
+            let speed = flow.pace, size = flow.diameter, style = Self.packetStyle(flow)
+            for (j, at) in shapes.enumerated() {
                 guard let shape = byID[at] else { continue }
-                let share = amount / max(volume, tiny)
-                let n = Int(min(max((share * since / every - 1e-9).rounded(.up), 1), 30))
+                let layer = byID[flow.from]?.layerID ?? shape.layerID
+                let backlog = waiting.first { $0.0 == at }?.1 ?? 0
+                let before = max(0, carried[Self.queueKey(shape: at, flow: flow.id)] ?? 0)
+                var depth = before + backlog * since
+                // Drain: at the most the cheapest way on to the flow's first reachable destination has room for. A
+                // queue with nowhere to go, or no room on the way, holds.
+                if backlog <= tiny, before > tiny,
+                   let tree = Self.flowTree(from: at, in: frame, offline: offline.union(full())),
+                   let goal = tree.goals(flow.to, spread: false).first {
+                    let r = route(tree, goal)
+                    let ids = Array(r.shapes.dropFirst()) + r.hops.map(\.0)
+                    let spare = ids.compactMap { room[$0] }.min() ?? .infinity
+                    let rate = spare.isFinite ? spare : before / 0.5
+                    if rate > tiny {
+                        depth = max(0, before - rate * since)
+                        if depth > tiny {
+                            for id in r.shapes + r.hops.map(\.0) { metrics.elements[id]?.throughput += rate }
+                            for id in ids where room[id] != nil { room[id]! -= rate }
+                        }
+                        // The drained traffic: packets leaving the queue while it empties.
+                        if let w = way(r.hops, r.shapes) {
+                            let spacing = max(unit / rate, 0.05), lasts = before / rate
+                            var k = 0
+                            while Double(k) * spacing < lasts, Double(k) * spacing <= since, k < 4000 {
+                                defer { k += 1 }
+                                guard let d = along(w, since - Double(k) * spacing, speed: speed) else { continue }
+                                packets.append(dot(Flow.packetID(flow.id, (1 << 39) + (1 << 20) + j * (1 << 14) + k),
+                                                   w.line.point(at: d / w.length), size, style, layer))
+                            }
+                        }
+                    }
+                }
+                guard depth > tiny || backlog > tiny else { continue }
+                metrics.elements[at]?.depth += depth
+                if depth > tiny { metrics.queues[Self.queueKey(shape: at, flow: flow.id)] = depth }
+                let n = Int(min(max((depth / unit - 1e-9).rounded(.up), 1), 30))
                 let rows = (n + 9) / 10
                 let base = piles[at, default: 0]; piles[at] = base + rows
                 for q in 0..<n {
-                    let x = shape.x + 2 + Double(q % 10) * (size + 3)
-                    let y = shape.y - 4 - size - Double(base + q / 10) * (size + 3)
-                    packets.append(Element(id: Flow.packetID(flow.id, (1 << 39) + j * 64 + q), kind: .ellipse,
-                                           frame: CGRect(x: x, y: y, width: size, height: size),
-                                           style: style, seed: 1, layerID: source.layerID))
+                    let center = CGPoint(x: shape.x + 2 + size / 2 + Double(q % 10) * (size + 3),
+                                         y: shape.y - 4 - size / 2 - Double(base + q / 10) * (size + 3))
+                    packets.append(dot(Flow.packetID(flow.id, (1 << 39) + j * 64 + q), center, size, style, layer))
                 }
             }
-            metrics.flows[flow.id] = fm
         }
         for e in frame.elements {
             guard let c = e.capacity, c.isFinite, var m = metrics.elements[e.id] else { continue }
@@ -279,6 +336,14 @@ extension DottieDocument {
         return (packets, metrics)
     }
 
+    /// How a flow's packets look.
+    static func packetStyle(_ flow: Flow) -> Style {
+        var style = Style()
+        let color = flow.color ?? Flow.defaultColor
+        style.fill = color; style.stroke = color; style.strokeWidth = 1.5; style.roughness = 0
+        return style
+    }
+
     /// A shape's delay as traffic feels it: 0...3600 seconds.
     static func delayOf(_ e: Element) -> Double {
         guard e.kind != .connector, let d = e.delay, d.isFinite else { return 0 }
@@ -286,8 +351,9 @@ extension DottieDocument {
     }
 
     /// The metrics of the page at `t` (ADR 0003).
-    public func metrics(at t: Double = 0, state: StateChoice = .initial, since: Double? = nil) -> FrameMetrics {
-        posedWithMetrics(at: t, state: state, since: since).metrics
+    public func metrics(at t: Double = 0, state: StateChoice = .initial, since: Double? = nil,
+                        carried: [String: Double] = [:]) -> FrameMetrics {
+        posedWithMetrics(at: t, state: state, since: since, carried: carried).metrics
     }
 }
 
@@ -482,8 +548,8 @@ extension DiagramOps {
     /// One line per element and flow with something to show, at the starting values: for a listing or a step of
     /// `simulate`.
     public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial,
-                                       since: Double? = nil) -> [String] {
-        let m = doc.metrics(at: t, state: state, since: since)
+                                       since: Double? = nil, carried: [String: Double] = [:]) -> [String] {
+        let m = doc.metrics(at: t, state: state, since: since, carried: carried)
         var names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0.components(separatedBy: "\n")[0])\"" } ?? $0.anchor ?? $0.id.uuidString) },
                                uniquingKeysWith: { a, _ in a })
         // An unlabelled connector is named by its ends.
@@ -493,10 +559,11 @@ extension DiagramOps {
         func n(_ v: Double) -> String { DottieDocument.number(v, places: 2) }
         var out: [String] = []
         for e in doc.elements {
-            guard let x = m.elements[e.id], x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 else { continue }
+            guard let x = m.elements[e.id], x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 || x.depth > 0 else { continue }
             var parts = ["throughput \(n(x.throughput))"]
             if let l = x.load { parts.append("load \(DottieDocument.formatted("load", l))") }
             if x.backlog > 0 { parts.append("backlog \(n(x.backlog)) (piled up \(n(x.depth)))") }
+            else if x.depth > 0 { parts.append("draining, \(n(x.depth)) left") }
             if x.delay > 0 { parts.append("delay \(n(x.delay))s") }
             out.append("\(names[e.id] ?? "?"): " + parts.joined(separator: ", "))
         }

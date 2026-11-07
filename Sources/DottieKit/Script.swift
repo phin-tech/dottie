@@ -1353,7 +1353,8 @@ public enum DottieScript {
     {id: {volume, placed, backlog, backup, transit?}}}: load is throughput over capacity, backlog the rate a queue grows \
     at, depth how much has piled up (backlog times the seconds since the state last changed, since; default at), \
     backup the share not reaching the first destination, transit seconds end to end. A backlog's pile of packets \
-    grows as you watch: the player counts from the last click, exports from the page's start
+    grows as you watch (the player counts from the last click, exports from the page's start), and when the state \
+    changes so there's room again, the queue drains at that room, its messages leaving as packets
       dottie.gauge(target, {metric, x, y, width?, height?, style?, max?, warn?, alarm?, label?})  a gauge showing a \
     metric (throughput, load, delay, backlog, depth, inFlight, transit, backup) of an element or flow as a number, bar or \
     dial, green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it

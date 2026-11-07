@@ -13,9 +13,9 @@ export interface ElementMetrics { throughput: number; load: number | null; delay
 /** A flow's metrics in one frame (FlowMetrics). */
 export interface FlowMetrics { volume: number; placed: number; backlog: number; backup: number; transit: number | null }
 /** Every metric of one frame (FrameMetrics). */
-export interface FrameMetrics { elements: Map<string, ElementMetrics>; flows: Map<string, FlowMetrics> }
+export interface FrameMetrics { elements: Map<string, ElementMetrics>; flows: Map<string, FlowMetrics>; queues: Record<string, number> }
 
-export const emptyMetrics = (): FrameMetrics => ({ elements: new Map(), flows: new Map() });
+export const emptyMetrics = (): FrameMetrics => ({ elements: new Map(), flows: new Map(), queues: {} });
 
 /** `metric` of the element or flow `id`, or null when it has none. */
 export function metricValue(m: FrameMetrics, metric: string, id: string): number | null {
@@ -54,12 +54,18 @@ export function delayOf(e: Element): number {
 }
 
 interface Placement { hops: [string, boolean][]; shapes: string[]; goal: string; amount: number }
+interface Way { line: Polyline; length: number; inside: [number, number, number][]; stretches: [string, number, number][] }
+
+/** The key of a flow's queue at a shape in `FrameMetrics.queues` and `carried` (DottieDocument.queueKey). */
+export const queueKey = (shape: string, flow: string): string => shape + "|" + flow;
 
 /** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs),
  * and the frame's metrics (DottieDocument.flowFrame). `since` is the seconds since the page's state last changed
- * (null: `t`), which backlog has been piling up for. */
+ * (null: `t`), and `carried` how much each flow's queue held at that moment: since then a queue grows by its
+ * backlog, or drains at the room its way on has left. */
 export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
-  offline: Set<string> = new Set(), sinceChange: number | null = null): { packets: Element[]; metrics: FrameMetrics } {
+  offline: Set<string> = new Set(), sinceChange: number | null = null,
+  carried: Record<string, number> = {}): { packets: Element[]; metrics: FrameMetrics } {
   const since = Math.max(0, Math.min(sinceChange ?? t, 1e6));
   const byID = new Map<string, Element>();
   for (const e of frame.elements) if (!byID.has(e.id)) byID.set(e.id, e);
@@ -83,6 +89,43 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     shapes.push(at);
     return { hops: hops.reverse(), shapes: shapes.reverse() };
   };
+  // A route as drawn: its line, length, the stretches inside the shapes it passes, and each hop's stretch.
+  const way = (hops: [string, boolean][], shapes: string[]): Way | null => {
+    const points: Point[] = [], inside: [number, number, number][] = [], stretches: [string, number, number][] = [];
+    let length = 0;
+    hops.forEach(([id, back], k) => {
+      const c = byID.get(id);
+      if (!c) return;
+      const line = back ? [...tracing(c, frame).points].reverse() : tracing(c, frame).points;
+      if (line.length === 0) return;
+      const last = points[points.length - 1];
+      if (last) {
+        const gap = Math.hypot(line[0].x - last.x, line[0].y - last.y);
+        const shape = byID.get(shapes[k]);
+        inside.push([length, length + gap, shape ? delayOf(shape) : 0]);
+        length += gap;
+      }
+      const start = length;
+      for (let q = 1; q < line.length; q++) length += Math.hypot(line[q].x - line[q - 1].x, line[q].y - line[q - 1].y);
+      stretches.push([id, start, length]);
+      points.push(...line);
+    });
+    return length > 0 ? { line: new Polyline(points), length, inside, stretches } : null;
+  };
+  // Where a packet is `elapsed` seconds after leaving along `w`: null while hidden inside a shape or off the end.
+  const along = (w: Way, elapsedAt: number, speed: number): number | null => {
+    let elapsed = elapsedAt, d = 0;
+    for (const [a, b, delay] of w.inside) {
+      const reach = (a - d) / speed;
+      if (elapsed <= reach) break;
+      elapsed -= reach; d = a;
+      const stay = (b - a) / speed + delay;
+      if (elapsed < stay) return null;
+      elapsed -= stay; d = b;
+    }
+    d += elapsed * speed;
+    return d >= 0 && d <= w.length ? d : null;
+  };
   const union = (a: Set<string>, b: Set<string>) => new Set([...a, ...b]);
   const bump = (id: string, f: (m: ElementMetrics) => void) => { const m = metrics.elements.get(id); if (m) f(m); };
 
@@ -91,7 +134,9 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   for (const flow of list) { const n = leaving.get(flow.from) ?? 0; turn.push(n); leaving.set(flow.from, n + 1); }
   const biggest = list.length > 0 ? Math.max(...list.map(amount)) : 1;
   const packets: Element[] = [];
-  const piles = new Map<string, number>();
+  const waitingBy = new Map<string, [string, number][]>();
+  const everyOf = (flow: Flow) =>
+    Math.min(Math.max(clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest / Math.max(amount(flow), TINY), 0.05), 60);
 
   for (const [i, flow] of list.entries()) {
     if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
@@ -132,8 +177,10 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
         const first = sequence.find(([id]) => done.has(id));
         if (first) at = first[1];
       }
-      waiting.push([at, left]);
+      const existing = waiting.find(([s]) => s === at);
+      if (existing) existing[1] += left; else waiting.push([at, left]);
     }
+    waitingBy.set(flow.id, waiting);
 
     // Metrics.
     for (const p of placements) {
@@ -145,7 +192,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     fm.backup = volume > TINY ? Math.max(0, (volume - reachedFirst) / volume) : 0;
 
     // Packets: dealt across the placements by their share of the volume.
-    const every = Math.min(Math.max(clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest / Math.max(volume, TINY), 0.05), 60);
+    const every = everyOf(flow);
     const speed = clamp(flow.speed, DEFAULT_SPEED, 1, 10000), size = clamp(flow.size, DEFAULT_SIZE, 2, 200);
     const phase = (turn[i] / leaving.get(flow.from)!) * every;
     const color = flow.color ?? DEFAULT_COLOR;
@@ -155,73 +202,91 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     if (cumulative.length > 0 && Math.abs(cumulative[cumulative.length - 1] - 1) < 1e-9) cumulative[cumulative.length - 1] = 1;
     let transitSum = 0;
     placements.forEach((p, r) => {
-      // The route, the stretches inside the shapes it passes (with their delays), and each hop's stretch.
-      const points: Point[] = [], inside: [number, number, number][] = [], stretches: [string, number, number][] = [];
-      let length = 0;
-      p.hops.forEach(([id, back], k) => {
-        const c = byID.get(id);
-        if (!c) return;
-        const line = back ? [...tracing(c, frame).points].reverse() : tracing(c, frame).points;
-        if (line.length === 0) return;
-        const last = points[points.length - 1];
-        if (last) {
-          const gap = Math.hypot(line[0].x - last.x, line[0].y - last.y);
-          const shape = byID.get(p.shapes[k]);
-          inside.push([length, length + gap, shape ? delayOf(shape) : 0]);
-          length += gap;
-        }
-        const start = length;
-        for (let q = 1; q < line.length; q++) length += Math.hypot(line[q].x - line[q - 1].x, line[q].y - line[q - 1].y);
-        stretches.push([id, start, length]);
-        points.push(...line);
-      });
-      if (!(length > 0)) return;
-      const travel = length / speed + inside.reduce((s, x) => s + x[2], 0);
+      const w = way(p.hops, p.shapes);
+      if (!w) return;
+      const travel = w.length / speed + w.inside.reduce((s, x) => s + x[2], 0);
       transitSum += travel * p.amount;
-      const polyline = new Polyline(points);
       const lo = Math.ceil((t - phase - travel) / every);
       const hi = Math.floor((t - phase) / every);
       const below = r === 0 ? 0 : cumulative[r - 1], upTo = cumulative[r];
       const dealt = (c: number, k: number) => Math.floor((k + 1) * c) - Math.floor(k * c);
       for (let k = Math.max(lo, hi - 3999); k <= hi; k++) {
         if (dealt(upTo, k) - dealt(below, k) !== 1) continue;
-        // Where packet k is, `elapsed` seconds after it left: hidden inside a shape, or `d` along.
-        let elapsed = t - k * every - phase, d = 0, hidden = false;
-        for (const [a, b, delay] of inside) {
-          const reach = (a - d) / speed;
-          if (elapsed <= reach) break;
-          elapsed -= reach; d = a;
-          const stay = (b - a) / speed + delay;
-          if (elapsed < stay) { hidden = true; break; }
-          elapsed -= stay; d = b;
-        }
-        if (hidden) continue;
-        d += elapsed * speed;
-        if (!(d >= 0 && d <= length)) continue;
-        const s = stretches.find(([, a, b]) => d >= a && d <= b);
+        const d = along(w, t - k * every - phase, speed);
+        if (d === null) continue;
+        const s = w.stretches.find(([, a, b]) => d >= a && d <= b);
         if (s) bump(s[0], (m) => { m.inFlight += 1; });
-        const pt = polyline.point(d / length);
+        const pt = w.line.point(d / w.length);
         packets.push(packet(packetID(flow.id, k), pt.x - size / 2, pt.y - size / 2, size, color, source.layerID));
       }
     });
     fm.transit = fm.placed > TINY ? transitSum / fm.placed : null;
-    // Backlog piles up above the shape it waits at: the packets that couldn't leave since the state last changed,
-    // so the pile grows (up to 30 a flow, in rows of 10, each flow's rows above the last's).
-    waiting.forEach(([at, a], j) => {
-      bump(at, (m) => { m.depth += a * since; });
+    metrics.flows.set(flow.id, fm);
+  }
+
+  // Queues: each flow's at each shape, its own or carried over from before the state changed. One with backlog
+  // grows by it; one without drains at the room left on its way on, and the drained traffic leaves as packets.
+  const piles = new Map<string, number>();
+  for (const flow of list) {
+    const waiting = waitingBy.get(flow.id) ?? [];
+    const shapes = waiting.map(([s]) => s);
+    for (const e of frame.elements) {
+      const c = carried[queueKey(e.id, flow.id)];
+      if (c !== undefined && c > TINY && !shapes.includes(e.id)) shapes.push(e.id);
+    }
+    if (shapes.length === 0) continue;
+    const volume = amount(flow);
+    const every = everyOf(flow);
+    const unit = every * Math.max(volume, TINY);
+    const speed = clamp(flow.speed, DEFAULT_SPEED, 1, 10000), size = clamp(flow.size, DEFAULT_SIZE, 2, 200);
+    const color = flow.color ?? DEFAULT_COLOR;
+    shapes.forEach((at, j) => {
       const shape = byID.get(at);
       if (!shape) return;
-      const share = a / Math.max(volume, TINY);
-      const n = Math.min(Math.max(Math.ceil(share * since / every - 1e-9), 1), 30);
+      const layer = byID.get(flow.from)?.layerID ?? shape.layerID;
+      const backlog = waiting.find(([s]) => s === at)?.[1] ?? 0;
+      const before = Math.max(0, carried[queueKey(at, flow.id)] ?? 0);
+      let depth = before + backlog * since;
+      const tree = backlog <= TINY && before > TINY ? flowTree(at, frame, union(offline, full())) : null;
+      const goal = tree?.goals(flow.to, false)[0];
+      if (tree && goal !== undefined) {
+        const r = route(tree, goal);
+        const ids = [...r.shapes.slice(1), ...r.hops.map(([id]) => id)];
+        const rooms = ids.filter((id) => room.has(id)).map((id) => room.get(id)!);
+        const spare = rooms.length > 0 ? Math.min(...rooms) : Infinity;
+        const rate = Number.isFinite(spare) ? spare : before / 0.5;
+        if (rate > TINY) {
+          depth = Math.max(0, before - rate * since);
+          if (depth > TINY) {
+            for (const id of [...r.shapes, ...r.hops.map(([h]) => h)]) bump(id, (m) => { m.throughput += rate; });
+            for (const id of ids) if (room.has(id)) room.set(id, room.get(id)! - rate);
+          }
+          // The drained traffic: packets leaving the queue while it empties.
+          const w = way(r.hops, r.shapes);
+          if (w) {
+            const spacing = Math.max(unit / rate, 0.05), lasts = before / rate;
+            for (let k = 0; k * spacing < lasts && k * spacing <= since && k < 4000; k++) {
+              const d = along(w, since - k * spacing, speed);
+              if (d === null) continue;
+              const pt = w.line.point(d / w.length);
+              packets.push(packet(packetID(flow.id, 2 ** 39 + 2 ** 20 + j * 2 ** 14 + k), pt.x - size / 2, pt.y - size / 2, size, color, layer));
+            }
+          }
+        }
+      }
+      if (!(depth > TINY || backlog > TINY)) return;
+      bump(at, (m) => { m.depth += depth; });
+      if (depth > TINY) metrics.queues[queueKey(at, flow.id)] = depth;
+      const n = Math.min(Math.max(Math.ceil(depth / unit - 1e-9), 1), 30);
       const rows = Math.trunc((n + 9) / 10);
       const base = piles.get(at) ?? 0;
       piles.set(at, base + rows);
       for (let q = 0; q < n; q++) {
-        packets.push(packet(packetID(flow.id, 2 ** 39 + j * 64 + q), shape.x + 2 + (q % 10) * (size + 3),
-          shape.y - 4 - size - (base + Math.trunc(q / 10)) * (size + 3), size, color, source.layerID));
+        const cx = shape.x + 2 + size / 2 + (q % 10) * (size + 3);
+        const cy = shape.y - 4 - size / 2 - (base + Math.trunc(q / 10)) * (size + 3);
+        packets.push(packet(packetID(flow.id, 2 ** 39 + j * 64 + q), cx - size / 2, cy - size / 2, size, color, layer));
       }
     });
-    metrics.flows.set(flow.id, fm);
   }
   for (const e of frame.elements) {
     const c = e.capacity ?? null;

@@ -24,6 +24,8 @@ public struct Simulation: Sendable {
     public private(set) var state: [String: Bool]
     /// Seconds played since the variables last changed: how long backlog has been piling up.
     public private(set) var sinceChange = 0.0
+    /// What each queue held when the variables last changed, which it drains from (`FrameMetrics.queues`).
+    public private(set) var carried: [String: Double] = [:]
 
     /// Starts as the player does: at the start, playing unless the first scene is there and doesn't loop. With
     /// `scene`, at that scene, playing on from it.
@@ -144,8 +146,9 @@ public struct Simulation: Sendable {
         var did: [String] = []
         if let c, c.changesState {
             let before = state, hiddenBefore = Set(hiddenByState.map(\.id))
+            let queues = doc.metrics(at: time, state: .values(before), since: sinceChange, carried: carried).queues
             state = c.applied(to: state, initial: doc.variables ?? [:])
-            if state != before { sinceChange = 0 }
+            if state != before { sinceChange = 0; carried = queues }
             let changed = state.keys.sorted().filter { before[$0] ?? false != state[$0] ?? false }
             did.append(changed.isEmpty ? "changed no variable" : "set " + changed.map { "\($0)=\(state[$0]!)" }.joined(separator: ", "))
             let hiddenAfter = Set(hiddenByState.map(\.id))
@@ -171,7 +174,7 @@ public struct Simulation: Sendable {
     }
 
     /// The page as drawn now: the frame, with these variables.
-    public var picture: DottieDocument { doc.resolved(at: time, state: .values(state), since: sinceChange) }
+    public var picture: DottieDocument { doc.resolved(at: time, state: .values(state), since: sinceChange, carried: carried) }
 
     /// The elements with a condition that the variables now hide.
     public var hiddenByState: [Element] {

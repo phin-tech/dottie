@@ -92,7 +92,9 @@ or the resources `dottie://examples/<name>`. Run one with `run_script` on an emp
 2. **How much.** `add_flow` `volume`, and `capacity` (and a shape's `delay`) on `update_element`. Flows fill their
    cheapest route in page order (earlier flows first); what doesn't fit takes the next route, and what fits nowhere is
    backlog, piled at the shape in front of the bottleneck (a queue in front of busy workers, a hub in front of a full
-   lane). `add_gauge` shows a metric (load, throughput, backlog, transit, backup, …) as a number, bar or dial.
+   lane). The pile grows while the scenario lasts and drains, as packets, when there's room again (the player
+   carries it across clicks). `add_gauge` shows a metric (load, throughput, backlog, depth, transit, backup, …) as a
+   number, bar or dial.
 3. **States.** `define_state` describes one variable at once: what it takes `down` (faded, traffic goes round it),
    `hide`s, `show`s, `dim`s or `restyle`s (including `cost`, `capacity` and `delay`), connectors whose `send_packet`
    packets `reroute`, and which clicks flip it (`toggled_by`). `add_override` adds one change to one element under

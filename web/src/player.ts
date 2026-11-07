@@ -23,7 +23,7 @@ import { type Plan, plan, svgParts } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { themeNamed } from "./theme.ts";
 import { applyClick } from "./state.ts";
-import { posed, posterTime } from "./timeline.ts";
+import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
 
 const WHITE: RGBA = { r: 1, g: 1, b: 1, a: 1 };
 
@@ -72,6 +72,13 @@ export class Playback {
   stateSince = typeof performance === "undefined" ? 0 : performance.now();
   /** A still (the `at` attribute): backlog is drawn for the page time, not the wall clock. */
   still = false;
+  /** What each queue held when the variables last changed, which it drains from (FrameMetrics.queues). */
+  carried: Record<string, number> = {};
+
+  /** Seconds since the variables last changed, or null for a still. */
+  sinceChange(now = typeof performance === "undefined" ? 0 : performance.now()): number | null {
+    return this.still || typeof performance === "undefined" ? null : (now - this.stateSince) / 1000;
+  }
   readonly background: RGBA;
   readonly ink: RGBA;
   /** What clicking each clickable element does, by element id. */
@@ -89,7 +96,7 @@ export class Playback {
   private overTimes = new Map<string, number>();
   private downTimes = new Map<string, number>();
   private hitTimes = new Map<string, number>();
-  private last: { t: number; i: number } = { t: 0, i: 0 };
+  last: { t: number; i: number } = { t: 0, i: 0 };
   private svg: SVGSVGElement;
   private groups = new Map<string, { g: SVGGElement; markup: string }>();
   private order: string[] = [];
@@ -184,7 +191,7 @@ export class Playback {
     for (const [id, start] of this.replayStarts) times.set(id, Math.min((now - start) / 1000, this.replays.get(id) ?? 0));
     const tc = clampTime(t);
     // Backlog piles up for as long as the state has held; a still (no performance clock) draws the page time.
-    const pose = posed(this.page, tc, this.state, this.still || typeof performance === "undefined" ? null : (now - this.stateSince) / 1000);
+    const pose = posed(this.page, tc, this.state, this.sinceChange(now), this.carried);
     const frame = expandingSymbols(pose, tc, true, times);
     const { parts } = svgParts(frame, this.background, r);
     const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
@@ -537,6 +544,9 @@ export class DottiePlayer extends ElementBase {
     if (!p) return;
     const next = { ...p.state, ...values };
     if (Object.keys(next).every((k) => next[k] === p.state[k])) return;
+    // The queues as they stand carry over, so a backlog drains from where it got to.
+    const t = clampTime(p.last.t);
+    p.carried = posedWithMetrics(p.page, t, p.state, p.sinceChange(), p.carried).metrics.queues;
     p.state = next;
     p.stateSince = performance.now();
     p.redraw();
