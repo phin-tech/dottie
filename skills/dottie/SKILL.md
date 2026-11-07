@@ -61,7 +61,7 @@ More of the MCP tools, by purpose:
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
-| Interactive pages: traffic and states | `add_flow`, `define_state`, `set_variable`, `add_gauge` |
+| Interactive pages: traffic and states | `add_flow`, `define_state`, `add_override`, `set_variable`, `add_gauge`; worked examples in `script_api` `example` |
 | Controls for an interactive page | `add_button`, `add_choice`, `add_reset`, `add_legend` |
 | Exports, and checking an interactive page | `export_svg`, `export_mermaid`, `export_animation`, `simulate` |
 
@@ -76,28 +76,40 @@ Any page can move. Most animations come from a few tools:
   steps through the scenes like slides. `loop: true` makes a scene play round instead of stopping.
 - `add_keyframe` and `set_timeline` for anything else, and `clear_animation` to start over.
 
-A diagram that keeps looping and reacts to clicks ("take us-east-1 down while traffic keeps flowing") uses page
-variables rather than scenes, and is easiest in two calls:
+### Showing how a system behaves
 
-1. `add_flow` sends steady traffic from a shape to the first of its destinations it can reach (`to: [east, west]`
-   fails over). It's routed afresh every frame over the connectors drawn, so nothing else needs drawing per state.
-   The route is the cheapest by connector `cost` (1 each, so fewest hops, unless set with `update_element`): give
-   the main path a lower cost than a backup. To split traffic, add one flow per destination, each with its own
-   `color` and fallbacks, e.g. `to: [use1, usw2]`, `to: [use2]`, `to: [usw2]`. With `spread: true`, a flow whose
-   first destination is down shares its packets across all the others it can reach, e.g. `to: [usw2, use1, use2]`.
-   A `define_state` `restyle` with `cost` degrades a link instead of taking it down.
-2. `define_state` describes one variable at once: what it takes `down` (faded, and traffic goes round it), `hide`s
-   (connectors go with a hidden shape), `show`s, `dim`s or `restyle`s (a new label, a red stroke), connectors whose `send_packet` packets
-   `reroute`, and which elements' clicks flip it (`toggled_by`).
-3. For how much, not just where: `add_flow` `volume`, and `capacity` (and a shape's `delay`) on `update_element`. Flows
-   fill their cheapest route in page order; what doesn't fit takes the next route, and what fits nowhere is backlog,
-   piled at the shape in front of the bottleneck (a queue in front of busy workers, a hub in front of a full lane).
-   `add_gauge` shows a metric (load, throughput, backlog, transit, …) as a number, bar or dial, and
-   `simulate` with `{"metrics": true}` prints them; an override like `{when: "load(workers) >= 0.9", stroke: ...}`
-   (by anchor) recolors whatever is saturated.
-3. Controls make it something to play with: `add_choice` for exclusive scenarios (one variable per option, give each
-   its meaning with `define_state`), `add_button` for one switch with a pressed look, `add_reset` to go back to the
-   start (call it again with `id` after adding variables), and `add_legend` to hide and show each flow.
+Dottie presents systems; it doesn't simulate them. A diagram that keeps looping and reacts to clicks ("take
+us-east-1 down while traffic keeps flowing", "what happens to the queue in a traffic spike") is built from a few
+pieces, each a picture of an idea rather than a forecast: pick numbers that make the story read clearly. The
+quickest start is a worked example: `script_api` with `example` (`region-failover`, `queue-workers`, `aws-outage`),
+or the resources `dottie://examples/<name>`. Run one with `run_script` on an empty page, then adapt it.
+
+1. **Where traffic goes.** `add_flow` sends steady traffic from a shape to the first of its destinations it can reach
+   (`to: [east, west]` fails over), routed afresh every frame over the connectors drawn. The route is the cheapest by
+   connector `cost` (1 each, so fewest hops, unless set): give the main path a lower cost than a backup. To split
+   traffic, add one flow per destination, each with its own `color`; with `spread: true`, a flow whose first
+   destination is down shares its packets across the others, keeping its color so you can see where it went.
+2. **How much.** `add_flow` `volume`, and `capacity` (and a shape's `delay`) on `update_element`. Flows fill their
+   cheapest route in page order (earlier flows first); what doesn't fit takes the next route, and what fits nowhere is
+   backlog, piled at the shape in front of the bottleneck (a queue in front of busy workers, a hub in front of a full
+   lane). `add_gauge` shows a metric (load, throughput, backlog, transit, backup, …) as a number, bar or dial.
+3. **States.** `define_state` describes one variable at once: what it takes `down` (faded, traffic goes round it),
+   `hide`s, `show`s, `dim`s or `restyle`s (including `cost`, `capacity` and `delay`), connectors whose `send_packet`
+   packets `reroute`, and which clicks flip it (`toggled_by`). `add_override` adds one change to one element under
+   a condition; a condition can compare a metric by anchor, like `load(workers) >= 0.9`, to turn whatever is
+   saturated red (such overrides change only looks).
+4. **Controls.** `add_choice` for exclusive scenarios (one variable per option, named `<name>_<option>` with the
+   option's capitals kept), `add_button` for one switch with a pressed look, `add_reset` to go back to the start, and
+   `add_legend` to hide and show each flow. A row of choice buttons (1×, 2×, 3× traffic, each adding a flow with a
+   `when`) stands in for a slider.
+5. **Check it.** Edit tools end with **Warnings** when the wiring looks wrong: a condition reading a variable nothing
+   sets (usually a typo; it suggests the right name), a metric comparison or gauge pointing at nothing.
+   `list_elements` lists each variable with what reads it and which clicks change it. `simulate` with steps like
+   `{"click": "spike"}`, `{"wait": 1}`, `{"metrics": true}` and `{"snapshot": true}` plays it as the player would.
+
+Traps: `update_element`/`dottie.update` with `overrides` replaces the whole list (use `add_override` /
+`dottie.addOverride` to add one); conditions are case-sensitive; flows are placed in page order, so the first flow
+gets capacity first.
 
 Lower level: `set_variable`, `update_element` with `click_toggle` / `click_set`, and `when` on shapes, connectors and
 packets (`"down"`, `"!down"`). Exports show the starting values; the HTML export and `<dottie-player>` change them on

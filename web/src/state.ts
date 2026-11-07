@@ -135,12 +135,18 @@ export function applyOverride(o: StateOverride, e: Element): Element {
 
 /** Whether a click sets or flips a variable. */
 export function changesState(c: ClickAction | null): boolean {
-  return !!c && (Object.keys(c.set ?? {}).length > 0 || (c.toggle ?? []).length > 0);
+  return !!c && (c.reset === true || Object.keys(c.set ?? {}).length > 0 || (c.toggle ?? []).length > 0);
 }
 
-/** `state` after the click: its `set` values, then each `toggle` flipped (a missing variable starts false). */
-export function applyClick(c: ClickAction, state: Record<string, boolean>): Record<string, boolean> {
-  const out = { ...state };
+/** `state` after the click: the starting values (`initial`) back if it resets, then its `set` values, then each
+ * `toggle` flipped (a missing variable starts false). */
+export function applyClick(c: ClickAction, state: Record<string, boolean>, initial: Record<string, boolean> = {}): Record<string, boolean> {
+  let out = { ...state };
+  if (c.reset === true) {
+    out = {};
+    for (const k of Object.keys(state)) out[k] = false;
+    Object.assign(out, initial);
+  }
   for (const [k, v] of Object.entries(c.set ?? {})) out[k] = v;
   for (const k of c.toggle ?? []) out[k] = !(out[k] ?? false);
   return out;

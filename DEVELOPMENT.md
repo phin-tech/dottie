@@ -247,6 +247,11 @@ room under `capacity`, the rest is backlog at the shape in front of the bottlene
 inside it, and the same pass yields the frame's metrics. Then overrides whose condition compares a metric
 (`load(workers) >= 1`) apply their looks, and elements with a `gauge` become plain `.path` elements (frame and label,
 bar or dial), so no renderer draws a gauge itself. The editor (`.all`) leaves both alone.
+`Checks.swift` (`DiagramOps.stateWarnings`, `describeVariables`) finds wiring mistakes on an interactive page (a
+condition reading a variable nothing sets, a metric or gauge naming nothing); MCP appends them to edit tools' results
+and `list_elements`. `ScriptExamples.swift` holds worked run_script programs, served as `dottie://examples/<name>`
+and by `script_api` `example`; `ScriptExamplesTests` runs, type-checks and warning-checks each, so keep them current
+when the API changes. A click's `reset` puts every variable back to its starting value before `set` and `toggle`.
 A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
 bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right
 angles, adding a corner between any two that are out of line and dropping any that fall into line

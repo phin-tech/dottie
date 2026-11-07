@@ -98,11 +98,11 @@ extension DiagramOps {
     @discardableResult
     public static func addReset(_ doc: inout DottieDocument, x: Double, y: Double, text: String = "Reset",
                                 replacing: UUID? = nil, color: RGBA? = nil) throws -> Element {
-        guard let vars = doc.variables, !vars.isEmpty else { throw OpsError.invalid("The page has no variables to reset") }
+        guard let vars = doc.variables, !vars.isEmpty, vars.count > 0 else { throw OpsError.invalid("The page has no variables to reset") }
         if let replacing {
             guard let i = doc.elements.firstIndex(where: { $0.id == replacing }) else { throw OpsError.notFound("No element \(replacing.uuidString)") }
             var c = doc.elements[i].click ?? ClickAction()
-            c.set = vars; c.toggle = nil
+            c.set = nil; c.toggle = nil; c.reset = true
             doc.elements[i].click = c
             return doc.elements[i]
         }
@@ -114,7 +114,7 @@ extension DiagramOps {
         look.textColor = .some(color)
         var e = try addShape(&doc, kind: .rectangle, frame: frame, at: frame.origin, text: text,
                              fill: RGBA(r: 1, g: 1, b: 1), stroke: color, roughness: 0, look: look)
-        e.click = ClickAction(set: vars)
+        e.click = ClickAction(reset: true)
         replace(&doc, e)
         return e
     }

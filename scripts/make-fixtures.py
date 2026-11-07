@@ -583,6 +583,7 @@ def state():
     p.add("rectangle", 40, 180, 120, 60, text="maint", when="down || maint && !down", click={"toggle": ["down", "maint"]})
     p.add("rectangle", 40, 300, 120, 60, text="broken", when="down |")
     p.add("ellipse", 300, 300, 60, 60, text="unknown", when="!nobody")
+    p.add("rectangle", 460, 300, 100, 40, text="reset", click={"reset": True, "toggle": "down"})   # starting values, then flip
     live = p.connect(east, west, text="live")
     p.connect(east, backup, text="standby")
     keyed = p.connect(east, backup, routing="curved", when="!down")

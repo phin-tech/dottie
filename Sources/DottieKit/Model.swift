@@ -299,15 +299,18 @@ public struct ClickAction: Codable, Equatable, Sendable {
     public var set: [String: Bool]?
     /// Page variables to flip, after `set`.
     public var toggle: [String]?
+    /// Puts every page variable back to its starting value first, whatever variables the page has by then.
+    public var reset: Bool?
 
-    public init(scene: String? = nil, url: String? = nil, set: [String: Bool]? = nil, toggle: [String]? = nil) {
+    public init(scene: String? = nil, url: String? = nil, set: [String: Bool]? = nil, toggle: [String]? = nil, reset: Bool? = nil) {
+        self.reset = reset == true ? true : nil
         self.scene = scene
         self.url = url.flatMap(Self.allowed)
         self.set = set.flatMap { $0.isEmpty ? nil : $0 }
         self.toggle = toggle.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle }
+    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle, reset }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -318,7 +321,8 @@ public struct ClickAction: Codable, Equatable, Sendable {
         self.init(scene: try c.decodeIfPresent(String.self, forKey: .scene),
                   url: try c.decodeIfPresent(String.self, forKey: .url),
                   set: try c.decodeIfPresent([String: Bool].self, forKey: .set)?.filter { PageState.isName($0.key) },
-                  toggle: toggle?.filter(PageState.isName))
+                  toggle: toggle?.filter(PageState.isName),
+                  reset: (try? c.decodeIfPresent(Bool.self, forKey: .reset)) ?? nil)
     }
 
     /// `url` trimmed, if it is a link a page may open.

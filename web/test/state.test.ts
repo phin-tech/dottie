@@ -27,9 +27,9 @@ test("the state fixture: starting values, other values, and every element", () =
   const file = parseDottie(read("edge", "state.dottie"));
   const [regions, plain] = file.pages;
   const texts = (p: { elements: { text: string | null; kind: string }[] }) => p.elements.map((e) => e.text ?? e.kind);
-  assert.deepEqual(texts(posed(regions, 0)), ["east", "west", "maint", "unknown", "live", "ellipse"]);
+  assert.deepEqual(texts(posed(regions, 0)), ["east", "west", "maint", "unknown", "reset", "live", "ellipse"]);
   // Down: west and its connector go, backup and its packet come, the keyed connector to backup stays gone.
-  assert.deepEqual(texts(posed(regions, 1.5, { down: true })), ["east", "backup", "maint", "unknown", "standby", "ellipse"]);
+  assert.deepEqual(texts(posed(regions, 1.5, { down: true })), ["east", "backup", "maint", "unknown", "reset", "standby", "ellipse"]);
   assert.equal(posed(regions, 0, "all").elements.length, regions.elements.length);
   // A page with no timeline still follows its state.
   assert.deepEqual(texts(still(plain)), ["on", "flip", "overridden"]);
@@ -64,6 +64,9 @@ test("clicks that set and toggle, alone or with a scene", () => {
   assert.deepEqual(byText("backup"), { scene: 1, set: { maint: false } });
   assert.deepEqual(byText("maint"), { state: true, toggle: ["down", "maint"] });
   assert.deepEqual(applyClick({ scene: null, url: null, set: { a: true }, toggle: ["a", "b"] }, { a: false }), { a: false, b: true });
+  // A reset puts every variable back to its starting value (one with none, false), before set and toggle.
+  assert.deepEqual(applyClick({ scene: null, url: null, set: null, toggle: ["b"], reset: true }, { a: false, b: true, c: true }, { a: true }),
+    { a: true, b: true, c: false });
   assert.equal(page.timeline!.markers![0].loop, true);
   assert.equal(page.timeline!.markers![1].loop, null);
 });

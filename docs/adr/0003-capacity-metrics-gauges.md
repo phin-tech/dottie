@@ -13,6 +13,12 @@ imply; and **gauges**, which show a metric. All of it follows ADR 0002's rule: e
 the page, the time and the variables. So exports, scrubbing and goldens keep working, and Swift and TypeScript
 have to agree exactly.
 
+**This is presentation, not a modelling language.** Dottie draws and plays diagrams. Volume, capacity and delay are
+there so a diagram can *show* a scenario (a region going down, a queue backing up, a lane filling) with numbers
+that make the story legible; they're illustrative, chosen by whoever draws it. Nothing here predicts how a real
+system behaves, and features are judged by whether they make a diagram clearer, not more realistic: steady rates
+rather than queueing theory, a greedy assignment a reader can follow rather than an optimal one.
+
 ## Decision
 
 ### The model

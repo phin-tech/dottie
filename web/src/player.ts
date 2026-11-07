@@ -500,7 +500,10 @@ export class DottiePlayer extends ElementBase {
       this.scheduleReplay();
     }
     if (!click) return;
-    if (click.set || click.toggle) this.setState(applyClick({ scene: null, url: null, set: click.set ?? null, toggle: click.toggle ?? null }, p.state));
+    if (click.set || click.toggle || click.reset) {
+      this.setState(applyClick({ scene: null, url: null, set: click.set ?? null, toggle: click.toggle ?? null, reset: click.reset ?? null },
+        p.state, p.page.variables ?? {}));
+    }
     if ("state" in click) return;
     if ("url" in click) {
       if (/^(https?:|mailto:)/i.test(click.url)) window.open(click.url, "_blank", "noopener");

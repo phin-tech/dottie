@@ -57,7 +57,11 @@ export interface StrokePoint { x: number; y: number }
 export interface EmbeddedImage { data: string; format: string }
 /** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link; and page
  * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
-export interface ClickAction { scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null }
+export interface ClickAction {
+  scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null;
+  /** Puts every page variable back to its starting value first. */
+  reset?: boolean | null;
+}
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
 /** A change to an element while `when` holds (StateOverride): a field left null keeps the element's own. */
 export interface StateOverride {
@@ -276,7 +280,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   repeat: ["start", "end", "count"],
   cameraKey: ["t", "x", "y", "width", "height", "ease"],
   marker: ["t", "name", "loop"],
-  click: ["scene", "url", "set", "toggle"],
+  click: ["scene", "url", "set", "toggle", "reset"],
   hover: ["stroke", "fill", "opacity"],
   override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost", "capacity", "delay"],
 };
@@ -529,7 +533,7 @@ class Reader {
     }
     const raw = typeof v.toggle === "string" ? [v.toggle] : Array.isArray(v.toggle) && v.toggle.every((x) => typeof x === "string") ? v.toggle as string[] : null;
     const toggle = raw ? raw.filter(isName) : null;
-    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null };
+    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null, reset: v.reset === true ? true : null };
   }
 
   playback(v: unknown): SymbolPlayback | null {

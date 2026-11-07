@@ -141,7 +141,7 @@ public struct Simulation: Sendable {
         var did: [String] = []
         if let c, c.changesState {
             let before = state, hiddenBefore = Set(hiddenByState.map(\.id))
-            state = c.applied(to: state)
+            state = c.applied(to: state, initial: doc.variables ?? [:])
             let changed = state.keys.sorted().filter { before[$0] ?? false != state[$0] ?? false }
             did.append(changed.isEmpty ? "changed no variable" : "set " + changed.map { "\($0)=\(state[$0]!)" }.joined(separator: ", "))
             let hiddenAfter = Set(hiddenByState.map(\.id))

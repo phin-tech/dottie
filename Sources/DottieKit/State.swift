@@ -157,11 +157,13 @@ extension DottieDocument {
 
 extension ClickAction {
     /// Whether the click sets or flips a variable.
-    public var changesState: Bool { !(set ?? [:]).isEmpty || !(toggle ?? []).isEmpty }
+    public var changesState: Bool { reset == true || !(set ?? [:]).isEmpty || !(toggle ?? []).isEmpty }
 
-    /// `state` after the click: its `set` values, then each `toggle` flipped (a missing variable starts false).
-    public func applied(to state: [String: Bool]) -> [String: Bool] {
+    /// `state` after the click: the starting values (`initial`) back if it resets, then its `set` values, then each
+    /// `toggle` flipped (a missing variable starts false).
+    public func applied(to state: [String: Bool], initial: [String: Bool] = [:]) -> [String: Bool] {
         var out = state
+        if reset == true { out = state.mapValues { _ in false }.merging(initial) { _, start in start } }
         for (k, v) in set ?? [:] { out[k] = v }
         for k in toggle ?? [] { out[k] = !(out[k] ?? false) }
         return out

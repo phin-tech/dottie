@@ -57,10 +57,14 @@ final class ControlsTests: XCTestCase {
         _ = try sim.click("b")
         _ = try sim.click("Reset")
         XCTAssertEqual(sim.state, ["mode_a": true, "mode_b": false])
-        // Variables added later: run it again on the same button.
+        XCTAssertEqual(doc.elements.first { $0.id == r.id }?.click?.reset, true)
+        // A variable added later is covered with nothing rewritten: reset is an action, not a list of values.
         try doc.setVariable("later", to: true)
+        var again = try Simulation(doc)
+        _ = try again.click("b")
+        _ = try again.click("Reset")
+        XCTAssertEqual(again.state, ["mode_a": true, "mode_b": false, "later": true])
         try DiagramOps.addReset(&doc, x: 0, y: 0, replacing: r.id)
-        XCTAssertEqual(doc.elements.first { $0.id == r.id }?.click?.set?["later"], true)
         XCTAssertEqual(doc.elements.filter { $0.text == "Reset" }.count, 1)
     }
 

@@ -147,3 +147,37 @@ extension PageState {
         }.joined(separator: " || ")
     }
 }
+
+extension DiagramOps {
+    /// Adds `override` to an element's overrides, keeping the ones it has: merged into the one with the same
+    /// condition (the fields it sets replace that one's), or appended. `update` with `overrides` replaces the list;
+    /// this doesn't. Returns the element's overrides.
+    @discardableResult
+    public static func addOverride(_ doc: inout DottieDocument, id: UUID, _ override: StateOverride) throws -> [StateOverride] {
+        guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        guard let when = try PageState.checked(override.when, metrics: true) else { throw OpsError.invalid("An override needs 'when'") }
+        var list = doc.elements[i].overrides ?? []
+        if let k = list.firstIndex(where: { $0.when == when }) {
+            var o = list[k]
+            if let v = override.stroke { o.stroke = v }
+            if let v = override.fill { o.fill = v }
+            if let v = override.textColor { o.textColor = v }
+            if let v = override.opacity { o.opacity = v }
+            if let v = override.strokeWidth { o.strokeWidth = v }
+            if let v = override.dash { o.dash = v }
+            if let v = override.text { o.text = v }
+            if let v = override.reroute { o.reroute = (o.reroute ?? [:]).merging(v) { _, new in new } }
+            if let v = override.offline { o.offline = v }
+            if let v = override.cost { o.cost = v }
+            if let v = override.capacity { o.capacity = v }
+            if let v = override.delay { o.delay = v }
+            list[k] = o
+        } else {
+            var o = override
+            o.when = when
+            list.append(o)
+        }
+        doc.elements[i].overrides = list
+        return list
+    }
+}

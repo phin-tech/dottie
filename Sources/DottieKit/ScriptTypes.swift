@@ -640,6 +640,9 @@ extension DottieScript {
              * defaults to warn 0.7 and alarm 0.9. */
             gauge(target: Ref, options: { metric: Metric; x: number; y: number; width?: number; height?: number; style?: GaugeStyle;
                 max?: number; warn?: number; alarm?: number; label?: string }): Element;
+            /** Adds an override, keeping the element's others: merged into the one with the same `when`, else appended.
+             * (`update` with `overrides` replaces the list.) */
+            addOverride(target: Ref, override: Override): Element;
             /** The page's metrics at a time (default 0) and state (default the starting values). */
             metrics(options?: { at?: number; state?: Record<string, boolean> }): Metrics;
             /** The page's flows. */

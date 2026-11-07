@@ -801,6 +801,12 @@ public enum DottieScript {
                                                replacing: a.has("id") ? try a.uuid("id") : nil)
                 return Self.describe(f)
 
+            case "addOverride":
+                guard let o = a.object("override") else { throw OpsError.invalid("addOverride takes an element and an override {when, ...}") }
+                let id = try a.uuid("id")
+                try DiagramOps.addOverride(&doc, id: id, try o.override())
+                return describe(try element(id))
+
             case "gauge":
                 let style = try a.enumValue("style", as: Gauge.Style.self)
                 let e = try DiagramOps.addGauge(&doc, metric: try a.require("metric"), of: try a.uuid("of"),
@@ -1095,6 +1101,16 @@ public enum DottieScript {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
         flows: function () { return call("flows"); },
+        addOverride: function (target, o) {
+          var x = o || {};
+          if (x.reroute) {
+            var r = {}, k;
+            if (Array.isArray(x.reroute)) x.reroute.forEach(function (p) { r[idOf(p[0])] = idOf(p[1]); });
+            else for (k in x.reroute) r[k] = idOf(x.reroute[k]);
+            x = merge(x, { reroute: r });
+          }
+          return call("addOverride", { id: idOf(target), override: x });
+        },
         gauge: function (target, o) { return call("gauge", merge(o, { of: idOf(target) })); },
         metrics: function (o) { return call("metrics", o || {}); },
         removeFlow: function (flow) { return call("removeFlow", { id: idOf(flow) }); },
@@ -1325,7 +1341,8 @@ public enum DottieScript {
     shapes they pass through and come out the other side. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
     loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
       dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
-      Capacity (ADR 0003): volume on a flow is how much it carries in the page's own unit (requests a second, \
+      Capacity (ADR 0003), for showing a scenario (numbers are illustrative; this presents, it doesn't predict): \
+    volume on a flow is how much it carries in the page's own unit (requests a second, \
     messages, trucks a day; default 1); the biggest flow draws a packet every `every`, the rest proportionally fewer. \
     capacity on a shape or connector (in dottie.rect/connect/update; null removes it) is the most volume it carries: \
     flows are placed in page order (earlier flows first), each on its cheapest route as far as it has room, the rest \
@@ -1338,6 +1355,8 @@ public enum DottieScript {
       dottie.gauge(target, {metric, x, y, width?, height?, style?, max?, warn?, alarm?, label?})  a gauge showing a \
     metric (throughput, load, delay, backlog, inFlight, transit, backup) of an element or flow as a number, bar or \
     dial, green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it
+      dottie.addOverride(el, {when, ...})  adds an override, keeping the element's others (merged into one with the same \
+    when); update with overrides replaces the whole list
       An override's condition can compare metrics, naming an element by its anchor or an element or flow by id: \
     {when: "load(workers) >= 0.9", stroke: "#dc2626"}; such an override changes only looks (no offline, cost, \
     capacity, delay or reroute), and a when on an element can't compare metrics
@@ -1353,8 +1372,8 @@ public enum DottieScript {
     sets ({name: bool}); filled, and labelled onText, while on. Returns it
       dottie.choice(name, [options], {x, y, direction?, initial?, color?})  exactly one on: variables name_option, each \
     click sets its own true and the rest false. Returns the buttons, each with its variable
-      dottie.resetButton({x, y, text?, id?})  sets every variable back to its starting value; run again with id after \
-    adding variables
+      dottie.resetButton({x, y, text?, id?})  sets every variable back to its starting value (a click with reset: true, \
+    so variables added later are covered too)
       dottie.legend({x, y, labels?})  a swatch and label per flow; clicking one hides or shows that flow (show_1, show_2…)
       Example: scenarios, each described once:
         const [normal, eastOut] = dottie.choice("scenario", ["normal", "east out"], {x: 40, y: 400});

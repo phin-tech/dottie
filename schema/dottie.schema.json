@@ -380,7 +380,8 @@
         "scene": { "type": "string", "description": "A marker's name: jump there and play on to the next scene." },
         "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." },
         "set": { "type": "object", "description": "Page variables to give these values, without touching the playhead.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
-        "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] }
+        "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] },
+        "reset": { "type": "boolean", "description": "Puts every page variable back to its starting value first, before set and toggle." }
       }
     },
     "override": {
