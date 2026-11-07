@@ -154,6 +154,7 @@ public struct DottieFile: Codable, Equatable, Sendable {
                 e.groupID = n
             }
             if let t = e.link { e.link = ids[t] ?? t }
+            e.remapOverrides(ids)
             if var c = e.connector {
                 if let s = c.start.elementID { c.start.elementID = ids[s] ?? s }
                 if let t = c.end.elementID { c.end.elementID = ids[t] ?? t }

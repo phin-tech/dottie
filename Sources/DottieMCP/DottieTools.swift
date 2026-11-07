@@ -84,6 +84,19 @@ private let whenProp = prop("string", "A condition on the page's variables (see 
     + "that sets or toggles a variable shows and hides it without stopping the animation; exports show the starting values. "
     + "Empty string removes it")
 
+private func idListProp(_ description: String) -> Value {
+    .object(["type": "array", "items": .object(["type": "string"]), "description": .string(description + "; element ids")])
+}
+private let stateRestyleProp: Value = .object([
+    "type": "object",
+    "description": "Element id to how it looks while it is true: {stroke, fill, text_color (hex), opacity (multiplies), stroke_width, dash, text}",
+    "additionalProperties": .object(["type": "object", "properties": .object([
+        "stroke": .object(["type": "string"]), "fill": .object(["type": "string"]), "text_color": .object(["type": "string"]),
+        "opacity": .object(["type": "number"]), "stroke_width": .object(["type": "number"]),
+        "dash": .object(["enum": .array(["solid", "dashed", "dotted"])]), "text": .object(["type": "string"]),
+    ])]),
+])
+
 private struct ToolFailure: Error { var message: String }
 
 extension Tool.Content {
@@ -332,6 +345,28 @@ actor DottieTools {
                 "name": prop("string", "Letters, digits and _, not starting with a digit, e.g. eastDown"),
                 "value": prop("boolean", "Its starting value (default false)"),
                 "remove": prop("boolean", "Remove the variable instead (elements and clicks that name it are left as they are)"),
+             ], required: ["path", "name"])),
+        Tool(name: "define_state",
+             description: "Describe one page variable all at once, instead of element by element: its starting value, what "
+                + "it hides and shows, what it dims or restyles, which connectors' packets detour onto which, and which elements' "
+                + "clicks flip or set it. Writes the when conditions, overrides and clicks this means (in one undo step); running it "
+                + "again changes nothing more. Prefer it to set_variable plus when on each element: one shape can dim and relabel "
+                + "itself, and the same packets keep flowing along a detour, instead of drawing every state twice. Check the "
+                + "result with simulate, or an export with a state.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "name": prop("string", "The variable: letters, digits and _, not starting with a digit, e.g. eastDown"),
+                "initial": prop("boolean", "Its starting value (default false)"),
+                "hide": idListProp("Drawn only while it is false (connectors attached go with them)"),
+                "show": idListProp("Drawn only while it is true"),
+                "dim": idListProp("Faded while it is true, still drawn"),
+                "dim_opacity": prop("number", "How faded dim makes them, 0...1 (default 0.3)"),
+                "restyle": stateRestyleProp,
+                "reroute": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                                    "description": "Connector id to connector id: while it is true, everything that follows the first (packets) follows the second"]),
+                "toggled_by": idListProp("Elements whose click flips it (on the web: the HTML export and <dottie-player>)"),
+                "turned_on_by": idListProp("Elements whose click sets it true"),
+                "turned_off_by": idListProp("Elements whose click sets it false"),
              ], required: ["path", "name"])),
         Tool(name: "list_extensions",
              description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
@@ -950,6 +985,41 @@ actor DottieTools {
             try save(file, to: url)
             let vars = (file.pages[p].variables ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
             return text("Variables: " + (vars.isEmpty ? "none" : vars.joined(separator: ", ")) + on(file, p))
+
+        case "define_state":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            var spec = StateSpec(name: try a.require("name"))
+            if let v = a.bool("initial") { spec.initial = v }
+            spec.hide = try a.uuids("hide") ?? []; spec.show = try a.uuids("show") ?? []; spec.dim = try a.uuids("dim") ?? []
+            if let v = a.double("dim_opacity") { spec.dimOpacity = v }
+            func color(_ o: Args, _ k: String) throws -> RGBA? {
+                guard let s = o.string(k) else { return nil }
+                guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'restyle' \(k) must be a hex color like #ffcc00, got '\(s)'") }
+                return c
+            }
+            for (k, v) in a.raw["restyle"]?.objectValue ?? [:] {
+                guard let id = UUID(uuidString: k) else { throw ToolFailure(message: "'restyle' has an invalid element id: \(k)") }
+                let o = Args(raw: v.objectValue ?? [:])
+                spec.restyle[id] = StateOverride(when: spec.name, stroke: try color(o, "stroke"), fill: try color(o, "fill"),
+                                                 textColor: try color(o, "text_color"), opacity: o.double("opacity"),
+                                                 strokeWidth: o.double("stroke_width"),
+                                                 dash: o.string("dash").flatMap(DashStyle.init(rawValue:)), text: o.string("text"))
+            }
+            for (k, v) in a.raw["reroute"]?.objectValue ?? [:] {
+                guard let from = UUID(uuidString: k), let to = v.stringValue.flatMap(UUID.init(uuidString:)) else {
+                    throw ToolFailure(message: "'reroute' maps connector ids to connector ids")
+                }
+                spec.reroute[from] = to
+            }
+            spec.toggledBy = try a.uuids("toggled_by") ?? []
+            spec.turnedOnBy = try a.uuids("turned_on_by") ?? []
+            spec.turnedOffBy = try a.uuids("turned_off_by") ?? []
+            let summary: String
+            do { summary = try DiagramOps.defineState(&file.pages[p], spec) } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            return text("State " + summary + on(file, p))
 
         case "script_api":
             if a.string("format") == "typescript" { return text(DottieScript.typeDefinitions) }

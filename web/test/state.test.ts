@@ -31,8 +31,28 @@ test("the state fixture: starting values, other values, and every element", () =
   assert.deepEqual(texts(posed(regions, 1.5, { down: true })), ["east", "backup", "maint", "unknown", "standby", "ellipse"]);
   assert.equal(posed(regions, 0, "all").elements.length, regions.elements.length);
   // A page with no timeline still follows its state.
-  assert.deepEqual(texts(still(plain)), ["on", "flip"]);
+  assert.deepEqual(texts(still(plain)), ["on", "flip", "overridden"]);
   assert.deepEqual(file.warnings, []);
+});
+
+test("overrides restyle under their condition, and reroute the same packet", () => {
+  const page = parseDottie(read("edge", "state.dottie")).pages[2];
+  const east = page.elements.find((e) => e.text === "east")!;
+  // A bad dash and a reroute target that isn't an id are dropped, as DottieKit drops them; a bad key is skipped.
+  assert.equal(east.overrides?.[2].dash, null);
+  const [rerouted, stays] = page.elements.filter((e) => e.kind === "ellipse");
+  assert.equal(Object.keys(rerouted.overrides![0].reroute!).length, 1);
+  assert.equal(stays.overrides![0].reroute, null);
+  const down = posed(page, 1).elements.find((e) => e.id === east.id)!;
+  assert.equal(down.text, "east (down)");
+  assert.equal(down.style.dash, "dashed");
+  assert.ok(Math.abs((down.style.opacity ?? 1) - 0.4) < 1e-9);   // 0.8 times 0.5
+  assert.equal(posed(page, 1, { down: false }).elements.find((e) => e.id === east.id)!.text, "east");
+  assert.equal(posed(page, 1, { down: true, calm: true }).elements.find((e) => e.id === east.id)!.text, "calm");
+  assert.equal(posed(page, 1, "all").elements.find((e) => e.id === east.id)!.text, "east");
+  // The rerouted dot ends near west (below), the other near east.
+  const at = (s: Record<string, boolean>) => posed(page, 2.9, s).elements.find((e) => e.id === rerouted.id)!.y;
+  assert.ok(at({ down: true }) > 200 && at({ down: false }) < 120);
 });
 
 test("clicks that set and toggle, alone or with a scene", () => {

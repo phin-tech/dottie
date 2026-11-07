@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -87,6 +87,8 @@ class Page:
             kw["text"] = text
         if when is not None:
             kw["when"] = when
+        if overrides is not None:
+            kw["overrides"] = overrides
         return self.add("connector", 0, 0, 0, 0, style=st or style(), layer=layer, **kw)
 
     def animate(self, duration, fps=12, **kw):
@@ -594,7 +596,32 @@ def state():
     b = q.add("rectangle", 240, 40, 120, 60, text="off", when="!on")
     q.connect(a, b, text="between")
     q.add("diamond", 40, 160, 120, 80, text="flip", click={"toggle": "on"})
-    write(EDGE / "state.dottie", [p, q])
+    # Overrides on a page with no timeline: the label changes at the starting values.
+    q.add("rectangle", 240, 160, 120, 60, text="plain", overrides=[{"when": "on", "text": "overridden"}])
+
+    o = Page("Overrides")
+    o.animate(3, fps=10)
+    o.extra = {"variables": {"down": True, "calm": False}}
+    api = o.add("rectangle", 40, 140, 100, 60, text="api")
+    east = o.add("rectangle", 340, 40, 120, 60, text="east", style=style(opacity=0.8), overrides=[
+        {"when": "down", "fill": rgba(1, 0.85, 0.85), "opacity": 0.5, "text": "east (down)", "dash": "dashed",
+         "strokeWidth": 4, "textColor": rgba(0.8, 0.1, 0.1)},
+        {"when": "calm", "text": "calm"},
+        {"when": "down && !calm", "stroke": rgba(0.8, 0.1, 0.1), "dash": "wavy"},
+        {"when": "down |", "text": "broken"},
+    ])
+    west = o.add("rectangle", 340, 240, 120, 60, text="west")
+    east_link = o.connect(api, east, text="east")
+    west_link = o.connect(api, west, text="west", overrides=[{"when": "!calm", "strokeWidth": 5, "stroke": rgba(0.1, 0.6, 0.2)}])
+    rerouted = o.add("ellipse", 0, 0, 16, 16, style=style(fill=rgba(0.2, 0.5, 1)), overrides=[
+        {"when": "down", "reroute": {east_link: west_link, "not-an-id": west_link}}])
+    o.track(rerouted, [{"t": 0, "visible": True}], follow=[{"path": east_link, "start": 0, "end": 3}])
+    # A reroute whose target isn't an id is dropped whole, so this one stays on its connector.
+    stays = o.add("ellipse", 0, 0, 16, 16, style=style(fill=rgba(1, 0.4, 0.2)), overrides=[
+        {"when": "down", "reroute": {east_link: "nowhere"}, "opacity": 0.6}])
+    o.track(stays, [{"t": 0, "visible": True}, {"t": 1, "opacity": 1}, {"t": 2, "opacity": 0.5}],
+            follow=[{"path": east_link, "start": 0.5, "end": 3}])
+    write(EDGE / "state.dottie", [p, q, o])
 
 
 def links():

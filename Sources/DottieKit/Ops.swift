@@ -432,6 +432,8 @@ public enum DiagramOps {
         public var clickSet: [String: Bool]? = nil
         public var clickToggle: [String]? = nil
         public var when: String? = nil
+        /// Its overrides, one line each: "down: opacity 0.3, text …, reroutes 1".
+        public var overrides: [String]? = nil
     }
 
     public static func summarize(_ doc: DottieDocument) -> [ElementSummary] {
@@ -453,6 +455,7 @@ public enum DiagramOps {
                                   playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil, args: e.args,
                                   waypoints: e.connector?.waypoints, hops: e.connector?.hops)
             s.clickSet = e.click?.set; s.clickToggle = e.click?.toggle; s.when = e.when
+            s.overrides = e.overrides.map { $0.map(\.summary) }
             return s
         }
     }

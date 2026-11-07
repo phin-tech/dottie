@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="468" height="308" viewBox="16 16 468 308">
+<rect x="16" y="16" width="468" height="308" fill="#ffffff"/>
+<path d="M40 140 L140 140 L140 200 L40 200 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="90" y="176.48">api</tspan></text>
+<g opacity="0.4">
+<path d="M340 40 L460 40 L460 100 L340 100 Z" fill="#ffd9d9" stroke="none"/>
+<path d="M340 40 L460 40 L460 100 L340 100 Z" fill="none" stroke="#cc1a1a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="16 12"/>
+<text x="400" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#cc1a1a" text-anchor="middle"><tspan x="400" y="76.48">east (down)</tspan></text>
+</g>
+<path d="M340 240 L460 240 L460 300 L340 300 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="400" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="400" y="276.48">west</tspan></text>
+<path d="M140 153.87 L340 89.35 M330.09 87.99 L340 89.35 M332.76 96.25 L340 89.35" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="216.5" y="108.11" width="47" height="27" fill="#ffffff"/>
+<text x="240" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="240" y="128.09">east</tspan></text>
+<path d="M140 186.13 L340 250.65 M321.89 233.41 L340 250.65 M315.23 254.05 L340 250.65" fill="none" stroke="#1a9933" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="215" y="204.89" width="50" height="27" fill="#ffffff"/>
+<text x="240" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1a9933" text-anchor="middle"><tspan x="240" y="224.87">west</tspan></text>
+<path d="M328.49 244.35 C328.49 248.77 324.91 252.35 320.49 252.35 C316.07 252.35 312.49 248.77 312.49 244.35 C312.49 239.93 316.07 236.35 320.49 236.35 C324.91 236.35 328.49 239.93 328.49 244.35 Z" fill="#3380ff" stroke="none"/>
+<path d="M328.49 244.35 C328.49 248.77 324.91 252.35 320.49 252.35 C316.07 252.35 312.49 248.77 312.49 244.35 C312.49 239.93 316.07 236.35 320.49 236.35 C324.91 236.35 328.49 239.93 328.49 244.35 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<g opacity="0.3">
+<path d="M314.28 100.23 C314.28 104.65 310.7 108.23 306.28 108.23 C301.87 108.23 298.28 104.65 298.28 100.23 C298.28 95.81 301.87 92.23 306.28 92.23 C310.7 92.23 314.28 95.81 314.28 100.23 Z" fill="#ff6633" stroke="none"/>
+<path d="M314.28 100.23 C314.28 104.65 310.7 108.23 306.28 108.23 C301.87 108.23 298.28 104.65 298.28 100.23 C298.28 95.81 301.87 92.23 306.28 92.23 C310.7 92.23 314.28 95.81 314.28 100.23 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

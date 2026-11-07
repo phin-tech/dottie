@@ -4,12 +4,12 @@
 import { endpoints, indexOf, routePoints, route } from "./connector.ts";
 import { angle, rotated } from "./element.ts";
 import {
-  BOIL_DRAWINGS, type CameraKey, type Ease, type Element, type Follow, type Keyframe, type Page, type RGBA, type Timeline,
+  BOIL_DRAWINGS, type CameraKey, type Ease, type Element, type Follow, type Keyframe, type Page, type RGBA, type StateOverride, type Timeline,
   type Track, clampFPS, clampTime, cloneElement, repeatIsValid, sameColor,
 } from "./model.ts";
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
-import { type StateChoice, stateHidden } from "./state.ts";
+import { activeOverrides, applyOverride, type StateChoice, stateHidden, stateValues } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
 
@@ -225,10 +225,29 @@ const EMPTY_TIMELINE: Timeline = { fps: 12, duration: 0, boil: null, settle: nul
  * with their connectors (DottieDocument.posed(at:state:)). */
 export function posed(page: Page, t: number, state: StateChoice = "initial"): Page {
   const off = stateHidden(page, state);
-  const timeline = page.timeline ?? (off.size === 0 ? null : EMPTY_TIMELINE);
+  const values = stateValues(page, state);
+  const active = new Map<string, StateOverride[]>();
+  for (const e of page.elements) {
+    const o = activeOverrides(e, values);
+    if (o.length > 0) active.set(e.id, o);
+  }
+  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 ? null : EMPTY_TIMELINE);
   if (!timeline) return page;
   t = clampTime(t);
   const tracks = trackMap(timeline);
+  // An override's reroute sends the element's follows along other connectors.
+  for (const [id, overrides] of active) {
+    const track = tracks.get(id);
+    if (!track?.follow || !overrides.some((o) => o.reroute)) continue;
+    tracks.set(id, {
+      ...track,
+      follow: track.follow.map((f) => {
+        let path = f.path;
+        for (const o of overrides) path = o.reroute?.[path] ?? path;
+        return { ...f, path };
+      }),
+    });
+  }
   const reseed = timeline.boil === null ? null
     : (Math.trunc(Math.floor(t * clampFPS(timeline.fps) + 1e-9) / Math.max(1, timeline.boil)) % BOIL_DRAWINGS) >>> 0;
   const hidden = new Set<string>();
@@ -249,6 +268,7 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
   let elements = page.elements.map((e) => {
     const track = tracks.get(e.id);
     let out = track ? applyTrack(track, e, t) : e;
+    for (const o of active.get(e.id) ?? []) out = applyOverride(o, out);
     if (reseed !== null && reseed > 0 && boils(e)) {
       if (out === e) out = cloneElement(e);
       out.seed = boiled(e.seed, reseed);

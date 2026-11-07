@@ -1,7 +1,7 @@
 // Page state (State.swift): named true-or-false variables that clicks set and flip, and conditions (`when`) that
 // pick which elements a page draws, so a looping diagram can change without its timeline stopping or jumping.
 
-import type { ClickAction, Page } from "./model.ts";
+import { cloneElement, type ClickAction, type Element, type Page, type StateOverride } from "./model.ts";
 
 const MAX_NAME = 64;
 
@@ -54,6 +54,28 @@ export function stateHidden(page: Page, choice: StateChoice): Set<string> {
   const out = new Set<string>();
   if (!values) return out;
   for (const e of page.elements) if (e.when !== null && !holds(e.when, values)) out.add(e.id);
+  return out;
+}
+
+/** The overrides of `e` that hold under `values`, in order; none for null ("all", the editor). */
+export function activeOverrides(e: Element, values: Record<string, boolean> | null): StateOverride[] {
+  if (!values || !e.overrides) return [];
+  return e.overrides.filter((o) => holds(o.when, values));
+}
+
+/** `e` with `o` applied (StateOverride.apply): opacity multiplies, the rest replaces. */
+export function applyOverride(o: StateOverride, e: Element): Element {
+  const out = cloneElement(e);
+  if (o.stroke) out.style.stroke = { ...o.stroke };
+  if (o.fill) out.style.fill = { ...o.fill };
+  if (o.textColor) out.style.textColor = { ...o.textColor };
+  if (o.strokeWidth !== null) out.style.strokeWidth = Math.max(0, o.strokeWidth);
+  if (o.dash !== null) out.style.dash = o.dash;
+  if (o.text !== null) out.text = o.text;
+  if (o.opacity !== null) {
+    const v = Math.min(Math.max(o.opacity, 0), 1) * (out.style.opacity ?? 1);
+    out.style.opacity = v >= 1 ? null : v;
+  }
   return out;
 }
 

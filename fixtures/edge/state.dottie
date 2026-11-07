@@ -631,6 +631,43 @@
           "width": 120,
           "x": 40,
           "y": 160
+        },
+        {
+          "height": 60,
+          "id": "0000026B-0000-4000-8000-00000000026B",
+          "kind": "rectangle",
+          "layerID": "00000266-0000-4000-8000-000000000266",
+          "overrides": [
+            {
+              "text": "overridden",
+              "when": "on"
+            }
+          ],
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "plain",
+          "width": 120,
+          "x": 240,
+          "y": 160
         }
       ],
       "id": "00000265-0000-4000-8000-000000000265",
@@ -645,6 +682,385 @@
       "name": "Still",
       "variables": {
         "on": true
+      }
+    },
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "0000026E-0000-4000-8000-00000000026E",
+          "kind": "rectangle",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "api",
+          "width": 100,
+          "x": 40,
+          "y": 140
+        },
+        {
+          "height": 60,
+          "id": "0000026F-0000-4000-8000-00000000026F",
+          "kind": "rectangle",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "overrides": [
+            {
+              "dash": "dashed",
+              "fill": {
+                "a": 1,
+                "b": 0.85,
+                "g": 0.85,
+                "r": 1
+              },
+              "opacity": 0.5,
+              "strokeWidth": 4,
+              "text": "east (down)",
+              "textColor": {
+                "a": 1,
+                "b": 0.1,
+                "g": 0.1,
+                "r": 0.8
+              },
+              "when": "down"
+            },
+            {
+              "text": "calm",
+              "when": "calm"
+            },
+            {
+              "dash": "wavy",
+              "stroke": {
+                "a": 1,
+                "b": 0.1,
+                "g": 0.1,
+                "r": 0.8
+              },
+              "when": "down && !calm"
+            },
+            {
+              "text": "broken",
+              "when": "down |"
+            }
+          ],
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "opacity": 0.8,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "east",
+          "width": 120,
+          "x": 340,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "00000270-0000-4000-8000-000000000270",
+          "kind": "rectangle",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "west",
+          "width": 120,
+          "x": 340,
+          "y": 240
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "0000026F-0000-4000-8000-00000000026F",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "0000026E-0000-4000-8000-00000000026E",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "00000271-0000-4000-8000-000000000271",
+          "kind": "connector",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "east",
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "00000270-0000-4000-8000-000000000270",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "0000026E-0000-4000-8000-00000000026E",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "00000272-0000-4000-8000-000000000272",
+          "kind": "connector",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "overrides": [
+            {
+              "stroke": {
+                "a": 1,
+                "b": 0.2,
+                "g": 0.6,
+                "r": 0.1
+              },
+              "strokeWidth": 5,
+              "when": "!calm"
+            }
+          ],
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "west",
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 16,
+          "id": "00000273-0000-4000-8000-000000000273",
+          "kind": "ellipse",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "overrides": [
+            {
+              "reroute": {
+                "00000271-0000-4000-8000-000000000271": "00000272-0000-4000-8000-000000000272",
+                "not-an-id": "00000272-0000-4000-8000-000000000272"
+              },
+              "when": "down"
+            }
+          ],
+          "seed": 4109647057,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 1,
+              "g": 0.5,
+              "r": 0.2
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 16,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 16,
+          "id": "00000274-0000-4000-8000-000000000274",
+          "kind": "ellipse",
+          "layerID": "0000026D-0000-4000-8000-00000000026D",
+          "overrides": [
+            {
+              "opacity": 0.6,
+              "reroute": {
+                "00000271-0000-4000-8000-000000000271": "nowhere"
+              },
+              "when": "down"
+            }
+          ],
+          "seed": 198874155,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 1,
+              "b": 0.2,
+              "g": 0.4,
+              "r": 1
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 16,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "id": "0000026C-0000-4000-8000-00000000026C",
+      "layers": [
+        {
+          "id": "0000026D-0000-4000-8000-00000000026D",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Overrides",
+      "timeline": {
+        "duration": 3,
+        "fps": 10,
+        "tracks": [
+          {
+            "element": "00000273-0000-4000-8000-000000000273",
+            "follow": [
+              {
+                "end": 3,
+                "path": "00000271-0000-4000-8000-000000000271",
+                "start": 0
+              }
+            ],
+            "keys": [
+              {
+                "t": 0,
+                "visible": true
+              }
+            ]
+          },
+          {
+            "element": "00000274-0000-4000-8000-000000000274",
+            "follow": [
+              {
+                "end": 3,
+                "path": "00000271-0000-4000-8000-000000000271",
+                "start": 0.5
+              }
+            ],
+            "keys": [
+              {
+                "t": 0,
+                "visible": true
+              },
+              {
+                "opacity": 1,
+                "t": 1
+              },
+              {
+                "opacity": 0.5,
+                "t": 2
+              }
+            ]
+          }
+        ]
+      },
+      "variables": {
+        "calm": false,
+        "down": true
       }
     }
   ],

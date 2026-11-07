@@ -57,6 +57,19 @@ export interface EmbeddedImage { data: string; format: string }
  * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
 export interface ClickAction { scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null }
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
+/** A change to an element while `when` holds (StateOverride): a field left null keeps the element's own. */
+export interface StateOverride {
+  when: string;
+  stroke: RGBA | null; fill: RGBA | null; textColor: RGBA | null;
+  /** Multiplies the element's opacity. */
+  opacity: number | null;
+  strokeWidth: number | null;
+  dash: DashStyle | null;
+  text: string | null;
+  /** Connector ids (uppercase) to the connectors a following element takes instead. */
+  reroute: Record<string, string> | null;
+}
+
 export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
 
 export interface Element {
@@ -84,6 +97,8 @@ export interface Element {
   hover: HoverLook | null;
   /** A condition on the page's variables: drawn only while it holds (Element.when; see state.ts). */
   when: string | null;
+  /** Changes to the element while a condition holds, in order (Element.overrides; see state.ts). */
+  overrides: StateOverride[] | null;
   /** For a `symbol` element: the page's symbol it shows, how it plays it, and from how far in. */
   symbol: string | null;
   playback: SymbolPlayback | null;
@@ -198,7 +213,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "symbol", "playback", "offset", "args", "image", "reveal",
+    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "overrides", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
@@ -218,6 +233,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   marker: ["t", "name", "loop"],
   click: ["scene", "url", "set", "toggle"],
   hover: ["stroke", "fill", "opacity"],
+  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute"],
 };
 
 export const MAX_DURATION = 3600;
@@ -242,6 +258,7 @@ const strings = (v: unknown): Record<string, string> | null =>
   isObj(v) && Object.values(v).every((x) => typeof x === "string") ? { ...(v as Record<string, string>) } : null;
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 /** UUIDs compare by value in Swift; uppercase them so string comparison agrees. */
+const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
 const uuid = (v: unknown): string | undefined => (typeof v === "string" ? v.toUpperCase() : undefined);
 
 export function clampTime(t: number): number {
@@ -390,6 +407,7 @@ class Reader {
       click: this.click(v.click),
       hover: this.hover(v.hover),
       when: str(v.when) ?? null,
+      overrides: this.overrides(v.overrides),
       symbol: uuid(v.symbol) ?? null,
       playback: this.playback(v.playback),
       offset: num(v.offset) ?? null,
@@ -474,6 +492,29 @@ class Reader {
       button: bool(v.button) ?? null,
       params: strings(v.params),
     };
+  }
+
+  /** As DottieKit reads them: a reroute whose targets aren't all ids is dropped, as are keys that aren't ids. */
+  overrides(v: unknown): StateOverride[] | null {
+    if (!Array.isArray(v)) return null;
+    return v.filter(isObj).map((o) => {
+      this.fields(o, "override");
+      const dash = str(o.dash);
+      let reroute: Record<string, string> | null = null;
+      if (isObj(o.reroute) && Object.values(o.reroute).every((x) => typeof x === "string" && UUID.test(x))) {
+        reroute = {};
+        for (const [k, x] of Object.entries(o.reroute)) if (UUID.test(k)) reroute[k.toUpperCase()] = (x as string).toUpperCase();
+        if (Object.keys(reroute).length === 0) reroute = null;
+      }
+      return {
+        when: str(o.when) ?? "",
+        stroke: rgba(o.stroke) ?? null, fill: rgba(o.fill) ?? null, textColor: rgba(o.textColor) ?? null,
+        opacity: num(o.opacity) ?? null, strokeWidth: num(o.strokeWidth) ?? null,
+        dash: dash !== undefined && ["solid", "dashed", "dotted"].includes(dash) ? dash as DashStyle : null,
+        text: str(o.text) ?? null,
+        reroute,
+      };
+    });
   }
 
   hover(v: unknown): HoverLook | null {

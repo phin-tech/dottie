@@ -569,11 +569,26 @@ extension DottieDocument {
     /// is returned as is.
     public func posed(at t: Double, state: StateChoice = .initial) -> DottieDocument {
         let off = stateHidden(state)
-        guard let timeline = timeline ?? (off.isEmpty ? nil : Timeline(duration: 0)) else { return self }
+        let values = stateValues(state)
+        let active = Dictionary(uniqueKeysWithValues: elements.compactMap { e in
+            let o = e.activeOverrides(values)
+            return o.isEmpty ? nil : (e.id, o)
+        })
+        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty ? nil : Timeline(duration: 0)) else { return self }
         let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
-        let tracks = Dictionary(timeline.tracks.map { ($0.element, $0) }, uniquingKeysWith: { a, _ in a })
+        var tracks = Dictionary(timeline.tracks.map { ($0.element, $0) }, uniquingKeysWith: { a, _ in a })
+        // An override's reroute sends the element's follows along other connectors.
+        for (id, overrides) in active where overrides.contains(where: { $0.reroute != nil }) {
+            guard var track = tracks[id], let follow = track.follow else { continue }
+            track.follow = follow.map { f in
+                var f = f
+                for o in overrides { f.path = o.route(f.path) }
+                return f
+            }
+            tracks[id] = track
+        }
         let reseed: UInt32? = timeline.boil.map { n in
             // t and fps are both clamped, so this frame number is always a small finite integer.
             UInt32(truncatingIfNeeded: (Int((t * Timeline.clampFPS(timeline.fps) + 1e-9).rounded(.down)) / max(1, n)) % Timeline.boilDrawings)
@@ -590,6 +605,7 @@ extension DottieDocument {
         for i in copy.elements.indices {
             let e = copy.elements[i]
             if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
+            for o in active[e.id] ?? [] { copy.elements[i] = o.apply(to: copy.elements[i]) }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
             if let speed = tracks[e.id]?.march, let pattern = Renderer.dashPattern(copy.elements[i].style.dash, width: copy.elements[i].style.strokeWidth) {
                 copy.elements[i].style.dashOffset = timeline.marchOffset(speed: speed, period: pattern.reduce(0, +), at: t)

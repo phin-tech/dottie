@@ -132,6 +132,7 @@
         "anchor": { "type": "string" },
         "click": { "$ref": "#/$defs/click" },
         "hover": { "$ref": "#/$defs/hover" },
+        "overrides": { "type": "array", "items": { "$ref": "#/$defs/override" }, "description": "Changes to the element while a condition on the page's variables holds, applied in order." },
         "when": { "type": "string", "description": "A condition on the page's variables: names, each optionally after !, joined by && and || (&& binds tighter), like \"down\" or \"east && !west\". The element, and connectors attached to it, is drawn only while it holds; a missing variable is false, and a condition that can't be read never holds." },
         "symbol": { "$ref": "#/$defs/uuid", "description": "For a symbol element: the page's symbol it shows." },
         "playback": { "enum": ["loop", "once", "still", "click"], "description": "How a symbol element plays its symbol's timeline; loop by default. click rests at the start and plays once when clicked in <dottie-player>." },
@@ -342,6 +343,23 @@
         "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." },
         "set": { "type": "object", "description": "Page variables to give these values, without touching the playhead.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
         "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] }
+      }
+    },
+    "override": {
+      "type": "object",
+      "description": "A change to an element while when holds: a field it leaves out keeps the element's own.",
+      "required": ["when"],
+      "additionalProperties": false,
+      "properties": {
+        "when": { "type": "string", "description": "A condition on the page's variables, as Element.when." },
+        "stroke": { "$ref": "#/$defs/rgba" },
+        "fill": { "$ref": "#/$defs/rgba" },
+        "textColor": { "$ref": "#/$defs/rgba" },
+        "opacity": { "type": "number", "description": "Multiplies the element's opacity, 0...1." },
+        "strokeWidth": { "type": "number" },
+        "dash": { "enum": ["solid", "dashed", "dotted"] },
+        "text": { "type": "string", "description": "Replaces the element's text or label." },
+        "reroute": { "type": "object", "additionalProperties": { "$ref": "#/$defs/uuid" }, "description": "For an element that follows connectors (a packet): connector id to the connector it follows instead." }
       }
     },
     "hover": {
