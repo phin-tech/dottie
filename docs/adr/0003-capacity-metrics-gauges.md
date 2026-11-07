@@ -4,9 +4,11 @@ status: accepted
 
 # Capacity, metrics and gauges are worked out per frame, and drawn as plain elements
 
-Flows (ADR 0002) say where traffic goes. People draw networks to answer three more questions: how much goes each
-way, what happens when a lane or hub is full, and how long it takes. This ADR adds **volume**, **capacity** and
-**dwell** to the model; one **metrics** function that works out, for any frame, the load and transit time they
+Flows (ADR 0002) say where traffic goes. People draw systems that carry things (requests through services,
+messages through queues, freight through hubs) to answer three more questions: how much goes each way, what
+happens when something is full, and how long it takes. The model stays generic: the same fields describe an SQS
+queue in front of a worker pool and a sort center in front of a linehaul lane. This ADR adds **volume**, **capacity** and
+**delay** to the model; one **metrics** function that works out, for any frame, the load and transit time they
 imply; and **gauges**, which show a metric. All of it follows ADR 0002's rule: each frame is a pure function of
 the page, the time and the variables. So exports, scrubbing and goldens keep working, and Swift and TypeScript
 have to agree exactly.
@@ -15,17 +17,18 @@ have to agree exactly.
 
 ### The model
 
-- **Volume** (`Flow.volume`, default 1): how much a flow carries, in whatever unit the page uses (trucks a day,
-  requests a second). Packets stay a picture of it. Packet spacing is `every / volume`, clamped as `every` is, so
-  a flow with three times the volume draws three times the packets.
-- **Capacity** (`capacity` on a connector or a shape; absent means unlimited): the most volume it carries. A
-  shape's capacity counts traffic arriving at it as well as passing through: a full warehouse refuses deliveries.
-- **Dwell** (`dwell` seconds on a shape, default 0): how long traffic stays inside a shape it passes through.
-  Packets already vanish inside such a shape. With a dwell they stay hidden that much longer, so a cross-dock is
-  visibly slower than a pass-through. A flow's source and destinations have no dwell. Dwell is fixed: it doesn't
-  grow with load (an override can raise it).
-- **Overrides** may set `capacity` and `dwell`, as they already set `cost`. "Peak season" is one `defineState`
-  raising volumes. "Lane at half capacity" is another.
+- **Volume** (`Flow.volume`, default 1): how much a flow carries, in whatever unit the page uses (requests a
+  second, messages a minute, trucks a day). Packets stay a picture of it. Packet spacing is `every / volume`,
+  clamped as `every` is, so a flow with three times the volume draws three times the packets.
+- **Capacity** (`capacity` on a connector or a shape; absent means unlimited): the most volume it carries: a
+  worker pool's throughput, a rate limit, a lane's trucks a day. A shape's capacity counts traffic arriving at it
+  as well as passing through: a saturated service or a full warehouse turns work away either way.
+- **Delay** (`delay` seconds on a shape, default 0): how long traffic stays inside a shape it passes through:
+  processing time, time in a queue, time on a dock. Packets already vanish inside such a shape. With a delay they
+  stay hidden that much longer, so a slow step is visibly slow. A flow's source and destinations have no delay.
+  Delay is fixed: it doesn't grow with load (an override can raise it).
+- **Overrides** may set `capacity` and `delay`, as they already set `cost`. "Traffic spike" or "peak season" is
+  one `defineState` raising volumes. "Half the workers down" or "lane at half capacity" is another.
 
 ### Assignment: where the volume goes
 
@@ -36,8 +39,11 @@ Each frame, after state has been applied, the page's flows are assigned to route
    is the smallest leftover capacity of any connector or shape on it, ends included.
 3. Any connector or shape that is now full is treated as offline for the rest of this flow, and the remainder goes
    onto the next cheapest route. This repeats until the volume is placed or nothing has room.
-4. Volume that can't be placed is **blocked**. It's counted, and drawn as packets queuing at the source. Nothing is
-   carried over to the next frame.
+4. Volume that can't be placed is **backlog**. It waits at the shape just before the first full connector or
+   shape on the flow's cheapest route: messages pile up in the queue in front of busy consumers, freight at the
+   hub in front of a full lane. Since volume is a rate, backlog is too: how fast that queue grows (40 messages a second
+   more than the consumers take). It's counted at that shape and drawn as packets bunched there. Nothing is
+   carried over to the next frame, so the frame shows the growth rate, not a depth that has built up.
 5. `spread` fits the same scheme: while the first destination is down, the volume is shared equally across the
    others that can be reached, each share placed as in 2 and 3.
 
@@ -51,9 +57,10 @@ languages, and with one route it's every packet.
 `metrics(page, t, values)` is one function in each language (`Metrics.swift`, `web/src/metrics.ts`). It returns,
 from the assignment:
 
-- per connector and shape: **throughput** (volume through it), **load** (throughput ÷ capacity), and **dwell**;
-- per flow: **placed** and **blocked** volume, **share via backup** (the fraction not reaching its first
-  destination) and **transit** (route length ÷ speed plus the dwells on the way, weighted by fraction);
+- per connector and shape: **throughput** (volume through it), **load** (throughput ÷ capacity) and **delay**,
+  and per shape the **backlog** growing at it;
+- per flow: **placed** and **backlog** volume, **share via backup** (the fraction not reaching its first
+  destination) and **transit** (route length ÷ speed plus the delays on the way, weighted by fraction);
 - per connector: **in flight**, the packets on it at `t`. This is the only metric counted from the frame rather than
   from the steady state.
 
@@ -62,13 +69,13 @@ they're exact, they don't flicker, and they only change when the state does.
 
 ### Conditions on metrics, for looks only
 
-Conditions gain comparisons against metrics: `load(memphis) > 0.9`, `blocked(east) > 0` and so on. An element
-is named by its `anchor`, the hidden label that already exists for linking. That's how a full lane turns red: an
+Conditions gain comparisons against metrics: `load(workers) > 0.9`, `backlog(orders) > 0` and so on. An element
+is named by its `anchor`, the hidden label that already exists for linking. That's how a saturated service or a full lane turns red: an
 override with that condition and a red stroke.
 
 To avoid a loop (a metric depends on what's drawn and routed, and the condition would change what's drawn and
 routed), **a condition that mentions a metric may only change looks**: `stroke`, `fill`, `textColor`,
-`opacity`, `strokeWidth`, `dash` and `text`. It can't drive `when`, `offline`, `cost`, `capacity`, `dwell`,
+`opacity`, `strokeWidth`, `dash` and `text`. It can't drive `when`, `offline`, `cost`, `capacity`, `delay`,
 `reroute` or flows. Posing runs in two passes:
 
 1. variables only: visibility, routing, assignment, metrics;
@@ -88,12 +95,12 @@ the plain rectangle.
 
 ### Exposure
 
-- Script: `dottie.metrics()` and `dottie.gauge(target, {metric, …})`, plus `volume`, `capacity` and `dwell` where
+- Script: `dottie.metrics()` and `dottie.gauge(target, {metric, …})`, plus `volume`, `capacity` and `delay` where
   look fields go.
 - MCP: `add_gauge`, the same fields on `add_flow` and `update_element`, and the metrics in `list_elements` and in
   each step of `simulate`.
 
-These are data. Reports, CSV import and maps are for agents and scripts to build from them.
+These are data. Reports, imports (lane tables, queue configs) and maps are for agents and scripts to build from them.
 
 ### What sits on top, with no format change
 
@@ -110,13 +117,13 @@ None of them depends on this ADR. A legend or a button can show a gauge's metric
 ## Considered and rejected
 
 - **Optimal assignment (min-cost flow, LP).** Better routing on paper, but it's opaque to someone reading the
-  diagram ("why did 12% go via Dallas?"), small changes can swing the answer, and it's much harder to keep
+  diagram ("why did 12% go to the backup region?"), small changes can swing the answer, and it's much harder to keep
   identical across two languages. A greedy assignment in page order is explainable: earlier flows have priority.
 - **Sampled metrics (counting packets drawn in a window).** These flicker, depend on frame rate, and disagree
   between a 30 fps export and a 60 fps player.
 - **Queues and backlog carried between frames.** That's realistic, but any frame would depend on every frame
-  before it, which ADR 0002 already rejected for packets. Blocked volume is shown as packets queuing at the source,
-  in that frame only.
+  before it, which ADR 0002 already rejected for packets. Backlog is reported as the rate a queue grows at, which is
+  steady; a depth that builds up while you watch would need history.
 - **Numeric variables and sliders.** These would need numeric conditions on variables, arithmetic in state, and a
   slider control. Metric comparisons cover the visual cases. A slider can be faked as a row of choice buttons.
 - **A gauge element kind.** Every renderer, the app's canvas and hit-testing included, would need to learn it.

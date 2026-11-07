@@ -95,23 +95,23 @@ How much a flow carries, in the page's own unit; packets are a picture of it.
 _Avoid_: weight, rate, traffic amount
 
 **Capacity**:
-The most volume a connector or shape carries; what doesn't fit takes the next cheapest route or is blocked.
+The most volume a connector or shape carries; what doesn't fit takes the next cheapest route or is backlog.
 _Avoid_: limit, bandwidth
 
-**Blocked**:
-Volume a flow can't place on any route with room; shown queuing at its source.
-_Avoid_: dropped, overflow
+**Backlog**:
+Volume a flow can't place on any route with room: the rate the queue in front of the bottleneck grows at.
+_Avoid_: blocked, dropped, overflow
 
-**Dwell**:
-Seconds traffic stays inside a shape it passes through.
-_Avoid_: delay, processing time
+**Delay**:
+Seconds traffic stays inside a shape it passes through: processing, queueing, handling.
+_Avoid_: dwell, latency (that is the whole route's transit)
 
 **Load**:
 A connector's or shape's throughput over its capacity.
 _Avoid_: utilization, usage
 
 **Metric**:
-A number worked out per frame from the flows and state: throughput, load, transit, share via backup, blocked, in flight.
+A number worked out per frame from the flows and state: throughput, load, transit, share via backup, backlog, in flight.
 _Avoid_: stat, measurement
 
 **Gauge**:
