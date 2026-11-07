@@ -48,8 +48,11 @@ Each frame, after state has been applied, the page's flows are assigned to route
 4. Volume that can't be placed is **backlog**. It waits at the shape just before the first full connector or
    shape on the flow's cheapest route: messages pile up in the queue in front of busy consumers, freight at the
    hub in front of a full lane. Since volume is a rate, backlog is too: how fast that queue grows (40 messages a second
-   more than the consumers take). It's counted at that shape and drawn as packets bunched there. Nothing is
-   carried over to the next frame, so the frame shows the growth rate, not a depth that has built up.
+   more than the consumers take). It's counted at that shape, and what has piled up there, its **depth**, is the
+   backlog times the seconds since the page's state last changed. That time is an input to posing, like `t` and
+   the variables: the player passes the time since the last click, `simulate` the time since its last click, and
+   exports and goldens use the page time. So the pile of packets above the shape grows as you watch (up to 30 a
+   flow), and every frame is still a pure function of its inputs.
 5. `spread` fits the same scheme: while the first destination is down, the volume is shared equally across the
    others that can be reached, each share placed as in 2 and 3.
 
@@ -64,7 +67,7 @@ languages, and with one route it's every packet.
 from the assignment:
 
 - per connector and shape: **throughput** (volume through it), **load** (throughput ÷ capacity) and **delay**,
-  and per shape the **backlog** growing at it;
+  and per shape the **backlog** growing at it and its **depth**;
 - per flow: **placed** and **backlog** volume, **share via backup** (the fraction not reaching its first
   destination) and **transit** (route length ÷ speed plus the delays on the way, weighted by fraction);
 - per connector: **in flight**, the packets on it at `t`. This is the only metric counted from the frame rather than
@@ -128,8 +131,8 @@ None of them depends on this ADR. A legend or a button can show a gauge's metric
 - **Sampled metrics (counting packets drawn in a window).** These flicker, depend on frame rate, and disagree
   between a 30 fps export and a 60 fps player.
 - **Queues and backlog carried between frames.** That's realistic, but any frame would depend on every frame
-  before it, which ADR 0002 already rejected for packets. Backlog is reported as the rate a queue grows at, which is
-  steady; a depth that builds up while you watch would need history.
+  before it, which ADR 0002 already rejected for packets. Depth grows from the time since the state last changed, an
+  explicit input, instead; it doesn't drain gradually when the state changes back, it resets.
 - **Numeric variables and sliders.** These would need numeric conditions on variables, arithmetic in state, and a
   slider control. Metric comparisons cover the visual cases. A slider can be faked as a row of choice buttons.
 - **A gauge element kind.** Every renderer, the app's canvas and hit-testing included, would need to learn it.

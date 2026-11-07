@@ -727,6 +727,7 @@ def flows():
             style=style(roughness=0))
     cap.add("rectangle", 600, 220, 160, 100, gauge={"metric": "transit", "of": first, "style": "dial", "max": 4, "warn": 2, "alarm": 3})
     cap.add("rectangle", 600, 340, 160, 60, gauge={"metric": "load", "of": "nope", "style": "x"})
+    cap.add("rectangle", 200, 260, 120, 60, gauge={"metric": "depth", "of": queue, "label": "piled up"})   # grows with t
     write(EDGE / "flows.dottie", [p, q, c, sp, cap])
 
 

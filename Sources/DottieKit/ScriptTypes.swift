@@ -267,12 +267,12 @@ extension DottieScript {
             delay?: number;
         }
 
-        type Metric = "throughput" | "load" | "delay" | "backlog" | "inFlight" | "transit" | "backup";
+        type Metric = "throughput" | "load" | "delay" | "backlog" | "depth" | "inFlight" | "transit" | "backup";
         type GaugeStyle = "number" | "bar" | "dial";
 
         /** The page's metrics in one frame (dottie.metrics): by element id and flow id. */
         interface Metrics {
-            elements: Record<string, { throughput: number; load?: number; delay: number; backlog: number; inFlight: number }>;
+            elements: Record<string, { throughput: number; load?: number; delay: number; backlog: number; depth: number; inFlight: number }>;
             flows: Record<string, { volume: number; placed: number; backlog: number; backup: number; transit?: number }>;
         }
 
@@ -644,7 +644,7 @@ extension DottieScript {
              * (`update` with `overrides` replaces the list.) */
             addOverride(target: Ref, override: Override): Element;
             /** The page's metrics at a time (default 0) and state (default the starting values). */
-            metrics(options?: { at?: number; state?: Record<string, boolean> }): Metrics;
+            metrics(options?: { at?: number; state?: Record<string, boolean>; since?: number }): Metrics;
             /** The page's flows. */
             flows(): FlowInfo[];
             /** Removes a flow; returns whether there was one. */

@@ -11,7 +11,7 @@ export function isName(name: string): boolean {
 }
 
 /** The metrics a condition can compare (ADR 0003), as `load(workers) > 0.9`. */
-export const METRIC_NAMES = ["throughput", "load", "delay", "backlog", "inFlight", "transit", "backup"];
+export const METRIC_NAMES = ["throughput", "load", "delay", "backlog", "depth", "inFlight", "transit", "backup"];
 
 /** A comparison of a metric in a condition (PageState.MetricTerm). */
 export interface MetricTerm { metric: string; target: string; op: string; value: number }

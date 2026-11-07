@@ -216,8 +216,8 @@ function trackMap(tl: Timeline): Map<string, Track> {
 
 /** The page as a still drawing at `t` seconds, symbol instances expanded (DottieDocument.resolved(at:)). A page with
  * no timeline and no instances is returned as is. */
-export function resolved(page: Page, t: number, state: StateChoice = "initial"): Page {
-  return expandingSymbols(posed(page, t, state), clampTime(t));
+export function resolved(page: Page, t: number, state: StateChoice = "initial", since: number | null = null): Page {
+  return expandingSymbols(posed(page, t, state, since), clampTime(t));
 }
 
 /** What a page without a timeline is posed with when its state hides something (Timeline(duration: 0)). */
@@ -225,12 +225,13 @@ const EMPTY_TIMELINE: Timeline = { fps: 12, duration: 0, boil: null, settle: nul
 
 /** The page posed at `t` seconds, instances kept, and the elements whose `when` doesn't hold under `state` left out
  * with their connectors (DottieDocument.posed(at:state:)). */
-export function posed(page: Page, t: number, state: StateChoice = "initial"): Page {
-  return posedWithMetrics(page, t, state).frame;
+export function posed(page: Page, t: number, state: StateChoice = "initial", since: number | null = null): Page {
+  return posedWithMetrics(page, t, state, since).frame;
 }
 
-/** `posed`, and the frame's metrics (ADR 0003). */
-export function posedWithMetrics(page: Page, t: number, state: StateChoice = "initial"): { frame: Page; metrics: FrameMetrics } {
+/** `posed`, and the frame's metrics (ADR 0003). `since` is the seconds since the page's state last changed, which
+ * backlog has been piling up for: the player passes the time since the last click; null is `t`, as exports draw it. */
+export function posedWithMetrics(page: Page, t: number, state: StateChoice = "initial", since: number | null = null): { frame: Page; metrics: FrameMetrics } {
   const off = stateHidden(page, state);
   const values = stateValues(page, state);
   const active = new Map<string, StateOverride[]>();
@@ -320,7 +321,7 @@ export function posedWithMetrics(page: Page, t: number, state: StateChoice = "in
   if (measuring) {
     const offline = new Set([...active].filter(([, list]) => list.some((o) => o.offline === true)).map(([id]) => id));
     const frame: Page = { ...page, elements, timeline: null };
-    const out = flowFrame(page.flows, frame, t, values, offline);
+    const out = flowFrame(page.flows, frame, t, values, offline, since);
     metrics = out.metrics;
     elements = [...finishing(elements, out.metrics, values, frame, page.flows ?? []), ...out.packets];
   }

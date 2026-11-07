@@ -11,7 +11,7 @@
       "required": ["metric", "of"],
       "additionalProperties": false,
       "properties": {
-        "metric": { "enum": ["throughput", "load", "delay", "backlog", "inFlight", "transit", "backup"] },
+        "metric": { "enum": ["throughput", "load", "delay", "backlog", "depth", "inFlight", "transit", "backup"] },
         "of": { "$ref": "#/$defs/uuid", "description": "The element or flow it measures." },
         "max": { "type": "number", "description": "What a full bar or dial stands for." },
         "warn": { "type": "number", "description": "At or past this it turns amber." },

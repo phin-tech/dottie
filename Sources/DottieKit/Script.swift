@@ -820,10 +820,10 @@ public enum DottieScript {
                 let state: StateChoice = a.object("state").map { o in
                     .values(o.raw.compactMapValues { $0 as? Bool })
                 } ?? .initial
-                let m = doc.metrics(at: a.double("at") ?? 0, state: state)
+                let m = doc.metrics(at: a.double("at") ?? 0, state: state, since: a.double("since"))
                 var elements: [String: Any] = [:], flows: [String: Any] = [:]
                 for (id, x) in m.elements where x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 || x.inFlight > 0 {
-                    var o: [String: Any] = ["throughput": x.throughput, "delay": x.delay, "backlog": x.backlog, "inFlight": x.inFlight]
+                    var o: [String: Any] = ["throughput": x.throughput, "delay": x.delay, "backlog": x.backlog, "depth": x.depth, "inFlight": x.inFlight]
                     if let l = x.load { o["load"] = l }
                     elements[id.uuidString] = o
                 }
@@ -1349,11 +1349,13 @@ public enum DottieScript {
     on the next cheapest, and what fits nowhere is backlog, piled at the shape in front of the first full thing (a \
     queue in front of busy workers). delay on a shape is seconds traffic stays inside it when passing through. \
     Overrides may set capacity and delay too (half the workers down); a traffic spike is an extra flow with a when.
-      dottie.metrics({at?, state?})  {elements: {id: {throughput, load?, delay, backlog, inFlight}}, flows: {id: \
-    {volume, placed, backlog, backup, transit?}}}: load is throughput over capacity, backlog the rate a queue grows \
-    at, backup the share not reaching the first destination, transit seconds end to end
+      dottie.metrics({at?, state?, since?})  {elements: {id: {throughput, load?, delay, backlog, depth, inFlight}}, flows: \
+    {id: {volume, placed, backlog, backup, transit?}}}: load is throughput over capacity, backlog the rate a queue grows \
+    at, depth how much has piled up (backlog times the seconds since the state last changed, since; default at), \
+    backup the share not reaching the first destination, transit seconds end to end. A backlog's pile of packets \
+    grows as you watch: the player counts from the last click, exports from the page's start
       dottie.gauge(target, {metric, x, y, width?, height?, style?, max?, warn?, alarm?, label?})  a gauge showing a \
-    metric (throughput, load, delay, backlog, inFlight, transit, backup) of an element or flow as a number, bar or \
+    metric (throughput, load, delay, backlog, depth, inFlight, transit, backup) of an element or flow as a number, bar or \
     dial, green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it
       dottie.addOverride(el, {when, ...})  adds an override, keeping the element's others (merged into one with the same \
     when); update with overrides replaces the whole list

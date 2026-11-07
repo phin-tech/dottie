@@ -44,7 +44,8 @@ final class FlowTests: XCTestCase {
         var none = doc
         none.flows![0].to = [client]
         let pile = packets(none.posed(at: 1))
-        XCTAssertEqual(pile.count, 5)
+        XCTAssertEqual(pile.count, 2)   // a packet every 0.5s that couldn't leave, for 1s
+        XCTAssertEqual(packets(none.posed(at: 1, state: .initial, since: 3)).count, 6)   // it grows while the state holds
         XCTAssertTrue(pile.allSatisfy { $0.frame.maxY < 100 && $0.frame.minX >= 0 && $0.frame.maxX < 80 })
         XCTAssertEqual(none.metrics(at: 1).flows[none.flows![0].id]?.backlog, 1)
         XCTAssertEqual(none.metrics(at: 1).elements[client]?.backlog, 1)

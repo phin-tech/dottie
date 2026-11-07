@@ -9,7 +9,7 @@ import { applyOverride, holds, looksOnly, mentionsMetric, type MetricTerm } from
 import { tracing } from "./timeline.ts";
 
 /** A connector's or shape's metrics in one frame (ElementMetrics). */
-export interface ElementMetrics { throughput: number; load: number | null; delay: number; backlog: number; inFlight: number }
+export interface ElementMetrics { throughput: number; load: number | null; delay: number; backlog: number; inFlight: number; depth: number }
 /** A flow's metrics in one frame (FlowMetrics). */
 export interface FlowMetrics { volume: number; placed: number; backlog: number; backup: number; transit: number | null }
 /** Every metric of one frame (FrameMetrics). */
@@ -37,6 +37,7 @@ export function metricValue(m: FrameMetrics, metric: string, id: string): number
     case "delay": return e.delay;
     case "backlog": return e.backlog;
     case "inFlight": return e.inFlight;
+    case "depth": return e.depth;
     default: return null;
   }
 }
@@ -55,15 +56,17 @@ export function delayOf(e: Element): number {
 interface Placement { hops: [string, boolean][]; shapes: string[]; goal: string; amount: number }
 
 /** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs),
- * and the frame's metrics (DottieDocument.flowFrame). */
+ * and the frame's metrics (DottieDocument.flowFrame). `since` is the seconds since the page's state last changed
+ * (null: `t`), which backlog has been piling up for. */
 export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
-  offline: Set<string> = new Set()): { packets: Element[]; metrics: FrameMetrics } {
+  offline: Set<string> = new Set(), sinceChange: number | null = null): { packets: Element[]; metrics: FrameMetrics } {
+  const since = Math.max(0, Math.min(sinceChange ?? t, 1e6));
   const byID = new Map<string, Element>();
   for (const e of frame.elements) if (!byID.has(e.id)) byID.set(e.id, e);
   const metrics = emptyMetrics();
   for (const e of frame.elements) {
     if (e.kind === "connector" && !e.connector) continue;
-    metrics.elements.set(e.id, { throughput: 0, load: null, delay: e.kind !== "connector" ? delayOf(e) : 0, backlog: 0, inFlight: 0 });
+    metrics.elements.set(e.id, { throughput: 0, load: null, delay: e.kind !== "connector" ? delayOf(e) : 0, backlog: 0, inFlight: 0, depth: 0 });
   }
   const list = flows ?? [];
   // Room left on everything with a capacity.
@@ -202,16 +205,20 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
       }
     });
     fm.transit = fm.placed > TINY ? transitSum / fm.placed : null;
-    // Backlog: a few packets bunched above the shape it waits at, a row per flow waiting there.
+    // Backlog piles up above the shape it waits at: the packets that couldn't leave since the state last changed,
+    // so the pile grows (up to 30 a flow, in rows of 10, each flow's rows above the last's).
     waiting.forEach(([at, a], j) => {
+      bump(at, (m) => { m.depth += a * since; });
       const shape = byID.get(at);
       if (!shape) return;
-      const row = piles.get(at) ?? 0;
-      piles.set(at, row + 1);
-      const n = Math.min(Math.max(Math.ceil(5 * a / Math.max(volume, TINY) - 1e-9), 1), 5);
+      const share = a / Math.max(volume, TINY);
+      const n = Math.min(Math.max(Math.ceil(share * since / every - 1e-9), 1), 30);
+      const rows = Math.trunc((n + 9) / 10);
+      const base = piles.get(at) ?? 0;
+      piles.set(at, base + rows);
       for (let q = 0; q < n; q++) {
-        packets.push(packet(packetID(flow.id, 2 ** 39 + j * 8 + q), shape.x + 2 + q * (size + 3),
-          shape.y - 4 - size - row * (size + 3), size, color, source.layerID));
+        packets.push(packet(packetID(flow.id, 2 ** 39 + j * 64 + q), shape.x + 2 + (q % 10) * (size + 3),
+          shape.y - 4 - size - (base + Math.trunc(q / 10)) * (size + 3), size, color, source.layerID));
       }
     });
     metrics.flows.set(flow.id, fm);

@@ -16,7 +16,7 @@ public enum PageState {
     }
 
     /// The metrics a condition can compare (ADR 0003), as `load(workers) > 0.9`.
-    public static let metricNames = ["throughput", "load", "delay", "backlog", "inFlight", "transit", "backup"]
+    public static let metricNames = ["throughput", "load", "delay", "backlog", "depth", "inFlight", "transit", "backup"]
 
     /// A comparison of a metric in a condition: `metric(target) op value`, the target an element's anchor or an
     /// element's or flow's id.

@@ -1717,7 +1717,7 @@ actor DottieTools {
                 sim.nextScene()
                 log.append("next: \(sim.summary)")
             } else if step.bool("metrics") == true {
-                let lines = DiagramOps.describeMetrics(sim.doc, at: sim.time, state: .values(sim.state))
+                let lines = DiagramOps.describeMetrics(sim.doc, at: sim.time, state: .values(sim.state), since: sim.sinceChange)
                 log.append("metrics: " + (lines.isEmpty ? "no traffic" : "\n  " + lines.joined(separator: "\n  ")))
             } else if step.raw["snapshot"] != nil, step.bool("snapshot") != false {
                 let picture = sim.picture

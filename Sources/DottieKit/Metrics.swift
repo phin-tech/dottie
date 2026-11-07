@@ -52,6 +52,8 @@ public struct ElementMetrics: Equatable, Sendable {
     public var backlog = 0.0
     /// Packets on it (connectors) in this frame.
     public var inFlight = 0
+    /// How much has piled up at it: backlog times the seconds since the page's state last changed.
+    public var depth = 0.0
 }
 
 /// A flow's metrics in one frame.
@@ -89,6 +91,7 @@ public struct FrameMetrics: Equatable, Sendable {
         case "delay": return e.delay
         case "backlog": return e.backlog
         case "inFlight": return Double(e.inFlight)
+        case "depth": return e.depth
         default: return nil
         }
     }
@@ -109,7 +112,10 @@ extension DottieDocument {
 
     /// The packets the page's flows draw in `frame` (the page posed at `t`), with these variable values (nil: every
     /// flow runs), and the frame's metrics.
-    func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID> = []) -> (packets: [Element], metrics: FrameMetrics) {
+    /// `since` is the seconds since the page's state last changed (nil: `t`), which backlog has been piling up for.
+    func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID> = [],
+                   since: Double? = nil) -> (packets: [Element], metrics: FrameMetrics) {
+        let since = max(0, min(since ?? t, 1e6))
         let byID = frame.elementIndex
         var metrics = FrameMetrics()
         for e in frame.elements where e.kind != .connector || e.connector != nil {
@@ -246,14 +252,19 @@ extension DottieDocument {
                 }
             }
             fm.transit = fm.placed > tiny ? transitSum / fm.placed : nil
-            // Backlog: a few packets bunched above the shape it waits at, a row per flow waiting there.
+            // Backlog piles up above the shape it waits at: the packets that couldn't leave since the state last
+            // changed, so the pile grows (up to 30 a flow, in rows of 10, each flow's rows above the last's).
             for (j, (at, amount)) in waiting.enumerated() {
+                metrics.elements[at]?.depth += amount * since
                 guard let shape = byID[at] else { continue }
-                let row = piles[at, default: 0]; piles[at] = row + 1
-                let n = Int(min(max((5 * amount / max(volume, tiny) - 1e-9).rounded(.up), 1), 5))
+                let share = amount / max(volume, tiny)
+                let n = Int(min(max((share * since / every - 1e-9).rounded(.up), 1), 30))
+                let rows = (n + 9) / 10
+                let base = piles[at, default: 0]; piles[at] = base + rows
                 for q in 0..<n {
-                    let x = shape.x + 2 + Double(q) * (size + 3), y = shape.y - 4 - size - Double(row) * (size + 3)
-                    packets.append(Element(id: Flow.packetID(flow.id, (1 << 39) + j * 8 + q), kind: .ellipse,
+                    let x = shape.x + 2 + Double(q % 10) * (size + 3)
+                    let y = shape.y - 4 - size - Double(base + q / 10) * (size + 3)
+                    packets.append(Element(id: Flow.packetID(flow.id, (1 << 39) + j * 64 + q), kind: .ellipse,
                                            frame: CGRect(x: x, y: y, width: size, height: size),
                                            style: style, seed: 1, layerID: source.layerID))
                 }
@@ -275,8 +286,8 @@ extension DottieDocument {
     }
 
     /// The metrics of the page at `t` (ADR 0003).
-    public func metrics(at t: Double = 0, state: StateChoice = .initial) -> FrameMetrics {
-        posedWithMetrics(at: t, state: state).metrics
+    public func metrics(at t: Double = 0, state: StateChoice = .initial, since: Double? = nil) -> FrameMetrics {
+        posedWithMetrics(at: t, state: state, since: since).metrics
     }
 }
 
@@ -470,8 +481,9 @@ extension DiagramOps {
 
     /// One line per element and flow with something to show, at the starting values: for a listing or a step of
     /// `simulate`.
-    public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial) -> [String] {
-        let m = doc.metrics(at: t, state: state)
+    public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial,
+                                       since: Double? = nil) -> [String] {
+        let m = doc.metrics(at: t, state: state, since: since)
         var names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0.components(separatedBy: "\n")[0])\"" } ?? $0.anchor ?? $0.id.uuidString) },
                                uniquingKeysWith: { a, _ in a })
         // An unlabelled connector is named by its ends.
@@ -484,7 +496,7 @@ extension DiagramOps {
             guard let x = m.elements[e.id], x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 else { continue }
             var parts = ["throughput \(n(x.throughput))"]
             if let l = x.load { parts.append("load \(DottieDocument.formatted("load", l))") }
-            if x.backlog > 0 { parts.append("backlog \(n(x.backlog))") }
+            if x.backlog > 0 { parts.append("backlog \(n(x.backlog)) (piled up \(n(x.depth)))") }
             if x.delay > 0 { parts.append("delay \(n(x.delay))s") }
             out.append("\(names[e.id] ?? "?"): " + parts.joined(separator: ", "))
         }

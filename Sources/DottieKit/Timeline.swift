@@ -556,8 +556,8 @@ extension DottieDocument {
     /// then (see `expandingSymbols(at:)`). Every renderer and exporter draws the result unchanged; a page with
     /// no timeline and no instances is returned as is.
     /// `state` picks which of the elements with a `when` are drawn (the variables' starting values unless given).
-    public func resolved(at t: Double, state: StateChoice) -> DottieDocument {
-        posed(at: t, state: state).expandingSymbols(at: Timeline.clampTime(t))
+    public func resolved(at t: Double, state: StateChoice, since: Double? = nil) -> DottieDocument {
+        posed(at: t, state: state, since: since).expandingSymbols(at: Timeline.clampTime(t))
     }
 
     /// `resolved(at:state:)` with the variables' starting values.
@@ -567,12 +567,14 @@ extension DottieDocument {
     /// whose `when` doesn't hold under `state` left out, with the connectors attached to them. What the editor
     /// shows and edits while stopped on the timeline (with `.all`); a page without a timeline or hidden elements
     /// is returned as is.
-    public func posed(at t: Double, state: StateChoice = .initial) -> DottieDocument {
-        posedWithMetrics(at: t, state: state).frame
+    /// `since` is the seconds since the page's state last changed, which backlog has been piling up for (ADR 0003):
+    /// a player passes the time since the last click; nil is `t`, as exports draw it.
+    public func posed(at t: Double, state: StateChoice = .initial, since: Double? = nil) -> DottieDocument {
+        posedWithMetrics(at: t, state: state, since: since).frame
     }
 
-    /// `posed(at:state:)`, and the frame's metrics (ADR 0003).
-    public func posedWithMetrics(at t: Double, state: StateChoice = .initial) -> (frame: DottieDocument, metrics: FrameMetrics) {
+    /// `posed(at:state:since:)`, and the frame's metrics (ADR 0003).
+    public func posedWithMetrics(at t: Double, state: StateChoice = .initial, since: Double? = nil) -> (frame: DottieDocument, metrics: FrameMetrics) {
         let off = stateHidden(state)
         let values = stateValues(state)
         let active = Dictionary(uniqueKeysWithValues: elements.compactMap { e in
@@ -648,7 +650,7 @@ extension DottieDocument {
         var metrics = FrameMetrics()
         if measuring {
             let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
-            let (packets, m) = flowFrame(in: copy, at: t, values: values, offline: offline)
+            let (packets, m) = flowFrame(in: copy, at: t, values: values, offline: offline, since: since)
             metrics = m
             copy.elements = Self.finishing(copy.elements, metrics: m, values: values, frame: copy, flows: flows ?? []) + packets
             copy.flows = nil

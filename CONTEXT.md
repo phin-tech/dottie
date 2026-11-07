@@ -106,6 +106,10 @@ _Avoid_: blocked, dropped, overflow
 Seconds traffic stays inside a shape it passes through: processing, queueing, handling.
 _Avoid_: dwell, latency (that is the whole route's transit)
 
+**Depth**:
+How much backlog has piled up at a shape: its backlog times the seconds since the page's state last changed.
+_Avoid_: queue length, size
+
 **Load**:
 A connector's or shape's throughput over its capacity.
 _Avoid_: utilization, usage

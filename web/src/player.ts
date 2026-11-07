@@ -68,6 +68,10 @@ export class Playback {
   readonly sceneLoops: boolean[];
   /** The page's variables now: their starting values until clicks change them. */
   state: Record<string, boolean>;
+  /** When the variables last changed (performance.now() milliseconds): backlog piles up from then (ADR 0003). */
+  stateSince = typeof performance === "undefined" ? 0 : performance.now();
+  /** A still (the `at` attribute): backlog is drawn for the page time, not the wall clock. */
+  still = false;
   readonly background: RGBA;
   readonly ink: RGBA;
   /** What clicking each clickable element does, by element id. */
@@ -179,7 +183,8 @@ export class Playback {
     const times = new Map<string, number>();
     for (const [id, start] of this.replayStarts) times.set(id, Math.min((now - start) / 1000, this.replays.get(id) ?? 0));
     const tc = clampTime(t);
-    const pose = posed(this.page, tc, this.state);
+    // Backlog piles up for as long as the state has held; a still (no performance clock) draws the page time.
+    const pose = posed(this.page, tc, this.state, this.still || typeof performance === "undefined" ? null : (now - this.stateSince) / 1000);
     const frame = expandingSymbols(pose, tc, true, times);
     const { parts } = svgParts(frame, this.background, r);
     const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
@@ -423,6 +428,7 @@ export class DottiePlayer extends ElementBase {
     const file = this.file!;
     const page = file.pages[pageIndex(file, this.getAttribute("page"))];
     const p = new Playback(page, this.stage, { clean: this.hasAttribute("clean"), file });
+    p.still = this.hasAttribute("at");
     this.playback = p;
     this.style.setProperty("--dottie-page", color(p.background));
     this.style.setProperty("--dottie-ink", color(p.ink));
@@ -532,6 +538,7 @@ export class DottiePlayer extends ElementBase {
     const next = { ...p.state, ...values };
     if (Object.keys(next).every((k) => next[k] === p.state[k])) return;
     p.state = next;
+    p.stateSince = performance.now();
     p.redraw();
     this.dispatchEvent(new CustomEvent("state", { detail: { variables: { ...next } } }));
   }

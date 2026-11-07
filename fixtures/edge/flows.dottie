@@ -1971,6 +1971,41 @@
           "width": 160,
           "x": 600,
           "y": 340
+        },
+        {
+          "gauge": {
+            "label": "piled up",
+            "metric": "depth",
+            "of": "000002AD-0000-4000-8000-0000000002AD"
+          },
+          "height": 60,
+          "id": "000002BA-0000-4000-8000-0000000002BA",
+          "kind": "rectangle",
+          "layerID": "000002AB-0000-4000-8000-0000000002AB",
+          "seed": 3818116956,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 120,
+          "x": 200,
+          "y": 260
         }
       ],
       "flows": [

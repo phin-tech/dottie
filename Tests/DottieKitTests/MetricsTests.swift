@@ -37,7 +37,11 @@ final class MetricsTests: XCTestCase {
         // Backlog piles above the queue.
         let frame = doc.posed(at: 1)
         let piled = frame.elements.filter { $0.kind == .ellipse && $0.frame.maxY < 100 && $0.frame.minX >= 200 && $0.frame.maxX < 290 }
-        XCTAssertEqual(piled.count, 2)   // a third of the volume: ceil(5 / 3)
+        XCTAssertEqual(piled.count, 1)   // a third of a packet every 0.5s, for 1s
+        // It grows while the state holds, and depth counts what has piled up.
+        let later = doc.posed(at: 1, state: .initial, since: 4).elements.filter { $0.kind == .ellipse && $0.frame.maxY < 100 && $0.frame.minX >= 200 && $0.frame.maxX < 290 }
+        XCTAssertEqual(later.count, 3)
+        XCTAssertEqual(try XCTUnwrap(doc.metrics(at: 1, since: 4).elements[queue]?.depth), 4, accuracy: 1e-9)
     }
 
     func testOverflowTakesTheNextRouteAndPageOrderIsPriority() throws {
