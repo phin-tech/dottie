@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Capacity, metrics and gauges are worked out per frame, and drawn as plain elements
@@ -18,10 +18,12 @@ have to agree exactly.
 - **Volume** (`Flow.volume`, default 1): how much a flow carries, in whatever unit the page uses (trucks a day,
   requests a second). Packets stay a picture of it. Packet spacing is `every / volume`, clamped as `every` is, so
   a flow with three times the volume draws three times the packets.
-- **Capacity** (`capacity` on a connector or a shape; absent means unlimited): the most volume it carries.
+- **Capacity** (`capacity` on a connector or a shape; absent means unlimited): the most volume it carries. A
+  shape's capacity counts traffic arriving at it as well as passing through: a full warehouse refuses deliveries.
 - **Dwell** (`dwell` seconds on a shape, default 0): how long traffic stays inside a shape it passes through.
   Packets already vanish inside such a shape. With a dwell they stay hidden that much longer, so a cross-dock is
-  visibly slower than a pass-through. A flow's source and destinations have no dwell.
+  visibly slower than a pass-through. A flow's source and destinations have no dwell. Dwell is fixed: it doesn't
+  grow with load (an override can raise it).
 - **Overrides** may set `capacity` and `dwell`, as they already set `cost`. "Peak season" is one `defineState`
   raising volumes. "Lane at half capacity" is another.
 
@@ -119,10 +121,3 @@ None of them depends on this ADR. A legend or a button can show a gauge's metric
   slider control. Metric comparisons cover the visual cases. A slider can be faked as a row of choice buttons.
 - **A gauge element kind.** Every renderer, the app's canvas and hit-testing included, would need to learn it.
   Expanding gauges into plain elements while posing keeps them as data.
-
-## Open questions
-
-- Should `capacity` on a shape apply to traffic passing through only, or to arrivals too? Proposed: both, since a
-  full warehouse refuses deliveries.
-- Should dwell grow with load (`dwell × (1 + load)`)? Proposed: not now. Fixed dwell is easier to read, and an
-  override can raise it.
