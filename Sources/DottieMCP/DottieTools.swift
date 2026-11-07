@@ -105,11 +105,13 @@ private func idListProp(_ description: String) -> Value {
 }
 private let stateRestyleProp: Value = .object([
     "type": "object",
-    "description": "Element id to how it looks while it is true: {stroke, fill, text_color (hex), opacity (multiplies), stroke_width, dash, text}",
+    "description": .string("Element id to how it looks while it is true: {stroke, fill, text_color (hex), opacity (multiplies), stroke_width, "
+        + "dash, text, cost (a connector's cost for add_flow traffic: a degraded link)}"),
     "additionalProperties": .object(["type": "object", "properties": .object([
         "stroke": .object(["type": "string"]), "fill": .object(["type": "string"]), "text_color": .object(["type": "string"]),
         "opacity": .object(["type": "number"]), "stroke_width": .object(["type": "number"]),
         "dash": .object(["enum": .array(["solid", "dashed", "dotted"])]), "text": .object(["type": "string"]),
+        "cost": .object(["type": "number"]),
     ])]),
 ])
 
@@ -415,6 +417,8 @@ actor DottieTools {
                 "color": prop("string", "Hex color of the packets"),
                 "size": prop("number", "Packet diameter (default 12)"),
                 "when": prop("string", "A condition on page variables: nothing flows while it fails"),
+                "spread": prop("boolean", "While the first destination can't be reached, deal packets in turn across every other "
+                               + "destination that can (a downed region's traffic shared by the rest), rather than all to the next"),
                 "id": prop("string", "An existing flow's id, to change or remove it"),
                 "remove": prop("boolean", "Remove the flow named by id"),
              ], required: ["path"])),
@@ -1070,7 +1074,7 @@ actor DottieTools {
                                                   guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'color' must be a hex color like #ffcc00") }
                                                   return c
                                               },
-                                              size: a.double("size"), when: a.string("when"),
+                                              size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
                                               replacing: a.string("id") == nil ? nil : try a.uuid("id"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
@@ -1096,7 +1100,8 @@ actor DottieTools {
                 spec.restyle[id] = StateOverride(when: spec.name, stroke: try color(o, "stroke"), fill: try color(o, "fill"),
                                                  textColor: try color(o, "text_color"), opacity: o.double("opacity"),
                                                  strokeWidth: o.double("stroke_width"),
-                                                 dash: o.string("dash").flatMap(DashStyle.init(rawValue:)), text: o.string("text"))
+                                                 dash: o.string("dash").flatMap(DashStyle.init(rawValue:)), text: o.string("text"),
+                                                 cost: o.double("cost"))
             }
             for (k, v) in a.raw["reroute"]?.objectValue ?? [:] {
                 guard let from = UUID(uuidString: k), let to = v.stringValue.flatMap(UUID.init(uuidString:)) else {

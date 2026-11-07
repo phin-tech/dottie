@@ -55,7 +55,8 @@
         "speed": { "type": "number", "description": "Points per second; 160 by default." },
         "color": { "$ref": "#/$defs/rgba" },
         "size": { "type": "number", "description": "Packet diameter; 12 by default." },
-        "when": { "type": "string", "description": "A condition on the page's variables: nothing flows while it fails." }
+        "when": { "type": "string", "description": "A condition on the page's variables: nothing flows while it fails." },
+        "spread": { "type": "boolean", "description": "While the first destination can't be reached, packets are dealt in turn across every other one that can." }
       }
     },
     "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
@@ -378,7 +379,8 @@
         "dash": { "enum": ["solid", "dashed", "dotted"] },
         "text": { "type": "string", "description": "Replaces the element's text or label." },
         "reroute": { "type": "object", "additionalProperties": { "$ref": "#/$defs/uuid" }, "description": "For an element that follows connectors (a packet): connector id to the connector it follows instead." },
-        "offline": { "type": "boolean", "description": "Still drawn, but carries no flow traffic: flows route round it." }
+        "offline": { "type": "boolean", "description": "Still drawn, but carries no flow traffic: flows route round it." },
+        "cost": { "type": "number", "minimum": 0, "description": "A connector's cost for flow traffic while this applies: a degraded link." }
       }
     },
     "hover": {

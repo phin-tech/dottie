@@ -126,6 +126,56 @@ final class FlowTests: XCTestCase {
         }
     }
 
+    func testSpreadSharesADownedRegionsTraffic() throws {
+        var (doc, client, _, east, west) = page()
+        let layer = doc.layers[0].id
+        let north = Element(kind: .rectangle, frame: CGRect(x: 400, y: 400, width: 80, height: 50), layerID: layer, text: "north")
+        doc.elements.append(north)
+        doc.elements.append(Element(kind: .connector, frame: .zero, layerID: layer,
+                                    connector: ConnectorData(start: .bound(doc.elements[1].id), end: .bound(north.id))))
+        try DiagramOps.addFlow(&doc, from: client, to: [east, west, north.id], every: 0.25, speed: 400, spread: true)
+        try DiagramOps.defineState(&doc, { var s = StateSpec(name: "eastDown"); s.down = [east]; return s }())
+        // Where each packet past api is headed, by the slope of its line from api's center (240, 125).
+        func ends(_ s: StateChoice) -> Set<String> {
+            Set(stride(from: 3.0, through: 3.9, by: 0.05).flatMap { packets(doc.posed(at: $0, state: s)) }.filter { $0.frame.midX > 300 }.map { p in
+                let slope = (p.frame.midY - 125) / (p.frame.midX - 240)
+                return slope < 0 ? "east" : slope < 1 ? "west" : "north"
+            })
+        }
+        XCTAssertEqual(ends(.initial), ["east"])                              // first choice up: all of it there
+        XCTAssertEqual(ends(.values(["eastDown": true])), ["west", "north"])  // down: shared by the rest
+        doc.flows![0].spread = nil
+        XCTAssertEqual(ends(.values(["eastDown": true])), ["west"])           // without spread: all to the next
+    }
+
+    func testPacketsVanishInsideTheShapesTheyPass() throws {
+        var (doc, client, api, east, _) = page()
+        try DiagramOps.addFlow(&doc, from: client, to: [east], every: 0.05, speed: 100)
+        let box = try XCTUnwrap(doc.elements.first { $0.id == api }).frame.insetBy(dx: 2, dy: 2)
+        for t in stride(from: 0.0, through: 4, by: 0.1) {
+            XCTAssertFalse(packets(doc.posed(at: t)).contains { box.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }, "at \(t)")
+        }
+    }
+
+    func testOverridesChangeCostAndBadCostsLoad() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../fixtures/edge/flows.dottie")
+        let costPage = try DottieFile.decode(Data(contentsOf: url)).pages[2]
+        let red = try XCTUnwrap(costPage.flows?.first)
+        let direct = try XCTUnwrap(costPage.elements.first { $0.connector?.cost == 5 })
+        func route(jam: Bool) throws -> [UUID] {
+            let frame = costPage.posed(at: 1, state: .values(["jam": jam]))
+            let offline = Set<UUID>()
+            return try XCTUnwrap(DottieDocument.flowRoute(from: red.from, to: red.to, in: frame, offline: offline)).map(\.0)
+        }
+        XCTAssertNotEqual(try route(jam: false), [direct.id])
+        XCTAssertEqual(try route(jam: true), [direct.id])   // hub → dst jammed at cost 10: the direct line (5) wins
+        // cost "high" loaded as no cost.
+        XCTAssertEqual(costPage.elements.filter { $0.kind == .connector }.count, 7)
+        let json = #"{"start": {"x": 0, "y": 0}, "end": {"x": 1, "y": 1}, "routing": "straight", "startHead": "none", "endHead": "arrow", "cost": "x", "hops": 3}"#
+        let c = try JSONDecoder().decode(ConnectorData.self, from: Data(json.utf8))
+        XCTAssertNil(c.cost); XCTAssertNil(c.hops)
+    }
+
     func testLenientDecoding() throws {
         let json = #"{"id": 3, "from": "nope", "to": ["\#(UUID().uuidString)", "bad"], "every": "fast"}"#
         let f = try JSONDecoder().decode(Flow.self, from: Data(json.utf8))

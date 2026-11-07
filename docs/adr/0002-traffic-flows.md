@@ -29,6 +29,15 @@ system and let people poke it", which a slide tool can't do.
   is the same in the app, the CLI, QuickLook, the drawn-ahead HTML player and dottie.js, and the goldens prove it. The
   pattern repeats every `every` seconds, so a timeline whose length is a multiple of it loops seamlessly;
   `add_flow` / `dottie.flow` round `every` to make that so.
+- **Spread.** A flow with `spread` sends everything to its first destination while it can be reached. When it
+  can't, packet `k` goes to the `k mod n`-th of the `n` other destinations that can, so a downed region's traffic is
+  shared by the rest. Such a flow repeats every `n × every`, so it loops seamlessly only when the timeline is a
+  multiple of that.
+- **Overrides can change a connector's `cost`**, so a state can degrade a link without taking it down, and the
+  traffic moves to the cheaper way while it holds.
+- **Packets vanish inside the shapes they pass through.** The stretch of route joining one connector's end to the
+  next one's start runs through a shape; packets there aren't drawn, so they enter a hub and come out the far side
+  instead of crossing its label.
 - **Flows from the same shape take turns.** The i-th of m flows leaving a shape (in page order, conditions ignored)
   sends its packets `i/m × every` later, so flows split across regions interleave instead of drawing on top of each
   other, and a flow's color says where it was meant to go even after it fails over.

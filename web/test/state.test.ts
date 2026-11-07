@@ -93,3 +93,25 @@ test("flows take the cheapest route by connector cost, as Flows.swift does", () 
   const b = flowRoute(blue.from, blue.to, page)!;
   assert.deepEqual(ends(b).map((c) => text(c.end.elementID!)), ["hub", "dst"]);
 });
+
+test("spread deals a downed destination's packets across the rest; a jam override changes a connector's cost", () => {
+  const pages = parseDottie(read("edge", "flows.dottie")).pages;
+  const spread = pages.find((p) => p.name === "Spread")!;
+  const frame = posed(spread, 1.9, { r1Down: true });
+  // Where each packet past x 200 is headed, by color (fill g): orange 0.5, blue 0.5 with r 0.2, green 0.7.
+  const ends = (r: number, g: number) => new Set(frame.elements
+    .filter((e) => e.text === null && e.kind === "ellipse" && e.style.fill.r === r && e.style.fill.g === g && e.x > 200)
+    .map((e) => (e.y < 250 ? "r2" : "r3")));
+  // Orange spreads over r2 and r3 while r1 is down; blue goes on to r2; green's first choice, r3, is up.
+  assert.deepEqual([...ends(0.9, 0.5)].sort(), ["r2", "r3"]);
+  assert.deepEqual([...ends(0.2, 0.5)], ["r2"]);
+  assert.deepEqual([...ends(0.2, 0.7)], ["r3"]);
+  const cost = pages.find((p) => p.name === "Cost")!;
+  const red = cost.flows![0];
+  const direct = cost.elements.find((e) => e.connector?.cost === 5)!;
+  const route = (jam: boolean) => flowRoute(red.from, red.to, posed(cost, 1, { jam }))!.map(([id]) => id);
+  assert.notDeepEqual(route(false), [direct.id]);
+  assert.deepEqual(route(true), [direct.id]);
+  // A cost that isn't a number loads as none.
+  assert.equal(cost.elements.filter((e) => e.connector && e.connector.cost === null).length, 3);
+});

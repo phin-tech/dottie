@@ -82,7 +82,9 @@ variables rather than scenes, and is easiest in two calls:
    fails over). It's routed afresh every frame over the connectors drawn, so nothing else needs drawing per state.
    The route is the cheapest by connector `cost` (1 each, so fewest hops, unless set with `update_element`): give
    the main path a lower cost than a backup. To split traffic, add one flow per destination, each with its own
-   `color` and fallbacks, e.g. `to: [use1, usw2]`, `to: [use2]`, `to: [usw2]`.
+   `color` and fallbacks, e.g. `to: [use1, usw2]`, `to: [use2]`, `to: [usw2]`. With `spread: true`, a flow whose
+   first destination is down shares its packets across all the others it can reach, e.g. `to: [usw2, use1, use2]`.
+   A `define_state` `restyle` with `cost` degrades a link instead of taking it down.
 2. `define_state` describes one variable at once: what it takes `down` (faded, and traffic goes round it), `hide`s
    (connectors go with a hidden shape), `show`s, `dim`s or `restyle`s (a new label, a red stroke), connectors whose `send_packet` packets
    `reroute`, and which elements' clicks flip it (`toggled_by`).

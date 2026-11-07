@@ -260,6 +260,8 @@ extension DottieScript {
             reroute?: Record<string, Ref> | [Ref, Ref][];
             /** Still drawn, but carries no flow traffic (dottie.flow): flows go round it. */
             offline?: boolean;
+            /** A connector's cost for flow traffic meanwhile: a degraded link. */
+            cost?: number;
         }
 
         /** A flow as dottie.flow and dottie.flows return it, defaults filled in. */
@@ -272,6 +274,7 @@ extension DottieScript {
             size: number;
             color?: Color;
             when?: Condition;
+            spread?: boolean;
         }
 
         /** One variable described at once (dottie.defineState): what changes while it is true, and which clicks change it. */
@@ -605,7 +608,9 @@ extension DottieScript {
             /** Traffic from a shape to the first of `to` (preferred first) it can reach over the connectors drawn, routed
              * afresh each frame, so a state that hides a shape or connector sends it round. Gives the page a timeline if
              * it has none and rounds `every` so it loops. With `id`, changes that flow. */
-            flow(from: Ref, to: Ref | Ref[], options?: { every?: number; speed?: number; color?: Color; size?: number; when?: Condition; id?: Ref }): FlowInfo;
+            flow(from: Ref, to: Ref | Ref[], options?: { every?: number; speed?: number; color?: Color; size?: number; when?: Condition;
+                /** While the first destination is down, deal packets across every other one that can be reached. */
+                spread?: boolean; id?: Ref }): FlowInfo;
             /** The page's flows. */
             flows(): FlowInfo[];
             /** Removes a flow; returns whether there was one. */

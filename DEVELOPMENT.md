@@ -237,7 +237,8 @@ multiplies), applied in order after its keys, and `reroute` sends its follows al
 detours instead of two being drawn. `DefineState.swift` (`define_state`, `dottie.defineState`) writes a variable's
 conditions, overrides and clicks from one description. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
 0002) are traffic no file stores: `posed` routes each one over the connectors left in the frame, cheapest by their `cost`
-(1 each unless set, so fewest hops), to the first destination it reaches and appends its packets, a pure function of the time and the values, with ids derived
+(1 each unless set, so fewest hops; an override can change it), to the first destination it reaches (or, with
+`spread`, shared across the others while the first is down) and appends its packets, a pure function of the time and the values, with ids derived
 from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn.
 A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
 bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right

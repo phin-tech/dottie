@@ -296,6 +296,7 @@ public enum DottieScript {
                 let r = try idMap("reroute")
                 if !r.isEmpty { o.reroute = Dictionary(uniqueKeysWithValues: r.map { ($0.key.uuidString, $0.value) }) }
                 if bool("offline") == true { o.offline = true }
+                o.cost = double("cost")
                 return o
             }
 
@@ -376,6 +377,7 @@ public enum DottieScript {
                                     "every": f.interval, "speed": f.pace, "size": f.diameter]
             if let c = f.color { d["color"] = String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
             if let w = f.when { d["when"] = w }
+            if f.spread == true { d["spread"] = true }
             return d
         }
 
@@ -426,6 +428,7 @@ public enum DottieScript {
                     if let v = o.text { x["text"] = v }
                     if let r = o.reroute { x["reroute"] = r.mapValues(\.uuidString) }
                     if o.offline == true { x["offline"] = true }
+                    if let v = o.cost { x["cost"] = v }
                     return x
                 }
             }
@@ -766,7 +769,8 @@ public enum DottieScript {
             case "flow":
                 let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
                                                speed: a.double("speed"), color: try a.color("color"), size: a.double("size"),
-                                               when: a.string("when"), replacing: a.has("id") ? try a.uuid("id") : nil)
+                                               when: a.string("when"), spread: a.bool("spread"),
+                                               replacing: a.has("id") ? try a.uuid("id") : nil)
                 return Self.describe(f)
 
             case "flows":
@@ -1204,20 +1208,23 @@ public enum DottieScript {
     traffic while true (a region that's down: flows go round it); restyle: {id: look} while true; \
     reroute: {fromConnector: toConnector}, so the same packets take a detour while true; toggledBy, turnedOnBy, \
     turnedOffBy: elements whose click flips, sets or clears it. Running it again changes nothing more; returns a summary
-      dottie.flow(from, to, {every?, speed?, color?, size?, when?, id?})  traffic from a shape to the first of to (a shape or \
+      dottie.flow(from, to, {every?, speed?, color?, size?, when?, spread?, id?})  traffic from a shape to the first of to (a shape or \
     a list, preferred first) it can reach over the connectors drawn: a packet every every seconds (0.5) at speed \
     points per second (160), routed afresh each frame, so when a state hides a shape or connector the traffic goes \
     round it with nothing more drawn. A connector carries traffic from its start to its end, and back too when its \
     start has an arrowhead; the route is the cheapest by connector cost (1 each unless set: give a main path a lower \
     cost than its backup). One flow per region splits traffic, each with its own color, so a failed region's \
-    packets keep its color on the region that takes them over. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
+    packets keep its color on the regions that take them over; spread: true deals a flow's packets across every \
+    other destination it can reach while the first is down, rather than all to the next. Packets vanish into the \
+    shapes they pass through and come out the other side. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
     loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
       dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
       Example: failover: api sends to east, or west when east is down:
         dottie.flow(api, [east, west]);
         dottie.defineState("eastDown", {down: east, toggledBy: east});   // east fades, and traffic goes to west
       overrides (on dottie.update): [{when, stroke?, fill?, textColor?, opacity?, strokeWidth?, dash?, text?, \
-    reroute?, offline?}]: changes to one element while a condition holds, in order; opacity multiplies; offline: still \
+    reroute?, offline?, cost?}]: changes to one element while a condition holds, in order; opacity multiplies; cost: a \
+    connector's cost meanwhile (a degraded link); offline: still \
     drawn but carries no flow traffic. Prefer these to a \
     second copy of a shape with the opposite when
       Example: a click that takes a region down while its packets keep flowing, the other way round:

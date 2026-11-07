@@ -23,10 +23,9 @@ export function packetID(flow: string, k: number): string {
 const routeCost = (cost: number | null): number =>
   cost === null || !Number.isFinite(cost) ? 1 : Math.min(Math.max(cost, 0), 1_000_000);
 
-/** The connectors traffic takes from `from` to the first of `to` it reaches in `frame`, as [connector, backwards]
- * hops; null when none can be reached. The cheapest route by the connectors' cost (1 each unless set), ties to the
- * route found first, earlier connectors first: with no costs set, the fewest hops. */
-export function flowRoute(from: string, to: string[], frame: Page, offline: Set<string> = new Set()): [string, boolean][] | null {
+/** Every shape traffic from `from` can reach in `frame`, with the cheapest way to each (DottieDocument.flowTree):
+ * by the connectors' cost (1 each unless set), ties to the shape reached first, earlier connectors first. */
+export function flowTree(from: string, frame: Page, offline: Set<string> = new Set()): FlowTree | null {
   const shapes = new Set(frame.elements.filter((e) => e.kind !== "connector" && !offline.has(e.id)).map((e) => e.id));
   if (!shapes.has(from)) return null;
   type Edge = { to: string; via: string; back: boolean; cost: number };
@@ -46,8 +45,8 @@ export function flowRoute(from: string, to: string[], frame: Page, offline: Set<
   // Dijkstra, settling the cheapest shape next, ties to the one reached first, as Flows.swift does.
   const dist = new Map<string, number>([[from, 0]]), order = new Map<string, number>([[from, 0]]);
   let counter = 1;
-  const came = new Map<string, { from: string; via: string; back: boolean }>();
-  const open = [from], settled = new Set<string>();
+  const tree = new FlowTree(from);
+  const open = [from];
   while (open.length > 0) {
     let best = 0;
     for (let i = 1; i < open.length; i++) {
@@ -55,22 +54,47 @@ export function flowRoute(from: string, to: string[], frame: Page, offline: Set<
       if (da < db || (da === db && order.get(open[i])! < order.get(open[best])!)) best = i;
     }
     const n = open.splice(best, 1)[0];
-    settled.add(n);
+    tree.settled.add(n);
     for (const edge of next.get(n) ?? []) {
-      if (settled.has(edge.to)) continue;
+      if (tree.settled.has(edge.to)) continue;
       const d = dist.get(n)! + edge.cost;
       const old = dist.get(edge.to);
       if (old !== undefined && old <= d) continue;
       if (old === undefined) open.push(edge.to);
       dist.set(edge.to, d); order.set(edge.to, counter++);
-      came.set(edge.to, { from: n, via: edge.via, back: edge.back });
+      tree.came.set(edge.to, { from: n, via: edge.via, back: edge.back });
     }
   }
-  const goal = to.find((x) => x !== from && settled.has(x));
-  if (goal === undefined) return null;
-  const hops: [string, boolean][] = [];
-  for (let at = goal, step = came.get(at); step; at = step.from, step = came.get(at)) hops.push([step.via, step.back]);
-  return hops.reverse();
+  return tree;
+}
+
+export class FlowTree {
+  settled = new Set<string>();
+  came = new Map<string, { from: string; via: string; back: boolean }>();
+  readonly from: string;
+  constructor(from: string) { this.from = from; }
+
+  /** The first of `to` that can be reached; with `spread`, when the first can't be, every other one that can. */
+  goals(to: string[], spread: boolean): string[] {
+    const reachable = to.filter((x) => x !== this.from && this.settled.has(x));
+    if (reachable.length === 0) return [];
+    return spread && reachable[0] !== to[0] ? reachable : [reachable[0]];
+  }
+
+  /** The connectors to `goal`, as [connector, backwards] hops. */
+  hops(goal: string): [string, boolean][] {
+    const hops: [string, boolean][] = [];
+    for (let at = goal, step = this.came.get(at); step; at = step.from, step = this.came.get(at)) hops.push([step.via, step.back]);
+    return hops.reverse();
+  }
+}
+
+/** The connectors traffic takes from `from` to the first of `to` it reaches in `frame`, as [connector, backwards]
+ * hops; null when none can be reached. */
+export function flowRoute(from: string, to: string[], frame: Page, offline: Set<string> = new Set()): [string, boolean][] | null {
+  const tree = flowTree(from, frame, offline);
+  const goal = tree?.goals(to, false)[0];
+  return tree && goal !== undefined ? tree.hops(goal) : null;
 }
 
 /** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs). */
@@ -87,41 +111,57 @@ export function flowPackets(flows: Flow[] | null, frame: Page, t: number, values
   for (const [i, flow] of flows.entries()) {
     if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
     const source = byID.get(flow.from);
-    const hops = source ? flowRoute(flow.from, flow.to, frame, offline) : null;
-    if (!source || !hops) continue;
-    const points: Point[] = [];
-    for (const [id, back] of hops) {
-      const c = byID.get(id);
-      if (!c) continue;
-      const p = tracing(c, frame).points;
-      points.push(...(back ? [...p].reverse() : p));
-    }
-    const line = new Polyline(points);
-    const length = line.length;
-    if (!(length > 0)) continue;
+    const tree = source ? flowTree(flow.from, frame, offline) : null;
+    if (!source || !tree) continue;
+    const goals = tree.goals(flow.to, flow.spread === true);
     const every = clamp(flow.every, DEFAULT_EVERY, 0.05, 60);
     const speed = clamp(flow.speed, DEFAULT_SPEED, 1, 10000);
     const size = clamp(flow.size, DEFAULT_SIZE, 2, 200);
-    // Packet k left at k × every + phase; it's on the route while 0 <= (t − k × every − phase) × speed <= length.
     const phase = (turn[i] / leaving.get(flow.from)!) * every;
-    const lo = Math.ceil((t - phase - length / speed) / every);
-    const hi = Math.floor((t - phase) / every);
-    if (hi < lo) continue;
     const color = flow.color ?? DEFAULT_COLOR;
-    for (let k = Math.max(lo, hi - MAX_PACKETS + 1); k <= hi; k++) {
-      const d = (t - k * every - phase) * speed;
-      const p = line.point(d / length);
-      out.push({
-        id: packetID(flow.id, k), kind: "ellipse", layerID: source.layerID,
-        x: p.x - size / 2, y: p.y - size / 2, width: size, height: size,
-        style: {
-          stroke: { ...color }, fill: { ...color }, fillStyle: "solid", strokeWidth: 1.5, dash: "solid", roughness: 0,
-          bowing: 1, fontSize: 18, font: null, gridSize: null, opacity: null, dashOffset: null, textColor: null,
-        },
-        seed: 1, text: null, connector: null, groupID: null, points: null, path: null, subpaths: null, evenOdd: null,
-        rotation: null, link: null, url: null, anchor: null, click: null, hover: null, when: null, overrides: null,
-        symbol: null, playback: null, offset: null, args: null, image: null, reveal: null,
-      });
+    // Spread: packet k goes to goal k mod n.
+    const n = goals.length;
+    for (const [j, goal] of goals.entries()) {
+      // The route, and the stretches inside the shapes it passes through, where a packet isn't drawn.
+      const points: Point[] = [], inside: [number, number][] = [];
+      let length = 0;
+      for (const [id, back] of tree.hops(goal)) {
+        const c = byID.get(id);
+        if (!c) continue;
+        const p = back ? [...tracing(c, frame).points].reverse() : tracing(c, frame).points;
+        if (p.length === 0) continue;
+        const last = points[points.length - 1];
+        if (last) {
+          const gap = Math.hypot(p[0].x - last.x, p[0].y - last.y);
+          inside.push([length, length + gap]);
+          length += gap;
+        }
+        for (let q = 1; q < p.length; q++) length += Math.hypot(p[q].x - p[q - 1].x, p[q].y - p[q - 1].y);
+        points.push(...p);
+      }
+      if (!(length > 0)) continue;
+      const line = new Polyline(points);
+      // Packet k left at k × every + phase; it's on the route while 0 <= (t − k × every − phase) × speed <= length.
+      const lo = Math.ceil((t - phase - length / speed) / every);
+      const hi = Math.floor((t - phase) / every);
+      let k = Math.max(lo, hi - MAX_PACKETS * n + 1);
+      k += (((j - k) % n) + n) % n;
+      for (; k <= hi; k += n) {
+        const d = (t - k * every - phase) * speed;
+        if (inside.some(([a, b]) => d > a && d < b)) continue;
+        const p = line.point(d / length);
+        out.push({
+          id: packetID(flow.id, k), kind: "ellipse", layerID: source.layerID,
+          x: p.x - size / 2, y: p.y - size / 2, width: size, height: size,
+          style: {
+            stroke: { ...color }, fill: { ...color }, fillStyle: "solid", strokeWidth: 1.5, dash: "solid", roughness: 0,
+            bowing: 1, fontSize: 18, font: null, gridSize: null, opacity: null, dashOffset: null, textColor: null,
+          },
+          seed: 1, text: null, connector: null, groupID: null, points: null, path: null, subpaths: null, evenOdd: null,
+          rotation: null, link: null, url: null, anchor: null, click: null, hover: null, when: null, overrides: null,
+          symbol: null, playback: null, offset: null, args: null, image: null, reveal: null,
+        });
+      }
     }
   }
   return out;

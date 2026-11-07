@@ -72,6 +72,7 @@ export function applyOverride(o: StateOverride, e: Element): Element {
   if (o.strokeWidth !== null) out.style.strokeWidth = Math.max(0, o.strokeWidth);
   if (o.dash !== null) out.style.dash = o.dash;
   if (o.text !== null) out.text = o.text;
+  if (o.cost !== null && out.connector) out.connector.cost = Math.min(Math.max(o.cost, 0), 1_000_000);
   if (o.opacity !== null) {
     const v = Math.min(Math.max(o.opacity, 0), 1) * (out.style.opacity ?? 1);
     out.style.opacity = v >= 1 ? null : v;

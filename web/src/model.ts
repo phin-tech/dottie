@@ -72,6 +72,8 @@ export interface StateOverride {
   reroute: Record<string, string> | null;
   /** Still drawn, but carries no flow traffic. */
   offline: boolean | null;
+  /** A connector's cost for flow traffic meanwhile. */
+  cost: number | null;
 }
 
 export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
@@ -192,6 +194,8 @@ export interface Flow {
   color: RGBA | null;
   size: number | null;
   when: string | null;
+  /** When the first destination can't be reached, deal packets across every other one that can. */
+  spread: boolean | null;
 }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
@@ -226,7 +230,7 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
   page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
-  flow: ["id", "from", "to", "every", "speed", "color", "size", "when"],
+  flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
@@ -252,7 +256,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   marker: ["t", "name", "loop"],
   click: ["scene", "url", "set", "toggle"],
   hover: ["stroke", "fill", "opacity"],
-  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline"],
+  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost"],
 };
 
 export const MAX_DURATION = 3600;
@@ -535,6 +539,7 @@ class Reader {
         text: str(o.text) ?? null,
         reroute,
         offline: o.offline === true ? true : null,
+        cost: typeof o.cost === "number" && Number.isFinite(o.cost) ? o.cost : null,
       };
     });
   }
@@ -663,6 +668,7 @@ class Reader {
       every: finite(f.every), speed: finite(f.speed), size: finite(f.size),
       color: isObj(f.color) && ["r", "g", "b", "a"].every((k) => typeof (f.color as Obj)[k] === "number") ? rgba(f.color) ?? null : null,
       when: str(f.when) ?? null,
+      spread: f.spread === true ? true : null,
     };
   }
 }

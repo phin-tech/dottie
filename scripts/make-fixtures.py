@@ -673,15 +673,31 @@ def flows():
     alt = c.add("rectangle", 220, 260, 100, 60, text="alt")
     c.connect(src, dst, text="cost 5", cost=5)
     c.connect(src, hub)
-    c.connect(hub, dst)
+    c.connect(hub, dst, overrides=[{"when": "jam", "cost": 10}])   # jammed: dearer than the direct line
     c.connect(alt, src, cost=1e12)   # clamped to a million
     c.connect(alt, hub, cost=0)
     c.connect(hub, src, start_head="arrow", cost=0)   # src reaches hub free, backwards
-    c.extra = {"flows": [
+    c.connect(dst, alt, cost="high")   # not a number: loads as cost 1
+    c.extra = {"variables": {"jam": True}, "flows": [
         {"id": uid(), "from": src, "to": [dst], "every": 0.4},
         {"id": uid(), "from": alt, "to": [dst], "every": 0.5, "color": rgba(0.2, 0.5, 1)},
     ]}
-    write(EDGE / "flows.dottie", [p, q, c])
+
+    # Spread: r1 is down (hidden), so the spread flow's packets take turns between r2 and r3; the plain flow sends all
+    # of its to r2; a spread flow whose first choice is up sends everything there.
+    sp = Page("Spread")
+    sp.animate(2, fps=10)
+    sp.extra = {"variables": {"r1Down": True}}
+    users = sp.add("ellipse", 20, 160, 100, 60, text="users")
+    regions = [sp.add("rectangle", 300, 40 + 120 * i, 100, 60, text=f"r{i + 1}", when="!r1Down" if i == 0 else None) for i in range(3)]
+    for r in regions:
+        sp.connect(users, r)
+    sp.extra["flows"] = [
+        {"id": uid(), "from": users, "to": regions, "every": 0.3, "spread": True, "color": rgba(0.9, 0.5, 0.1)},
+        {"id": uid(), "from": users, "to": regions, "every": 0.3, "color": rgba(0.2, 0.5, 1)},
+        {"id": uid(), "from": users, "to": [regions[2], regions[1]], "every": 0.3, "spread": True, "color": rgba(0.2, 0.7, 0.3)},
+    ]
+    write(EDGE / "flows.dottie", [p, q, c, sp])
 
 
 def links():

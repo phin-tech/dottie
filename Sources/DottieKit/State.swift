@@ -129,10 +129,14 @@ public struct StateOverride: Codable, Equatable, Sendable {
     public var reroute: [String: UUID]?
     /// Still drawn, but carries no traffic: flows (`Flow`) route round it, as round a region that is down.
     public var offline: Bool?
+    /// For a connector: what flow traffic pays to take it meanwhile (`ConnectorData.cost`), so a degraded link loses
+    /// traffic to a healthy one.
+    public var cost: Double?
 
     public init(when: String, stroke: RGBA? = nil, fill: RGBA? = nil, textColor: RGBA? = nil, opacity: Double? = nil,
                 strokeWidth: Double? = nil, dash: DashStyle? = nil, text: String? = nil, reroute: [UUID: UUID]? = nil,
-                offline: Bool? = nil) {
+                offline: Bool? = nil, cost: Double? = nil) {
+        self.cost = cost
         self.when = when; self.stroke = stroke; self.fill = fill; self.textColor = textColor; self.opacity = opacity
         self.strokeWidth = strokeWidth; self.dash = dash; self.text = text; self.offline = offline == true ? true : nil
         self.reroute = reroute.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.uuidString, $0.value) }) }
@@ -149,6 +153,7 @@ public struct StateOverride: Codable, Equatable, Sendable {
         dash = try? c.decodeIfPresent(DashStyle.self, forKey: .dash)
         text = try c.decodeIfPresent(String.self, forKey: .text)
         offline = ((try? c.decodeIfPresent(Bool.self, forKey: .offline)) ?? nil) == true ? true : nil
+        cost = ((try? c.decodeIfPresent(Double.self, forKey: .cost)) ?? nil).flatMap { $0.isFinite ? $0 : nil }
         // Keys that aren't ids are dropped, and keys are matched without regard to case.
         let raw = (try? c.decodeIfPresent([String: UUID].self, forKey: .reroute)) ?? nil
         let ids = raw?.reduce(into: [String: UUID]()) { out, kv in
@@ -170,6 +175,7 @@ public struct StateOverride: Codable, Equatable, Sendable {
         if let v = text { parts.append("text \"\(v)\"") }
         if let r = reroute { parts.append("reroutes \(r.count)") }
         if offline == true { parts.append("offline") }
+        if let v = cost { parts.append("cost \(v)") }
         return when + ": " + (parts.isEmpty ? "no change" : parts.joined(separator: ", "))
     }
 
@@ -185,6 +191,7 @@ public struct StateOverride: Codable, Equatable, Sendable {
         if let strokeWidth { e.style.strokeWidth = max(0, strokeWidth) }
         if let dash { e.style.dash = dash }
         if let text { e.text = text }
+        if let cost, cost.isFinite, e.connector != nil { e.connector?.cost = min(max(cost, 0), 1_000_000) }
         if let opacity {
             let o = min(max(opacity, 0), 1) * (e.style.opacity ?? 1)
             e.style.opacity = o >= 1 ? nil : o

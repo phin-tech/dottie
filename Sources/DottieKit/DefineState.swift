@@ -16,7 +16,7 @@ public struct StateSpec: Equatable, Sendable {
     /// Down while it is true: dimmed like `dim`, and carrying no traffic, so flows go round them.
     public var down: [UUID] = []
     public var dimOpacity = 0.3
-    /// Other changes while it is true, per element. The override's own `when` is ignored.
+    /// Other changes while it is true, per element (`cost` for a connector that degrades). The override's own `when` is ignored.
     public var restyle: [UUID: StateOverride] = [:]
     /// Connector to connector: everything that follows the first follows the second while it is true, so packets
     /// keep flowing along a detour.
@@ -80,6 +80,7 @@ extension DiagramOps {
                 if let v = look.strokeWidth { o.strokeWidth = v }
                 if let v = look.dash { o.dash = v }
                 if let v = look.text { o.text = v }
+                if let v = look.cost { o.cost = v }
             }
         }
         // Everything with a follow along a rerouted connector: packets, mostly.
