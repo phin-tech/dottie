@@ -65,30 +65,41 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
 
 extension DottieDocument {
     /// The connectors traffic takes from `from` to the first of `to` it reaches in `frame`, as (connector, backwards)
-    /// hops; nil when none can be reached. Breadth first by hop count, earlier connectors first (ADR 0002).
+    /// hops; nil when none can be reached. The cheapest route by the connectors' `cost` (1 each unless set), ties to
+    /// the route found first, earlier connectors first (ADR 0002): with no costs set, the fewest hops.
     /// `offline` elements (an override says so) carry nothing: traffic neither leaves, passes nor arrives through them.
     static func flowRoute(from: UUID, to: [UUID], in frame: DottieDocument, offline: Set<UUID> = []) -> [(UUID, Bool)]? {
         let shapes = Set(frame.elements.filter { $0.kind != .connector && !offline.contains($0.id) }.map(\.id))
         guard shapes.contains(from) else { return nil }
-        var next: [UUID: [(to: UUID, via: UUID, back: Bool)]] = [:]
+        var next: [UUID: [(to: UUID, via: UUID, back: Bool, cost: Double)]] = [:]
         for e in frame.elements {
             guard let c = e.connector, !offline.contains(e.id), let a = c.start.elementID, let b = c.end.elementID, a != b,
                   shapes.contains(a), shapes.contains(b) else { continue }
-            next[a, default: []].append((b, e.id, false))
-            if c.startHead != .none { next[b, default: []].append((a, e.id, true)) }
+            next[a, default: []].append((b, e.id, false, c.routeCost))
+            if c.startHead != .none { next[b, default: []].append((a, e.id, true, c.routeCost)) }
         }
+        // Dijkstra. The next shape settled is the cheapest not yet settled, ties to the one reached first (`order`), so
+        // with equal costs it settles shapes in breadth-first order and web/src/flows.ts picks the same route.
+        var dist: [UUID: Double] = [from: 0], order: [UUID: Int] = [from: 0], counter = 1
         var came: [UUID: (from: UUID, via: UUID, back: Bool)] = [:]
-        var seen: Set<UUID> = [from]
-        var queue = [from], head = 0
-        while head < queue.count {
-            let n = queue[head]; head += 1
-            for edge in next[n] ?? [] where !seen.contains(edge.to) {
-                seen.insert(edge.to)
+        var open: [UUID] = [from], settled: Set<UUID> = []
+        while !open.isEmpty {
+            var best = 0
+            for i in 1..<open.count {
+                let (a, b) = (open[i], open[best])
+                if dist[a]! < dist[b]! || (dist[a]! == dist[b]! && order[a]! < order[b]!) { best = i }
+            }
+            let n = open.remove(at: best)
+            settled.insert(n)
+            for edge in next[n] ?? [] where !settled.contains(edge.to) {
+                let d = dist[n]! + edge.cost
+                if let old = dist[edge.to], old <= d { continue }
+                if dist[edge.to] == nil { open.append(edge.to) }
+                dist[edge.to] = d; order[edge.to] = counter; counter += 1
                 came[edge.to] = (n, edge.via, edge.back)
-                queue.append(edge.to)
             }
         }
-        guard let goal = to.first(where: { $0 != from && seen.contains($0) }) else { return nil }
+        guard let goal = to.first(where: { $0 != from && settled.contains($0) }) else { return nil }
         var hops: [(UUID, Bool)] = []
         var at = goal
         while let step = came[at] { hops.append((step.via, step.back)); at = step.from }
@@ -101,7 +112,11 @@ extension DottieDocument {
         guard let flows, !flows.isEmpty else { return [] }
         let byID = frame.elementIndex
         var out: [Element] = []
-        for flow in flows {
+        // Flows leaving the same shape take turns: the i-th of m starts i/m of its gap later, so they don't draw on
+        // top of each other. Counted over the page's flows, whatever their conditions, so a flow switching on moves none.
+        var leaving: [UUID: Int] = [:], turn: [Int] = []
+        for flow in flows { turn.append(leaving[flow.from, default: 0]); leaving[flow.from, default: 0] += 1 }
+        for (i, flow) in flows.enumerated() {
             if let w = flow.when, let values, !PageState.holds(w, in: values) { continue }
             guard let source = byID[flow.from], let hops = Self.flowRoute(from: flow.from, to: flow.to, in: frame, offline: offline) else { continue }
             var points: [CGPoint] = []
@@ -114,15 +129,16 @@ extension DottieDocument {
             let length = Double(line.length)
             guard length > 0 else { continue }
             let every = flow.interval, speed = flow.pace, size = flow.diameter
-            // Packet k left at k × every; it's on the route while 0 <= (t − k × every) × speed <= length.
-            let lo = Int(((t - length / speed) / every).rounded(.up))
-            let hi = Int((t / every).rounded(.down))
+            // Packet k left at k × every + phase; it's on the route while 0 <= (t − k × every − phase) × speed <= length.
+            let phase = Double(turn[i]) / Double(leaving[flow.from]!) * every
+            let lo = Int(((t - phase - length / speed) / every).rounded(.up))
+            let hi = Int(((t - phase) / every).rounded(.down))
             guard hi >= lo else { continue }
             var style = Style()
             let color = flow.color ?? Flow.defaultColor
             style.fill = color; style.stroke = color; style.strokeWidth = 1.5; style.roughness = 0
             for k in max(lo, hi - Flow.maxPackets + 1)...hi {
-                let d = (t - Double(k) * every) * speed
+                let d = (t - Double(k) * every - phase) * speed
                 let p = line.point(at: d / length)
                 out.append(Element(id: Flow.packetID(flow.id, k), kind: .ellipse,
                                    frame: CGRect(x: p.x - size / 2, y: p.y - size / 2, width: size, height: size),

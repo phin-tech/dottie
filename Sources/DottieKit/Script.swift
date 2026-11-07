@@ -328,7 +328,8 @@ public enum DottieScript {
                                 endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"),
                                 gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"),
                                 waypoints: try points("waypoints"), hops: bool("hops"),
-                                textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") })
+                                textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") },
+                                cost: double("cost"))
             }
             /// A list of {x, y} points.
             func points(_ k: String) throws -> [CGPoint]? {
@@ -440,6 +441,7 @@ public enum DottieScript {
                 d["routing"] = c.routing.rawValue
                 if let w = c.waypoints { d["waypoints"] = w.map { ["x": $0.x, "y": $0.y] } }
                 if c.hops == true { d["hops"] = true }
+                if let cost = c.cost { d["cost"] = cost }
                 if let f = c.start.elementID { d["from"] = f.uuidString }
                 if let t = c.end.elementID { d["to"] = t.uuidString }
             }
@@ -1206,7 +1208,9 @@ public enum DottieScript {
     a list, preferred first) it can reach over the connectors drawn: a packet every every seconds (0.5) at speed \
     points per second (160), routed afresh each frame, so when a state hides a shape or connector the traffic goes \
     round it with nothing more drawn. A connector carries traffic from its start to its end, and back too when its \
-    start has an arrowhead. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
+    start has an arrowhead; the route is the cheapest by connector cost (1 each unless set: give a main path a lower \
+    cost than its backup). One flow per region splits traffic, each with its own color, so a failed region's \
+    packets keep its color on the region that takes them over. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
     loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
       dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
       Example: failover: api sends to east, or west when east is down:
@@ -1241,7 +1245,8 @@ public enum DottieScript {
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
     waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
-    (connectors: a small hop where the line crosses a connector drawn beneath it), \
+    (connectors: a small hop where the line crosses a connector drawn beneath it), cost 0-1000000 (connectors: what \
+    flow traffic pays to take the line, default 1; flows take the cheapest route), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
     exports but not embedded; "" for Helvetica Neue), fontSize 4-200, textColor hex (a shape's or connector's label; \
     "" follows the stroke again; setting stroke on update recolors the label too, as in Excalidraw).

@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None, cost=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -83,6 +83,8 @@ class Page:
             kw["connector"]["waypoints"] = [{"x": x, "y": y} for x, y in waypoints]
         if hops is not None:
             kw["connector"]["hops"] = hops
+        if cost is not None:
+            kw["connector"]["cost"] = cost
         if text:
             kw["text"] = text
         if when is not None:
@@ -660,7 +662,26 @@ def flows():
     b = q.add("rectangle", 300, 40, 100, 60, text="b")
     q.connect(a, b)
     q.extra = {"flows": [{"id": uid(), "from": a, "to": [b], "every": 0.3, "speed": 200}]}
-    write(EDGE / "flows.dottie", [p, q])
+
+    # Cost: the direct line is one hop but costs 5, so traffic takes the cheaper way round; the blue flow goes
+    # alt -> hub (free) -> dst rather than through src; costs out of range are clamped to 0...1,000,000.
+    c = Page("Cost")
+    c.animate(2, fps=10)
+    src = c.add("rectangle", 20, 140, 100, 60, text="src")
+    hub = c.add("rectangle", 220, 20, 100, 60, text="hub")
+    dst = c.add("rectangle", 420, 140, 100, 60, text="dst")
+    alt = c.add("rectangle", 220, 260, 100, 60, text="alt")
+    c.connect(src, dst, text="cost 5", cost=5)
+    c.connect(src, hub)
+    c.connect(hub, dst)
+    c.connect(alt, src, cost=1e12)   # clamped to a million
+    c.connect(alt, hub, cost=0)
+    c.connect(hub, src, start_head="arrow", cost=0)   # src reaches hub free, backwards
+    c.extra = {"flows": [
+        {"id": uid(), "from": src, "to": [dst], "every": 0.4},
+        {"id": uid(), "from": alt, "to": [dst], "every": 0.5, "color": rgba(0.2, 0.5, 1)},
+    ]}
+    write(EDGE / "flows.dottie", [p, q, c])
 
 
 def links():

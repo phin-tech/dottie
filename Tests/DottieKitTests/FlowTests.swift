@@ -86,6 +86,46 @@ final class FlowTests: XCTestCase {
         XCTAssertEqual(DottieDocument.flowRoute(from: api, to: [client], in: doc)?.map(\.1), [true])
     }
 
+    func testTheCheapestRouteWins() throws {
+        var (doc, client, _, east, west) = page()
+        let layer = doc.layers[0].id
+        // A direct line client → east: one hop, so it wins until it costs more than the two-hop way.
+        var direct = Element(kind: .connector, frame: .zero, layerID: layer, connector: ConnectorData(start: .bound(client), end: .bound(east)))
+        doc.elements.append(direct)
+        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [east], in: doc)?.map(\.0), [direct.id])
+        DiagramOps.Look(cost: 2.5).apply(to: &direct)
+        XCTAssertEqual(direct.connector?.cost, 2.5)
+        doc.elements[doc.elements.count - 1] = direct
+        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [east], in: doc)?.count, 2)
+        // A tie goes to the route found first: cost 2 ties, and the direct line was found first.
+        doc.elements[doc.elements.count - 1].connector?.cost = 2
+        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [east], in: doc)?.map(\.0), [direct.id])
+        // Out of range is clamped; 1 clears it.
+        DiagramOps.Look(cost: -4).apply(to: &direct)
+        XCTAssertEqual(direct.connector?.cost, 0)
+        DiagramOps.Look(cost: 1).apply(to: &direct)
+        XCTAssertNil(direct.connector?.cost)
+        // The preference order still picks the destination; cost only picks the way there.
+        XCTAssertEqual(DottieDocument.flowRoute(from: client, to: [west, east], in: doc)?.count, 2)
+        // The fixture: the five-cost direct line loses to the way round.
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../fixtures/edge/flows.dottie")
+        let costPage = try DottieFile.decode(Data(contentsOf: url)).pages[2]
+        let first = try XCTUnwrap(costPage.flows?.first)
+        let route = try XCTUnwrap(DottieDocument.flowRoute(from: first.from, to: first.to, in: costPage))
+        XCTAssertEqual(route.count, 2)
+    }
+
+    func testFlowsFromOneShapeTakeTurns() throws {
+        var (doc, client, _, east, west) = page()
+        // Two flows, same source and timing, one failing over onto the other's region: they interleave, never overlap.
+        try DiagramOps.addFlow(&doc, from: client, to: [east], every: 0.5, speed: 100)
+        try DiagramOps.addFlow(&doc, from: client, to: [west], every: 0.5, speed: 100)
+        for t in stride(from: 0.0, through: 2, by: 0.25) {
+            let frames = packets(doc.posed(at: t)).map(\.frame)
+            XCTAssertEqual(Set(frames.map { "\($0.midX),\($0.midY)" }).count, frames.count, "at \(t)")
+        }
+    }
+
     func testLenientDecoding() throws {
         let json = #"{"id": 3, "from": "nope", "to": ["\#(UUID().uuidString)", "bad"], "every": "fast"}"#
         let f = try JSONDecoder().decode(Flow.self, from: Data(json.utf8))

@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { clickTargets } from "../src/clicks.ts";
 import { parseDottie } from "../src/model.ts";
 import { applyClick, conditionNames, holds } from "../src/state.ts";
+import { flowRoute } from "../src/flows.ts";
 import { posed, still } from "../src/timeline.ts";
 import { read } from "./helpers.ts";
 
@@ -77,4 +78,18 @@ test("flows: routed over what is drawn, round what is offline, nothing where the
   assert.ok(colors({ eastDown: false }).includes("0.3,0.7"));
   // The damaged flow loads, sending nothing.
   assert.equal(flows[flows.length - 1].from, "00000000-0000-0000-0000-000000000000");
+});
+
+test("flows take the cheapest route by connector cost, as Flows.swift does", () => {
+  const page = parseDottie(read("edge", "flows.dottie")).pages.find((p) => p.name === "Cost")!;
+  const [red, blue] = page.flows!;
+  const text = (id: string) => page.elements.find((e) => e.id === id)?.text ?? null;
+  const ends = (route: [string, boolean][]) => route.map(([id]) => page.elements.find((e) => e.id === id)!.connector!);
+  // The direct line costs 5: red goes round by hub, free back along the cost-0 line, then on to dst.
+  const r = flowRoute(red.from, red.to, page)!;
+  assert.equal(r.length, 2);
+  assert.ok(!ends(r).some((c) => text(c.start.elementID!) === "src" && text(c.end.elementID!) === "dst"));
+  // Blue goes alt → hub (free) → dst, not through src (a million).
+  const b = flowRoute(blue.from, blue.to, page)!;
+  assert.deepEqual(ends(b).map((c) => text(c.end.elementID!)), ["hub", "dst"]);
 });

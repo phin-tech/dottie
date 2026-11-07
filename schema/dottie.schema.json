@@ -246,7 +246,8 @@
         "startHead": { "$ref": "#/$defs/arrowhead" },
         "endHead": { "$ref": "#/$defs/arrowhead" },
         "waypoints": { "type": "array", "items": { "$ref": "#/$defs/waypoint" }, "description": "Bends on the canvas the line passes through, start to end, whatever its routing." },
-        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it." }
+        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it." },
+        "cost": { "type": "number", "minimum": 0, "description": "What a flow's traffic pays to take this connector; flows take the cheapest route. Absent is 1." }
       }
     },
     "waypoint": {

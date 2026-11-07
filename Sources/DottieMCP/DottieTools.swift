@@ -47,13 +47,15 @@ private let lookProps: [String: Value] = [
                           "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
                               + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
     "hops": prop("boolean", "Connectors: draw a small hop where this line crosses a connector drawn beneath it"),
+    "cost": prop("number", "Connectors: what add_flow traffic pays to take this line, default 1. Flows take the cheapest "
+                 + "route, so give a main path a lower cost than its backup (or the backup a higher one)"),
     "text_color": prop("string", "Hex color of a shape's or connector's label; \"\" follows the stroke again. Setting stroke on "
                         + "update_element recolors the label too, as in Excalidraw"),
 ]
 
 /// The look fields a connector takes, for build_diagram's edges.
 private let edgeLookProps = lookProps.filter { ["dash", "stroke_width", "bowing", "start_head", "end_head", "font", "font_size", "hops",
-                                                 "text_color"].contains($0.key) }
+                                                 "text_color", "cost"].contains($0.key) }
 
 /// build_diagram's edge fields: what a connector is made with, and its look.
 private let buildEdgeProps: [String: Value] = {
@@ -222,7 +224,8 @@ private struct Args {
                         startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
                         rotation: double("rotation"), gridSize: double("grid_size"),
                         font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"),
-                        textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") })
+                        textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") },
+                        cost: double("cost"))
     }
 
     /// A list of {x, y} points.
@@ -397,7 +400,9 @@ actor DottieTools {
                 + "a state hides a shape or connector (define_state hide, or when), the traffic goes round it with nothing more "
                 + "drawn, and define_state down takes a shape out of the traffic while keeping it drawn, faded: failover, outages "
                 + "and maintenance animate themselves. A connector carries traffic from its start to its "
-                + "end, and back too when its start has an arrowhead. Gives the page a 4-second timeline if it has none and rounds "
+                + "end, and back too when its start has an arrowhead. Traffic takes the cheapest route by connector `cost` "
+                + "(1 each by default, set with update_element), so give a main path a lower cost than its backup. To split "
+                + "traffic across several regions, add one flow per region, each with its own color and its fallbacks in `to`. Gives the page a 4-second timeline if it has none and rounds "
                 + "every so the timeline loops seamlessly. With id, changes that flow; with remove, removes it. Prefer it to "
                 + "send_packet for steady traffic in a system diagram.",
              inputSchema: schema([

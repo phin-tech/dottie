@@ -48,6 +48,8 @@ export interface ConnectorData {
   waypoints: StrokePoint[] | null;
   /** Hops where the line crosses a connector drawn beneath it. */
   hops: boolean | null;
+  /** What a flow's traffic pays to take this connector (ADR 0002); null is 1. */
+  cost: number | null;
 }
 
 export interface PathSubpath { closed: boolean; coords: number[] }
@@ -239,7 +241,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   extensionRef: ["id", "shape", "version", "params"],
   normalizedPoint: ["x", "y"],
   normalizedRect: ["x", "y", "width", "height"],
-  connector: ["start", "end", "routing", "startHead", "endHead", "waypoints", "hops"],
+  connector: ["start", "end", "routing", "startHead", "endHead", "waypoints", "hops", "cost"],
   waypoint: ["x", "y"],
   timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
   track: ["element", "keys", "boil", "follow", "repeats", "march"],
@@ -377,6 +379,7 @@ class Reader {
         ? v.waypoints.filter(isObj).map((w) => { this.fields(w, "waypoint"); return { x: num(w.x) ?? 0, y: num(w.y) ?? 0 }; })
         : null,
       hops: typeof v.hops === "boolean" ? v.hops : null,
+      cost: typeof v.cost === "number" && Number.isFinite(v.cost) ? v.cost : null,
     };
   }
 

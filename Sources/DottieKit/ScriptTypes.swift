@@ -341,6 +341,8 @@ extension DottieScript {
             /** Connectors: the bends the line runs through, and whether it hops the lines beneath it. */
             waypoints?: Point[];
             hops?: boolean;
+            /** Connectors: what a flow's traffic pays to take it, when not 1. */
+            cost?: number;
             /** Connectors: the shape at each end, when attached. */
             from?: string;
             to?: string;
@@ -375,6 +377,8 @@ extension DottieScript {
             waypoints?: Point[];
             /** Connectors only: a small hop where the line crosses a connector drawn beneath it. */
             hops?: boolean;
+            /** Connectors only: what a flow's traffic pays to take this line, default 1; flows take the cheapest route. */
+            cost?: number;
             /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
              * (named in exports, not embedded), or "" for Helvetica Neue. */
             font?: string;

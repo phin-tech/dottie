@@ -105,16 +105,18 @@ public enum DiagramOps {
         public var waypoints: [CGPoint]?
         /// Whether a connector hops over the connectors beneath it.
         public var hops: Bool?
+        /// What a flow's traffic pays to take a connector; 1 (the default) clears it.
+        public var cost: Double?
         /// A shape's or connector's label color; `.some(nil)` goes back to following the stroke.
         public var textColor: RGBA??
         public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
                     startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil,
                     font: String? = nil, fontSize: Double? = nil, waypoints: [CGPoint]? = nil, hops: Bool? = nil,
-                    textColor: RGBA?? = nil) {
+                    textColor: RGBA?? = nil, cost: Double? = nil) {
             self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
             self.startHead = startHead; self.endHead = endHead; self.rotation = rotation; self.gridSize = gridSize
             self.font = font; self.fontSize = fontSize; self.waypoints = waypoints; self.hops = hops
-            self.textColor = textColor
+            self.textColor = textColor; self.cost = cost
         }
 
         /// Sets the font and text size, the part of the look a shape's default size depends on.
@@ -140,6 +142,10 @@ public enum DiagramOps {
                 if let endHead { e.connector?.endHead = endHead }
                 if let waypoints { e.connector?.waypoints = waypoints.isEmpty ? nil : waypoints.map(Waypoint.init) }
                 if let hops { e.connector?.hops = hops ? true : nil }
+                if let cost, cost.isFinite {
+                    let c = min(max(cost, 0), 1_000_000)
+                    e.connector?.cost = c == 1 ? nil : c
+                }
             } else if let rotation {
                 let a = (rotation * .pi / 180).truncatingRemainder(dividingBy: 2 * .pi)
                 e.rotation = abs(a) < 1e-9 ? nil : a
@@ -428,6 +434,8 @@ public enum DiagramOps {
         /// For a connector: the bends it runs through, and whether it hops the lines beneath it.
         public var waypoints: [Waypoint]?
         public var hops: Bool?
+        /// For a connector: what a flow's traffic pays to take it, when not 1.
+        public var cost: Double? = nil
         /// The page variables a click sets and flips, and the condition the element is drawn under.
         public var clickSet: [String: Bool]? = nil
         public var clickToggle: [String]? = nil
@@ -455,6 +463,7 @@ public enum DiagramOps {
                                   playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil, args: e.args,
                                   waypoints: e.connector?.waypoints, hops: e.connector?.hops)
             s.clickSet = e.click?.set; s.clickToggle = e.click?.toggle; s.when = e.when
+            s.cost = e.connector?.cost
             s.overrides = e.overrides.map { $0.map(\.summary) }
             return s
         }
