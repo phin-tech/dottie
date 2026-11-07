@@ -5,6 +5,31 @@
   "description": "A Dottie drawing as DottieKit reads and writes it. Kept in step with the Swift model: DottieKitTests/SchemaTests checks that every fixture and every encoded model validates, and that every stored property of the model types is listed here. A change to the model that isn't made here fails that test, which is the prompt to update dottie.js (web/) too. Required fields are the ones DottieKit's decoders need; everything else may be left out.",
   "$ref": "#/$defs/file",
   "$defs": {
+    "flowOverride": {
+      "type": "object",
+      "description": "A flow's volume while a condition on the page's variables holds.",
+      "required": ["when"],
+      "additionalProperties": false,
+      "properties": {
+        "when": { "type": "string" },
+        "volume": { "type": "number", "minimum": 0 }
+      }
+    },
+    "gauge": {
+      "type": "object",
+      "description": "Shows a metric (ADR 0003): when the page is posed, the element is drawn as plain paths and a label.",
+      "required": ["metric", "of"],
+      "additionalProperties": false,
+      "properties": {
+        "metric": { "enum": ["throughput", "load", "delay", "backlog", "depth", "inFlight", "transit", "backup"] },
+        "of": { "$ref": "#/$defs/uuid", "description": "The element or flow it measures." },
+        "max": { "type": "number", "description": "What a full bar or dial stands for." },
+        "warn": { "type": "number", "description": "At or past this it turns amber." },
+        "alarm": { "type": "number", "description": "At or past this it turns red." },
+        "style": { "enum": ["number", "bar", "dial"] },
+        "label": { "type": "string" }
+      }
+    },
     "uuid": {
       "type": "string",
       "pattern": "^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$"
@@ -56,7 +81,10 @@
         "color": { "$ref": "#/$defs/rgba" },
         "size": { "type": "number", "description": "Packet diameter; 12 by default." },
         "when": { "type": "string", "description": "A condition on the page's variables: nothing flows while it fails." },
-        "spread": { "type": "boolean", "description": "While the first destination can't be reached, packets are dealt in turn across every other one that can." }
+        "spread": { "type": "boolean", "description": "While the first destination can't be reached, packets are dealt in turn across every other one that can." },
+        "volume": { "type": "number", "minimum": 0, "description": "How much it carries, in the page's own unit (ADR 0003); 1 by default." },
+        "overrides": { "type": "array", "description": "Its volume while a condition on the page's variables holds, the last that holds winning.",
+          "items": { "$ref": "#/$defs/flowOverride" } }
       }
     },
     "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
@@ -160,7 +188,11 @@
         "reveal": { "type": "number" },
         "extension": { "$ref": "#/$defs/extensionRef", "description": "For a path made by an extension: the shape that generated its subpaths, and its parameters." },
         "ports": { "type": "array", "items": { "$ref": "#/$defs/normalizedPoint" }, "description": "For an extension shape: connection points, normalized to the frame." },
-        "labelRect": { "$ref": "#/$defs/normalizedRect", "description": "For an extension shape: where its label goes, normalized to the frame." }
+        "labelRect": { "$ref": "#/$defs/normalizedRect", "description": "For an extension shape: where its label goes, normalized to the frame." },
+        "capacity": { "type": "number", "minimum": 0, "description": "The most flow volume it carries (ADR 0003); what doesn't fit takes the next cheapest route or is backlog. Absent is unlimited." },
+        "delay": { "type": "number", "minimum": 0, "description": "A shape's seconds that flow traffic stays inside it when passing through (ADR 0003)." },
+        "queue": { "type": "boolean", "description": "A shape that is a queue: traffic that can't go on waits at the nearest one before whatever is full (ADR 0003)." },
+        "gauge": { "$ref": "#/$defs/gauge" }
       }
     },
     "extensionRef": {
@@ -361,7 +393,8 @@
         "scene": { "type": "string", "description": "A marker's name: jump there and play on to the next scene." },
         "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." },
         "set": { "type": "object", "description": "Page variables to give these values, without touching the playhead.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
-        "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] }
+        "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] },
+        "reset": { "type": "boolean", "description": "Puts every page variable back to its starting value first, before set and toggle." }
       }
     },
     "override": {
@@ -380,7 +413,9 @@
         "text": { "type": "string", "description": "Replaces the element's text or label." },
         "reroute": { "type": "object", "additionalProperties": { "$ref": "#/$defs/uuid" }, "description": "For an element that follows connectors (a packet): connector id to the connector it follows instead." },
         "offline": { "type": "boolean", "description": "Still drawn, but carries no flow traffic: flows route round it." },
-        "cost": { "type": "number", "minimum": 0, "description": "A connector's cost for flow traffic while this applies: a degraded link." }
+        "cost": { "type": "number", "minimum": 0, "description": "A connector's cost for flow traffic while this applies: a degraded link." },
+        "capacity": { "type": "number", "minimum": 0, "description": "Its capacity while this applies." },
+        "delay": { "type": "number", "minimum": 0, "description": "Its delay while this applies." }
       }
     },
     "hover": {

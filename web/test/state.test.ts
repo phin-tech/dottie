@@ -6,7 +6,8 @@ import { clickTargets } from "../src/clicks.ts";
 import { parseDottie } from "../src/model.ts";
 import { applyClick, conditionNames, holds } from "../src/state.ts";
 import { flowRoute } from "../src/flows.ts";
-import { posed, still } from "../src/timeline.ts";
+import { queueKey } from "../src/measure.ts";
+import { posed, posedWithMetrics, still } from "../src/timeline.ts";
 import { read } from "./helpers.ts";
 
 test("conditions read as DottieKit reads them", () => {
@@ -27,9 +28,9 @@ test("the state fixture: starting values, other values, and every element", () =
   const file = parseDottie(read("edge", "state.dottie"));
   const [regions, plain] = file.pages;
   const texts = (p: { elements: { text: string | null; kind: string }[] }) => p.elements.map((e) => e.text ?? e.kind);
-  assert.deepEqual(texts(posed(regions, 0)), ["east", "west", "maint", "unknown", "live", "ellipse"]);
+  assert.deepEqual(texts(posed(regions, 0)), ["east", "west", "maint", "unknown", "reset", "live", "ellipse"]);
   // Down: west and its connector go, backup and its packet come, the keyed connector to backup stays gone.
-  assert.deepEqual(texts(posed(regions, 1.5, { down: true })), ["east", "backup", "maint", "unknown", "standby", "ellipse"]);
+  assert.deepEqual(texts(posed(regions, 1.5, { down: true })), ["east", "backup", "maint", "unknown", "reset", "standby", "ellipse"]);
   assert.equal(posed(regions, 0, "all").elements.length, regions.elements.length);
   // A page with no timeline still follows its state.
   assert.deepEqual(texts(still(plain)), ["on", "flip", "overridden"]);
@@ -64,6 +65,9 @@ test("clicks that set and toggle, alone or with a scene", () => {
   assert.deepEqual(byText("backup"), { scene: 1, set: { maint: false } });
   assert.deepEqual(byText("maint"), { state: true, toggle: ["down", "maint"] });
   assert.deepEqual(applyClick({ scene: null, url: null, set: { a: true }, toggle: ["a", "b"] }, { a: false }), { a: false, b: true });
+  // A reset puts every variable back to its starting value (one with none, false), before set and toggle.
+  assert.deepEqual(applyClick({ scene: null, url: null, set: null, toggle: ["b"], reset: true }, { a: false, b: true, c: true }, { a: true }),
+    { a: true, b: true, c: false });
   assert.equal(page.timeline!.markers![0].loop, true);
   assert.equal(page.timeline!.markers![1].loop, null);
 });
@@ -73,8 +77,11 @@ test("flows: routed over what is drawn, round what is offline, nothing where the
   const flows = page.flows!;
   const colors = (s: Record<string, boolean>) => posed(page, 1, s).elements.filter((e) => e.text === null && e.kind === "ellipse")
     .map((e) => `${e.style.fill.r},${e.style.fill.g}`);
-  // East down (the starting value): no traffic to spare, which is offline; east up: some.
-  assert.ok(!colors({}).includes("0.3,0.7"));
+  // East down (the starting value): nothing reaches spare, which is offline, so that flow is all backlog, piled
+  // at the client (ADR 0003); east up: it flows.
+  const spareFlow = flows[4].id;
+  assert.equal(posedWithMetrics(page, 1, {}).metrics.flows.get(spareFlow)?.backlog, 1);
+  assert.equal(posedWithMetrics(page, 1, { eastDown: false }).metrics.flows.get(spareFlow)?.placed, 1);
   assert.ok(colors({ eastDown: false }).includes("0.3,0.7"));
   // The damaged flow loads, sending nothing.
   assert.equal(flows[flows.length - 1].from, "00000000-0000-0000-0000-000000000000");
@@ -97,11 +104,11 @@ test("flows take the cheapest route by connector cost, as Flows.swift does", () 
 test("spread deals a downed destination's packets across the rest; a jam override changes a connector's cost", () => {
   const pages = parseDottie(read("edge", "flows.dottie")).pages;
   const spread = pages.find((p) => p.name === "Spread")!;
-  const frame = posed(spread, 1.9, { r1Down: true });
+  const frames = [1.3, 1.45, 1.6, 1.75, 1.9].map((t) => posed(spread, t, { r1Down: true }));
   // Where each packet past x 200 is headed, by color (fill g): orange 0.5, blue 0.5 with r 0.2, green 0.7.
-  const ends = (r: number, g: number) => new Set(frame.elements
+  const ends = (r: number, g: number) => new Set(frames.flatMap((f) => f.elements)
     .filter((e) => e.text === null && e.kind === "ellipse" && e.style.fill.r === r && e.style.fill.g === g && e.x > 200)
-    .map((e) => (e.y < 250 ? "r2" : "r3")));
+    .map((e) => (e.y + e.height / 2 < 205 ? "r2" : "r3")));
   // Orange spreads over r2 and r3 while r1 is down; blue goes on to r2; green's first choice, r3, is up.
   assert.deepEqual([...ends(0.9, 0.5)].sort(), ["r2", "r3"]);
   assert.deepEqual([...ends(0.2, 0.5)], ["r2"]);
@@ -114,4 +121,37 @@ test("spread deals a downed destination's packets across the rest; a jam overrid
   assert.deepEqual(route(true), [direct.id]);
   // A cost that isn't a number loads as none.
   assert.equal(cost.elements.filter((e) => e.connector && e.connector.cost === null).length, 3);
+});
+
+test("a carried queue drains at the room left, holds with none, and its packets leave (ADR 0003)", () => {
+  const cap = parseDottie(read("edge", "flows.dottie")).pages.find((p) => p.name === "Capacity")!;
+  const queue = cap.elements.find((e) => e.anchor === "queue")!.id;
+  const workers = cap.elements.find((e) => e.anchor === "workers")!;
+  const blue = cap.flows![1];
+  // Blue switched off, with 4 carried in the queue: the workers are full with red, so it holds.
+  const page = { ...cap, flows: [cap.flows![0], { ...blue, when: "busy" }] };
+  const carried = { [queueKey(queue, blue.id)]: 4 };
+  const held = posedWithMetrics(page, 1, { busy: false }, 2, carried).metrics;
+  assert.equal(held.elements.get(queue)?.depth, 4);
+  // With room for 2 more a second on the workers, it drains at 2 a second, and they run full meanwhile.
+  const roomy = { ...page, elements: page.elements.map((e) => (e.id === workers.id ? { ...e, capacity: 5 } : e)) };
+  const draining = posedWithMetrics(roomy, 1, { busy: false }, 1, carried);
+  assert.equal(draining.metrics.elements.get(queue)?.depth, 2);
+  assert.equal(draining.metrics.elements.get(workers.id)?.load, 1);
+  assert.ok(draining.frame.elements.some((e) => e.id.startsWith(blue.id.slice(0, 24))));
+  assert.equal(posedWithMetrics(roomy, 1, { busy: false }, 3, carried).metrics.elements.get(queue)?.depth, 0);
+});
+
+test("queues, flow volume overrides, combined capacities and alarms on an element's own load", () => {
+  const qp = parseDottie(read("edge", "flows.dottie")).pages.find((p) => p.name === "Queue")!;
+  const id = (t: string) => qp.elements.find((e) => e.text === t)!.id;
+  const { frame, metrics } = posedWithMetrics(qp, 1, {});
+  // spike: 5 against a table of 2; sqs is a queue, so the 3 waits there, not at the worker.
+  assert.equal(metrics.flows.get(qp.flows![0].id)?.volume, 5);
+  assert.equal(metrics.elements.get(id("sqs"))?.backlog, 3);
+  assert.equal(metrics.elements.get(id("worker"))?.backlog, 0);
+  assert.equal(frame.elements.find((e) => e.id === id("worker"))?.capacity, 10);
+  assert.equal(posed(qp, 1, { slow: true }).elements.find((e) => e.id === id("worker"))?.capacity, 1);
+  assert.equal(frame.elements.find((e) => e.id === id("table"))?.style.stroke.r, 0.86);
+  assert.equal(posedWithMetrics(qp, 1, { spike: false }).metrics.flows.get(qp.flows![0].id)?.volume, 2);
 });

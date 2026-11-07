@@ -206,6 +206,16 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var ports: [NormalizedPoint]?
     /// Only for an extension shape: where its label goes, normalized to the frame.
     public var labelRect: NormalizedRect?
+    /// The most flow volume it carries (ADR 0003): a worker pool's throughput, a rate limit, a lane's trucks a day.
+    /// What doesn't fit takes the next cheapest route or is backlog. nil is unlimited.
+    public var capacity: Double?
+    /// Only for a shape: seconds flow traffic stays inside it when passing through (ADR 0003). nil is 0.
+    public var delay: Double?
+    /// Only for a shape: it's a queue, so traffic that can't go on waits here, the nearest queue before whatever is
+    /// full, rather than right in front of it (ADR 0003): an SQS queue in front of workers and the table they write to.
+    public var queue: Bool?
+    /// Shows a metric (ADR 0003). When the page is posed, it's drawn as plain paths and a label in this frame.
+    public var gauge: Gauge?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,
@@ -292,15 +302,18 @@ public struct ClickAction: Codable, Equatable, Sendable {
     public var set: [String: Bool]?
     /// Page variables to flip, after `set`.
     public var toggle: [String]?
+    /// Puts every page variable back to its starting value first, whatever variables the page has by then.
+    public var reset: Bool?
 
-    public init(scene: String? = nil, url: String? = nil, set: [String: Bool]? = nil, toggle: [String]? = nil) {
+    public init(scene: String? = nil, url: String? = nil, set: [String: Bool]? = nil, toggle: [String]? = nil, reset: Bool? = nil) {
+        self.reset = reset == true ? true : nil
         self.scene = scene
         self.url = url.flatMap(Self.allowed)
         self.set = set.flatMap { $0.isEmpty ? nil : $0 }
         self.toggle = toggle.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle }
+    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle, reset }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -311,7 +324,8 @@ public struct ClickAction: Codable, Equatable, Sendable {
         self.init(scene: try c.decodeIfPresent(String.self, forKey: .scene),
                   url: try c.decodeIfPresent(String.self, forKey: .url),
                   set: try c.decodeIfPresent([String: Bool].self, forKey: .set)?.filter { PageState.isName($0.key) },
-                  toggle: toggle?.filter(PageState.isName))
+                  toggle: toggle?.filter(PageState.isName),
+                  reset: (try? c.decodeIfPresent(Bool.self, forKey: .reset)) ?? nil)
     }
 
     /// `url` trimmed, if it is a link a page may open.

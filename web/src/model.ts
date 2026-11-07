@@ -57,7 +57,11 @@ export interface StrokePoint { x: number; y: number }
 export interface EmbeddedImage { data: string; format: string }
 /** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link; and page
  * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
-export interface ClickAction { scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null }
+export interface ClickAction {
+  scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null;
+  /** Puts every page variable back to its starting value first. */
+  reset?: boolean | null;
+}
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
 /** A change to an element while `when` holds (StateOverride): a field left null keeps the element's own. */
 export interface StateOverride {
@@ -74,6 +78,9 @@ export interface StateOverride {
   offline: boolean | null;
   /** A connector's cost for flow traffic meanwhile. */
   cost: number | null;
+  /** Its capacity and delay meanwhile (ADR 0003). */
+  capacity: number | null;
+  delay: number | null;
 }
 
 export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
@@ -118,6 +125,24 @@ export interface Element {
   ports?: { x: number; y: number }[] | null;
   labelRect?: { x: number; y: number; width: number; height: number } | null;
   extension?: ExtensionRef | null;
+  /** The most flow volume it carries, and a shape's delay in seconds (ADR 0003). */
+  capacity?: number | null;
+  delay?: number | null;
+  /** A shape that is a queue: backlog waits at the nearest one before whatever is full. */
+  queue?: boolean | null;
+  /** Shows a metric; drawn as plain paths and a label when the page is posed (metrics.ts). */
+  gauge?: Gauge | null;
+}
+
+/** A metric shown in an element's frame (Gauge, ADR 0003). */
+export interface Gauge {
+  metric: string;
+  of: string;
+  max: number | null;
+  warn: number | null;
+  alarm: number | null;
+  style: "number" | "bar" | "dial" | null;
+  label: string | null;
 }
 
 export interface Layer { id: string; name: string; visible: boolean; locked: boolean }
@@ -196,6 +221,10 @@ export interface Flow {
   when: string | null;
   /** When the first destination can't be reached, deal packets across every other one that can. */
   spread: boolean | null;
+  /** How much it carries (ADR 0003); null is 1. */
+  volume: number | null;
+  /** Its volume while a condition holds, the last that holds winning. */
+  overrides?: { when: string; volume: number | null }[] | null;
 }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
@@ -230,14 +259,16 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
   page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
-  flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread"],
+  flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume", "overrides"],
+  flowOverride: ["when", "volume"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "overrides", "symbol", "playback", "offset", "args", "image", "reveal",
-    "ports", "labelRect", "extension"],
+    "ports", "labelRect", "extension", "capacity", "delay", "queue", "gauge"],
+  gauge: ["metric", "of", "max", "warn", "alarm", "style", "label"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
   inlineImage: ["data", "format"],
@@ -254,9 +285,9 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   repeat: ["start", "end", "count"],
   cameraKey: ["t", "x", "y", "width", "height", "ease"],
   marker: ["t", "name", "loop"],
-  click: ["scene", "url", "set", "toggle"],
+  click: ["scene", "url", "set", "toggle", "reset"],
   hover: ["stroke", "fill", "opacity"],
-  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost"],
+  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost", "capacity", "delay"],
 };
 
 export const MAX_DURATION = 3600;
@@ -442,6 +473,24 @@ class Reader {
       ports: Array.isArray(v.ports) ? v.ports.map((p) => { const o: Obj = isObj(p) ? p : {}; return { x: num(o.x) ?? 0, y: num(o.y) ?? 0 }; }) : null,
       labelRect: this.labelRect(v.labelRect),
       extension: this.extension(v.extension),
+      capacity: num(v.capacity) ?? null,
+      delay: num(v.delay) ?? null,
+      queue: v.queue === true ? true : null,
+      gauge: this.gauge(v.gauge),
+    };
+  }
+
+  gauge(v: unknown): Gauge | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "gauge");
+    const finite = (x: unknown): number | null => (typeof x === "number" && Number.isFinite(x) ? x : null);
+    const style = str(v.style);
+    return {
+      metric: str(v.metric) ?? "",
+      of: typeof v.of === "string" && UUID.test(v.of) ? v.of.toUpperCase() : NO_ID,
+      max: finite(v.max), warn: finite(v.warn), alarm: finite(v.alarm),
+      style: style === "number" || style === "bar" || style === "dial" ? style : null,
+      label: str(v.label) ?? null,
     };
   }
 
@@ -490,7 +539,7 @@ class Reader {
     }
     const raw = typeof v.toggle === "string" ? [v.toggle] : Array.isArray(v.toggle) && v.toggle.every((x) => typeof x === "string") ? v.toggle as string[] : null;
     const toggle = raw ? raw.filter(isName) : null;
-    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null };
+    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null, reset: v.reset === true ? true : null };
   }
 
   playback(v: unknown): SymbolPlayback | null {
@@ -540,6 +589,8 @@ class Reader {
         reroute,
         offline: o.offline === true ? true : null,
         cost: typeof o.cost === "number" && Number.isFinite(o.cost) ? o.cost : null,
+        capacity: typeof o.capacity === "number" && Number.isFinite(o.capacity) ? o.capacity : null,
+        delay: typeof o.delay === "number" && Number.isFinite(o.delay) ? o.delay : null,
       };
     });
   }
@@ -669,6 +720,10 @@ class Reader {
       color: isObj(f.color) && ["r", "g", "b", "a"].every((k) => typeof (f.color as Obj)[k] === "number") ? rgba(f.color) ?? null : null,
       when: str(f.when) ?? null,
       spread: f.spread === true ? true : null,
+      volume: finite(f.volume),
+      overrides: Array.isArray(f.overrides) && f.overrides.length > 0
+        ? f.overrides.filter(isObj).map((o) => { this.fields(o, "flowOverride"); return { when: str(o.when) ?? "", volume: finite(o.volume) }; })
+        : null,
     };
   }
 }
@@ -728,6 +783,7 @@ export function cloneElement(e: Element): Element {
       ...e.connector, start: { ...e.connector.start }, end: { ...e.connector.end },
       waypoints: e.connector.waypoints?.map((w) => ({ ...w })) ?? null,
     } : null,
+    gauge: e.gauge ? { ...e.gauge } : e.gauge,
   };
 }
 

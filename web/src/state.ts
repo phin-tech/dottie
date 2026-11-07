@@ -10,12 +10,61 @@ export function isName(name: string): boolean {
   return name.length <= MAX_NAME && /^[A-Za-z_][A-Za-z0-9_]*$/.test(name);
 }
 
-/** The variable names `condition` reads, or null when it isn't one: names, each optionally after `!`, joined by
- * `&&` and `||` (`&&` binds tighter). */
+/** The metrics a condition can compare (ADR 0003), as `load(workers) > 0.9`. */
+export const METRIC_NAMES = ["throughput", "load", "delay", "backlog", "depth", "inFlight", "transit", "backup"];
+
+/** A comparison of a metric in a condition (PageState.MetricTerm). */
+export interface MetricTerm { metric: string; target: string; op: string; value: number }
+
+const OPS = [">=", "<=", "==", "!=", ">", "<"];
+
+/** `term` (trimmed) read as a metric comparison, or null. */
+export function metricTerm(term: string): MetricTerm | null {
+  const t = trim(term);
+  // Without a target (`load >= 1`) it's the element's own.
+  if (!t.includes("(")) {
+    const op = t.search(/[>=<!]/);
+    if (op < 0) return null;
+    const name = trim(t.slice(0, op));
+    if (!METRIC_NAMES.includes(name)) return null;
+    const m = metricTerm(name + "() " + t.slice(op));
+    return m ? { ...m, target: "" } : null;
+  }
+  const open = t.indexOf("("), close = t.indexOf(")");
+  if (open < 0 || close < 0 || open >= close) return null;
+  const name = trim(t.slice(0, open)), target = trim(t.slice(open + 1, close));
+  let rest = trim(t.slice(close + 1));
+  if (!METRIC_NAMES.includes(name) || target.includes("(")) return null;
+  const op = OPS.find((o) => rest.startsWith(o));
+  if (op === undefined) return null;
+  rest = trim(rest.slice(op.length));
+  if (!/^-?[0-9]+(\.[0-9]+)?$/.test(rest)) return null;
+  return { metric: name, target, op, value: Number(rest) };
+}
+
+function passes(m: MetricTerm, v: number): boolean {
+  switch (m.op) {
+    case ">": return v > m.value;
+    case ">=": return v >= m.value;
+    case "<": return v < m.value;
+    case "<=": return v <= m.value;
+    case "==": return v === m.value;
+    default: return v !== m.value;
+  }
+}
+
+/** Whether `condition` compares a metric anywhere. */
+export function mentionsMetric(condition: string): boolean {
+  return condition.split("||").some((any) => any.split("&&").some((all) => metricTerm(all) !== null));
+}
+
+/** The variable names `condition` reads, or null when it isn't one: names, each optionally after `!`, or metric
+ * comparisons, joined by `&&` and `||` (`&&` binds tighter). */
 export function conditionNames(condition: string): string[] | null {
   const out: string[] = [];
   for (const any of condition.split("||")) {
     for (const all of any.split("&&")) {
+      if (metricTerm(all) !== null) continue;
       let term = trim(all);
       if (term.startsWith("!")) term = trim(term.slice(1));
       if (!isName(term)) return null;
@@ -25,11 +74,17 @@ export function conditionNames(condition: string): string[] | null {
   return out;
 }
 
-/** Whether `condition` holds with these values. A missing variable is false; a condition that can't be read never
- * holds. */
-export function holds(condition: string, state: Record<string, boolean>): boolean {
+/** Whether `condition` holds with these values, and `metric` giving the frame's metrics. A missing variable is
+ * false, and so is a comparison whose metric can't be had; a condition that can't be read never holds. */
+export function holds(condition: string, state: Record<string, boolean>,
+  metric: ((m: MetricTerm) => number | null) | null = null): boolean {
   if (conditionNames(condition) === null) return false;
   return condition.split("||").some((any) => any.split("&&").every((all) => {
+    const m = metricTerm(all);
+    if (m !== null) {
+      const v = metric ? metric(m) : null;
+      return v !== null && passes(m, v);
+    }
     let term = trim(all);
     let negated = false;
     if (term.startsWith("!")) { negated = true; term = trim(term.slice(1)); }
@@ -60,7 +115,12 @@ export function stateHidden(page: Page, choice: StateChoice): Set<string> {
 /** The overrides of `e` that hold under `values`, in order; none for null ("all", the editor). */
 export function activeOverrides(e: Element, values: Record<string, boolean> | null): StateOverride[] {
   if (!values || !e.overrides) return [];
-  return e.overrides.filter((o) => holds(o.when, values));
+  return e.overrides.filter((o) => !mentionsMetric(o.when) && holds(o.when, values));
+}
+
+/** Only what an override comparing metrics may change: its looks (ADR 0003). */
+export function looksOnly(o: StateOverride): StateOverride {
+  return { ...o, reroute: null, offline: null, cost: null, capacity: null, delay: null };
 }
 
 /** `e` with `o` applied (StateOverride.apply): opacity multiplies, the rest replaces. */
@@ -73,6 +133,8 @@ export function applyOverride(o: StateOverride, e: Element): Element {
   if (o.dash !== null) out.style.dash = o.dash;
   if (o.text !== null) out.text = o.text;
   if (o.cost !== null && out.connector) out.connector.cost = Math.min(Math.max(o.cost, 0), 1_000_000);
+  if (o.capacity !== null) out.capacity = Math.max(o.capacity, 0);
+  if (o.delay !== null && out.kind !== "connector") out.delay = Math.max(o.delay, 0);
   if (o.opacity !== null) {
     const v = Math.min(Math.max(o.opacity, 0), 1) * (out.style.opacity ?? 1);
     out.style.opacity = v >= 1 ? null : v;
@@ -82,12 +144,18 @@ export function applyOverride(o: StateOverride, e: Element): Element {
 
 /** Whether a click sets or flips a variable. */
 export function changesState(c: ClickAction | null): boolean {
-  return !!c && (Object.keys(c.set ?? {}).length > 0 || (c.toggle ?? []).length > 0);
+  return !!c && (c.reset === true || Object.keys(c.set ?? {}).length > 0 || (c.toggle ?? []).length > 0);
 }
 
-/** `state` after the click: its `set` values, then each `toggle` flipped (a missing variable starts false). */
-export function applyClick(c: ClickAction, state: Record<string, boolean>): Record<string, boolean> {
-  const out = { ...state };
+/** `state` after the click: the starting values (`initial`) back if it resets, then its `set` values, then each
+ * `toggle` flipped (a missing variable starts false). */
+export function applyClick(c: ClickAction, state: Record<string, boolean>, initial: Record<string, boolean> = {}): Record<string, boolean> {
+  let out = { ...state };
+  if (c.reset === true) {
+    out = {};
+    for (const k of Object.keys(state)) out[k] = false;
+    Object.assign(out, initial);
+  }
   for (const [k, v] of Object.entries(c.set ?? {})) out[k] = v;
   for (const k of c.toggle ?? []) out[k] = !(out[k] ?? false);
   return out;

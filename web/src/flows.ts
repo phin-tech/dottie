@@ -6,11 +6,10 @@ import { Polyline, type Point } from "./path.ts";
 import { holds } from "./state.ts";
 import { tracing } from "./timeline.ts";
 
-const DEFAULT_EVERY = 0.5, DEFAULT_SPEED = 160, DEFAULT_SIZE = 12;
-const DEFAULT_COLOR: RGBA = { r: 0.95, g: 0.36, b: 0.33, a: 1 };
-const MAX_PACKETS = 400;
+export const DEFAULT_EVERY = 0.5, DEFAULT_SPEED = 160, DEFAULT_SIZE = 12;
+export const DEFAULT_COLOR: RGBA = { r: 0.95, g: 0.36, b: 0.33, a: 1 };
 
-const clamp = (v: number | null, fallback: number, lo: number, hi: number): number =>
+export const clamp = (v: number | null, fallback: number, lo: number, hi: number): number =>
   v === null || !Number.isFinite(v) ? fallback : Math.min(Math.max(v, lo), hi);
 
 /** The id of a flow's packet `k`: the flow's id with its last twelve digits standing for `k` (Flow.packetID). */
@@ -95,74 +94,4 @@ export function flowRoute(from: string, to: string[], frame: Page, offline: Set<
   const tree = flowTree(from, frame, offline);
   const goal = tree?.goals(to, false)[0];
   return tree && goal !== undefined ? tree.hops(goal) : null;
-}
-
-/** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs). */
-export function flowPackets(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
-  offline: Set<string> = new Set()): Element[] {
-  if (!flows || flows.length === 0) return [];
-  const byID = new Map<string, Element>();
-  for (const e of frame.elements) if (!byID.has(e.id)) byID.set(e.id, e);
-  const out: Element[] = [];
-  // Flows leaving the same shape take turns: the i-th of m starts i/m of its gap later, so they don't draw on top
-  // of each other. Counted over the page's flows, whatever their conditions, so a flow switching on moves none.
-  const leaving = new Map<string, number>(), turn: number[] = [];
-  for (const flow of flows) { const n = leaving.get(flow.from) ?? 0; turn.push(n); leaving.set(flow.from, n + 1); }
-  for (const [i, flow] of flows.entries()) {
-    if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
-    const source = byID.get(flow.from);
-    const tree = source ? flowTree(flow.from, frame, offline) : null;
-    if (!source || !tree) continue;
-    const goals = tree.goals(flow.to, flow.spread === true);
-    const every = clamp(flow.every, DEFAULT_EVERY, 0.05, 60);
-    const speed = clamp(flow.speed, DEFAULT_SPEED, 1, 10000);
-    const size = clamp(flow.size, DEFAULT_SIZE, 2, 200);
-    const phase = (turn[i] / leaving.get(flow.from)!) * every;
-    const color = flow.color ?? DEFAULT_COLOR;
-    // Spread: packet k goes to goal k mod n.
-    const n = goals.length;
-    for (const [j, goal] of goals.entries()) {
-      // The route, and the stretches inside the shapes it passes through, where a packet isn't drawn.
-      const points: Point[] = [], inside: [number, number][] = [];
-      let length = 0;
-      for (const [id, back] of tree.hops(goal)) {
-        const c = byID.get(id);
-        if (!c) continue;
-        const p = back ? [...tracing(c, frame).points].reverse() : tracing(c, frame).points;
-        if (p.length === 0) continue;
-        const last = points[points.length - 1];
-        if (last) {
-          const gap = Math.hypot(p[0].x - last.x, p[0].y - last.y);
-          inside.push([length, length + gap]);
-          length += gap;
-        }
-        for (let q = 1; q < p.length; q++) length += Math.hypot(p[q].x - p[q - 1].x, p[q].y - p[q - 1].y);
-        points.push(...p);
-      }
-      if (!(length > 0)) continue;
-      const line = new Polyline(points);
-      // Packet k left at k × every + phase; it's on the route while 0 <= (t − k × every − phase) × speed <= length.
-      const lo = Math.ceil((t - phase - length / speed) / every);
-      const hi = Math.floor((t - phase) / every);
-      let k = Math.max(lo, hi - MAX_PACKETS * n + 1);
-      k += (((j - k) % n) + n) % n;
-      for (; k <= hi; k += n) {
-        const d = (t - k * every - phase) * speed;
-        if (inside.some(([a, b]) => d > a && d < b)) continue;
-        const p = line.point(d / length);
-        out.push({
-          id: packetID(flow.id, k), kind: "ellipse", layerID: source.layerID,
-          x: p.x - size / 2, y: p.y - size / 2, width: size, height: size,
-          style: {
-            stroke: { ...color }, fill: { ...color }, fillStyle: "solid", strokeWidth: 1.5, dash: "solid", roughness: 0,
-            bowing: 1, fontSize: 18, font: null, gridSize: null, opacity: null, dashOffset: null, textColor: null,
-          },
-          seed: 1, text: null, connector: null, groupID: null, points: null, path: null, subpaths: null, evenOdd: null,
-          rotation: null, link: null, url: null, anchor: null, click: null, hover: null, when: null, overrides: null,
-          symbol: null, playback: null, offset: null, args: null, image: null, reveal: null,
-        });
-      }
-    }
-  }
-  return out;
 }

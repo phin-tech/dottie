@@ -235,11 +235,28 @@ players play into it without stopping and go round from its end (the next scene,
 An element's `overrides` change it while their own `when` holds (stroke, fill, text color, width, dash, text; opacity
 multiplies), applied in order after its keys, and `reroute` sends its follows along other connectors, so one dot
 detours instead of two being drawn. `DefineState.swift` (`define_state`, `dottie.defineState`) writes a variable's
-conditions, overrides and clicks from one description. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
+conditions, overrides and clicks from one description, and `Controls.swift` (`add_button`, `add_choice`,
+`add_reset`, `add_legend`, ADR 0003) writes buttons, exclusive choices, a reset and a flow legend as ordinary
+shapes, clicks and overrides, so they need nothing new from any renderer. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
 0002) are traffic no file stores: `posed` routes each one over the connectors left in the frame, cheapest by their `cost`
 (1 each unless set, so fewest hops; an override can change it), to the first destination it reaches (or, with
 `spread`, shared across the others while the first is down) and appends its packets, a pure function of the time and the values, with ids derived
-from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn.
+from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn. `Metrics.swift`
+(`web/src/measure.ts`, ADR 0003) does the routing and packets now: flows are assigned in page order to routes with
+room under `capacity`, the rest is backlog at the shape in front of the bottleneck, a shape's `delay` holds packets
+inside it, and the same pass yields the frame's metrics. Then overrides whose condition compares a metric
+(`load(workers) >= 1`) apply their looks, and elements with a `gauge` become plain `.path` elements (frame and label,
+bar or dial), so no renderer draws a gauge itself. The editor (`.all`) leaves both alone.
+A shape with `queue: true` is where backlog waits (the nearest queue before the bottleneck); a flow's `overrides`
+set its volume per state; overrides holding together take the tightest capacity and longest delay; a metric
+comparison with no target means the element's own (`DiagramOps.addAlarm`). `DiagramOps.controlOrigin`,
+`gaugeFrame` and `addGroup` (Controls.swift) place controls after one another, gauges beside their targets, and
+frames behind groups.
+`Checks.swift` (`DiagramOps.stateWarnings`, `describeVariables`) finds wiring mistakes on an interactive page (a
+condition reading a variable nothing sets, a metric or gauge naming nothing); MCP appends them to edit tools' results
+and `list_elements`. `ScriptExamples.swift` holds worked run_script programs, served as `dottie://examples/<name>`
+and by `script_api` `example`; `ScriptExamplesTests` runs, type-checks and warning-checks each, so keep them current
+when the API changes. A click's `reset` puts every variable back to its starting value before `set` and `toggle`.
 A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
 bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right
 angles, adding a corner between any two that are out of line and dropping any that fall into line

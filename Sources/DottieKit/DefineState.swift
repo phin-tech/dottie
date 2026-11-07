@@ -147,3 +147,53 @@ extension PageState {
         }.joined(separator: " || ")
     }
 }
+
+extension DiagramOps {
+    /// Adds `override` to an element's overrides, keeping the ones it has: merged into the one with the same
+    /// condition (the fields it sets replace that one's), or appended. `update` with `overrides` replaces the list;
+    /// this doesn't. Returns the element's overrides.
+    @discardableResult
+    public static func addOverride(_ doc: inout DottieDocument, id: UUID, _ override: StateOverride) throws -> [StateOverride] {
+        guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
+        guard let when = try PageState.checked(override.when, metrics: true) else { throw OpsError.invalid("An override needs 'when'") }
+        var list = doc.elements[i].overrides ?? []
+        if let k = list.firstIndex(where: { $0.when == when }) {
+            var o = list[k]
+            if let v = override.stroke { o.stroke = v }
+            if let v = override.fill { o.fill = v }
+            if let v = override.textColor { o.textColor = v }
+            if let v = override.opacity { o.opacity = v }
+            if let v = override.strokeWidth { o.strokeWidth = v }
+            if let v = override.dash { o.dash = v }
+            if let v = override.text { o.text = v }
+            if let v = override.reroute { o.reroute = (o.reroute ?? [:]).merging(v) { _, new in new } }
+            if let v = override.offline { o.offline = v }
+            if let v = override.cost { o.cost = v }
+            if let v = override.capacity { o.capacity = v }
+            if let v = override.delay { o.delay = v }
+            list[k] = o
+        } else {
+            var o = override
+            o.when = when
+            list.append(o)
+        }
+        doc.elements[i].overrides = list
+        return list
+    }
+}
+
+extension DiagramOps {
+    /// Turns each element `color` (stroke and label) while its own `metric` is at or past `at` (ADR 0003): one
+    /// override, `"load >= 1"`, on each, so whatever is saturated shows it. Returns the condition.
+    @discardableResult
+    public static func addAlarm(_ doc: inout DottieDocument, ids: [UUID], metric: String = "load", at: Double = 1,
+                                color: RGBA = RGBA(r: 0.86, g: 0.15, b: 0.15)) throws -> String {
+        guard PageState.metricNames.contains(metric) else {
+            throw OpsError.invalid("'metric' is one of \(PageState.metricNames.joined(separator: ", ")), got '\(metric)'")
+        }
+        guard at.isFinite else { throw OpsError.invalid("'at' is a number") }
+        let when = "\(metric) >= \(DottieDocument.number(at, places: 2))"
+        for id in ids { try addOverride(&doc, id: id, StateOverride(when: when, stroke: color, textColor: color)) }
+        return when
+    }
+}

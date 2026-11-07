@@ -556,8 +556,8 @@ extension DottieDocument {
     /// then (see `expandingSymbols(at:)`). Every renderer and exporter draws the result unchanged; a page with
     /// no timeline and no instances is returned as is.
     /// `state` picks which of the elements with a `when` are drawn (the variables' starting values unless given).
-    public func resolved(at t: Double, state: StateChoice) -> DottieDocument {
-        posed(at: t, state: state).expandingSymbols(at: Timeline.clampTime(t))
+    public func resolved(at t: Double, state: StateChoice, since: Double? = nil, carried: [String: Double] = [:]) -> DottieDocument {
+        posed(at: t, state: state, since: since, carried: carried).expandingSymbols(at: Timeline.clampTime(t))
     }
 
     /// `resolved(at:state:)` with the variables' starting values.
@@ -567,7 +567,16 @@ extension DottieDocument {
     /// whose `when` doesn't hold under `state` left out, with the connectors attached to them. What the editor
     /// shows and edits while stopped on the timeline (with `.all`); a page without a timeline or hidden elements
     /// is returned as is.
-    public func posed(at t: Double, state: StateChoice = .initial) -> DottieDocument {
+    /// `since` is the seconds since the page's state last changed, which backlog has been piling up for (ADR 0003):
+    /// a player passes the time since the last click; nil is `t`, as exports draw it. `carried` is what each queue
+    /// held when the state last changed (`FrameMetrics.carry` then), which it drains from.
+    public func posed(at t: Double, state: StateChoice = .initial, since: Double? = nil, carried: [String: Double] = [:]) -> DottieDocument {
+        posedWithMetrics(at: t, state: state, since: since, carried: carried).frame
+    }
+
+    /// `posed(at:state:since:)`, and the frame's metrics (ADR 0003).
+    public func posedWithMetrics(at t: Double, state: StateChoice = .initial, since: Double? = nil,
+                                 carried: [String: Double] = [:]) -> (frame: DottieDocument, metrics: FrameMetrics) {
         let off = stateHidden(state)
         let values = stateValues(state)
         let active = Dictionary(uniqueKeysWithValues: elements.compactMap { e in
@@ -575,7 +584,9 @@ extension DottieDocument {
             return o.isEmpty ? nil : (e.id, o)
         })
         let flowing = !(flows ?? []).isEmpty
-        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !flowing ? nil : Timeline(duration: 0)) else { return self }
+        // Gauges and overrides comparing metrics need the frame's metrics, even on a page that doesn't move.
+        let measuring = flowing || elements.contains { $0.gauge != nil || $0.overrides?.contains { PageState.mentionsMetric($0.when) } == true }
+        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !measuring ? nil : Timeline(duration: 0)) else { return (self, FrameMetrics()) }
         let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
@@ -607,6 +618,13 @@ extension DottieDocument {
             let e = copy.elements[i]
             if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             for o in active[e.id] ?? [] { copy.elements[i] = o.apply(to: copy.elements[i]) }
+            // Overrides that hold together: the tightest capacity and the longest delay win (ADR 0003), whatever
+            // their order, so "half the workers down" still caps a scaled-out pool.
+            if let list = active[e.id] {
+                let caps = list.compactMap(\.capacity).filter(\.isFinite), delays = list.compactMap(\.delay).filter(\.isFinite)
+                if let c = caps.min() { copy.elements[i].capacity = max(c, 0) }
+                if let d = delays.max(), e.kind != .connector { copy.elements[i].delay = max(d, 0) }
+            }
             if let reseed, reseed > 0, boils(e) { copy.elements[i].seed = Self.boiled(e.seed, reseed) }
             if let speed = tracks[e.id]?.march, let pattern = Renderer.dashPattern(copy.elements[i].style.dash, width: copy.elements[i].style.strokeWidth) {
                 copy.elements[i].style.dashOffset = timeline.marchOffset(speed: speed, period: pattern.reduce(0, +), at: t)
@@ -637,13 +655,19 @@ extension DottieDocument {
             copy.elements[i].connector!.end = Endpoint(elementID: nil, port: c.end.port, x: b.x, y: b.y)
         }
         copy.elements.removeAll { gone.contains($0.id) }
-        // Flows are routed over what is left, and drawn above it.
-        if flowing {
+        // Flows are routed over what is left, and drawn above it; then the looks that compare metrics, and gauges.
+        var metrics = FrameMetrics()
+        if measuring {
             let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
-            copy.elements += flowPackets(in: copy, at: t, values: values, offline: offline)
+            let (packets, m) = flowFrame(in: copy, at: t, values: values, offline: offline, since: since, carried: carried)
+            let finished = Self.finishing(copy.elements, metrics: m, values: values, frame: copy, flows: flows ?? [],
+                                          since: max(0, min(since ?? t, 1e6)), carried: carried)
+            metrics = m
+            metrics.carry.merge(finished.readings) { _, new in new }
+            copy.elements = finished.elements + packets
             copy.flows = nil
         }
-        return copy
+        return (copy, metrics)
     }
 
     /// Elements that only exist in motion: hidden at the start and in the still (packets, mostly). The

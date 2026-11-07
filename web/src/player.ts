@@ -23,7 +23,7 @@ import { type Plan, plan, svgParts } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { themeNamed } from "./theme.ts";
 import { applyClick } from "./state.ts";
-import { posed, posterTime } from "./timeline.ts";
+import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
 
 const WHITE: RGBA = { r: 1, g: 1, b: 1, a: 1 };
 
@@ -68,6 +68,17 @@ export class Playback {
   readonly sceneLoops: boolean[];
   /** The page's variables now: their starting values until clicks change them. */
   state: Record<string, boolean>;
+  /** When the variables last changed (performance.now() milliseconds): backlog piles up from then (ADR 0003). */
+  stateSince = typeof performance === "undefined" ? 0 : performance.now();
+  /** A still (the `at` attribute): backlog is drawn for the page time, not the wall clock. */
+  still = false;
+  /** What each queue held when the variables last changed, which it drains from (FrameMetrics.carry). */
+  carried: Record<string, number> = {};
+
+  /** Seconds since the variables last changed, or null for a still. */
+  sinceChange(now = typeof performance === "undefined" ? 0 : performance.now()): number | null {
+    return this.still || typeof performance === "undefined" ? null : (now - this.stateSince) / 1000;
+  }
   readonly background: RGBA;
   readonly ink: RGBA;
   /** What clicking each clickable element does, by element id. */
@@ -85,7 +96,7 @@ export class Playback {
   private overTimes = new Map<string, number>();
   private downTimes = new Map<string, number>();
   private hitTimes = new Map<string, number>();
-  private last: { t: number; i: number } = { t: 0, i: 0 };
+  last: { t: number; i: number } = { t: 0, i: 0 };
   private svg: SVGSVGElement;
   private groups = new Map<string, { g: SVGGElement; markup: string }>();
   private order: string[] = [];
@@ -179,7 +190,8 @@ export class Playback {
     const times = new Map<string, number>();
     for (const [id, start] of this.replayStarts) times.set(id, Math.min((now - start) / 1000, this.replays.get(id) ?? 0));
     const tc = clampTime(t);
-    const pose = posed(this.page, tc, this.state);
+    // Backlog piles up for as long as the state has held; a still (no performance clock) draws the page time.
+    const pose = posed(this.page, tc, this.state, this.sinceChange(now), this.carried);
     const frame = expandingSymbols(pose, tc, true, times);
     const { parts } = svgParts(frame, this.background, r);
     const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
@@ -423,6 +435,7 @@ export class DottiePlayer extends ElementBase {
     const file = this.file!;
     const page = file.pages[pageIndex(file, this.getAttribute("page"))];
     const p = new Playback(page, this.stage, { clean: this.hasAttribute("clean"), file });
+    p.still = this.hasAttribute("at");
     this.playback = p;
     this.style.setProperty("--dottie-page", color(p.background));
     this.style.setProperty("--dottie-ink", color(p.ink));
@@ -500,7 +513,10 @@ export class DottiePlayer extends ElementBase {
       this.scheduleReplay();
     }
     if (!click) return;
-    if (click.set || click.toggle) this.setState(applyClick({ scene: null, url: null, set: click.set ?? null, toggle: click.toggle ?? null }, p.state));
+    if (click.set || click.toggle || click.reset) {
+      this.setState(applyClick({ scene: null, url: null, set: click.set ?? null, toggle: click.toggle ?? null, reset: click.reset ?? null },
+        p.state, p.page.variables ?? {}));
+    }
     if ("state" in click) return;
     if ("url" in click) {
       if (/^(https?:|mailto:)/i.test(click.url)) window.open(click.url, "_blank", "noopener");
@@ -528,7 +544,11 @@ export class DottiePlayer extends ElementBase {
     if (!p) return;
     const next = { ...p.state, ...values };
     if (Object.keys(next).every((k) => next[k] === p.state[k])) return;
+    // The queues as they stand carry over, so a backlog drains from where it got to.
+    const t = clampTime(p.last.t);
+    p.carried = posedWithMetrics(p.page, t, p.state, p.sinceChange(), p.carried).metrics.carry;
     p.state = next;
+    p.stateSince = performance.now();
     p.redraw();
     this.dispatchEvent(new CustomEvent("state", { detail: { variables: { ...next } } }));
   }

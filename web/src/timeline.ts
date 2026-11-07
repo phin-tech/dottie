@@ -10,7 +10,8 @@ import {
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
 import { activeOverrides, applyOverride, type StateChoice, stateHidden, stateValues } from "./state.ts";
-import { flowPackets } from "./flows.ts";
+import { emptyMetrics, finishing, flowFrame, type FrameMetrics } from "./measure.ts";
+import { mentionsMetric } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
 
@@ -215,8 +216,9 @@ function trackMap(tl: Timeline): Map<string, Track> {
 
 /** The page as a still drawing at `t` seconds, symbol instances expanded (DottieDocument.resolved(at:)). A page with
  * no timeline and no instances is returned as is. */
-export function resolved(page: Page, t: number, state: StateChoice = "initial"): Page {
-  return expandingSymbols(posed(page, t, state), clampTime(t));
+export function resolved(page: Page, t: number, state: StateChoice = "initial", since: number | null = null,
+  carried: Record<string, number> = {}): Page {
+  return expandingSymbols(posed(page, t, state, since, carried), clampTime(t));
 }
 
 /** What a page without a timeline is posed with when its state hides something (Timeline(duration: 0)). */
@@ -224,7 +226,16 @@ const EMPTY_TIMELINE: Timeline = { fps: 12, duration: 0, boil: null, settle: nul
 
 /** The page posed at `t` seconds, instances kept, and the elements whose `when` doesn't hold under `state` left out
  * with their connectors (DottieDocument.posed(at:state:)). */
-export function posed(page: Page, t: number, state: StateChoice = "initial"): Page {
+export function posed(page: Page, t: number, state: StateChoice = "initial", since: number | null = null,
+  carried: Record<string, number> = {}): Page {
+  return posedWithMetrics(page, t, state, since, carried).frame;
+}
+
+/** `posed`, and the frame's metrics (ADR 0003). `since` is the seconds since the page's state last changed, which
+ * backlog has been piling up for: the player passes the time since the last click; null is `t`, as exports draw it.
+ * `carried` is what each queue held when the state last changed (`FrameMetrics.carry` then), which it drains from. */
+export function posedWithMetrics(page: Page, t: number, state: StateChoice = "initial", since: number | null = null,
+  carried: Record<string, number> = {}): { frame: Page; metrics: FrameMetrics } {
   const off = stateHidden(page, state);
   const values = stateValues(page, state);
   const active = new Map<string, StateOverride[]>();
@@ -233,8 +244,10 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     if (o.length > 0) active.set(e.id, o);
   }
   const flowing = (page.flows ?? []).length > 0;
-  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !flowing ? null : EMPTY_TIMELINE);
-  if (!timeline) return page;
+  // Gauges and overrides comparing metrics need the frame's metrics, even on a page that doesn't move.
+  const measuring = flowing || page.elements.some((e) => e.gauge || (e.overrides ?? []).some((o) => mentionsMetric(o.when)));
+  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !measuring ? null : EMPTY_TIMELINE);
+  if (!timeline) return { frame: page, metrics: emptyMetrics() };
   t = clampTime(t);
   const tracks = trackMap(timeline);
   // An override's reroute sends the element's follows along other connectors.
@@ -271,6 +284,14 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     const track = tracks.get(e.id);
     let out = track ? applyTrack(track, e, t) : e;
     for (const o of active.get(e.id) ?? []) out = applyOverride(o, out);
+    // Overrides that hold together: the tightest capacity and the longest delay win, whatever their order.
+    const list = active.get(e.id);
+    if (list) {
+      const caps = list.map((o) => o.capacity).filter((c): c is number => c !== null && Number.isFinite(c));
+      const delays = list.map((o) => o.delay).filter((d): d is number => d !== null && Number.isFinite(d));
+      if (caps.length > 0) out.capacity = Math.max(Math.min(...caps), 0);
+      if (delays.length > 0 && out.kind !== "connector") out.delay = Math.max(Math.max(...delays), 0);
+    }
     if (reseed !== null && reseed > 0 && boils(e)) {
       if (out === e) out = cloneElement(e);
       out.seed = boiled(e.seed, reseed);
@@ -307,12 +328,18 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     return pinned;
   });
   elements = elements.filter((e) => !gone.has(e.id));
-  // Flows are routed over what is left, and drawn above it.
-  if (flowing) {
+  // Flows are routed over what is left, and drawn above it; then the looks that compare metrics, and gauges.
+  let metrics = emptyMetrics();
+  if (measuring) {
     const offline = new Set([...active].filter(([, list]) => list.some((o) => o.offline === true)).map(([id]) => id));
-    elements = [...elements, ...flowPackets(page.flows, { ...page, elements, timeline: null }, t, values, offline)];
+    const frame: Page = { ...page, elements, timeline: null };
+    const out = flowFrame(page.flows, frame, t, values, offline, since, carried);
+    metrics = out.metrics;
+    const finished = finishing(elements, out.metrics, values, frame, page.flows ?? [], Math.max(0, Math.min(since ?? t, 1e6)), carried);
+    Object.assign(metrics.carry, finished.readings);
+    elements = [...finished.elements, ...out.packets];
   }
-  return { ...page, elements, timeline: null, flows: flowing ? null : page.flows };
+  return { frame: { ...page, elements, timeline: null, flows: measuring ? null : page.flows }, metrics };
 }
 
 /** The moment a still picture of the page shows: its poster, else the end. */

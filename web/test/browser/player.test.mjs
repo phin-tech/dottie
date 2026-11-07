@@ -561,11 +561,15 @@ test("flows: traffic goes round a region taken down, and back when it comes up",
   const { page, errors, close } = await open(`<dottie-player src="/fixtures/edge/flows.dottie"></dottie-player>`);
   await ready(page);
   const markup = () => page.evaluate(() => document.querySelector("dottie-player").shadowRoot.innerHTML);
-  // East starts down, so spare is offline (no green traffic) and the red traffic runs.
+  // East starts down, so spare is offline: its green traffic is backlog, a still pile above the client (ADR 0003),
+  // while the red traffic runs. With east up, green packets move off along the route.
+  const greens = () => page.evaluate(() => (document.querySelector("dottie-player").shadowRoot.innerHTML.match(/#4db34d/g) ?? []).length);
   assert.ok((await markup()).includes("#f25c54"));
-  assert.ok(!(await markup()).includes("#4db34d"));
+  const piled = await greens();
+  assert.ok(piled > 0);
   await page.evaluate(() => document.querySelector("dottie-player").setState({ eastDown: false }));
-  await page.waitForFunction(() => document.querySelector("dottie-player").shadowRoot.innerHTML.includes("#4db34d"), null, { timeout: 5000 });
+  await page.waitForFunction((n) => (document.querySelector("dottie-player").shadowRoot.innerHTML.match(/#4db34d/g) ?? []).length !== n,
+    piled, { timeout: 5000 });
   assert.deepEqual(errors, []);
   await close();
 });

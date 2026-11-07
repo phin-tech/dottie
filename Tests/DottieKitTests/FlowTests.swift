@@ -40,10 +40,15 @@ final class FlowTests: XCTestCase {
         let down = faded.posed(at: 3.9, state: .values(["eastDown": true]))
         XCTAssertNotNil(down.elements.first { $0.id == east })
         XCTAssertTrue(packets(down).allSatisfy { $0.frame.midY > 100 })
-        // Nothing to reach: nothing flows.
+        // Nothing to reach: nothing moves; the volume is backlog, piled above the source (ADR 0003).
         var none = doc
         none.flows![0].to = [client]
-        XCTAssertTrue(packets(none.posed(at: 1)).isEmpty)
+        let pile = packets(none.posed(at: 1))
+        XCTAssertEqual(pile.count, 2)   // a packet every 0.5s that couldn't leave, for 1s
+        XCTAssertEqual(packets(none.posed(at: 1, state: .initial, since: 3)).count, 6)   // it grows while the state holds
+        XCTAssertTrue(pile.allSatisfy { $0.frame.maxY < 100 && $0.frame.minX >= 0 && $0.frame.maxX < 80 })
+        XCTAssertEqual(none.metrics(at: 1).flows[none.flows![0].id]?.backlog, 1)
+        XCTAssertEqual(none.metrics(at: 1).elements[client]?.backlog, 1)
     }
 
     func testPacketsAreAFunctionOfTimeWithStableIDs() throws {

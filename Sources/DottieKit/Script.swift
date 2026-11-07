@@ -287,7 +287,7 @@ public enum DottieScript {
             }
             /// A state override (`StateOverride`); `when` may be left out where the caller supplies it.
             func override(when fallback: String? = nil) throws -> StateOverride {
-                let when = try PageState.checked(string("when") ?? fallback ?? "")
+                let when = try PageState.checked(string("when") ?? fallback ?? "", metrics: true)
                 guard let when else { throw OpsError.invalid("An override needs 'when', a condition like \"down\"") }
                 var o = StateOverride(when: when, stroke: try color("stroke"), fill: try color("fill"),
                                       textColor: try color("textColor"), opacity: double("opacity"),
@@ -296,8 +296,27 @@ public enum DottieScript {
                 let r = try idMap("reroute")
                 if !r.isEmpty { o.reroute = Dictionary(uniqueKeysWithValues: r.map { ($0.key.uuidString, $0.value) }) }
                 if bool("offline") == true { o.offline = true }
-                o.cost = double("cost")
+                o.cost = double("cost"); o.capacity = double("capacity"); o.delay = double("delay")
                 return o
+            }
+
+            /// Sets `capacity` and `delay` on `id` when given; "" (null in the prelude) clears one.
+            func measure(_ doc: inout DottieDocument, _ id: UUID) throws {
+                func value(_ k: String) throws -> Double?? {
+                    guard has(k) else { return nil }
+                    if let s = raw[Args.normalize(k)] as? String, s.isEmpty { return .some(nil) }
+                    guard let d = double(k) else { throw OpsError.invalid("'\(k)' is a number, or null to remove it") }
+                    return .some(d)
+                }
+                let c = try value("capacity"), d = try value("delay")
+                if c != nil || d != nil { try DiagramOps.setCapacity(&doc, id: id, capacity: c, delay: d) }
+                if has("queue") { try DiagramOps.setQueue(&doc, id: id, bool("queue") == true) }
+            }
+
+            /// A control's position: x and y when given, else after `after`, else above the page's content.
+            func controlOrigin(_ doc: DottieDocument) throws -> CGPoint {
+                if let x = double("x"), let y = double("y") { return CGPoint(x: x, y: y) }
+                return try DiagramOps.controlOrigin(doc, after: has("after") ? try uuid("after") : nil)
             }
 
             func require(_ k: String) throws -> String {
@@ -378,6 +397,8 @@ public enum DottieScript {
             if let c = f.color { d["color"] = String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
             if let w = f.when { d["when"] = w }
             if f.spread == true { d["spread"] = true }
+            if let v = f.volume { d["volume"] = v }
+            if let list = f.overrides { d["overrides"] = list.map { o -> [String: Any] in o.volume.map { ["when": o.when, "volume": $0] } ?? ["when": o.when] } }
             return d
         }
 
@@ -410,6 +431,17 @@ public enum DottieScript {
                 d["click"] = o
             }
             if let w = e.when { d["when"] = w }
+            if let v = e.capacity { d["capacity"] = v }
+            if let v = e.delay { d["delay"] = v }
+            if e.queue == true { d["queue"] = true }
+            if let g = e.gauge {
+                var o: [String: Any] = ["metric": g.metric, "of": g.of.uuidString, "style": (g.style ?? .number).rawValue]
+                if let v = g.max { o["max"] = v }
+                if let v = g.warn { o["warn"] = v }
+                if let v = g.alarm { o["alarm"] = v }
+                if let v = g.label { o["label"] = v }
+                d["gauge"] = o
+            }
             if let id = e.symbol {
                 d["symbol"] = id.uuidString
                 if let p = e.playback { d["playback"] = p.rawValue }
@@ -429,6 +461,8 @@ public enum DottieScript {
                     if let r = o.reroute { x["reroute"] = r.mapValues(\.uuidString) }
                     if o.offline == true { x["offline"] = true }
                     if let v = o.cost { x["cost"] = v }
+                    if let v = o.capacity { x["capacity"] = v }
+                    if let v = o.delay { x["delay"] = v }
                     return x
                 }
             }
@@ -511,6 +545,7 @@ public enum DottieScript {
                                                 roughness: a.roughness, look: try a.look())
                 if let n = a.string("anchor"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].anchor = n }
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: e.id, w) }
+                try a.measure(&doc, e.id)
                 return describe(try element(e.id))
 
             case "connector":
@@ -520,8 +555,9 @@ public enum DottieScript {
                                                     arrow: a.bool("arrow") ?? true, port: (start.0, end.0),
                                                     portIndex: (start.1, end.1), roughness: a.roughness,
                                                     label: a.string("label"), look: try a.look())
-                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w); return describe(try element(c.id)) }
-                return describe(c)
+                if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w) }
+                try a.measure(&doc, c.id)
+                return describe(try element(c.id))
 
             case "update":
                 let id = try a.uuid("id")
@@ -560,6 +596,7 @@ public enum DottieScript {
                     let parsed = try list.map { try $0.override() }
                     doc.elements[i].overrides = parsed.isEmpty ? nil : parsed
                 }
+                try a.measure(&doc, id)
                 return describe(try element(id))
 
             case "pages":
@@ -769,15 +806,105 @@ public enum DottieScript {
             case "flow":
                 let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
                                                speed: a.double("speed"), color: try a.color("color"), size: a.double("size"),
-                                               when: a.string("when"), spread: a.bool("spread"),
+                                               when: a.string("when"), spread: a.bool("spread"), volume: a.double("volume"),
+                                               overrides: try a.list("overrides").map { list in
+                                                   try list.map { FlowOverride(when: try $0.require("when"), volume: $0.double("volume")) }
+                                               },
                                                replacing: a.has("id") ? try a.uuid("id") : nil)
                 return Self.describe(f)
+
+            case "group":
+                let g = try DiagramOps.addGroup(&doc, ids: try a.ids("ids"), label: a.string("label") ?? "",
+                                                padding: a.double("padding") ?? 24,
+                                                color: try a.color("color") ?? RGBA(r: 0.6, g: 0.65, b: 0.72))
+                return ["frame": describe(g.frame), "label": describe(g.label)]
+
+            case "alarm":
+                return try DiagramOps.addAlarm(&doc, ids: try a.ids("ids"), metric: a.string("metric") ?? "load", at: a.double("at") ?? 1,
+                                               color: try a.color("color") ?? RGBA(r: 0.86, g: 0.15, b: 0.15))
+
+            case "addOverride":
+                guard let o = a.object("override") else { throw OpsError.invalid("addOverride takes an element and an override {when, ...}") }
+                let id = try a.uuid("id")
+                try DiagramOps.addOverride(&doc, id: id, try o.override())
+                return describe(try element(id))
+
+            case "gauge":
+                let style = try a.enumValue("style", as: Gauge.Style.self)
+                let size = CGSize(width: a.double("width") ?? 160, height: a.double("height") ?? (style == .dial ? 110 : 80))
+                let frame = try a.string("near").map { try DiagramOps.gaugeFrame(doc, near: try a.uuid("of"), side: $0, size: size) }
+                    ?? CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: size.width, height: size.height)
+                let e = try DiagramOps.addGauge(&doc, metric: try a.require("metric"), of: try a.uuid("of"), frame: frame,
+                                                style: style, max: a.double("max"), warn: a.double("warn"), alarm: a.double("alarm"),
+                                                label: a.string("label"))
+                return describe(e)
+
+            case "metrics":
+                let state: StateChoice = a.object("state").map { o in
+                    .values(o.raw.compactMapValues { $0 as? Bool })
+                } ?? .initial
+                let m = doc.metrics(at: a.double("at") ?? 0, state: state, since: a.double("since"))
+                var elements: [String: Any] = [:], flows: [String: Any] = [:]
+                for (id, x) in m.elements where x.throughput > 0 || x.load != nil || x.backlog > 0 || x.delay > 0 || x.inFlight > 0 {
+                    var o: [String: Any] = ["throughput": x.throughput, "delay": x.delay, "backlog": x.backlog, "depth": x.depth, "inFlight": x.inFlight]
+                    if let l = x.load { o["load"] = l }
+                    elements[id.uuidString] = o
+                }
+                for (id, x) in m.flows {
+                    var o: [String: Any] = ["volume": x.volume, "placed": x.placed, "backlog": x.backlog, "backup": x.backup]
+                    if let tr = x.transit { o["transit"] = tr }
+                    flows[id.uuidString] = o
+                }
+                return ["elements": elements, "flows": flows]
 
             case "flows":
                 return (doc.flows ?? []).map(Self.describe)
 
             case "removeFlow":
                 return DiagramOps.removeFlow(&doc, try a.uuid("id"))
+
+            case "button":
+                var spec = ButtonSpec(text: try a.require("text"))
+                let origin = try a.controlOrigin(doc)
+                spec.x = origin.x; spec.y = origin.y
+                spec.width = a.double("width"); spec.height = a.double("height")
+                spec.toggles = a.string("toggles"); spec.onText = a.string("onText"); spec.color = try a.color("color")
+                if let s = a.object("sets") {
+                    for (k, v) in s.raw {
+                        guard let b = (v as? NSNumber).map(\.boolValue) else { throw OpsError.invalid("'sets' maps variable names to true or false") }
+                        spec.sets[k] = b
+                    }
+                }
+                let b = try DiagramOps.addButton(&doc, spec)
+                return describe(try element(b.id))
+
+            case "choice":
+                guard let options = a.raw["options"] as? [String] else { throw OpsError.invalid("'options' is a list of names") }
+                let origin = try a.controlOrigin(doc)
+                let made = try DiagramOps.addChoice(&doc, name: try a.require("name"), options: options,
+                                                    x: origin.x, y: origin.y,
+                                                    row: a.string("direction") != "column", initial: a.string("initial"),
+                                                    color: try a.color("color"))
+                return try made.map { m -> [String: Any] in
+                    var d = describe(try element(m.button.id)); d["variable"] = m.variable; return d
+                }
+
+            case "reset":
+                let origin = try a.controlOrigin(doc)
+                let r = try DiagramOps.addReset(&doc, x: origin.x, y: origin.y, text: a.string("text") ?? "Reset",
+                                                replacing: a.has("id") ? try a.uuid("id") : nil, color: try a.color("color"))
+                return describe(try element(r.id))
+
+            case "legend":
+                var labels: [UUID: String] = [:]
+                for (k, v) in a.object("labels")?.raw ?? [:] {
+                    guard let id = UUID(uuidString: k), let s = v as? String else { throw OpsError.invalid("'labels' maps flow ids to text") }
+                    labels[id] = s
+                }
+                let rows = try DiagramOps.addLegend(&doc, x: a.double("x") ?? 0, y: a.double("y") ?? 0, labels: labels)
+                return try rows.map { r -> [String: Any] in
+                    ["swatch": describe(try element(r.swatch.id)), "label": describe(try element(r.label.id))]
+                }
 
             case "defineState":
                 var spec = StateSpec(name: try a.require("name"))
@@ -935,6 +1062,8 @@ public enum DottieScript {
           var o = merge(changes, { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
           if (o.overrides === null) o.overrides = [];
+          if (o.capacity === null) o.capacity = "";
+          if (o.delay === null) o.delay = "";
           if (Array.isArray(o.overrides)) o.overrides = o.overrides.map(function (x) {
             if (!x || !x.reroute) return x;
             var r = {}, k;
@@ -998,7 +1127,32 @@ public enum DottieScript {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
         flows: function () { return call("flows"); },
+        alarm: function (els, o) { return call("alarm", merge(o, { ids: ids(els) })); },
+        addOverride: function (target, o) {
+          var x = o || {};
+          if (x.reroute) {
+            var r = {}, k;
+            if (Array.isArray(x.reroute)) x.reroute.forEach(function (p) { r[idOf(p[0])] = idOf(p[1]); });
+            else for (k in x.reroute) r[k] = idOf(x.reroute[k]);
+            x = merge(x, { reroute: r });
+          }
+          return call("addOverride", { id: idOf(target), override: x });
+        },
+        gauge: function (target, o) { return call("gauge", merge(o, { of: idOf(target) })); },
+        metrics: function (o) { return call("metrics", o || {}); },
         removeFlow: function (flow) { return call("removeFlow", { id: idOf(flow) }); },
+        button: function (o) { return call("button", merge(o, { after: o && o.after ? idOf(o.after) : undefined })); },
+        choice: function (name, options, o) {
+          return call("choice", merge(o, { name: name, options: options, after: o && o.after ? idOf(o.after) : undefined }));
+        },
+        resetButton: function (o) {
+          return call("reset", merge(o, { id: o && o.id ? idOf(o.id) : undefined, after: o && o.after ? idOf(o.after) : undefined }));
+        },
+        group: function (els, o) { return call("group", merge(o, { ids: ids(els) })); },
+        legend: function (o) {
+          o = o || {};
+          return call("legend", merge(o, { labels: pairs(o.labels, function (x) { return x; }) }));
+        },
         defineState: function (name, o) {
           o = o || {};
           return call("defineState", merge(o, {
@@ -1208,7 +1362,7 @@ public enum DottieScript {
     traffic while true (a region that's down: flows go round it); restyle: {id: look} while true; \
     reroute: {fromConnector: toConnector}, so the same packets take a detour while true; toggledBy, turnedOnBy, \
     turnedOffBy: elements whose click flips, sets or clears it. Running it again changes nothing more; returns a summary
-      dottie.flow(from, to, {every?, speed?, color?, size?, when?, spread?, id?})  traffic from a shape to the first of to (a shape or \
+      dottie.flow(from, to, {every?, speed?, color?, size?, when?, spread?, volume?, overrides?, id?})  traffic from a shape to the first of to (a shape or \
     a list, preferred first) it can reach over the connectors drawn: a packet every every seconds (0.5) at speed \
     points per second (160), routed afresh each frame, so when a state hides a shape or connector the traffic goes \
     round it with nothing more drawn. A connector carries traffic from its start to its end, and back too when its \
@@ -1219,11 +1373,62 @@ public enum DottieScript {
     shapes they pass through and come out the other side. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
     loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
       dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
+      Capacity (ADR 0003), for showing a scenario (numbers are illustrative; this presents, it doesn't predict): \
+    volume on a flow is how much it carries in the page's own unit (requests a second, \
+    messages, trucks a day; default 1); the biggest flow draws a packet every `every`, the rest proportionally fewer. \
+    capacity on a shape or connector (in dottie.rect/connect/update; null removes it) is the most volume it carries: \
+    flows are placed in page order (earlier flows first), each on its cheapest route as far as it has room, the rest \
+    on the next cheapest, and what fits nowhere is backlog, piled at the shape in front of the first full thing (a \
+    queue in front of busy workers). delay on a shape is seconds traffic stays inside it when passing through. \
+    Overrides may set capacity and delay too (half the workers down; several holding together: the tightest capacity, \
+    the longest delay). A flow's overrides: [{when, volume}] set its volume while a condition holds (a spike: \
+    {when: "spike", volume: 12}). queue: true on a shape makes it where traffic waits: the nearest queue before \
+    whatever is full (SQS in front of workers and the table they write to), not right in front of the full thing.
+      dottie.metrics({at?, state?, since?})  {elements: {id: {throughput, load?, delay, backlog, depth, inFlight}}, flows: \
+    {id: {volume, placed, backlog, backup, transit?}}}: load is throughput over capacity, backlog the rate a queue grows \
+    at, depth how much has piled up (backlog times the seconds since the state last changed, since; default at), \
+    backup the share not reaching the first destination, transit seconds end to end. A backlog's pile of packets \
+    grows as you watch (the player counts from the last click, exports from the page's start), and when the state \
+    changes so there's room again, the queue drains at that room, its messages leaving as packets
+      dottie.gauge(target, {metric, x?, y?, near?, width?, height?, style?, max?, warn?, alarm?, label?})  a gauge showing a \
+    metric (throughput, load, delay, backlog, depth, inFlight, transit, backup) of an element or flow as a number, bar or \
+    dial, green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it. near: right|left|above|below \
+    places it beside its target (a flow's: its source), clear of other gauges, instead of x and y
+      dottie.group(elements, {label, padding?, color?})  a labelled dashed frame behind them: a region, an account, a VPC
+      Controls (button, choice, resetButton) take after: an element to sit 12 points to the right of, instead of x \
+    and y; with neither they go above the page's content. A choice returns its buttons, so the next control can \
+    follow the last
+      dottie.alarm(elements, {metric?, at?, color?})  each turns color (red) while its own metric (load) is at or past at \
+    (1): an override "load >= 1" on each; a condition without a target, like load >= 1, means the element's own
+      dottie.addOverride(el, {when, ...})  adds an override, keeping the element's others (merged into one with the same \
+    when); update with overrides replaces the whole list
+      An override's condition can compare metrics, naming an element by its anchor or an element or flow by id: \
+    {when: "load(workers) >= 0.9", stroke: "#dc2626"}; such an override changes only looks (no offline, cost, \
+    capacity, delay or reroute), and a when on an element can't compare metrics
+      Example: a queue in front of workers that take 2 a second:
+        const api = dottie.rect({x: 0, y: 100, text: "api"}), q = dottie.rect({x: 200, y: 100, text: "queue", delay: 0.5});
+        const w = dottie.rect({x: 400, y: 100, text: "workers", anchor: "workers", capacity: 2});
+        dottie.connect(api, q); dottie.connect(q, w);
+        dottie.flow(api, w, {volume: 3});   // 2 placed, 1 backlog in the queue
+        dottie.gauge(w, {metric: "load", x: 400, y: 0, style: "bar"});
+        dottie.update(w, {overrides: [{when: "load(workers) >= 1", stroke: "#dc2626", text: "workers (saturated)"}]});
+      Controls, made of ordinary shapes, clicks and overrides (clicks work on the web):
+      dottie.button({text, x, y, toggles?, sets?, onText?, width?, height?, color?})  a button that flips toggles or sets \
+    sets ({name: bool}); filled, and labelled onText, while on. Returns it
+      dottie.choice(name, [options], {x, y, direction?, initial?, color?})  exactly one on: variables name_option, each \
+    click sets its own true and the rest false. Returns the buttons, each with its variable
+      dottie.resetButton({x, y, text?, id?})  sets every variable back to its starting value (a click with reset: true, \
+    so variables added later are covered too)
+      dottie.legend({x, y, labels?})  a swatch and label per flow; clicking one hides or shows that flow (show_1, show_2…)
+      Example: scenarios, each described once:
+        const [normal, eastOut] = dottie.choice("scenario", ["normal", "east out"], {x: 40, y: 400});
+        dottie.defineState(eastOut.variable, {down: east});
+        dottie.resetButton({x: 300, y: 400}); dottie.legend({x: 600, y: 400});
       Example: failover: api sends to east, or west when east is down:
         dottie.flow(api, [east, west]);
         dottie.defineState("eastDown", {down: east, toggledBy: east});   // east fades, and traffic goes to west
       overrides (on dottie.update): [{when, stroke?, fill?, textColor?, opacity?, strokeWidth?, dash?, text?, \
-    reroute?, offline?, cost?}]: changes to one element while a condition holds, in order; opacity multiplies; cost: a \
+    reroute?, offline?, cost?, capacity?, delay?}]: changes to one element while a condition holds, in order; opacity multiplies; cost: a \
     connector's cost meanwhile (a degraded link); offline: still \
     drawn but carries no flow traffic. Prefer these to a \
     second copy of a shape with the opposite when

@@ -131,7 +131,7 @@ extension DiagramOps {
     /// Gives element `id` the condition `when` (see `PageState`); nil or "" removes it.
     public static func setWhen(_ doc: inout DottieDocument, id: UUID, _ when: String?) throws {
         guard let i = doc.elements.firstIndex(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
-        doc.elements[i].when = try when.flatMap(PageState.checked)
+        doc.elements[i].when = try when.flatMap { try PageState.checked($0) }
     }
 
     /// `base` with the hover colors and opacity given; "" for a color (or a negative opacity) clears it.

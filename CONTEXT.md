@@ -90,6 +90,42 @@ _Avoid_: variant, state style
 Traffic from a shape to the first of its destinations it can reach, routed afresh each frame over the connectors drawn.
 _Avoid_: stream, packet rule
 
+**Volume**:
+How much a flow carries, in the page's own unit; packets are a picture of it.
+_Avoid_: weight, rate, traffic amount
+
+**Capacity**:
+The most volume a connector or shape carries; what doesn't fit takes the next cheapest route or is backlog.
+_Avoid_: limit, bandwidth
+
+**Queue**:
+A shape marked as where traffic waits: backlog collects at the nearest queue before whatever is full.
+_Avoid_: buffer, holding area
+
+**Backlog**:
+Volume a flow can't place on any route with room: the rate the queue in front of the bottleneck grows at.
+_Avoid_: blocked, dropped, overflow
+
+**Delay**:
+Seconds traffic stays inside a shape it passes through: processing, queueing, handling.
+_Avoid_: dwell, latency (that is the whole route's transit)
+
+**Depth**:
+How much backlog has piled up at a shape: its backlog times the seconds since the page's state last changed.
+_Avoid_: queue length, size
+
+**Load**:
+A connector's or shape's throughput over its capacity.
+_Avoid_: utilization, usage
+
+**Metric**:
+A number worked out per frame from the flows and state: throughput, load, transit, share via backup, backlog, in flight.
+_Avoid_: stat, measurement
+
+**Gauge**:
+A rectangle that shows one metric as a number, bar or dial, drawn as plain shapes when the page is posed.
+_Avoid_: meter, widget, dial (that is one style)
+
 **Simulation**:
 Playing a page as `<dottie-player>` would, with no browser (clicks, waits, snapshots), to check an interactive page.
 _Avoid_: dry run, test run

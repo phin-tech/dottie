@@ -23,11 +23,24 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
     /// When the first destination can't be reached, deal packets in turn across every other one that can, rather
     /// than sending them all to the next.
     public var spread: Bool?
+    /// How much it carries, in the page's own unit (ADR 0003); nil is 1. The page's biggest flow draws a packet
+    /// every `every` seconds, and the rest proportionally fewer.
+    public var volume: Double?
+    /// Its volume while a condition on the page's variables holds, the last that holds winning: a spike, peak season.
+    public var overrides: [FlowOverride]?
 
     public init(id: UUID = UUID(), from: UUID, to: [UUID], every: Double? = nil, speed: Double? = nil,
-                color: RGBA? = nil, size: Double? = nil, when: String? = nil, spread: Bool? = nil) {
+                color: RGBA? = nil, size: Double? = nil, when: String? = nil, spread: Bool? = nil, volume: Double? = nil) {
         self.id = id; self.from = from; self.to = to; self.every = every; self.speed = speed
         self.color = color; self.size = size; self.when = when; self.spread = spread == true ? true : nil
+        self.volume = volume
+    }
+
+    /// The volume it carries with these variable values (nil: its own).
+    func amount(_ values: [String: Bool]?) -> Double {
+        guard let values, let list = overrides else { return amount }
+        let v = list.last { $0.volume != nil && !PageState.mentionsMetric($0.when) && PageState.holds($0.when, in: values) }?.volume
+        return v.map { min(max($0.isFinite ? $0 : 1, 0), 1e12) } ?? amount
     }
 
     // Lenient, like the rest of the format: a flow with a missing or bad id, source or destination loads and sends
@@ -43,6 +56,8 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
         color = (try? c.decodeIfPresent(RGBA.self, forKey: .color)) ?? nil
         when = (try? c.decodeIfPresent(String.self, forKey: .when)) ?? nil
         spread = ((try? c.decodeIfPresent(Bool.self, forKey: .spread)) ?? nil) == true ? true : nil
+        volume = number(.volume)
+        overrides = ((try? c.decodeIfPresent([FlowOverride].self, forKey: .overrides)) ?? nil).flatMap { $0.isEmpty ? nil : $0 }
     }
 
     public static let defaultEvery = 0.5, defaultSpeed = 160.0, defaultSize = 12.0
@@ -54,6 +69,8 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
     var interval: Double { Self.clamp(every, Self.defaultEvery, 0.05, 60) }
     var pace: Double { Self.clamp(speed, Self.defaultSpeed, 1, 10000) }
     var diameter: Double { Self.clamp(size, Self.defaultSize, 2, 200) }
+    /// `volume` as assigned: 1 for nil, within 0...1e12.
+    var amount: Double { Self.clamp(volume, 1, 0, 1e12) }
     private static func clamp(_ v: Double?, _ fallback: Double, _ lo: Double, _ hi: Double) -> Double {
         guard let v, v.isFinite else { return fallback }
         return min(max(v, lo), hi)
@@ -64,6 +81,18 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
     static func packetID(_ flow: UUID, _ k: Int) -> UUID {
         let n = UInt64(bitPattern: Int64(k) &+ (1 << 40)) & 0xFFFF_FFFF_FFFF
         return UUID(uuidString: String(flow.uuidString.prefix(24)) + String(format: "%012llX", n)) ?? flow
+    }
+}
+
+/// A flow's volume while a condition holds (`Flow.overrides`).
+public struct FlowOverride: Codable, Equatable, Sendable {
+    public var when: String
+    public var volume: Double?
+    public init(when: String, volume: Double? = nil) { self.when = when; self.volume = volume }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        when = ((try? c.decodeIfPresent(String.self, forKey: .when)) ?? nil) ?? ""
+        volume = ((try? c.decodeIfPresent(Double.self, forKey: .volume)) ?? nil).flatMap { $0.isFinite ? $0 : nil }
     }
 }
 
@@ -134,65 +163,6 @@ extension DottieDocument {
         guard let tree = flowTree(from: from, in: frame, offline: offline), let goal = tree.goals(to, spread: false).first else { return nil }
         return tree.hops(to: goal)
     }
-
-    /// The packets the page's flows draw in `frame` (the page posed at `t`), with these variable values (nil: every
-    /// flow runs).
-    func flowPackets(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID> = []) -> [Element] {
-        guard let flows, !flows.isEmpty else { return [] }
-        let byID = frame.elementIndex
-        var out: [Element] = []
-        // Flows leaving the same shape take turns: the i-th of m starts i/m of its gap later, so they don't draw on
-        // top of each other. Counted over the page's flows, whatever their conditions, so a flow switching on moves none.
-        var leaving: [UUID: Int] = [:], turn: [Int] = []
-        for flow in flows { turn.append(leaving[flow.from, default: 0]); leaving[flow.from, default: 0] += 1 }
-        for (i, flow) in flows.enumerated() {
-            if let w = flow.when, let values, !PageState.holds(w, in: values) { continue }
-            guard let source = byID[flow.from], let tree = Self.flowTree(from: flow.from, in: frame, offline: offline) else { continue }
-            let goals = tree.goals(flow.to, spread: flow.spread == true)
-            let every = flow.interval, speed = flow.pace, size = flow.diameter
-            let phase = Double(turn[i]) / Double(leaving[flow.from]!) * every
-            var style = Style()
-            let color = flow.color ?? Flow.defaultColor
-            style.fill = color; style.stroke = color; style.strokeWidth = 1.5; style.roughness = 0
-            // Spread: packet k goes to goal k mod n.
-            let n = goals.count
-            for (j, goal) in goals.enumerated() {
-                // The route, and the stretches inside the shapes it passes through, where a packet isn't drawn.
-                var points: [CGPoint] = [], inside: [(Double, Double)] = []
-                var length = 0.0
-                for (id, back) in tree.hops(to: goal) {
-                    guard let c = byID[id] else { continue }
-                    var p = Polyline(tracing: c, in: frame).points
-                    if back { p.reverse() }
-                    guard let head = p.first else { continue }
-                    if let last = points.last {
-                        let gap = Double(hypot(head.x - last.x, head.y - last.y))
-                        inside.append((length, length + gap))
-                        length += gap
-                    }
-                    for (a, b) in zip(p, p.dropFirst()) { length += Double(hypot(b.x - a.x, b.y - a.y)) }
-                    points += p
-                }
-                guard length > 0 else { continue }
-                let line = Polyline(points)
-                // Packet k left at k × every + phase; it's on the route while 0 <= (t − k × every − phase) × speed <= length.
-                let lo = Int(((t - phase - length / speed) / every).rounded(.up))
-                let hi = Int(((t - phase) / every).rounded(.down))
-                var k = max(lo, hi - Flow.maxPackets * n + 1)
-                k += ((j - k) % n + n) % n
-                while k <= hi {
-                    defer { k += n }
-                    let d = (t - Double(k) * every - phase) * speed
-                    if inside.contains(where: { d > $0.0 && d < $0.1 }) { continue }
-                    let p = line.point(at: d / length)
-                    out.append(Element(id: Flow.packetID(flow.id, k), kind: .ellipse,
-                                       frame: CGRect(x: p.x - size / 2, y: p.y - size / 2, width: size, height: size),
-                                       style: style, seed: 1, layerID: source.layerID))
-                }
-            }
-        }
-        return out
-    }
 }
 
 extension DiagramOps {
@@ -202,15 +172,24 @@ extension DiagramOps {
     @discardableResult
     public static func addFlow(_ doc: inout DottieDocument, from: UUID, to: [UUID], every: Double? = nil, speed: Double? = nil,
                                color: RGBA? = nil, size: Double? = nil, when: String? = nil, spread: Bool? = nil,
-                               replacing: UUID? = nil) throws -> Flow {
+                               volume: Double? = nil, overrides: [FlowOverride]? = nil, replacing: UUID? = nil) throws -> Flow {
         let shapes = Set(doc.elements.filter { $0.kind != .connector }.map(\.id))
         guard shapes.contains(from) else { throw OpsError.notFound("Traffic leaves from a shape on the page; no shape \(from.uuidString)") }
         guard !to.isEmpty else { throw OpsError.invalid("A flow needs at least one destination") }
         if let bad = to.first(where: { !shapes.contains($0) }) { throw OpsError.notFound("No shape \(bad.uuidString) to send traffic to") }
-        let condition = try when.flatMap(PageState.checked)
+        let condition = try when.flatMap { try PageState.checked($0) }
+        let checkedOverrides = try overrides.map { list in
+            try list.map { o -> FlowOverride in
+                guard let w = try PageState.checked(o.when) else { throw OpsError.invalid("A flow override needs 'when'") }
+                if let v = o.volume, !(v.isFinite && v >= 0) { throw OpsError.invalid("A flow override's volume is 0 or more") }
+                return FlowOverride(when: w, volume: o.volume)
+            }
+        }
         if doc.timeline == nil { doc.timeline = Timeline(duration: 4) }
         let duration = max(doc.timeline!.duration, 0.05)
-        var flow = Flow(id: replacing ?? UUID(), from: from, to: to, every: nil, speed: speed, color: color, size: size, when: condition, spread: spread)
+        var flow = Flow(id: replacing ?? UUID(), from: from, to: to, every: nil, speed: speed, color: color, size: size, when: condition, spread: spread,
+                        volume: volume.flatMap { $0.isFinite ? max($0, 0) : nil })
+        flow.overrides = checkedOverrides.flatMap { $0.isEmpty ? nil : $0 }
         if let every, every.isFinite, every > 0 {
             let n = max(1, (duration / min(max(every, 0.05), 60)).rounded())
             flow.every = duration / n
@@ -249,6 +228,8 @@ extension DiagramOps {
             line += String(format: ", every %.2gs at %g pt/s", f.interval, f.pace)
             if let w = f.when { line += ", when \(w)" }
             if f.spread == true { line += ", spread when the first is down" }
+            if let v = f.volume { line += ", volume \(DottieDocument.number(v, places: 2))" }
+            for o in f.overrides ?? [] { line += ", volume \(o.volume.map { DottieDocument.number($0, places: 2) } ?? "?") when \(o.when)" }
             if let hops = DottieDocument.flowRoute(from: f.from, to: f.to, in: frame, offline: offline) {
                 line += ", now \(hops.count) hop\(hops.count == 1 ? "" : "s")"
             } else {

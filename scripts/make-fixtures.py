@@ -583,6 +583,7 @@ def state():
     p.add("rectangle", 40, 180, 120, 60, text="maint", when="down || maint && !down", click={"toggle": ["down", "maint"]})
     p.add("rectangle", 40, 300, 120, 60, text="broken", when="down |")
     p.add("ellipse", 300, 300, 60, 60, text="unknown", when="!nobody")
+    p.add("rectangle", 460, 300, 100, 40, text="reset", click={"reset": True, "toggle": "down"})   # starting values, then flip
     live = p.connect(east, west, text="live")
     p.connect(east, backup, text="standby")
     keyed = p.connect(east, backup, routing="curved", when="!down")
@@ -697,7 +698,55 @@ def flows():
         {"id": uid(), "from": users, "to": regions, "every": 0.3, "color": rgba(0.2, 0.5, 1)},
         {"id": uid(), "from": users, "to": [regions[2], regions[1]], "every": 0.3, "spread": True, "color": rgba(0.2, 0.7, 0.3)},
     ]
-    write(EDGE / "flows.dottie", [p, q, c, sp])
+
+    # Capacity (ADR 0003): a queue in front of workers that take 2 a second. The first flow (3) fills them and
+    # overflows to the spare; the second (1) finds them full and is backlog in the queue. The queue holds traffic
+    # for 0.5s. Gauges show the workers' load (bar), the queue's backlog (number) and the first flow's transit
+    # (dial); an override comparing a metric turns the saturated workers red, and one that would take them offline
+    # does nothing. A gauge with a bad target shows a dash; a `when` comparing a metric hides its element.
+    cap = Page("Capacity")
+    cap.animate(2, fps=10)
+    api = cap.add("rectangle", 20, 160, 100, 60, text="api")
+    queue = cap.add("rectangle", 200, 160, 100, 60, text="queue", anchor="queue", delay=0.5)
+    workers = cap.add("rectangle", 400, 60, 120, 60, text="workers", anchor="workers", capacity=2, overrides=[
+        {"when": "load(workers) >= 1", "stroke": rgba(0.86, 0.15, 0.15), "text": "workers (saturated)"},
+        {"when": "load(workers) >= 1", "offline": True},
+    ])
+    spare = cap.add("rectangle", 400, 260, 120, 60, text="spare")
+    cap.add("rectangle", 20, 20, 60, 30, text="never", when="load(workers) > 0")
+    cap.connect(api, queue)
+    cap.connect(queue, workers)
+    cap.connect(queue, spare)
+    first = uid()
+    cap.extra = {"flows": [
+        {"id": first, "from": api, "to": [workers, spare], "every": 0.3, "volume": 3},
+        {"id": uid(), "from": api, "to": [workers], "every": 0.3, "volume": 1, "color": rgba(0.2, 0.5, 1)},
+    ]}
+    cap.add("rectangle", 600, 20, 160, 80, gauge={"metric": "load", "of": workers, "style": "bar"})
+    cap.add("rectangle", 600, 120, 160, 80, gauge={"metric": "backlog", "of": queue, "label": "queue backlog"},
+            style=style(roughness=0))
+    cap.add("rectangle", 600, 220, 160, 100, gauge={"metric": "transit", "of": first, "style": "dial", "max": 4, "warn": 2, "alarm": 3})
+    cap.add("rectangle", 600, 340, 160, 60, gauge={"metric": "load", "of": "nope", "style": "x"})
+    cap.add("rectangle", 200, 260, 120, 60, gauge={"metric": "depth", "of": queue, "label": "piled up"})   # grows with t
+
+    # Queue (ADR 0003): sqs is a queue, so with the table full the backlog waits there, not at the worker; the flow's
+    # volume follows its overrides (spike: 5; a damaged override and one with no condition never hold); the worker's
+    # capacity overrides combine to the tightest of those holding (scale alone: 10); alarms on their own load turn
+    # the full table red.
+    qp = Page("Queue")
+    qp.animate(2, fps=10)
+    qp.extra = {"variables": {"spike": True, "scale": True, "slow": False}}
+    api2 = qp.add("rectangle", 20, 100, 100, 60, text="api")
+    sqs = qp.add("rectangle", 200, 100, 100, 60, text="sqs", queue=True, overrides=[{"when": "backlog > 0", "stroke": rgba(0.85, 0.47, 0.02)}])
+    worker = qp.add("rectangle", 380, 100, 100, 60, text="worker", capacity=4, overrides=[
+        {"when": "slow", "capacity": 1}, {"when": "scale", "capacity": 10}, {"when": "load >= 1", "stroke": rgba(0.86, 0.15, 0.15)}])
+    table = qp.add("rectangle", 560, 100, 100, 60, text="table", capacity=2, overrides=[
+        {"when": "load >= 1", "stroke": rgba(0.86, 0.15, 0.15), "textColor": rgba(0.86, 0.15, 0.15)}])
+    qp.connect(api2, sqs); qp.connect(sqs, worker); qp.connect(worker, table)
+    qp.extra["flows"] = [{"id": uid(), "from": api2, "to": [table], "every": 0.3, "volume": 2,
+                          "overrides": [{"when": "spike", "volume": 5}, {"when": "nope ||", "volume": 99}, {"volume": 7}]}]
+    qp.add("rectangle", 200, 200, 120, 60, gauge={"metric": "backlog", "of": sqs, "label": "sqs backlog"})
+    write(EDGE / "flows.dottie", [p, q, c, sp, cap, qp])
 
 
 def links():
