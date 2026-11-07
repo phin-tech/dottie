@@ -1,4 +1,4 @@
-// Traffic flows (Flows.swift, ADR 0002): packets aren't stored; each frame routes every flow over the connectors still
+// Traffic flows (ADR 0002; the model is Flows.swift, and Dottie runs this routing in JavaScriptCore, ADR 0004): packets aren't stored; each frame routes every flow over the connectors still
 // drawn, from the time and the page's variables, so when a click takes a region down the traffic goes round it.
 
 import type { Element, Flow, Page, RGBA } from "./model.ts";
@@ -22,7 +22,7 @@ export function packetID(flow: string, k: number): string {
 const routeCost = (cost: number | null): number =>
   cost === null || !Number.isFinite(cost) ? 1 : Math.min(Math.max(cost, 0), 1_000_000);
 
-/** Every shape traffic from `from` can reach in `frame`, with the cheapest way to each (DottieDocument.flowTree):
+/** Every shape traffic from `from` can reach in `frame`, with the cheapest way to each:
  * by the connectors' cost (1 each unless set), ties to the shape reached first, earlier connectors first. */
 export function flowTree(from: string, frame: Page, offline: Set<string> = new Set()): FlowTree | null {
   const shapes = new Set(frame.elements.filter((e) => e.kind !== "connector" && !offline.has(e.id)).map((e) => e.id));
@@ -41,7 +41,7 @@ export function flowTree(from: string, frame: Page, offline: Set<string> = new S
     add(a, { to: b, via: e.id, back: false, cost });
     if (c.startHead !== "none") add(b, { to: a, via: e.id, back: true, cost });
   }
-  // Dijkstra, settling the cheapest shape next, ties to the one reached first, as Flows.swift does.
+  // Dijkstra, settling the cheapest shape next, ties to the one reached first.
   const dist = new Map<string, number>([[from, 0]]), order = new Map<string, number>([[from, 0]]);
   let counter = 1;
   const tree = new FlowTree(from);

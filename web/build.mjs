@@ -15,6 +15,8 @@ await Promise.all([
   // A classic script has no import.meta; it finds its fonts from document.currentScript instead (fonts.ts).
   build({ ...common, entryPoints: ["src/player-entry.ts"], format: "iife", minify: true, outfile: "dist/dottie-player.min.js",
     define: { "import.meta.url": "undefined" } }),
+  // The simulation DottieKit runs in JavaScriptCore (scripts/update-player-script.py, SimulationEngine.swift).
+  build({ ...common, entryPoints: ["src/sim-entry.ts"], format: "iife", minify: true, outfile: "dist/dottie-sim.min.js" }),
   build({ ...common, entryPoints: ["src/compile.ts"], format: "esm", outfile: "dist/compile.js" }),
   build({ ...common, entryPoints: ["src/cli.ts"], format: "esm", platform: "node", outfile: "dist/dottie-compile.mjs",
     banner: { js: "#!/usr/bin/env node\n" + banner.js } }),

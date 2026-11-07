@@ -96,75 +96,6 @@ public struct FlowOverride: Codable, Equatable, Sendable {
     }
 }
 
-extension DottieDocument {
-    /// Every shape traffic from `from` can reach in `frame`, with the cheapest way to each: by the connectors'
-    /// `cost` (1 each unless set), ties to the shape reached first, earlier connectors first (ADR 0002), so with no
-    /// costs set it's the fewest hops. Nil when `from` isn't drawn or is offline. `offline` elements (an override says
-    /// so) carry nothing: traffic neither leaves, passes nor arrives through them.
-    static func flowTree(from: UUID, in frame: DottieDocument, offline: Set<UUID> = []) -> FlowTree? {
-        let shapes = Set(frame.elements.filter { $0.kind != .connector && !offline.contains($0.id) }.map(\.id))
-        guard shapes.contains(from) else { return nil }
-        var next: [UUID: [(to: UUID, via: UUID, back: Bool, cost: Double)]] = [:]
-        for e in frame.elements {
-            guard let c = e.connector, !offline.contains(e.id), let a = c.start.elementID, let b = c.end.elementID, a != b,
-                  shapes.contains(a), shapes.contains(b) else { continue }
-            next[a, default: []].append((b, e.id, false, c.routeCost))
-            if c.startHead != .none { next[b, default: []].append((a, e.id, true, c.routeCost)) }
-        }
-        // Dijkstra. The next shape settled is the cheapest not yet settled, ties to the one reached first (`order`), so
-        // with equal costs it settles shapes in breadth-first order and web/src/flows.ts picks the same routes.
-        var dist: [UUID: Double] = [from: 0], order: [UUID: Int] = [from: 0], counter = 1
-        var tree = FlowTree(from: from)
-        var open: [UUID] = [from]
-        while !open.isEmpty {
-            var best = 0
-            for i in 1..<open.count {
-                let (a, b) = (open[i], open[best])
-                if dist[a]! < dist[b]! || (dist[a]! == dist[b]! && order[a]! < order[b]!) { best = i }
-            }
-            let n = open.remove(at: best)
-            tree.settled.insert(n)
-            for edge in next[n] ?? [] where !tree.settled.contains(edge.to) {
-                let d = dist[n]! + edge.cost
-                if let old = dist[edge.to], old <= d { continue }
-                if dist[edge.to] == nil { open.append(edge.to) }
-                dist[edge.to] = d; order[edge.to] = counter; counter += 1
-                tree.came[edge.to] = (n, edge.via, edge.back)
-            }
-        }
-        return tree
-    }
-
-    struct FlowTree {
-        let from: UUID
-        var settled: Set<UUID> = []
-        var came: [UUID: (from: UUID, via: UUID, back: Bool)] = [:]
-
-        /// The destinations a flow sends to: the first of `to` that can be reached; with `spread`, when the first
-        /// can't be, every other one that can.
-        func goals(_ to: [UUID], spread: Bool) -> [UUID] {
-            let reachable = to.filter { $0 != from && settled.contains($0) }
-            guard let first = reachable.first else { return [] }
-            return spread && first != to.first ? reachable : [first]
-        }
-
-        /// The connectors to `goal`, as (connector, backwards) hops.
-        func hops(to goal: UUID) -> [(UUID, Bool)] {
-            var hops: [(UUID, Bool)] = []
-            var at = goal
-            while let step = came[at] { hops.append((step.via, step.back)); at = step.from }
-            return hops.reversed()
-        }
-    }
-
-    /// The connectors traffic takes from `from` to the first of `to` it reaches in `frame`, as (connector, backwards)
-    /// hops; nil when none can be reached.
-    static func flowRoute(from: UUID, to: [UUID], in frame: DottieDocument, offline: Set<UUID> = []) -> [(UUID, Bool)]? {
-        guard let tree = flowTree(from: from, in: frame, offline: offline), let goal = tree.goals(to, spread: false).first else { return nil }
-        return tree.hops(to: goal)
-    }
-}
-
 extension DiagramOps {
     /// Adds a flow (or with `replacing`, changes that one) and makes sure the page plays: a timeline at least `loop`
     /// seconds long (4 by default), with `every` rounded so the timeline is a whole number of packets and loops
@@ -219,9 +150,6 @@ extension DiagramOps {
 
     /// One line per flow for a listing: where it goes now (at the starting values), or that it can't get there.
     public static func describeFlows(_ doc: DottieDocument) -> [String] {
-        let frame = doc.posed(at: 0)
-        let values = doc.stateValues(.initial)
-        let offline = Set(doc.elements.filter { $0.activeOverrides(values).contains { $0.offline == true } }.map(\.id))
         let names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0)\"" } ?? $0.id.uuidString) }, uniquingKeysWith: { a, _ in a })
         return (doc.flows ?? []).map { f in
             var line = "flow \(f.id.uuidString): \(names[f.from] ?? "?") → " + f.to.map { names[$0] ?? "?" }.joined(separator: " or ")
@@ -230,12 +158,24 @@ extension DiagramOps {
             if f.spread == true { line += ", spread when the first is down" }
             if let v = f.volume { line += ", volume \(DottieDocument.number(v, places: 2))" }
             for o in f.overrides ?? [] { line += ", volume \(o.volume.map { DottieDocument.number($0, places: 2) } ?? "?") when \(o.when)" }
-            if let hops = DottieDocument.flowRoute(from: f.from, to: f.to, in: frame, offline: offline) {
-                line += ", now \(hops.count) hop\(hops.count == 1 ? "" : "s")"
+            if let hops = route(of: f, in: doc) {
+                line += ", now \(hops) hop\(hops == 1 ? "" : "s")"
             } else {
                 line += ", now can't reach any destination"
             }
             return line
         }
+    }
+
+    /// How many connectors the flow's cheapest way to a destination has at the starting values, whatever its own
+    /// condition and volume, as the simulation routes it; nil when it can reach none.
+    static func route(of flow: Flow, in doc: DottieDocument) -> Int? {
+        var alone = flow
+        alone.when = nil; alone.volume = nil; alone.overrides = nil
+        var d = doc
+        d.flows = [alone]
+        let m = d.metrics(at: 0)
+        let n = d.elements.filter { $0.kind == .connector && (m.elements[$0.id]?.throughput ?? 0) > 0 }.count
+        return n > 0 ? n : nil
     }
 }

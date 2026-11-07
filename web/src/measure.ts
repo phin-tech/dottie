@@ -1,4 +1,5 @@
-// Capacity, metrics and gauges (Metrics.swift, ADR 0003; font metrics are metrics.ts). Each frame, the page's flows are assigned to routes in
+// Capacity, metrics and gauges (ADR 0003; font metrics are metrics.ts). The only implementation: Dottie runs this in
+// JavaScriptCore (sim-entry.ts, SimulationEngine.swift, ADR 0004). Each frame, the page's flows are assigned to routes in
 // page order, as much as each route has room for; the packets drawn and the metrics shown both come from that
 // assignment, so a frame stays a pure function of the page, the time and the variables.
 
@@ -68,7 +69,7 @@ interface Way { line: Polyline; length: number; inside: [number, number, number]
 export const queueKey = (shape: string, flow: string): string => shape + "|" + flow;
 
 /** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs),
- * and the frame's metrics (DottieDocument.flowFrame). `since` is the seconds since the page's state last changed
+ * and the frame's metrics. `since` is the seconds since the page's state last changed
  * (null: `t`), and `carried` how much each flow's queue held at that moment: since then a queue grows by its
  * backlog, or drains at the room its way on has left. */
 export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
@@ -366,22 +367,27 @@ export function metricLookup(m: FrameMetrics, frame: Page): (t: MetricTerm, own:
   };
 }
 
-/** `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements; with
- * no values ("all", the editor), both are left as they are (DottieDocument.finishing). */
-export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
-  frame: Page, flows: Flow[], since = Infinity, carried: Record<string, number> = {}): { elements: Element[]; readings: Record<string, number> } {
+/** What finishing does to one element: which of its overrides that compare metrics hold (their looks apply, in
+ * order), and, for a gauge, the reading it shows. */
+export interface Finish { applied: number[]; gauge: { value: number | null } | null }
+
+/** For each of `elements`, the overrides that compare metrics that hold and the reading a gauge shows (easing, over
+ * `GAUGE_EASE` seconds since the state changed, from its reading then, `carried`); with no values ("all", the
+ * editor), nothing. The readings come back to carry over. */
+export function finishPlan(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
+  frame: Page, since = Infinity, carried: Record<string, number> = {}): { plan: Finish[]; readings: Record<string, number> } {
   const lookup = metricLookup(metrics, frame);
-  const out: Element[] = [], readings: Record<string, number> = {};
-  for (let e of elements) {
+  const plan: Finish[] = [], readings: Record<string, number> = {};
+  for (const e of elements) {
+    const applied: number[] = [];
     if (values !== null && e.overrides) {
-      for (const o of e.overrides) {
-        const own = e.id;
-        if (mentionsMetric(o.when) && holds(o.when, values, (m) => lookup(m, own))) e = applyOverride(looksOnly(o), e);
-      }
+      e.overrides.forEach((o, k) => {
+        if (mentionsMetric(o.when) && holds(o.when, values, (m) => lookup(m, e.id))) applied.push(k);
+      });
     }
     // The editor ("all", no values) edits the gauge itself, a rectangle.
-    if (!e.gauge || values === null) { out.push(e); continue; }
-    const g = e.gauge;
+    const g = values === null ? null : e.gauge;
+    if (!g) { plan.push({ applied, gauge: null }); continue; }
     let shown = metricValue(metrics, g.metric, g.of);
     const then = carried[gaugeKey(e.id)];
     if (shown !== null && then !== undefined && g.metric !== "depth" && g.metric !== "inFlight" && since < GAUGE_EASE) {
@@ -389,8 +395,22 @@ export function finishing(elements: Element[], metrics: FrameMetrics, values: Re
       shown = then + (shown - then) * smooth;
     }
     if (shown !== null) readings[gaugeKey(e.id)] = shown;
-    out.push(...gauge(e, g, shown, frame, flows));
+    plan.push({ applied, gauge: { value: shown } });
   }
+  return { plan, readings };
+}
+
+/** `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements; with
+ * no values ("all", the editor), both are left as they are (`finishPlan`). */
+export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
+  frame: Page, flows: Flow[], since = Infinity, carried: Record<string, number> = {}): { elements: Element[]; readings: Record<string, number> } {
+  const { plan, readings } = finishPlan(elements, metrics, values, frame, since, carried);
+  const out: Element[] = [];
+  elements.forEach((e, i) => {
+    for (const k of plan[i].applied) e = applyOverride(looksOnly(e.overrides![k]), e);
+    const g = plan[i].gauge;
+    if (g && e.gauge) out.push(...gauge(e, e.gauge, g.value, frame, flows)); else out.push(e);
+  });
   return { elements: out, readings };
 }
 
@@ -432,7 +452,7 @@ export function formatNumber(v: number, places: number): string {
   return (v < 0 && n > 0 ? "-" : "") + s;
 }
 
-/** A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial (DottieDocument.gauge). */
+/** A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial. */
 export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, flows: Flow[]): Element[] {
   const target = frame.elements.find((x) => x.id === g.of);
   const full = g.max ?? (g.metric === "load" ? 1 : target?.capacity ?? value ?? 1);

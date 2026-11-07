@@ -2,6 +2,9 @@
 status: accepted
 ---
 
+> Amended by [ADR 0004](0004-one-simulation-in-javascript.md): what this describes is now written once, in dottie.js,
+> and Dottie runs it in JavaScriptCore. "Swift and TypeScript have to agree" no longer applies.
+
 # Capacity, metrics and gauges are worked out per frame, and drawn as plain elements
 
 Flows (ADR 0002) say where traffic goes. People draw systems that carry things (requests through services,

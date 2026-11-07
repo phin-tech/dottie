@@ -242,8 +242,11 @@ shapes, clicks and overrides, so they need nothing new from any renderer. A page
 0002) are traffic no file stores: `posed` routes each one over the connectors left in the frame, cheapest by their `cost`
 (1 each unless set, so fewest hops; an override can change it), to the first destination it reaches (or, with
 `spread`, shared across the others while the first is down) and appends its packets, a pure function of the time and the values, with ids derived
-from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn. `Metrics.swift`
-(`web/src/measure.ts`, ADR 0003) does the routing and packets now: flows are assigned in page order to routes with
+from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn. All of this is written
+once, in dottie.js (`web/src/flows.ts`, `web/src/measure.ts`), and Dottie runs it in JavaScriptCore: `posedWithMetrics`
+calls `SimulationEngine`, which keeps the bundled `PlayerScript.simulation` (`web/src/sim-entry.ts`) in one context,
+sends the posed page only when it changes, and builds packets and gauges as Swift elements from what comes back
+(ADR 0004). `measure.ts` (ADR 0003) does the routing and packets: flows are assigned in page order to routes with
 room under `capacity`, the rest is backlog at the shape in front of the bottleneck, a shape's `delay` holds packets
 inside it, and the same pass yields the frame's metrics. Then overrides whose condition compares a metric
 (`load(workers) >= 1`) apply their looks, and elements with a `gauge` become plain `.path` elements (frame and label,
