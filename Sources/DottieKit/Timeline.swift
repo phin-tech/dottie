@@ -569,7 +569,7 @@ extension DottieDocument {
     /// is returned as is.
     /// `since` is the seconds since the page's state last changed, which backlog has been piling up for (ADR 0003):
     /// a player passes the time since the last click; nil is `t`, as exports draw it. `carried` is what each queue
-    /// held when the state last changed (`FrameMetrics.queues` then), which it drains from.
+    /// held when the state last changed (`FrameMetrics.carry` then), which it drains from.
     public func posed(at t: Double, state: StateChoice = .initial, since: Double? = nil, carried: [String: Double] = [:]) -> DottieDocument {
         posedWithMetrics(at: t, state: state, since: since, carried: carried).frame
     }
@@ -653,8 +653,11 @@ extension DottieDocument {
         if measuring {
             let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
             let (packets, m) = flowFrame(in: copy, at: t, values: values, offline: offline, since: since, carried: carried)
+            let finished = Self.finishing(copy.elements, metrics: m, values: values, frame: copy, flows: flows ?? [],
+                                          since: max(0, min(since ?? t, 1e6)), carried: carried)
             metrics = m
-            copy.elements = Self.finishing(copy.elements, metrics: m, values: values, frame: copy, flows: flows ?? []) + packets
+            metrics.carry.merge(finished.readings) { _, new in new }
+            copy.elements = finished.elements + packets
             copy.flows = nil
         }
         return (copy, metrics)

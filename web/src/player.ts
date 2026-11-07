@@ -72,7 +72,7 @@ export class Playback {
   stateSince = typeof performance === "undefined" ? 0 : performance.now();
   /** A still (the `at` attribute): backlog is drawn for the page time, not the wall clock. */
   still = false;
-  /** What each queue held when the variables last changed, which it drains from (FrameMetrics.queues). */
+  /** What each queue held when the variables last changed, which it drains from (FrameMetrics.carry). */
   carried: Record<string, number> = {};
 
   /** Seconds since the variables last changed, or null for a still. */
@@ -546,7 +546,7 @@ export class DottiePlayer extends ElementBase {
     if (Object.keys(next).every((k) => next[k] === p.state[k])) return;
     // The queues as they stand carry over, so a backlog drains from where it got to.
     const t = clampTime(p.last.t);
-    p.carried = posedWithMetrics(p.page, t, p.state, p.sinceChange(), p.carried).metrics.queues;
+    p.carried = posedWithMetrics(p.page, t, p.state, p.sinceChange(), p.carried).metrics.carry;
     p.state = next;
     p.stateSince = performance.now();
     p.redraw();

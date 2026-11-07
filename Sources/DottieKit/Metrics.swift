@@ -72,9 +72,10 @@ public struct FlowMetrics: Equatable, Sendable {
 public struct FrameMetrics: Equatable, Sendable {
     public var elements: [UUID: ElementMetrics] = [:]
     public var flows: [UUID: FlowMetrics] = [:]
-    /// How much each flow's queue at each shape holds (`DottieDocument.queueKey`): what a player carries over when
-    /// the state changes, so the queue drains from there.
-    public var queues: [String: Double] = [:]
+    /// What a player carries over when the state changes: how much each flow's queue at each shape holds
+    /// (`DottieDocument.queueKey`), so it drains from there, and each gauge's reading (`gaugeKey`), so it eases from
+    /// there to the new one.
+    public var carry: [String: Double] = [:]
 
     /// `metric` of the element or flow `id`, or nil when it has none.
     public func value(_ metric: String, of id: UUID) -> Double? {
@@ -111,14 +112,20 @@ extension DottieDocument {
         var shapes: [UUID]
         var goal: UUID
         var amount: Double
+        /// Traffic that only gets as far as the queue it waits in: drawn and counted up to there, not delivered.
+        var waits = false
     }
 
-    /// The key of a flow's queue at a shape in `FrameMetrics.queues` and `carried`.
+    /// The key of a flow's queue at a shape in `FrameMetrics.carry` and `carried`.
     public static func queueKey(shape: UUID, flow: UUID) -> String { shape.uuidString + "|" + flow.uuidString }
+    /// The key of a gauge's reading in `FrameMetrics.carry` and `carried`.
+    public static func gaugeKey(_ gauge: UUID) -> String { "gauge|" + gauge.uuidString }
+    /// Seconds a gauge takes to ease from its reading when the state changed to the new one.
+    static let gaugeEase = 1.0
 
     /// The packets the page's flows draw in `frame` (the page posed at `t`), with these variable values (nil: every
     /// flow runs), and the frame's metrics. `since` is the seconds since the page's state last changed (nil: `t`),
-    /// and `carried` how much each flow's queue held at that moment (`FrameMetrics.queues` then; ADR 0003): since
+    /// and `carried` how much each flow's queue held at that moment (`FrameMetrics.carry` then; ADR 0003): since
     /// then a queue grows by its backlog, or drains at the room its way on has left.
     func flowFrame(in frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID> = [],
                    since: Double? = nil, carried: [String: Double] = [:]) -> (packets: [Element], metrics: FrameMetrics) {
@@ -223,6 +230,12 @@ extension DottieDocument {
                     var sequence: [(UUID, UUID)] = [(r.shapes[0], r.shapes[0])]   // (element, the shape before it)
                     for (k, hop) in r.hops.enumerated() { sequence += [(hop.0, r.shapes[k]), (r.shapes[k + 1], r.shapes[k])] }
                     if let first = sequence.first(where: { done.contains($0.0) }) { at = first.1 }
+                    // It still travels as far as the queue it waits in.
+                    if at != flow.from, let n = r.shapes.firstIndex(of: at) {
+                        let shapes = Array(r.shapes[...n]), hops = Array(r.hops[..<n])
+                        for id in shapes + hops.map(\.0) where room[id] != nil { room[id] = max(0, room[id]! - left) }
+                        placements.append(Placement(hops: hops, shapes: shapes, goal: at, amount: left, waits: true))
+                    }
                 }
                 if let k = waiting.firstIndex(where: { $0.0 == at }) { waiting[k].1 += left } else { waiting.append((at, left)) }
             }
@@ -231,10 +244,10 @@ extension DottieDocument {
             // Metrics.
             for p in placements {
                 for id in p.shapes + p.hops.map(\.0) { metrics.elements[id]?.throughput += p.amount }
-                fm.placed += p.amount
+                if !p.waits { fm.placed += p.amount }
             }
             for (at, amount) in waiting { metrics.elements[at]?.backlog += amount; fm.backlog += amount }
-            let reachedFirst = placements.filter { $0.goal == flow.to.first }.reduce(0) { $0 + $1.amount }
+            let reachedFirst = placements.filter { !$0.waits && $0.goal == flow.to.first }.reduce(0) { $0 + $1.amount }
             fm.backup = volume > tiny ? max(0, (volume - reachedFirst) / volume) : 0
 
             // Packets: dealt across the placements by their share of the volume.
@@ -250,7 +263,7 @@ extension DottieDocument {
             for (r, p) in placements.enumerated() {
                 guard let w = way(p.hops, p.shapes) else { continue }
                 let travel = w.length / speed + w.inside.reduce(0) { $0 + $1.2 }
-                transitSum += travel * p.amount
+                if !p.waits { transitSum += travel * p.amount }
                 let lo = Int(((t - phase - travel) / every).rounded(.up))
                 let hi = Int(((t - phase) / every).rounded(.down))
                 let below = r == 0 ? 0 : cumulative[r - 1], upTo = cumulative[r]
@@ -287,29 +300,40 @@ extension DottieDocument {
                 let backlog = waiting.first { $0.0 == at }?.1 ?? 0
                 let before = max(0, carried[Self.queueKey(shape: at, flow: flow.id)] ?? 0)
                 var depth = before + backlog * since
-                // Drain: at the most the cheapest way on to the flow's first reachable destination has room for. A
-                // queue with nowhere to go, or no room on the way, holds.
-                if backlog <= tiny, before > tiny,
-                   let tree = Self.flowTree(from: at, in: frame, offline: offline.union(full())),
-                   let goal = tree.goals(flow.to, spread: false).first {
-                    let r = route(tree, goal)
-                    let ids = Array(r.shapes.dropFirst()) + r.hops.map(\.0)
-                    let spare = ids.compactMap { room[$0] }.min() ?? .infinity
-                    let rate = spare.isFinite ? spare : before / 0.5
-                    if rate > tiny {
-                        depth = max(0, before - rate * since)
+                // Drain: at the room left on the ways on to the flow's destinations, the cheapest first, then the next
+                // (as traffic is placed); all at once, over half a second, if a way has no capacity. A queue with
+                // nowhere to go, or no room on the way, holds.
+                if backlog <= tiny, before > tiny {
+                    var trial = room, outlets: [(hops: [(UUID, Bool)], shapes: [UUID], rate: Double)] = [], total = 0.0
+                    for _ in 0..<32 {
+                        let blocked = Set(trial.filter { $0.value <= tiny }.keys)
+                        guard let tree = Self.flowTree(from: at, in: frame, offline: offline.union(blocked)),
+                              let goal = tree.goals(flow.to, spread: false).first else { break }
+                        let r = route(tree, goal)
+                        let ids = Array(r.shapes.dropFirst()) + r.hops.map(\.0)
+                        let spare = ids.compactMap { trial[$0] }.min() ?? .infinity
+                        let rate = spare.isFinite ? spare : max(before / 0.5 - total, tiny * 2)
+                        guard rate > tiny else { break }
+                        for id in ids where trial[id] != nil { trial[id]! -= rate }
+                        outlets.append((r.hops, r.shapes, rate)); total += rate
+                        if !spare.isFinite { break }
+                    }
+                    if total > tiny {
+                        depth = max(0, before - total * since)
                         if depth > tiny {
-                            for id in r.shapes + r.hops.map(\.0) { metrics.elements[id]?.throughput += rate }
-                            for id in ids where room[id] != nil { room[id]! -= rate }
+                            room = trial
+                            for o in outlets { for id in o.shapes + o.hops.map(\.0) { metrics.elements[id]?.throughput += o.rate } }
                         }
-                        // The drained traffic: packets leaving the queue while it empties.
-                        if let w = way(r.hops, r.shapes) {
-                            let spacing = max(unit / rate, 0.05), lasts = before / rate
+                        // The drained traffic: packets leaving the queue along each way while it empties.
+                        let lasts = before / total
+                        for (i, o) in outlets.enumerated() {
+                            guard let w = way(o.hops, o.shapes) else { continue }
+                            let spacing = max(unit / o.rate, 0.05)
                             var k = 0
-                            while Double(k) * spacing < lasts, Double(k) * spacing <= since, k < 4000 {
+                            while Double(k) * spacing < lasts, Double(k) * spacing <= since, k < 2048 {
                                 defer { k += 1 }
                                 guard let d = along(w, since - Double(k) * spacing, speed: speed) else { continue }
-                                packets.append(dot(Flow.packetID(flow.id, (1 << 39) + (1 << 20) + j * (1 << 14) + k),
+                                packets.append(dot(Flow.packetID(flow.id, (1 << 39) + (1 << 20) + j * (1 << 14) + i * (1 << 11) + k),
                                                    w.line.point(at: d / w.length), size, style, layer))
                             }
                         }
@@ -317,7 +341,7 @@ extension DottieDocument {
                 }
                 guard depth > tiny || backlog > tiny else { continue }
                 metrics.elements[at]?.depth += depth
-                if depth > tiny { metrics.queues[Self.queueKey(shape: at, flow: flow.id)] = depth }
+                if depth > tiny { metrics.carry[Self.queueKey(shape: at, flow: flow.id)] = depth }
                 let n = Int(min(max((depth / unit - 1e-9).rounded(.up), 1), 30))
                 let rows = (n + 9) / 10
                 let base = piles[at, default: 0]; piles[at] = base + rows
@@ -372,11 +396,12 @@ extension DottieDocument {
     }
 
     /// `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements;
-    /// with no values (`.all`, the editor), both are left as they are.
+    /// with no values (`.all`, the editor), both are left as they are. A gauge eases, over `gaugeEase` seconds since
+    /// the state changed, from its reading then (`carried`) to the new one; its readings come back to carry over.
     static func finishing(_ elements: [Element], metrics: FrameMetrics, values: [String: Bool]?, frame: DottieDocument,
-                          flows: [Flow]) -> [Element] {
+                          flows: [Flow], since: Double = .infinity, carried: [String: Double] = [:]) -> (elements: [Element], readings: [String: Double]) {
         let lookup = metricLookup(metrics, in: frame)
-        var out: [Element] = []
+        var out: [Element] = [], readings: [String: Double] = [:]
         for var e in elements {
             if let values, let overrides = e.overrides {
                 for o in overrides where PageState.mentionsMetric(o.when) && PageState.holds(o.when, in: values, metric: lookup) {
@@ -384,9 +409,16 @@ extension DottieDocument {
                 }
             }
             // The editor (`.all`, no values) edits the gauge itself, a rectangle.
-            if let g = e.gauge, values != nil { out += gauge(e, g, metrics: metrics, frame: frame, flows: flows) } else { out.append(e) }
+            guard let g = e.gauge, values != nil else { out.append(e); continue }
+            var shown = metrics.value(g.metric, of: g.of)
+            if let now = shown, let then = carried[gaugeKey(e.id)], !["depth", "inFlight"].contains(g.metric), since < gaugeEase {
+                let f = max(0, since / gaugeEase), smooth = f * f * (3 - 2 * f)
+                shown = then + (now - then) * smooth
+            }
+            if let shown { readings[gaugeKey(e.id)] = shown }
+            out += gauge(e, g, value: shown, frame: frame, flows: flows)
         }
-        return out
+        return (out, readings)
     }
 
     static let gaugeGreen = RGBA(hex: "#16a34a")!, gaugeAmber = RGBA(hex: "#d97706")!, gaugeRed = RGBA(hex: "#dc2626")!
@@ -419,8 +451,7 @@ extension DottieDocument {
     }
 
     /// A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial.
-    static func gauge(_ e: Element, _ g: Gauge, metrics: FrameMetrics, frame: DottieDocument, flows: [Flow]) -> [Element] {
-        let value = metrics.value(g.metric, of: g.of)
+    static func gauge(_ e: Element, _ g: Gauge, value: Double?, frame: DottieDocument, flows: [Flow]) -> [Element] {
         let target = frame.elements.first { $0.id == g.of }
         let full = g.max ?? (g.metric == "load" ? 1 : target?.capacity ?? value ?? 1)
         let fraction = value.map { full > 0 ? min(max($0 / full, 0), 1) : 0 } ?? 0
@@ -563,7 +594,7 @@ extension DiagramOps {
             var parts = ["throughput \(n(x.throughput))"]
             if let l = x.load { parts.append("load \(DottieDocument.formatted("load", l))") }
             if x.backlog > 0 { parts.append("backlog \(n(x.backlog)) (piled up \(n(x.depth)))") }
-            else if x.depth > 0 { parts.append("draining, \(n(x.depth)) left") }
+            else if x.depth > 0 { parts.append("\(n(x.depth)) queued (drains when there's room)") }
             if x.delay > 0 { parts.append("delay \(n(x.delay))s") }
             out.append("\(names[e.id] ?? "?"): " + parts.joined(separator: ", "))
         }

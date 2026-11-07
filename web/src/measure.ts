@@ -13,9 +13,9 @@ export interface ElementMetrics { throughput: number; load: number | null; delay
 /** A flow's metrics in one frame (FlowMetrics). */
 export interface FlowMetrics { volume: number; placed: number; backlog: number; backup: number; transit: number | null }
 /** Every metric of one frame (FrameMetrics). */
-export interface FrameMetrics { elements: Map<string, ElementMetrics>; flows: Map<string, FlowMetrics>; queues: Record<string, number> }
+export interface FrameMetrics { elements: Map<string, ElementMetrics>; flows: Map<string, FlowMetrics>; carry: Record<string, number> }
 
-export const emptyMetrics = (): FrameMetrics => ({ elements: new Map(), flows: new Map(), queues: {} });
+export const emptyMetrics = (): FrameMetrics => ({ elements: new Map(), flows: new Map(), carry: {} });
 
 /** `metric` of the element or flow `id`, or null when it has none. */
 export function metricValue(m: FrameMetrics, metric: string, id: string): number | null {
@@ -53,10 +53,10 @@ export function delayOf(e: Element): number {
   return Math.min(Math.max(d, 0), 3600);
 }
 
-interface Placement { hops: [string, boolean][]; shapes: string[]; goal: string; amount: number }
+interface Placement { hops: [string, boolean][]; shapes: string[]; goal: string; amount: number; waits?: boolean }
 interface Way { line: Polyline; length: number; inside: [number, number, number][]; stretches: [string, number, number][] }
 
-/** The key of a flow's queue at a shape in `FrameMetrics.queues` and `carried` (DottieDocument.queueKey). */
+/** The key of a flow's queue at a shape in `FrameMetrics.carry` and `carried` (DottieDocument.queueKey). */
 export const queueKey = (shape: string, flow: string): string => shape + "|" + flow;
 
 /** The packets the page's flows draw in `frame` (the page posed at `t`), with these values (null: every flow runs),
@@ -176,6 +176,13 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
         r.hops.forEach(([id], k) => { sequence.push([id, r.shapes[k]], [r.shapes[k + 1], r.shapes[k]]); });
         const first = sequence.find(([id]) => done.has(id));
         if (first) at = first[1];
+        // It still travels as far as the queue it waits in.
+        const n = r.shapes.indexOf(at);
+        if (at !== flow.from && n >= 0) {
+          const shapes = r.shapes.slice(0, n + 1), hops = r.hops.slice(0, n);
+          for (const id of [...shapes, ...hops.map(([h]) => h)]) if (room.has(id)) room.set(id, Math.max(0, room.get(id)! - left));
+          placements.push({ hops, shapes, goal: at, amount: left, waits: true });
+        }
       }
       const existing = waiting.find(([s]) => s === at);
       if (existing) existing[1] += left; else waiting.push([at, left]);
@@ -185,10 +192,10 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     // Metrics.
     for (const p of placements) {
       for (const id of [...p.shapes, ...p.hops.map(([h]) => h)]) bump(id, (m) => { m.throughput += p.amount; });
-      fm.placed += p.amount;
+      if (!p.waits) fm.placed += p.amount;
     }
     for (const [at, a] of waiting) { bump(at, (m) => { m.backlog += a; }); fm.backlog += a; }
-    const reachedFirst = placements.filter((p) => p.goal === flow.to[0]).reduce((s, p) => s + p.amount, 0);
+    const reachedFirst = placements.filter((p) => !p.waits && p.goal === flow.to[0]).reduce((s, p) => s + p.amount, 0);
     fm.backup = volume > TINY ? Math.max(0, (volume - reachedFirst) / volume) : 0;
 
     // Packets: dealt across the placements by their share of the volume.
@@ -205,7 +212,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
       const w = way(p.hops, p.shapes);
       if (!w) return;
       const travel = w.length / speed + w.inside.reduce((s, x) => s + x[2], 0);
-      transitSum += travel * p.amount;
+      if (!p.waits) transitSum += travel * p.amount;
       const lo = Math.ceil((t - phase - travel) / every);
       const hi = Math.floor((t - phase) / every);
       const below = r === 0 ? 0 : cumulative[r - 1], upTo = cumulative[r];
@@ -247,36 +254,51 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
       const backlog = waiting.find(([s]) => s === at)?.[1] ?? 0;
       const before = Math.max(0, carried[queueKey(at, flow.id)] ?? 0);
       let depth = before + backlog * since;
-      const tree = backlog <= TINY && before > TINY ? flowTree(at, frame, union(offline, full())) : null;
-      const goal = tree?.goals(flow.to, false)[0];
-      if (tree && goal !== undefined) {
-        const r = route(tree, goal);
-        const ids = [...r.shapes.slice(1), ...r.hops.map(([id]) => id)];
-        const rooms = ids.filter((id) => room.has(id)).map((id) => room.get(id)!);
-        const spare = rooms.length > 0 ? Math.min(...rooms) : Infinity;
-        const rate = Number.isFinite(spare) ? spare : before / 0.5;
-        if (rate > TINY) {
-          depth = Math.max(0, before - rate * since);
+      // Drain: at the room left on the ways on to the flow's destinations, the cheapest first, then the next.
+      if (backlog <= TINY && before > TINY) {
+        const trial = new Map(room);
+        const outlets: { hops: [string, boolean][]; shapes: string[]; rate: number }[] = [];
+        let total = 0;
+        for (let n = 0; n < 32; n++) {
+          const blocked = new Set([...trial].filter(([, v]) => v <= TINY).map(([id]) => id));
+          const tree = flowTree(at, frame, union(offline, blocked));
+          const goal = tree?.goals(flow.to, false)[0];
+          if (!tree || goal === undefined) break;
+          const r = route(tree, goal);
+          const ids = [...r.shapes.slice(1), ...r.hops.map(([id]) => id)];
+          const rooms = ids.filter((id) => trial.has(id)).map((id) => trial.get(id)!);
+          const spare = rooms.length > 0 ? Math.min(...rooms) : Infinity;
+          const rate = Number.isFinite(spare) ? spare : Math.max(before / 0.5 - total, TINY * 2);
+          if (!(rate > TINY)) break;
+          for (const id of ids) if (trial.has(id)) trial.set(id, trial.get(id)! - rate);
+          outlets.push({ hops: r.hops, shapes: r.shapes, rate });
+          total += rate;
+          if (!Number.isFinite(spare)) break;
+        }
+        if (total > TINY) {
+          depth = Math.max(0, before - total * since);
           if (depth > TINY) {
-            for (const id of [...r.shapes, ...r.hops.map(([h]) => h)]) bump(id, (m) => { m.throughput += rate; });
-            for (const id of ids) if (room.has(id)) room.set(id, room.get(id)! - rate);
+            for (const [id, v] of trial) room.set(id, v);
+            for (const o of outlets) for (const id of [...o.shapes, ...o.hops.map(([h]) => h)]) bump(id, (m) => { m.throughput += o.rate; });
           }
-          // The drained traffic: packets leaving the queue while it empties.
-          const w = way(r.hops, r.shapes);
-          if (w) {
-            const spacing = Math.max(unit / rate, 0.05), lasts = before / rate;
-            for (let k = 0; k * spacing < lasts && k * spacing <= since && k < 4000; k++) {
+          // The drained traffic: packets leaving the queue along each way while it empties.
+          const lasts = before / total;
+          outlets.forEach((o, i) => {
+            const w = way(o.hops, o.shapes);
+            if (!w) return;
+            const spacing = Math.max(unit / o.rate, 0.05);
+            for (let k = 0; k * spacing < lasts && k * spacing <= since && k < 2048; k++) {
               const d = along(w, since - k * spacing, speed);
               if (d === null) continue;
               const pt = w.line.point(d / w.length);
-              packets.push(packet(packetID(flow.id, 2 ** 39 + 2 ** 20 + j * 2 ** 14 + k), pt.x - size / 2, pt.y - size / 2, size, color, layer));
+              packets.push(packet(packetID(flow.id, 2 ** 39 + 2 ** 20 + j * 2 ** 14 + i * 2 ** 11 + k), pt.x - size / 2, pt.y - size / 2, size, color, layer));
             }
-          }
+          });
         }
       }
       if (!(depth > TINY || backlog > TINY)) return;
       bump(at, (m) => { m.depth += depth; });
-      if (depth > TINY) metrics.queues[queueKey(at, flow.id)] = depth;
+      if (depth > TINY) metrics.carry[queueKey(at, flow.id)] = depth;
       const n = Math.min(Math.max(Math.ceil(depth / unit - 1e-9), 1), 30);
       const rows = Math.trunc((n + 9) / 10);
       const base = piles.get(at) ?? 0;
@@ -330,19 +352,34 @@ export function metricLookup(m: FrameMetrics, frame: Page): (t: MetricTerm) => n
 /** `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements; with
  * no values ("all", the editor), both are left as they are (DottieDocument.finishing). */
 export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
-  frame: Page, flows: Flow[]): Element[] {
+  frame: Page, flows: Flow[], since = Infinity, carried: Record<string, number> = {}): { elements: Element[]; readings: Record<string, number> } {
   const lookup = metricLookup(metrics, frame);
-  const out: Element[] = [];
+  const out: Element[] = [], readings: Record<string, number> = {};
   for (let e of elements) {
     if (values !== null && e.overrides) {
       for (const o of e.overrides) {
         if (mentionsMetric(o.when) && holds(o.when, values, lookup)) e = applyOverride(looksOnly(o), e);
       }
     }
-    if (e.gauge && values !== null) out.push(...gauge(e, e.gauge, metrics, frame, flows)); else out.push(e);
+    // The editor ("all", no values) edits the gauge itself, a rectangle.
+    if (!e.gauge || values === null) { out.push(e); continue; }
+    const g = e.gauge;
+    let shown = metricValue(metrics, g.metric, g.of);
+    const then = carried[gaugeKey(e.id)];
+    if (shown !== null && then !== undefined && g.metric !== "depth" && g.metric !== "inFlight" && since < GAUGE_EASE) {
+      const f = Math.max(0, since / GAUGE_EASE), smooth = f * f * (3 - 2 * f);
+      shown = then + (shown - then) * smooth;
+    }
+    if (shown !== null) readings[gaugeKey(e.id)] = shown;
+    out.push(...gauge(e, g, shown, frame, flows));
   }
-  return out;
+  return { elements: out, readings };
 }
+
+/** The key of a gauge's reading in `FrameMetrics.carry` and `carried` (DottieDocument.gaugeKey). */
+export const gaugeKey = (id: string): string => "gauge|" + id;
+/** Seconds a gauge takes to ease from its reading when the state changed to the new one. */
+const GAUGE_EASE = 1;
 
 const hex = (h: string): RGBA => {
   const v = parseInt(h.slice(1), 16);
@@ -378,8 +415,7 @@ export function formatNumber(v: number, places: number): string {
 }
 
 /** A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial (DottieDocument.gauge). */
-export function gauge(e: Element, g: Gauge, metrics: FrameMetrics, frame: Page, flows: Flow[]): Element[] {
-  const value = metricValue(metrics, g.metric, g.of);
+export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, flows: Flow[]): Element[] {
   const target = frame.elements.find((x) => x.id === g.of);
   const full = g.max ?? (g.metric === "load" ? 1 : target?.capacity ?? value ?? 1);
   const fraction = value === null ? 0 : full > 0 ? Math.min(Math.max(value / full, 0), 1) : 0;

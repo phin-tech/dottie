@@ -52,11 +52,14 @@ Each frame, after state has been applied, the page's flows are assigned to route
    backlog times the seconds since the page's state last changed. That time is an input to posing, like `t` and
    the variables: the player passes the time since the last click, `simulate` the time since its last click, and
    exports and goldens use the page time. So the pile of packets above the shape grows as you watch (up to 30 a
-   flow), and every frame is still a pure function of its inputs.
+   flow), and every frame is still a pure function of its inputs. Waiting traffic still travels as far as the queue:
+   it counts toward the throughput of everything on the way and is drawn arriving at the pile, though it isn't
+   delivered.
 6. **Draining.** When the state changes, the player (and `simulate`) also hands posing what each flow's queue held
    at that moment, **carried**, another explicit input (exports and goldens carry nothing). From there a queue with
-   backlog keeps growing; one without drains at the room left on the cheapest way on to its flow's first reachable
-   destination (all at once, over half a second, when nothing on the way has a capacity), using that room, so
+   backlog keeps growing; one without drains at the room left on the ways on to its flow's destinations, the
+   cheapest first and then the next, as traffic is placed (so a queue drains through the overflow too), all at once
+   over half a second when a way has no capacity, using that room, so
    the workers run full until it's empty. The drained traffic leaves as packets of that flow, even one that has
    stopped (the spike's messages are still worked off after the spike). Depth is
    `max(0, carried − drain rate × since)`, exact between clicks; a click mid-drain carries what's left.
@@ -100,6 +103,10 @@ routed), **a condition that mentions a metric may only change looks**: `stroke`,
 A file that breaks this rule loads, and the offending override does nothing. Variables stay booleans.
 
 ### Gauges
+
+A gauge's reading also carries across a state change (`carry`, with the queues), and it eases from that reading to
+the new one over a second, so a dial swings rather than jumps when you click. Exports carry nothing and show the
+reading itself. Depth and in-flight counts don't ease; they already move continuously.
 
 A gauge is a rectangle with a `gauge` field: `{metric, of, max?, warn?, alarm?, style: number | bar | dial,
 label?}`. When the page is posed, it's replaced by plain elements: a frame, a bar or an arc and needle as clean

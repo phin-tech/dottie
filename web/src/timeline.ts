@@ -233,7 +233,7 @@ export function posed(page: Page, t: number, state: StateChoice = "initial", sin
 
 /** `posed`, and the frame's metrics (ADR 0003). `since` is the seconds since the page's state last changed, which
  * backlog has been piling up for: the player passes the time since the last click; null is `t`, as exports draw it.
- * `carried` is what each queue held when the state last changed (`FrameMetrics.queues` then), which it drains from. */
+ * `carried` is what each queue held when the state last changed (`FrameMetrics.carry` then), which it drains from. */
 export function posedWithMetrics(page: Page, t: number, state: StateChoice = "initial", since: number | null = null,
   carried: Record<string, number> = {}): { frame: Page; metrics: FrameMetrics } {
   const off = stateHidden(page, state);
@@ -327,7 +327,9 @@ export function posedWithMetrics(page: Page, t: number, state: StateChoice = "in
     const frame: Page = { ...page, elements, timeline: null };
     const out = flowFrame(page.flows, frame, t, values, offline, since, carried);
     metrics = out.metrics;
-    elements = [...finishing(elements, out.metrics, values, frame, page.flows ?? []), ...out.packets];
+    const finished = finishing(elements, out.metrics, values, frame, page.flows ?? [], Math.max(0, Math.min(since ?? t, 1e6)), carried);
+    Object.assign(metrics.carry, finished.readings);
+    elements = [...finished.elements, ...out.packets];
   }
   return { frame: { ...page, elements, timeline: null, flows: measuring ? null : page.flows }, metrics };
 }

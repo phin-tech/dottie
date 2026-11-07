@@ -33,7 +33,7 @@ final class MetricsTests: XCTestCase {
         XCTAssertEqual(m.flows[flow.id]?.backlog, 1)
         XCTAssertEqual(m.elements[queue]?.backlog, 1, "it waits in the queue, in front of the full workers")
         XCTAssertEqual(m.elements[workers]?.load, 1)
-        XCTAssertEqual(m.elements[api]?.throughput, 2)
+        XCTAssertEqual(m.elements[api]?.throughput, 3)   // the 1 that waits still comes through the API to the queue
         // Backlog piles above the queue.
         let frame = doc.posed(at: 1)
         let piled = frame.elements.filter { $0.kind == .ellipse && $0.frame.maxY < 100 && $0.frame.minX >= 200 && $0.frame.maxX < 290 }
@@ -52,23 +52,39 @@ final class MetricsTests: XCTestCase {
         try doc.setVariable("spike", to: false)
         // In the spike, 1 a second more than the workers take piles up in the queue: 4 after 4s.
         let during = doc.metrics(at: 1, state: .values(["spike": true]), since: 4)
-        XCTAssertEqual(try XCTUnwrap(during.queues[DottieDocument.queueKey(shape: queue, flow: spike.id)]), 4, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(during.carry[DottieDocument.queueKey(shape: queue, flow: spike.id)]), 4, accuracy: 1e-9)
         // After it, the workers have 1 a second of room, so the queue drains at 1 a second, keeping them busy.
-        let after = doc.metrics(at: 1, state: .values(["spike": false]), since: 2, carried: during.queues)
+        let after = doc.metrics(at: 1, state: .values(["spike": false]), since: 2, carried: during.carry)
         XCTAssertEqual(try XCTUnwrap(after.elements[queue]?.depth), 2, accuracy: 1e-9)
         XCTAssertEqual(after.elements[workers]?.load, 1)
-        let empty = doc.metrics(at: 1, state: .values(["spike": false]), since: 5, carried: during.queues)
+        let empty = doc.metrics(at: 1, state: .values(["spike": false]), since: 5, carried: during.carry)
         XCTAssertEqual(empty.elements[queue]?.depth, 0)
         XCTAssertEqual(empty.elements[workers]?.load, 0.5)
         // The drained messages leave as packets of the spike's flow, though it no longer runs.
         let prefix = String(spike.id.uuidString.prefix(24))
-        let drained = doc.posed(at: 1, state: .values(["spike": false]), since: 2, carried: during.queues).elements
+        let drained = doc.posed(at: 1, state: .values(["spike": false]), since: 2, carried: during.carry).elements
             .filter { $0.id.uuidString.hasPrefix(prefix) }
         XCTAssertGreaterThan(drained.count, 2)
         // A simulation carries the queue across the click itself.
         var sim = try Simulation(doc)
         _ = try? sim.click(workers.uuidString)   // no click there: nothing changes
         XCTAssertTrue(sim.carried.isEmpty)
+    }
+
+    func testAQueueDrainsThroughTheOverflowToo() throws {
+        var (doc, api, queue, workers, spare) = page()
+        set(&doc, workers) { $0.capacity = 2 }
+        set(&doc, spare) { $0.capacity = 3 }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers, spare], volume: 1)
+        let spike = try DiagramOps.addFlow(&doc, from: api, to: [workers, spare], when: "spike", volume: 9)
+        try doc.setVariable("spike", to: false)
+        // After the spike, 8 queued drains at the workers' spare 1 plus the overflow's 3: 4 a second.
+        let carried = [DottieDocument.queueKey(shape: queue, flow: spike.id): 8.0]
+        let m = doc.metrics(at: 1, state: .initial, since: 1, carried: carried)
+        XCTAssertEqual(try XCTUnwrap(m.elements[queue]?.depth), 4, accuracy: 1e-9)
+        XCTAssertEqual(m.elements[workers]?.load, 1)
+        XCTAssertEqual(m.elements[spare]?.load, 1)
+        XCTAssertEqual(doc.metrics(at: 1, state: .initial, since: 2, carried: carried).elements[queue]?.depth, 0)
     }
 
     func testOverflowTakesTheNextRouteAndPageOrderIsPriority() throws {
@@ -129,6 +145,27 @@ final class MetricsTests: XCTestCase {
         XCTAssertThrowsError(try PageState.checked("load(x) > 1"))
         XCTAssertEqual(try PageState.checked("load(x) > 1", metrics: true), "load(x) > 1")
         XCTAssertTrue(PageState.holds("backlog(q) > 0", in: [:]) == false)
+    }
+
+    func testGaugesEaseFromTheirReadingWhenTheStateChanges() throws {
+        var (doc, api, _, workers, _) = page()
+        set(&doc, workers) { $0.capacity = 4 }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 1)
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], when: "spike", volume: 3)
+        try doc.setVariable("spike", to: false)
+        var g = Element(kind: .rectangle, frame: CGRect(x: 600, y: 0, width: 140, height: 80), layerID: doc.layers[0].id)
+        g.gauge = Gauge(metric: "load", of: workers)
+        doc.elements.append(g)
+        func text(_ since: Double, _ carried: [String: Double]) -> String? {
+            doc.posed(at: 1, state: .values(["spike": true]), since: since, carried: carried).elements.first { $0.id == g.id }?.text
+        }
+        // Before the click it read 25%; the spike makes it 100%, reached after a second, halfway after half a second.
+        let before = doc.posedWithMetrics(at: 1, state: .initial, since: 3).metrics.carry
+        XCTAssertEqual(before[DottieDocument.gaugeKey(g.id)], 0.25)
+        XCTAssertEqual(text(0, before), "load workers\n25%")
+        XCTAssertEqual(text(0.5, before), "load workers\n63%")
+        XCTAssertEqual(text(1, before), "load workers\n100%")
+        XCTAssertEqual(text(0.5, [:]), "load workers\n100%")   // nothing carried (an export): no easing
     }
 
     func testGaugesAreDrawnAsPlainElements() throws {
