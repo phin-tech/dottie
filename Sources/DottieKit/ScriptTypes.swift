@@ -258,6 +258,20 @@ extension DottieScript {
             /** For a packet (anything following connectors): connector id to the connector it takes instead, or
              * [from, to] pairs. */
             reroute?: Record<string, Ref> | [Ref, Ref][];
+            /** Still drawn, but carries no flow traffic (dottie.flow): flows go round it. */
+            offline?: boolean;
+        }
+
+        /** A flow as dottie.flow and dottie.flows return it, defaults filled in. */
+        interface FlowInfo {
+            id: string;
+            from: string;
+            to: string[];
+            every: number;
+            speed: number;
+            size: number;
+            color?: Color;
+            when?: Condition;
         }
 
         /** One variable described at once (dottie.defineState): what changes while it is true, and which clicks change it. */
@@ -270,6 +284,8 @@ extension DottieScript {
             show?: Ref | Ref[];
             /** Faded to dimOpacity (default 0.3) while it is true. */
             dim?: Ref | Ref[];
+            /** Down while it is true: faded like dim, and carrying no flow traffic, so flows go round them. */
+            down?: Ref | Ref[];
             dimOpacity?: number;
             /** Other changes while it is true: element id to look, or [element, look] pairs. */
             restyle?: Record<string, Omit<Override, "when" | "reroute">> | [Ref, Omit<Override, "when" | "reroute">][];
@@ -582,6 +598,14 @@ extension DottieScript {
              * on what it dims, restyles and reroutes, and the clicks that change it. Running it again changes nothing
              * more. Returns a summary. */
             defineState(name: string, spec: StateSpec): string;
+            /** Traffic from a shape to the first of `to` (preferred first) it can reach over the connectors drawn, routed
+             * afresh each frame, so a state that hides a shape or connector sends it round. Gives the page a timeline if
+             * it has none and rounds `every` so it loops. With `id`, changes that flow. */
+            flow(from: Ref, to: Ref | Ref[], options?: { every?: number; speed?: number; color?: Color; size?: number; when?: Condition; id?: Ref }): FlowInfo;
+            /** The page's flows. */
+            flows(): FlowInfo[];
+            /** Removes a flow; returns whether there was one. */
+            removeFlow(flow: Ref): boolean;
             /** Renames a scene (named by its name or its time); clicks that play it follow the new name. */
             renameScene(scene: string | number, name: string): void;
             /** Moves a scene (named by its name or its time) to t seconds. */

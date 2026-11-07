@@ -368,6 +368,8 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     /// The page's variables and their starting values (see `PageState`): clicks change them on the web, and
     /// elements with a `when` follow them.
     public var variables: [String: Bool]?
+    /// Traffic the players route over the connectors drawn in each frame (`Flow`, ADR 0002).
+    public var flows: [Flow]?
 
     public init(id: UUID = UUID(), name: String = "Page 1", layers: [Layer]? = nil, elements: [Element] = []) {
         self.id = id
@@ -402,6 +404,14 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
         }
         elements.removeAll { ids.contains($0.id) }
         timeline?.tracks.removeAll { ids.contains($0.element) }
+        if flows != nil {
+            flows = flows!.compactMap { f in
+                var f = f
+                f.to.removeAll(where: ids.contains)
+                return ids.contains(f.from) || f.to.isEmpty ? nil : f
+            }
+            if flows!.isEmpty { flows = nil }
+        }
         // Drop connectors that lost both ends to deleted shapes? Keep them: they're free-floating arrows now.
     }
 

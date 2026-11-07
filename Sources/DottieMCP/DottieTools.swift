@@ -382,6 +382,7 @@ actor DottieTools {
                 "hide": idListProp("Drawn only while it is false (connectors attached go with them)"),
                 "show": idListProp("Drawn only while it is true"),
                 "dim": idListProp("Faded while it is true, still drawn"),
+                "down": idListProp("Down while it is true: faded like dim and carrying no traffic, so add_flow traffic goes round them"),
                 "dim_opacity": prop("number", "How faded dim makes them, 0...1 (default 0.3)"),
                 "restyle": stateRestyleProp,
                 "reroute": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
@@ -390,6 +391,28 @@ actor DottieTools {
                 "turned_on_by": idListProp("Elements whose click sets it true"),
                 "turned_off_by": idListProp("Elements whose click sets it false"),
              ], required: ["path", "name"])),
+        Tool(name: "add_flow",
+             description: "Send traffic from one shape to the first of a list of destinations (preferred first) it can reach "
+                + "over the connectors drawn: a packet every `every` seconds, routed afresh in every frame by every renderer. When "
+                + "a state hides a shape or connector (define_state hide, or when), the traffic goes round it with nothing more "
+                + "drawn, and define_state down takes a shape out of the traffic while keeping it drawn, faded: failover, outages "
+                + "and maintenance animate themselves. A connector carries traffic from its start to its "
+                + "end, and back too when its start has an arrowhead. Gives the page a 4-second timeline if it has none and rounds "
+                + "every so the timeline loops seamlessly. With id, changes that flow; with remove, removes it. Prefer it to "
+                + "send_packet for steady traffic in a system diagram.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "from": prop("string", "Id of the shape traffic leaves from"),
+                "to": .object(["type": "array", "items": .object(["type": "string"]),
+                               "description": "Ids of the destinations, preferred first: traffic goes to the first it can reach"]),
+                "every": prop("number", "Seconds between packets (default 0.5)"),
+                "speed": prop("number", "Points per second (default 160)"),
+                "color": prop("string", "Hex color of the packets"),
+                "size": prop("number", "Packet diameter (default 12)"),
+                "when": prop("string", "A condition on page variables: nothing flows while it fails"),
+                "id": prop("string", "An existing flow's id, to change or remove it"),
+                "remove": prop("boolean", "Remove the flow named by id"),
+             ], required: ["path"])),
         Tool(name: "list_extensions",
              description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
                 + "commands, or why it did not load. Shapes are added with add_shape (extension, shape, params); commands run with run_command.",
@@ -1024,13 +1047,38 @@ actor DottieTools {
             let vars = (file.pages[p].variables ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
             return text("Variables: " + (vars.isEmpty ? "none" : vars.joined(separator: ", ")) + on(file, p))
 
+        case "add_flow":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            if a.bool("remove") == true {
+                let id = try a.uuid("id")
+                guard DiagramOps.removeFlow(&file.pages[p], id) else { throw ToolFailure(message: "No flow \(id.uuidString)") }
+                try save(file, to: url)
+                return text("Removed flow \(id.uuidString)" + on(file, p))
+            }
+            let flow: Flow
+            do {
+                flow = try DiagramOps.addFlow(&file.pages[p], from: try a.uuid("from"), to: try a.uuids("to") ?? [],
+                                              every: a.double("every"), speed: a.double("speed"),
+                                              color: try a.string("color").map { s in
+                                                  guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'color' must be a hex color like #ffcc00") }
+                                                  return c
+                                              },
+                                              size: a.double("size"), when: a.string("when"),
+                                              replacing: a.string("id") == nil ? nil : try a.uuid("id"))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let line = DiagramOps.describeFlows(file.pages[p]).first { $0.contains(flow.id.uuidString) } ?? flow.id.uuidString
+            return text((a.string("id") == nil ? "Added " : "Changed ") + line + on(file, p))
+
         case "define_state":
             let url = try fileURL(a)
             var file = try load(url)
             let p = try pageIndex(file, a)
             var spec = StateSpec(name: try a.require("name"))
             if let v = a.bool("initial") { spec.initial = v }
-            spec.hide = try a.uuids("hide") ?? []; spec.show = try a.uuids("show") ?? []; spec.dim = try a.uuids("dim") ?? []
+            spec.hide = try a.uuids("hide") ?? []; spec.show = try a.uuids("show") ?? []; spec.dim = try a.uuids("dim") ?? []; spec.down = try a.uuids("down") ?? []
             if let v = a.double("dim_opacity") { spec.dimOpacity = v }
             func color(_ o: Args, _ k: String) throws -> RGBA? {
                 guard let s = o.string(k) else { return nil }
@@ -1270,6 +1318,8 @@ actor DottieTools {
             let file = try load(try fileURL(a))
             let p = try pageIndex(file, a)
             var list = try json(DiagramOps.summarize(file.pages[p]))
+            let flows = DiagramOps.describeFlows(file.pages[p])
+            if !flows.isEmpty { list = "Flows:\n" + flows.map { "  " + $0 }.joined(separator: "\n") + "\n" + list }
             if let vars = file.pages[p].variables, !vars.isEmpty {
                 list = "Variables (starting values): " + vars.sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
                     .joined(separator: ", ") + "\n" + list

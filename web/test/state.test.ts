@@ -66,3 +66,15 @@ test("clicks that set and toggle, alone or with a scene", () => {
   assert.equal(page.timeline!.markers![0].loop, true);
   assert.equal(page.timeline!.markers![1].loop, null);
 });
+
+test("flows: routed over what is drawn, round what is offline, nothing where they can't go", () => {
+  const page = parseDottie(read("edge", "flows.dottie")).pages[0];
+  const flows = page.flows!;
+  const colors = (s: Record<string, boolean>) => posed(page, 1, s).elements.filter((e) => e.text === null && e.kind === "ellipse")
+    .map((e) => `${e.style.fill.r},${e.style.fill.g}`);
+  // East down (the starting value): no traffic to spare, which is offline; east up: some.
+  assert.ok(!colors({}).includes("0.3,0.7"));
+  assert.ok(colors({ eastDown: false }).includes("0.3,0.7"));
+  // The damaged flow loads, sending nothing.
+  assert.equal(flows[flows.length - 1].from, "00000000-0000-0000-0000-000000000000");
+});

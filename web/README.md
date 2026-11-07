@@ -37,8 +37,9 @@ click first fires a cancelable `action` event whose `detail` is `{element, scene
 replay?}`; call `preventDefault()` to handle it yourself.
 
 A click can also set or toggle the page's variables, which show and hide the elements with a `when` while the
-animation keeps playing: a diagram you leave running that people poke. A looping scene plays round until a click
-or next leaves it, instead of stopping.
+animation keeps playing: a diagram you leave running that people poke. Elements can restyle themselves under a
+condition (`overrides`), and a page's `flows` send traffic over whatever connectors are drawn, so it goes round a
+region a click took down. A looping scene plays round until a click or next leaves it, instead of stopping.
 
 The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(elementId)`, `currentTime`
 (settable), `duration`, `paused`, `variables` and `setState({name: value})`, and fires `load`, `frame`, `action`,

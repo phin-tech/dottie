@@ -13,6 +13,8 @@ public struct StateSpec: Equatable, Sendable {
     public var show: [UUID] = []
     /// Faded to `dimOpacity` while it is true, still drawn.
     public var dim: [UUID] = []
+    /// Down while it is true: dimmed like `dim`, and carrying no traffic, so flows go round them.
+    public var down: [UUID] = []
     public var dimOpacity = 0.3
     /// Other changes while it is true, per element. The override's own `when` is ignored.
     public var restyle: [UUID: StateOverride] = [:]
@@ -40,7 +42,7 @@ extension DiagramOps {
         func check(_ list: [UUID], _ what: String) throws {
             if let bad = list.first(where: { !ids.contains($0) }) { throw OpsError.notFound("No element \(bad.uuidString) to \(what)") }
         }
-        try check(spec.hide, "hide"); try check(spec.show, "show"); try check(spec.dim, "dim")
+        try check(spec.hide, "hide"); try check(spec.show, "show"); try check(spec.dim, "dim"); try check(spec.down, "take down")
         try check(Array(spec.restyle.keys), "restyle")
         try check(Array(spec.reroute.keys) + Array(spec.reroute.values), "reroute")
         try check(spec.toggledBy + spec.turnedOnBy + spec.turnedOffBy, "click")
@@ -68,6 +70,7 @@ extension DiagramOps {
         }
         let fade = min(max(spec.dimOpacity.isFinite ? spec.dimOpacity : 0.3, 0), 1)
         for id in spec.dim { override(id) { $0.opacity = fade } }
+        for id in spec.down { override(id) { $0.opacity = fade; $0.offline = true } }
         for (id, look) in spec.restyle {
             override(id) { o in
                 if let v = look.stroke { o.stroke = v }
@@ -122,6 +125,7 @@ extension DiagramOps {
         var parts: [String] = []
         func count(_ n: Int, _ verb: String) { if n > 0 { parts.append("\(verb) \(n)") } }
         count(spec.hide.count, "hides"); count(spec.show.count, "shows"); count(spec.dim.count, "dims")
+        count(spec.down.count, "takes down")
         count(spec.restyle.count, "restyles"); count(rerouted, "reroutes")
         let buttons = spec.toggledBy.count + spec.turnedOnBy.count + spec.turnedOffBy.count
         if buttons > 0 { parts.append("changed by \(buttons) click\(buttons == 1 ? "" : "s")") }

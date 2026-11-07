@@ -162,6 +162,11 @@ public struct DottieFile: Codable, Equatable, Sendable {
             }
             copy.elements[k] = e
         }
+        copy.flows = copy.flows?.map { f in
+            var f = f
+            f.id = UUID(); f.from = ids[f.from] ?? f.from; f.to = f.to.map { ids[$0] ?? $0 }
+            return f
+        }
         pages.insert(copy, at: i + 1)
         return copy.id
     }

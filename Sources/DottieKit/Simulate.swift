@@ -109,14 +109,16 @@ public struct Simulation: Sendable {
     }
 
     /// The element `target` names: its id (or the start of one), else its text or anchor, exactly and then in any
-    /// case. Several matches are an error that lists them.
+    /// case. Text is matched as it shows now, an override's included. Several matches are an error that lists them.
     public func element(_ target: String) throws -> Element {
         let t = target.trimmingCharacters(in: .whitespacesAndNewlines)
         if let id = UUID(uuidString: t), let e = doc.elements.first(where: { $0.id == id }) { return e }
         let byID = doc.elements.filter { t.count >= 4 && $0.id.uuidString.lowercased().hasPrefix(t.lowercased()) }
         if byID.count == 1 { return byID[0] }
+        let values = doc.stateValues(.values(state))
+        func shown(_ e: Element) -> String? { e.activeOverrides(values).compactMap(\.text).last ?? e.text }
         func named(_ same: (String) -> Bool) -> [Element] {
-            doc.elements.filter { e in [e.text, e.anchor].contains { $0.map(same) ?? false } }
+            doc.elements.filter { e in [shown(e), e.text, e.anchor].contains { $0.map(same) ?? false } }
         }
         var found = named { $0 == t }
         if found.isEmpty { found = named { $0.caseInsensitiveCompare(t) == .orderedSame } }

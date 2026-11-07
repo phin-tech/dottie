@@ -69,7 +69,7 @@ public enum StateChoice: Sendable, Equatable {
 extension DottieDocument {
     /// Whether anything on the page reads or sets a variable, so its web export needs a player that keeps state.
     public var usesState: Bool {
-        !(variables ?? [:]).isEmpty || elements.contains { $0.when != nil || $0.overrides != nil || $0.click?.changesState == true }
+        !(variables ?? [:]).isEmpty || (flows ?? []).contains { $0.when != nil } || elements.contains { $0.when != nil || $0.overrides != nil || $0.click?.changesState == true }
     }
 
     /// The values `choice` gives each variable; nil for `.all`.
@@ -127,11 +127,14 @@ public struct StateOverride: Codable, Equatable, Sendable {
     /// For an element that follows connectors (a packet): connector ids to the connectors it takes instead, so the
     /// same dot reroutes when a path goes down. Keys are uppercase UUID strings.
     public var reroute: [String: UUID]?
+    /// Still drawn, but carries no traffic: flows (`Flow`) route round it, as round a region that is down.
+    public var offline: Bool?
 
     public init(when: String, stroke: RGBA? = nil, fill: RGBA? = nil, textColor: RGBA? = nil, opacity: Double? = nil,
-                strokeWidth: Double? = nil, dash: DashStyle? = nil, text: String? = nil, reroute: [UUID: UUID]? = nil) {
+                strokeWidth: Double? = nil, dash: DashStyle? = nil, text: String? = nil, reroute: [UUID: UUID]? = nil,
+                offline: Bool? = nil) {
         self.when = when; self.stroke = stroke; self.fill = fill; self.textColor = textColor; self.opacity = opacity
-        self.strokeWidth = strokeWidth; self.dash = dash; self.text = text
+        self.strokeWidth = strokeWidth; self.dash = dash; self.text = text; self.offline = offline == true ? true : nil
         self.reroute = reroute.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.key.uuidString, $0.value) }) }
     }
 
@@ -145,6 +148,7 @@ public struct StateOverride: Codable, Equatable, Sendable {
         strokeWidth = try c.decodeIfPresent(Double.self, forKey: .strokeWidth).flatMap { $0.isFinite ? $0 : nil }
         dash = try? c.decodeIfPresent(DashStyle.self, forKey: .dash)
         text = try c.decodeIfPresent(String.self, forKey: .text)
+        offline = ((try? c.decodeIfPresent(Bool.self, forKey: .offline)) ?? nil) == true ? true : nil
         // Keys that aren't ids are dropped, and keys are matched without regard to case.
         let raw = (try? c.decodeIfPresent([String: UUID].self, forKey: .reroute)) ?? nil
         let ids = raw?.reduce(into: [String: UUID]()) { out, kv in
@@ -165,6 +169,7 @@ public struct StateOverride: Codable, Equatable, Sendable {
         if let v = dash { parts.append(v.rawValue) }
         if let v = text { parts.append("text \"\(v)\"") }
         if let r = reroute { parts.append("reroutes \(r.count)") }
+        if offline == true { parts.append("offline") }
         return when + ": " + (parts.isEmpty ? "no change" : parts.joined(separator: ", "))
     }
 

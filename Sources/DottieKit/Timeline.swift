@@ -574,7 +574,8 @@ extension DottieDocument {
             let o = e.activeOverrides(values)
             return o.isEmpty ? nil : (e.id, o)
         })
-        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty ? nil : Timeline(duration: 0)) else { return self }
+        let flowing = !(flows ?? []).isEmpty
+        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !flowing ? nil : Timeline(duration: 0)) else { return self }
         let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
@@ -636,6 +637,12 @@ extension DottieDocument {
             copy.elements[i].connector!.end = Endpoint(elementID: nil, port: c.end.port, x: b.x, y: b.y)
         }
         copy.elements.removeAll { gone.contains($0.id) }
+        // Flows are routed over what is left, and drawn above it.
+        if flowing {
+            let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
+            copy.elements += flowPackets(in: copy, at: t, values: values, offline: offline)
+            copy.flows = nil
+        }
         return copy
     }
 

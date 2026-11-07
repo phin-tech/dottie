@@ -61,6 +61,7 @@ More of the MCP tools, by purpose:
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
+| Interactive pages: traffic and states | `add_flow`, `define_state`, `set_variable` |
 | Exports, and checking an interactive page | `export_svg`, `export_mermaid`, `export_animation`, `simulate` |
 
 ## Animating
@@ -74,11 +75,18 @@ Any page can move. Most animations come from a few tools:
   steps through the scenes like slides. `loop: true` makes a scene play round instead of stopping.
 - `add_keyframe` and `set_timeline` for anything else, and `clear_animation` to start over.
 
-A diagram that keeps looping and reacts to clicks ("take us-east-1 down while packets keep flowing") uses page
-variables rather than scenes: `set_variable` adds one, `update_element` with `click_toggle` (or `click_set`) makes a
-shape flip it, and `when` on shapes, connectors and `send_packet` packets (`"down"`, `"!down"`) shows each only while
-it holds. Connectors go with a shape the state hides. Exports show the starting values; the HTML export and
-`<dottie-player>` change them on click without stopping.
+A diagram that keeps looping and reacts to clicks ("take us-east-1 down while traffic keeps flowing") uses page
+variables rather than scenes, and is easiest in two calls:
+
+1. `add_flow` sends steady traffic from a shape to the first of its destinations it can reach (`to: [east, west]`
+   fails over). It's routed afresh every frame over the connectors drawn, so nothing else needs drawing per state.
+2. `define_state` describes one variable at once: what it takes `down` (faded, and traffic goes round it), `hide`s
+   (connectors go with a hidden shape), `show`s, `dim`s or `restyle`s (a new label, a red stroke), connectors whose `send_packet` packets
+   `reroute`, and which elements' clicks flip it (`toggled_by`).
+
+Lower level: `set_variable`, `update_element` with `click_toggle` / `click_set`, and `when` on shapes, connectors and
+packets (`"down"`, `"!down"`). Exports show the starting values; the HTML export and `<dottie-player>` change them on
+click without stopping.
 
 Check an interactive page before calling it done; you can't click the HTML export yourself. `simulate` plays it as
 the player would: give it steps like `{"click": "east"}`, `{"wait": 2}` and `{"snapshot": true}`, and it reports the

@@ -68,6 +68,8 @@ export interface StateOverride {
   text: string | null;
   /** Connector ids (uppercase) to the connectors a following element takes instead. */
   reroute: Record<string, string> | null;
+  /** Still drawn, but carries no flow traffic. */
+  offline: boolean | null;
 }
 
 export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
@@ -174,6 +176,20 @@ export interface Page {
   symbols: Symbol[] | null;
   /** The page's variables and their starting values (DottieDocument.variables). */
   variables: Record<string, boolean> | null;
+  /** Traffic routed over the connectors drawn in each frame (DottieDocument.flows; see flows.ts). */
+  flows: Flow[] | null;
+}
+
+/** Traffic from one shape to the first of `to` it can reach (Flow, ADR 0002). Numbers left null take defaults. */
+export interface Flow {
+  id: string;
+  from: string;
+  to: string[];
+  every: number | null;
+  speed: number | null;
+  color: RGBA | null;
+  size: number | null;
+  when: string | null;
 }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
@@ -207,7 +223,8 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables"],
+  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
+  flow: ["id", "from", "to", "every", "speed", "color", "size", "when"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
@@ -233,7 +250,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   marker: ["t", "name", "loop"],
   click: ["scene", "url", "set", "toggle"],
   hover: ["stroke", "fill", "opacity"],
-  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute"],
+  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline"],
 };
 
 export const MAX_DURATION = 3600;
@@ -258,6 +275,7 @@ const strings = (v: unknown): Record<string, string> | null =>
   isObj(v) && Object.values(v).every((x) => typeof x === "string") ? { ...(v as Record<string, string>) } : null;
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 /** UUIDs compare by value in Swift; uppercase them so string comparison agrees. */
+const NO_ID = "00000000-0000-0000-0000-000000000000";
 const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
 const uuid = (v: unknown): string | undefined => (typeof v === "string" ? v.toUpperCase() : undefined);
 
@@ -513,6 +531,7 @@ class Reader {
         dash: dash !== undefined && ["solid", "dashed", "dotted"].includes(dash) ? dash as DashStyle : null,
         text: str(o.text) ?? null,
         reroute,
+        offline: o.offline === true ? true : null,
       };
     });
   }
@@ -625,6 +644,22 @@ class Reader {
       timeline: this.timeline(v.timeline),
       symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
       variables: this.variables(v.variables),
+      flows: Array.isArray(v.flows) ? v.flows.filter(isObj).map((f) => this.flow(f)) : null,
+    };
+  }
+
+  /** As DottieKit reads one: a missing or bad id, source or destination sends nothing; bad destinations are dropped. */
+  flow(f: Obj): Flow {
+    this.fields(f, "flow");
+    const id = (x: unknown): string => (typeof x === "string" && UUID.test(x) ? x.toUpperCase() : NO_ID);
+    const finite = (x: unknown): number | null => { const n = num(x); return n !== undefined && Number.isFinite(n) ? n : null; };
+    return {
+      id: id(f.id), from: id(f.from),
+      to: Array.isArray(f.to) && f.to.every((x) => typeof x === "string")
+        ? (f.to as string[]).filter((x) => UUID.test(x)).map((x) => x.toUpperCase()) : [],
+      every: finite(f.every), speed: finite(f.speed), size: finite(f.size),
+      color: isObj(f.color) && ["r", "g", "b", "a"].every((k) => typeof (f.color as Obj)[k] === "number") ? rgba(f.color) ?? null : null,
+      when: str(f.when) ?? null,
     };
   }
 }

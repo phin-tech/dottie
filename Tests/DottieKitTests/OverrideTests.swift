@@ -128,4 +128,17 @@ final class OverrideTests: XCTestCase {
         XCTAssertNil(DottieScript.run("dottie.update(dottie.elements()[2], {overrides: null})", on: &d2, libraries: [.starter], timeLimit: 5).error)
         XCTAssertNil(d2.elements[2].overrides)
     }
+
+    /// A simulation clicks an element by the label it shows now, an override's included.
+    func testSimulationFindsTheLabelShownNow() throws {
+        var (doc, _, east, _, _, _, _) = try page()
+        var spec = StateSpec(name: "down")
+        spec.down = [east]; spec.restyle = [east: StateOverride(when: "", text: "east (down)")]; spec.toggledBy = [east]
+        try DiagramOps.defineState(&doc, spec)
+        var sim = try Simulation(doc)
+        try sim.click("east")
+        XCTAssertEqual(sim.state["down"], true)
+        try sim.click("east (down)")
+        XCTAssertEqual(sim.state["down"], false)
+    }
 }

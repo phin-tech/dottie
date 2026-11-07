@@ -232,6 +232,13 @@ state stays editable. Only the web players change them: `<dottie-player>` redraw
 export of a page that uses state (`usesState`) is dottie.js's player in a page (`Exporter.statefulPlayer`), since
 the drawn-ahead player can't know which frames to draw. A marker with `loop: true` is a looping scene: both
 players play into it without stopping and go round from its end (the next scene, or the timeline's end) to its start.
+An element's `overrides` change it while their own `when` holds (stroke, fill, text color, width, dash, text; opacity
+multiplies), applied in order after its keys, and `reroute` sends its follows along other connectors, so one dot
+detours instead of two being drawn. `DefineState.swift` (`define_state`, `dottie.defineState`) writes a variable's
+conditions, overrides and clicks from one description. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
+0002) are traffic no file stores: `posed` routes each one breadth first over the connectors left in the frame to the
+first destination it reaches and appends its packets, a pure function of the time and the values, with ids derived
+from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn.
 A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
 bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right
 angles, adding a corner between any two that are out of line and dropping any that fall into line

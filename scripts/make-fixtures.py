@@ -624,6 +624,45 @@ def state():
     write(EDGE / "state.dottie", [p, q, o])
 
 
+def flows():
+    """Traffic flows (ADR 0002): routed each frame over the connectors drawn, to the first destination that can be
+    reached; a state that hides a region sends traffic round it; arrows say which way a connector carries it (both
+    ways with a start arrowhead); a flow under a failing condition, one with nowhere to go, and damaged ones send
+    nothing; a page with no timeline shows traffic in flight."""
+    p = Page("Failover")
+    p.animate(2, fps=10)
+    p.extra = {"variables": {"eastDown": True, "busy": False}}
+    client = p.add("rectangle", 20, 140, 100, 60, text="client")
+    api = p.add("rectangle", 200, 140, 100, 60, text="api")
+    east = p.add("rectangle", 400, 30, 100, 60, text="east", when="!eastDown")
+    west = p.add("rectangle", 400, 250, 100, 60, text="west")
+    cache = p.add("ellipse", 200, 320, 80, 60, text="cache")
+    # Drawn, faded, but offline while east is down: traffic to it stops.
+    spare = p.add("ellipse", 20, 320, 80, 60, text="spare", overrides=[{"when": "eastDown", "opacity": 0.3, "offline": True}])
+    p.connect(client, api, routing="elbow")
+    p.connect(api, east, routing="curved")
+    p.connect(api, west, routing="elbow", text="standby")
+    p.connect(cache, api, start_head="arrow")      # carries traffic both ways
+    p.connect(east, west, routing="straight")
+    p.connect(client, spare)
+    flows = [
+        {"id": uid(), "from": client, "to": [east, west], "every": 0.4, "speed": 180},
+        {"id": uid(), "from": api, "to": [cache], "every": 0.5, "color": rgba(0.2, 0.5, 1), "size": 8},
+        {"id": uid(), "from": west, "to": [client], "when": "busy"},          # its condition fails
+        {"id": uid(), "from": west, "to": [cache]},                            # nowhere to go: arrows point away
+        {"id": uid(), "from": client, "to": [spare], "color": rgba(0.3, 0.7, 0.3)},   # spare is offline
+        {"id": 7, "from": "nope", "to": ["bad", client], "every": "fast"},     # damaged
+    ]
+    p.extra["flows"] = flows
+
+    q = Page("Still")
+    a = q.add("rectangle", 20, 40, 100, 60, text="a")
+    b = q.add("rectangle", 300, 40, 100, 60, text="b")
+    q.connect(a, b)
+    q.extra = {"flows": [{"id": uid(), "from": a, "to": [b], "every": 0.3, "speed": 200}]}
+    write(EDGE / "flows.dottie", [p, q])
+
+
 def links():
     """Links out of the drawing (`url`): web and mail addresses become <a> in SVG and clicks in the web players, faded
     and turned shapes keep their link around the whole element, a symbol's parts keep theirs, and links that must do
@@ -997,6 +1036,7 @@ def main():
     waypoints()
     text_colors()
     state()
+    flows()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

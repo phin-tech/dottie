@@ -295,6 +295,7 @@ public enum DottieScript {
                                       text: string("text"))
                 let r = try idMap("reroute")
                 if !r.isEmpty { o.reroute = Dictionary(uniqueKeysWithValues: r.map { ($0.key.uuidString, $0.value) }) }
+                if bool("offline") == true { o.offline = true }
                 return o
             }
 
@@ -369,6 +370,14 @@ public enum DottieScript {
 
         private func round1(_ v: Double) -> Double { (v * 10).rounded() / 10 }
 
+        private static func describe(_ f: Flow) -> [String: Any] {
+            var d: [String: Any] = ["id": f.id.uuidString, "from": f.from.uuidString, "to": f.to.map(\.uuidString),
+                                    "every": f.interval, "speed": f.pace, "size": f.diameter]
+            if let c = f.color { d["color"] = String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
+            if let w = f.when { d["when"] = w }
+            return d
+        }
+
         private func describe(_ e: Element, index: [UUID: Element]? = nil) -> [String: Any] {
             let b = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.frame
             var d: [String: Any] = [
@@ -415,6 +424,7 @@ public enum DottieScript {
                     if let v = o.dash { x["dash"] = v.rawValue }
                     if let v = o.text { x["text"] = v }
                     if let r = o.reroute { x["reroute"] = r.mapValues(\.uuidString) }
+                    if o.offline == true { x["offline"] = true }
                     return x
                 }
             }
@@ -751,10 +761,22 @@ public enum DottieScript {
             case "variables":
                 return doc.variables ?? [:]
 
+            case "flow":
+                let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
+                                               speed: a.double("speed"), color: try a.color("color"), size: a.double("size"),
+                                               when: a.string("when"), replacing: a.has("id") ? try a.uuid("id") : nil)
+                return Self.describe(f)
+
+            case "flows":
+                return (doc.flows ?? []).map(Self.describe)
+
+            case "removeFlow":
+                return DiagramOps.removeFlow(&doc, try a.uuid("id"))
+
             case "defineState":
                 var spec = StateSpec(name: try a.require("name"))
                 if let v = a.bool("initial") { spec.initial = v }
-                spec.hide = try a.ids("hide"); spec.show = try a.ids("show"); spec.dim = try a.ids("dim")
+                spec.hide = try a.ids("hide"); spec.show = try a.ids("show"); spec.dim = try a.ids("dim"); spec.down = try a.ids("down")
                 if let v = a.double("dimOpacity") { spec.dimOpacity = v }
                 if let r = a.object("restyle") {
                     for (k, _) in r.raw {
@@ -887,6 +909,15 @@ public enum DottieScript {
         return id;
       };
       var merge = function (a, b) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) o[k] = b[k]; return o; };
+      // Element lists and maps keyed by element, as defineState takes them: one or a list; {id: value} or [[el, value]].
+      var ids = function (v) { return v === undefined ? undefined : (Array.isArray(v) ? v : [v]).map(idOf); };
+      var pairs = function (v, value) {
+        if (v === undefined) return undefined;
+        var out = {}, k;
+        if (Array.isArray(v)) v.forEach(function (p) { out[idOf(p[0])] = value(p[1]); });
+        else for (k in v) out[k] = value(v[k]);
+        return out;
+      };
       var kind = function (k) { return function (o) { return call("shape", merge(o, { kind: k })); }; };
       g.dottie = {
         elements: function (filter) { return call("elements", filter); },
@@ -957,18 +988,15 @@ public enum DottieScript {
         loopScene: function (scene, loop) { call("editScene", { scene: String(scene), loop: loop !== false }); },
         variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
         variables: function () { return call("variables"); },
+        flow: function (from, to, o) {
+          return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
+        },
+        flows: function () { return call("flows"); },
+        removeFlow: function (flow) { return call("removeFlow", { id: idOf(flow) }); },
         defineState: function (name, o) {
           o = o || {};
-          var ids = function (v) { return v === undefined ? undefined : (Array.isArray(v) ? v : [v]).map(idOf); };
-          var pairs = function (v, value) {
-            if (v === undefined) return undefined;
-            var out = {};
-            if (Array.isArray(v)) v.forEach(function (p) { out[idOf(p[0])] = value(p[1]); });
-            else for (var k in v) out[k] = value(v[k]);
-            return out;
-          };
           return call("defineState", merge(o, {
-            name: name, hide: ids(o.hide), show: ids(o.show), dim: ids(o.dim),
+            name: name, hide: ids(o.hide), show: ids(o.show), dim: ids(o.dim), down: ids(o.down),
             toggledBy: ids(o.toggledBy), turnedOnBy: ids(o.turnedOnBy), turnedOffBy: ids(o.turnedOffBy),
             restyle: pairs(o.restyle, function (x) { return x; }), reroute: pairs(o.reroute, idOf),
           }));
@@ -1168,13 +1196,25 @@ public enum DottieScript {
     on the web, elements with a when follow them, and the timeline keeps looping. Exports and previews show the \
     starting values; the editor shows every element while stopped. Inside a symbol, when sees no variables (all false)
       dottie.variables()               {name: startingValue}
-      dottie.defineState(name, {initial?, hide?, show?, dim?, dimOpacity?, restyle?, reroute?, toggledBy?, turnedOnBy?, \
+      dottie.defineState(name, {initial?, hide?, show?, dim?, down?, dimOpacity?, restyle?, reroute?, toggledBy?, turnedOnBy?, \
     turnedOffBy?})  one variable described at once; writes the when conditions, overrides and clicks it means. hide: \
-    drawn only while it is false; show: only while true; dim: faded while true; restyle: {id: look} while true; \
+    drawn only while it is false; show: only while true; dim: faded while true; down: faded and carrying no flow \
+    traffic while true (a region that's down: flows go round it); restyle: {id: look} while true; \
     reroute: {fromConnector: toConnector}, so the same packets take a detour while true; toggledBy, turnedOnBy, \
     turnedOffBy: elements whose click flips, sets or clears it. Running it again changes nothing more; returns a summary
+      dottie.flow(from, to, {every?, speed?, color?, size?, when?, id?})  traffic from a shape to the first of to (a shape or \
+    a list, preferred first) it can reach over the connectors drawn: a packet every every seconds (0.5) at speed \
+    points per second (160), routed afresh each frame, so when a state hides a shape or connector the traffic goes \
+    round it with nothing more drawn. A connector carries traffic from its start to its end, and back too when its \
+    start has an arrowhead. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
+    loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
+      dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
+      Example: failover: api sends to east, or west when east is down:
+        dottie.flow(api, [east, west]);
+        dottie.defineState("eastDown", {down: east, toggledBy: east});   // east fades, and traffic goes to west
       overrides (on dottie.update): [{when, stroke?, fill?, textColor?, opacity?, strokeWidth?, dash?, text?, \
-    reroute?}]: changes to one element while a condition holds, in order; opacity multiplies. Prefer these to a \
+    reroute?, offline?}]: changes to one element while a condition holds, in order; opacity multiplies; offline: still \
+    drawn but carries no flow traffic. Prefer these to a \
     second copy of a shape with the opposite when
       Example: a click that takes a region down while its packets keep flowing, the other way round:
         const east = dottie.rect({x: 300, y: 0, text: "east"}), west = dottie.rect({x: 300, y: 200, text: "west"});

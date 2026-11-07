@@ -10,6 +10,7 @@ import {
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
 import { activeOverrides, applyOverride, type StateChoice, stateHidden, stateValues } from "./state.ts";
+import { flowPackets } from "./flows.ts";
 import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
 
@@ -231,7 +232,8 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     const o = activeOverrides(e, values);
     if (o.length > 0) active.set(e.id, o);
   }
-  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 ? null : EMPTY_TIMELINE);
+  const flowing = (page.flows ?? []).length > 0;
+  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !flowing ? null : EMPTY_TIMELINE);
   if (!timeline) return page;
   t = clampTime(t);
   const tracks = trackMap(timeline);
@@ -304,7 +306,13 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     pinned.connector!.end = { elementID: null, port: c.end.port, x: b.x, y: b.y };
     return pinned;
   });
-  return { ...page, elements: elements.filter((e) => !gone.has(e.id)), timeline: null };
+  elements = elements.filter((e) => !gone.has(e.id));
+  // Flows are routed over what is left, and drawn above it.
+  if (flowing) {
+    const offline = new Set([...active].filter(([, list]) => list.some((o) => o.offline === true)).map(([id]) => id));
+    elements = [...elements, ...flowPackets(page.flows, { ...page, elements, timeline: null }, t, values, offline)];
+  }
+  return { ...page, elements, timeline: null, flows: flowing ? null : page.flows };
 }
 
 /** The moment a still picture of the page shows: its poster, else the end. */

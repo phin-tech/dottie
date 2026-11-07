@@ -38,7 +38,24 @@
         "guidesLocked": { "type": "boolean" },
         "timeline": { "$ref": "#/$defs/timeline" },
         "symbols": { "type": "array", "description": "Drawings placed by symbol elements, each with its own animation.", "items": { "$ref": "#/$defs/symbol" } },
-        "variables": { "type": "object", "description": "Page variables and their starting values. Clicks set and toggle them on the web; elements with a when follow them.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } }
+        "variables": { "type": "object", "description": "Page variables and their starting values. Clicks set and toggle them on the web; elements with a when follow them.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
+        "flows": { "type": "array", "items": { "$ref": "#/$defs/flow" }, "description": "Traffic the players route over the connectors drawn in each frame (ADR 0002)." }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "description": "Traffic from one shape to the first destination it can reach over the connectors drawn: packets every `every` seconds at `speed` points per second, rerouted as the page's state hides shapes and connectors.",
+      "required": ["id", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "from": { "$ref": "#/$defs/uuid", "description": "The shape traffic leaves from." },
+        "to": { "type": "array", "items": { "$ref": "#/$defs/uuid" }, "description": "Destinations in order of preference." },
+        "every": { "type": "number", "description": "Seconds between packets; 0.5 by default." },
+        "speed": { "type": "number", "description": "Points per second; 160 by default." },
+        "color": { "$ref": "#/$defs/rgba" },
+        "size": { "type": "number", "description": "Packet diameter; 12 by default." },
+        "when": { "type": "string", "description": "A condition on the page's variables: nothing flows while it fails." }
       }
     },
     "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
@@ -359,7 +376,8 @@
         "strokeWidth": { "type": "number" },
         "dash": { "enum": ["solid", "dashed", "dotted"] },
         "text": { "type": "string", "description": "Replaces the element's text or label." },
-        "reroute": { "type": "object", "additionalProperties": { "$ref": "#/$defs/uuid" }, "description": "For an element that follows connectors (a packet): connector id to the connector it follows instead." }
+        "reroute": { "type": "object", "additionalProperties": { "$ref": "#/$defs/uuid" }, "description": "For an element that follows connectors (a packet): connector id to the connector it follows instead." },
+        "offline": { "type": "boolean", "description": "Still drawn, but carries no flow traffic: flows route round it." }
       }
     },
     "hover": {
