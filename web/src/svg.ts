@@ -42,6 +42,25 @@ export interface Plan {
 /** What an animation shows over time (Exporter.animation): with a camera, its view at each frame, widened to
  * the first key's shape; without, the bounds of the whole animation for every frame. */
 export function plan(page: Page): Plan {
+  // Planning resolves every frame, so a page shown again (a player remounted for a new attribute) reuses its plan,
+  // as long as none of the page's fields has been changed or swapped out since.
+  const hit = plans.get(page);
+  if (hit && unchanged(page, hit.fields)) return hit.plan;
+  const made = makePlan(page);
+  plans.set(page, { fields: { ...page }, plan: made });
+  return made;
+}
+
+const plans = new WeakMap<Page, { fields: Page; plan: Plan }>();
+
+/** Whether `page` still holds exactly the fields it had when `fields` was copied from it. */
+export function unchanged(page: Page, fields: Page): boolean {
+  const a = page as unknown as Record<string, unknown>, b = fields as unknown as Record<string, unknown>;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((k) => a[k] === b[k]);
+}
+
+function makePlan(page: Page): Plan {
   const tl = page.timeline ?? { fps: 12, duration: 0, boil: null, settle: null, poster: null, tracks: [], camera: null, markers: null };
   const times = frameTimes(tl);
   const first = tl.camera?.find((k) => k.width > 1 && k.height > 1);
@@ -76,9 +95,11 @@ export interface Part { key: string; markup: string }
 
 /** The SVG for each thing drawn, back to front, keyed by element id (rock hatching as "rock"). With `links`, an
  * element whose click or `url` is a web address is wrapped in an `<a>` that opens it, the click's first (the players
- * make their own clickable groups). */
-export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, links = false): { bounds: Rect; parts: Part[] } {
-  if (hasInstances(page)) return svgParts(expandingSymbols(page, 0), background, fixed, links);
+ * make their own clickable groups). With `only`, just the parts whose keys it accepts, drawn as they are on the
+ * whole page (connectors still meet and hop the rest). */
+export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, links = false,
+  only?: (key: string) => boolean): { bounds: Rect; parts: Part[] } {
+  if (hasInstances(page)) return svgParts(expandingSymbols(page, 0), background, fixed, links, only);
   const theme = themeNamed(page.theme);
   const bg = background ? (theme?.background ?? background) : null;
   const ink = theme?.ink ?? black;
@@ -89,11 +110,11 @@ export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, link
   const index = indexOf(d);
   const ordered = orderedElements(d);
   const floors = ordered.filter((e) => visible.has(e.layerID) && isFloor(e));
-  const rockMarkup = rock(floors).map((r) =>
+  const rockMarkup = only && !only("rock") ? "" : rock(floors).map((r) =>
     `<path d="${r.path.data()}" fill="none" stroke="${color(r.ink)}"${opacity(r.ink, "stroke-opacity")} stroke-width="${fmt(r.width)}" stroke-linecap="round"/>\n`).join("");
   if (rockMarkup) parts.push({ key: "rock", markup: rockMarkup });
   for (const e of ordered) {
-    if (!visible.has(e.layerID)) continue;
+    if (!visible.has(e.layerID) || (only && !only(e.id))) continue;
     const alpha = Math.min(Math.max(e.style.opacity ?? 1, 0), 1);
     if (alpha <= 0) continue;
     let body = svgElement(e, index, bg, d);

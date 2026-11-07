@@ -245,9 +245,17 @@ export function midpoint(e: Element, index: Index): Point {
   return pts[0];
 }
 
+const indexes = new WeakMap<readonly Element[], { members: Element[]; index: Index }>();
+
+/** Each element by id, the first with an id winning. Kept per elements array, so every follow, trace and render of
+ * one frame shares it; checked against the array's members each time, so a page changed in place is indexed anew. */
 export function indexOf(page: Page): Index {
+  const els = page.elements;
+  const hit = indexes.get(els);
+  if (hit && hit.members.length === els.length && hit.members.every((e, i) => e === els[i])) return hit.index;
   const m: Index = new Map();
-  for (const e of page.elements) if (!m.has(e.id)) m.set(e.id, e);
+  for (const e of els) if (!m.has(e.id)) m.set(e.id, e);
+  indexes.set(els, { members: [...els], index: m });
   return m;
 }
 

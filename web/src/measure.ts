@@ -147,10 +147,16 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   const everyOf = (flow: Flow) =>
     Math.min(Math.max(clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest / Math.max(amountIn(flow, values), TINY), 0.05), 60);
 
+  // The cheapest ways from a source, ignoring capacity, are the same for every flow leaving it.
+  const bases = new Map<string, FlowTree | null>();
+  const baseTree = (from: string): FlowTree | null => {
+    if (!bases.has(from)) bases.set(from, flowTree(from, frame, offline));
+    return bases.get(from)!;
+  };
   for (const [i, flow] of list.entries()) {
     if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
     const source = byID.get(flow.from);
-    const base = source ? flowTree(flow.from, frame, offline) : null;
+    const base = source ? baseTree(flow.from) : null;
     if (!source || !base) continue;
     const volume = amountIn(flow, values);
     const fm: FlowMetrics = { volume, placed: 0, backlog: 0, backup: 0, transit: null };

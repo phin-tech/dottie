@@ -22,45 +22,93 @@ export function packetID(flow: string, k: number): string {
 const routeCost = (cost: number | null): number =>
   cost === null || !Number.isFinite(cost) ? 1 : Math.min(Math.max(cost, 0), 1_000_000);
 
-/** Every shape traffic from `from` can reach in `frame`, with the cheapest way to each:
- * by the connectors' cost (1 each unless set), ties to the shape reached first, earlier connectors first. */
-export function flowTree(from: string, frame: Page, offline: Set<string> = new Set()): FlowTree | null {
-  const shapes = new Set(frame.elements.filter((e) => e.kind !== "connector" && !offline.has(e.id)).map((e) => e.id));
-  if (!shapes.has(from)) return null;
-  type Edge = { to: string; via: string; back: boolean; cost: number };
+type Edge = { to: string; via: string; back: boolean; cost: number };
+type Graph = { shapes: Set<string>; next: Map<string, Edge[]> };
+const graphs = new WeakMap<readonly Element[], { members: Element[]; graph: Graph }>();
+
+/** Every shape in `frame` and the connectors leaving each, in page order: built once per frame however many trees
+ * are grown in it (checked against the frame's members, so a page changed in place is read anew). */
+function graphOf(frame: Page): Graph {
+  const els = frame.elements;
+  const hit = graphs.get(els);
+  if (hit && hit.members.length === els.length && hit.members.every((e, i) => e === els[i])) return hit.graph;
+  const shapes = new Set(els.filter((e) => e.kind !== "connector").map((e) => e.id));
   const next = new Map<string, Edge[]>();
   const add = (a: string, edge: Edge) => {
     const list = next.get(a);
     if (list) list.push(edge); else next.set(a, [edge]);
   };
-  for (const e of frame.elements) {
+  for (const e of els) {
     const c = e.connector;
     const a = c?.start.elementID ?? null, b = c?.end.elementID ?? null;
-    if (!c || offline.has(e.id) || a === null || b === null || a === b || !shapes.has(a) || !shapes.has(b)) continue;
+    if (!c || a === null || b === null || a === b || !shapes.has(a) || !shapes.has(b)) continue;
     const cost = routeCost(c.cost);
     add(a, { to: b, via: e.id, back: false, cost });
     if (c.startHead !== "none") add(b, { to: a, via: e.id, back: true, cost });
   }
-  // Dijkstra, settling the cheapest shape next, ties to the one reached first.
+  const graph = { shapes, next };
+  graphs.set(els, { members: [...els], graph });
+  return graph;
+}
+
+/** Shapes waiting to be settled, cheapest first, ties to the one reached first (a binary heap). */
+class Frontier {
+  private heap: { id: string; dist: number; order: number }[] = [];
+  get size(): number { return this.heap.length; }
+  private less(i: number, j: number): boolean {
+    const a = this.heap[i], b = this.heap[j];
+    return a.dist < b.dist || (a.dist === b.dist && a.order < b.order);
+  }
+  private swap(i: number, j: number): void { [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]]; }
+  push(id: string, dist: number, order: number): void {
+    this.heap.push({ id, dist, order });
+    for (let i = this.heap.length - 1; i > 0;) {
+      const up = (i - 1) >> 1;
+      if (!this.less(i, up)) break;
+      this.swap(i, up); i = up;
+    }
+  }
+  pop(): { id: string; dist: number; order: number } {
+    const top = this.heap[0], last = this.heap.pop()!;
+    if (this.heap.length > 0) {
+      this.heap[0] = last;
+      for (let i = 0; ;) {
+        const l = 2 * i + 1, r = l + 1;
+        let m = i;
+        if (l < this.heap.length && this.less(l, m)) m = l;
+        if (r < this.heap.length && this.less(r, m)) m = r;
+        if (m === i) break;
+        this.swap(i, m); i = m;
+      }
+    }
+    return top;
+  }
+}
+
+/** Every shape traffic from `from` can reach in `frame`, with the cheapest way to each:
+ * by the connectors' cost (1 each unless set), ties to the shape reached first, earlier connectors first. */
+export function flowTree(from: string, frame: Page, offline: Set<string> = new Set()): FlowTree | null {
+  const { shapes, next } = graphOf(frame);
+  if (!shapes.has(from) || offline.has(from)) return null;
+  // Dijkstra, settling the cheapest shape next, ties to the one reached first. A shape reached again more cheaply
+  // is queued again under its new order; the entry it leaves behind is passed over.
   const dist = new Map<string, number>([[from, 0]]), order = new Map<string, number>([[from, 0]]);
   let counter = 1;
   const tree = new FlowTree(from);
-  const open = [from];
-  while (open.length > 0) {
-    let best = 0;
-    for (let i = 1; i < open.length; i++) {
-      const da = dist.get(open[i])!, db = dist.get(open[best])!;
-      if (da < db || (da === db && order.get(open[i])! < order.get(open[best])!)) best = i;
-    }
-    const n = open.splice(best, 1)[0];
+  const open = new Frontier();
+  open.push(from, 0, 0);
+  while (open.size > 0) {
+    const { id: n, order: o } = open.pop();
+    if (tree.settled.has(n) || order.get(n) !== o) continue;
     tree.settled.add(n);
     for (const edge of next.get(n) ?? []) {
+      if (offline.has(edge.via) || offline.has(edge.to)) continue;
       if (tree.settled.has(edge.to)) continue;
       const d = dist.get(n)! + edge.cost;
       const old = dist.get(edge.to);
       if (old !== undefined && old <= d) continue;
-      if (old === undefined) open.push(edge.to);
-      dist.set(edge.to, d); order.set(edge.to, counter++);
+      dist.set(edge.to, d); order.set(edge.to, counter);
+      open.push(edge.to, d, counter++);
       tree.came.set(edge.to, { from: n, via: edge.via, back: edge.back });
     }
   }

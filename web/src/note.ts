@@ -479,14 +479,42 @@ function layoutLines(paras: Para[], width: number, height: number, fontSize: num
   return lines;
 }
 
+/** A bounded memo: emptied when full, as the shape caches are. */
+class Memo<V> {
+  private map = new Map<string, V>();
+  private readonly limit: number;
+  constructor(limit: number) { this.limit = limit; }
+  get(key: string, make: () => V): V {
+    const hit = this.map.get(key);
+    if (hit !== undefined) return hit;
+    const v = make();
+    if (this.map.size >= this.limit) this.map.clear();
+    this.map.set(key, v);
+    return v;
+  }
+}
+
+/** Laid-out lines by text, box size and font, wherever the note stands; and finished markup by everything it shows. */
+const layouts = new Memo<Line[]>(500);
+const markups = new Memo<string>(500);
+
 /** The note's text as positioned SVG, laid out as Dottie lays it out (SVG.swift's noteText). */
 export function noteMarkup(source: string, e: Element): string {
+  const st = e.style, ink = st.stroke;
+  const key = [e.x, e.y, e.width, e.height, st.fontSize, ink.r, ink.g, ink.b, ink.a, st.font ?? "", source].join("\u0000");
+  return markups.get(key, () => computeNoteMarkup(source, e));
+}
+
+function computeNoteMarkup(source: string, e: Element): string {
   const rect = textRect({ x: e.x, y: e.y, width: e.width, height: e.height });
   if (!(rect.width > 1 && rect.height > 1)) return "";
   const fam = familyMetrics(e.style.font);
-  const b = new Builder(e.style.fontSize, rect.width, fam);
-  for (const block of parseBlocks(source)) b.block(block, { indent: 0, marker: null, quote: null, listDepth: 0 });
-  const lines = layoutLines(b.paras, rect.width, rect.height, e.style.fontSize, fam);
+  const layoutKey = [rect.width, rect.height, e.style.fontSize, e.style.font ?? "", source].join("\u0000");
+  const lines = layouts.get(layoutKey, () => {
+    const b = new Builder(e.style.fontSize, rect.width, fam);
+    for (const block of parseBlocks(source)) b.block(block, { indent: 0, marker: null, quote: null, listDepth: 0 });
+    return layoutLines(b.paras, rect.width, rect.height, e.style.fontSize, fam);
+  });
   const ink = color(e.style.stroke);
   let s = "";
   const marks: [number, number, number, number][] = [];

@@ -173,7 +173,7 @@ export function following(track: Track, e: Element, t: number, page: Page): Elem
   const f = followSpan(track, t);
   if (!f) return e;
   t = localTime(track, t);
-  const pathElement = page.elements.find((x) => x.id === f.path);
+  const pathElement = indexOf(page).get(f.path);
   if (!pathElement || pathElement.id === e.id) return e;
   const line = tracing(pathElement, page);
   const span = f.end - f.start;

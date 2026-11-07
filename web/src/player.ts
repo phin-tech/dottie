@@ -19,7 +19,7 @@ import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, 
 import { type DottieFile, type Page, type RGBA, clampTime, luminance, parseDottie } from "./model.ts";
 import { Path, fmt, rotate } from "./path.ts";
 import { buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
-import { type Plan, plan, svgParts } from "./svg.ts";
+import { type Plan, plan, svgParts, unchanged } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { themeNamed } from "./theme.ts";
 import { applyClick } from "./state.ts";
@@ -105,7 +105,7 @@ export class Playback {
 
   /** `file` is the drawing `page` belongs to, so links to its other pages are clickable. */
   constructor(page: Page, into: Element, options: { clean?: boolean; file?: DottieFile } = {}) {
-    this.page = options.clean ? withRoughness(page, 0) : page;
+    this.page = options.clean ? cleanCopy(page) : page;
     addFonts(usedFonts(this.page));
     this.plan = plan(this.page);
     this.clicks = clickTargets(page, options.file);
@@ -199,12 +199,13 @@ export class Playback {
       return m;
     };
     // A state is drawn only for the copies that have it.
+    // Only those copies' parts are drawn again; the rest of the page is there for them to connect to.
     const state = (st: Map<string, number>) => st.size === 0 ? new Map<string, string>()
-      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st])), this.background, r).parts
-        .filter((p) => st.has(this.owner.get(p.key) ?? "")));
+      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st])), this.background, r, false,
+        (key) => st.has(this.owner.get(key) ?? "")).parts);
     // A clickable shape with a hover look holds both, a button its over and down states, and the stylesheet shows one.
     const hover = this.hoverIDs.size === 0 ? new Map<string, string>()
-      : owned(new Map(), svgParts(hovered(frame, this.hoverIDs), this.background, r).parts.filter((p) => this.hoverIDs.has(p.key)));
+      : owned(new Map(), svgParts(hovered(frame, this.hoverIDs), this.background, r, false, (key) => this.hoverIDs.has(key)).parts);
     const over = state(this.overTimes), down = state(this.downTimes), hit = state(this.hitTimes);
     const normal = owned(new Map(), parts);
     // Each clickable owner becomes one part, where its first piece is drawn.
@@ -309,6 +310,18 @@ export class Playback {
     const entered = this.scenes.indexOf(next);
     return { frame: next, stop: entered >= 0 && !this.sceneLoops[entered] };
   }
+}
+
+const cleanCopies = new WeakMap<Page, { fields: Page; page: Page }>();
+
+/** `page` drawn precisely, the same copy each time it is asked for while the page is unchanged (so its plan is
+ * made once). */
+function cleanCopy(page: Page): Page {
+  const hit = cleanCopies.get(page);
+  if (hit && unchanged(page, hit.fields)) return hit.page;
+  const clean = withRoughness(page, 0);
+  cleanCopies.set(page, { fields: { ...page }, page: clean });
+  return clean;
 }
 
 /** HTMLElement where there is a DOM; a stand-in elsewhere, so the library still loads in Node (to render SVG). */
