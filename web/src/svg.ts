@@ -53,6 +53,17 @@ export function plan(page: Page): Plan {
 
 const plans = new WeakMap<Page, { fields: Page; plan: Plan }>();
 
+/** Whether `plan(page)` would return at once. */
+export function hasPlan(page: Page): boolean {
+  const hit = plans.get(page);
+  return !!hit && unchanged(page, hit.fields);
+}
+
+/** Has `plan(page)` return `made`, a plan of this page made elsewhere (in a worker, planner.ts). */
+export function rememberPlan(page: Page, made: Plan): void {
+  plans.set(page, { fields: { ...page }, plan: made });
+}
+
 /** Whether `page` still holds exactly the fields it had when `fields` was copied from it. */
 export function unchanged(page: Page, fields: Page): boolean {
   const a = page as unknown as Record<string, unknown>, b = fields as unknown as Record<string, unknown>;

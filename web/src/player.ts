@@ -21,6 +21,7 @@ import { Path, fmt, rotate } from "./path.ts";
 import { Expansions, buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
 import { type Plan, plan, svgParts, unchanged } from "./svg.ts";
 import { color } from "./svg-util.ts";
+import { planInWorker, plansInWorker } from "./planner.ts";
 import { themeNamed } from "./theme.ts";
 import { applyClick } from "./state.ts";
 import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
@@ -349,6 +350,8 @@ export class DottiePlayer extends ElementBase {
   private raf = 0;
   private replayRaf = 0;
   private loadToken = 0;
+  /** Counts mounts, so a plan that comes back from a worker after a newer one is dropped. */
+  private mountToken = 0;
   /** The time a still shows; null while the drawing is animated. */
   private stillTime: number | null = null;
   private visible = true;
@@ -439,6 +442,7 @@ export class DottiePlayer extends ElementBase {
       this.replayRaf = 0;
       this.playback = null;
       this.file = null;
+      this.mountToken++;
       this.stillTime = null;
       this.bar.hidden = true;
       this.stage.innerHTML = "";
@@ -460,14 +464,27 @@ export class DottiePlayer extends ElementBase {
   private showFile(file: DottieFile): void {
     this.file = file;
     for (const w of file.warnings) console.warn(`dottie-player: ${w}`);
-    this.mount();
-    this.dispatchEvent(new CustomEvent("load", { detail: { file } }));
+    this.mount(() => this.dispatchEvent(new CustomEvent("load", { detail: { file } })));
   }
 
-  private mount(): void {
+  /** Shows the file's page; then `mounted`. A big animation is planned in a worker first (planner.ts), and what was
+   * showing stays until it is ready; a newer mount, file or failed load in the meantime wins. */
+  private mount(mounted?: () => void): void {
     const file = this.file!;
     const page = file.pages[pageIndex(file, this.getAttribute("page"))];
-    const p = new Playback(page, this.stage, { clean: this.hasAttribute("clean"), file });
+    const clean = this.hasAttribute("clean");
+    const token = ++this.mountToken;
+    const shown = clean ? cleanCopy(page) : page;
+    if (!plansInWorker(shown)) { this.mountPage(file, page, clean); mounted?.(); return; }
+    void planInWorker(shown).then(() => {
+      if (token !== this.mountToken || this.file !== file) return;
+      this.mountPage(file, page, clean);
+      mounted?.();
+    });
+  }
+
+  private mountPage(file: DottieFile, page: Page, clean: boolean): void {
+    const p = new Playback(page, this.stage, { clean, file });
     p.still = this.hasAttribute("at");
     this.playback = p;
     this.style.setProperty("--dottie-page", color(p.background));

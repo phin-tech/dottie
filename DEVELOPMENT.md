@@ -105,7 +105,9 @@ things guard against it:
 **Compiled drawings.** `dottie render -f js` and dottie.js's `dottie-compile` write the same thing: the player
 runtime (`web/dist/dottie-player.min.js`) followed by the loader in `web/src/compile.ts` with the page as JSON.
 DottieKit embeds both in the generated `Sources/DottieKit/PlayerScript.swift`; after changing `web/`, run
-`just player-script` and commit it (the Linux CI job fails if it is stale).
+`just player-script` and commit it (the Linux CI job fails if it is stale). `build.mjs` wraps the minified runtime
+in the function `dottiePlayerScript`, which `web/src/planner.ts` reads back as source to start a worker of itself
+for planning big animations; keep the wrapper if you change the build.
 
 [`web/PARITY.md`](web/PARITY.md) lists each feature as supported, partial or missing with its fixture; a new app
 feature lands there as a missing row.
