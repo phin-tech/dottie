@@ -232,6 +232,14 @@ state stays editable. Only the web players change them: `<dottie-player>` redraw
 export of a page that uses state (`usesState`) is dottie.js's player in a page (`Exporter.statefulPlayer`), since
 the drawn-ahead player can't know which frames to draw. A marker with `loop: true` is a looping scene: both
 players play into it without stopping and go round from its end (the next scene, or the timeline's end) to its start.
+An element's `overrides` change it while their own `when` holds (stroke, fill, text color, width, dash, text; opacity
+multiplies), applied in order after its keys, and `reroute` sends its follows along other connectors, so one dot
+detours instead of two being drawn. `DefineState.swift` (`define_state`, `dottie.defineState`) writes a variable's
+conditions, overrides and clicks from one description. A page's `flows` (`Flows.swift`, `web/src/flows.ts`, ADR
+0002) are traffic no file stores: `posed` routes each one over the connectors left in the frame, cheapest by their `cost`
+(1 each unless set, so fewest hops; an override can change it), to the first destination it reaches (or, with
+`spread`, shared across the others while the first is down) and appends its packets, a pure function of the time and the values, with ids derived
+from the flow's, so a state that hides a region reroutes its traffic with nothing more drawn.
 A connector's `waypoints` are points on the canvas its line passes through, start to end (the app calls them
 bends). A straight line joins them, a curved one runs a Catmull-Rom curve through them, and an elbow keeps right
 angles, adding a corner between any two that are out of line and dropping any that fall into line
@@ -335,6 +343,9 @@ dottie ext check my.dottieext                     # load an extension and try it
 
 `dottie render diagram.dottie -f js` writes the page and dottie.js's player as one script (see dottie.js below).
 `dottie inspect diagram.dottie --at 1.5` prints the page's resolved geometry as JSON (see dottie.js above).
+`--state down=true,east=false` on `render` and `inspect` gives the page's variables those starting values. `dottie
+simulate diagram.dottie --click east --wait 2 --snapshot out.png` plays a page as `<dottie-player>` would and prints
+what each step leaves it at (`Simulation` in `Sources/DottieKit/Simulate.swift`, also the MCP `simulate` tool).
 `--clean` / `--sketchy` override the look and `--transparent` drops the background. When the app has the file
 open, `render` and `inspect` read that window over the live socket (`LiveClient.current`), unsaved and MCP edits
 included, and say so on stderr when it differs from the file; `--disk` reads the saved file. `just goldens` passes

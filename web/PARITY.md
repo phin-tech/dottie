@@ -48,6 +48,8 @@ fixture, so the gap is visible rather than silent.
 | Copies that play when clicked | Supported | [edge/buttons](../fixtures/edge/buttons.dottie) | `<dottie-player>` only: the HTML export is drawn ahead of time and shows them at rest |
 | Clicks: play a scene, open a link, hover looks, keyboard | Supported | [edge/clicks](../fixtures/edge/clicks.dottie) | As the HTML export does; only http, https and mailto links are followed |
 | Page variables and conditions (`variables`, `when`) | Supported | [edge/state](../fixtures/edge/state.dottie) | Starting values in every still and export; connectors go with a shape the state hides |
+| Overrides (`overrides`: restyle and reroute under a condition) | Supported | [edge/state](../fixtures/edge/state.dottie) | Opacity multiplies; a reroute or key that isn't an id is dropped as DottieKit drops it |
+| Traffic flows (`flows`) | Supported | [edge/flows](../fixtures/edge/flows.dottie) | Routed each frame over the connectors drawn, cheapest by connector `cost` (ADR 0002); packet ids derive from the flow's |
 | Clicks that set and toggle variables | Supported | [edge/state](../fixtures/edge/state.dottie) | Change what shows without touching the playhead. The HTML export of a page with state is this player |
 | Looping scenes (`loop` on a marker) | Supported | [edge/state](../fixtures/edge/state.dottie) | As the HTML export plays them: no stop on entering, round from the scene's end to its start |
 | Links out of the drawing (`url`) | Supported | [edge/links](../fixtures/edge/links.dottie) | A web or mail `url` opens when clicked if there is no `click`, and SVG export wraps it in `<a>`; a link to another drawing does nothing on the web |

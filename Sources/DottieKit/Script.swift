@@ -263,6 +263,43 @@ public enum DottieScript {
                 return list as? [String]
             }
 
+            /// A list of element ids (or one), as the JavaScript side sends them.
+            func ids(_ k: String) throws -> [UUID] {
+                guard let v = raw[Args.normalize(k)] else { return [] }
+                let list = (v as? [Any]) ?? [v]
+                return try list.map { x in
+                    guard let s = x as? String, let u = UUID(uuidString: s) else { throw OpsError.invalid("'\(k)' must be element ids") }
+                    return u
+                }
+            }
+            /// An object of element ids to element ids (`reroute`).
+            func idMap(_ k: String) throws -> [UUID: UUID] {
+                guard let v = raw[Args.normalize(k)] else { return [:] }
+                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must map connector ids to connector ids") }
+                var out: [UUID: UUID] = [:]
+                for (from, to) in d {
+                    guard let f = UUID(uuidString: from), let s = to as? String, let t = UUID(uuidString: s) else {
+                        throw OpsError.invalid("'\(k)' must map connector ids to connector ids")
+                    }
+                    out[f] = t
+                }
+                return out
+            }
+            /// A state override (`StateOverride`); `when` may be left out where the caller supplies it.
+            func override(when fallback: String? = nil) throws -> StateOverride {
+                let when = try PageState.checked(string("when") ?? fallback ?? "")
+                guard let when else { throw OpsError.invalid("An override needs 'when', a condition like \"down\"") }
+                var o = StateOverride(when: when, stroke: try color("stroke"), fill: try color("fill"),
+                                      textColor: try color("textColor"), opacity: double("opacity"),
+                                      strokeWidth: double("strokeWidth"), dash: try enumValue("dash", as: DashStyle.self),
+                                      text: string("text"))
+                let r = try idMap("reroute")
+                if !r.isEmpty { o.reroute = Dictionary(uniqueKeysWithValues: r.map { ($0.key.uuidString, $0.value) }) }
+                if bool("offline") == true { o.offline = true }
+                o.cost = double("cost")
+                return o
+            }
+
             func require(_ k: String) throws -> String {
                 guard let s = string(k), !s.isEmpty else { throw OpsError.invalid("Missing required argument '\(k)'") }
                 return s
@@ -292,7 +329,8 @@ public enum DottieScript {
                                 endHead: try enumValue("endHead", as: Arrowhead.self), rotation: double("rotation"),
                                 gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"),
                                 waypoints: try points("waypoints"), hops: bool("hops"),
-                                textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") })
+                                textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") },
+                                cost: double("cost"))
             }
             /// A list of {x, y} points.
             func points(_ k: String) throws -> [CGPoint]? {
@@ -334,6 +372,15 @@ public enum DottieScript {
 
         private func round1(_ v: Double) -> Double { (v * 10).rounded() / 10 }
 
+        private static func describe(_ f: Flow) -> [String: Any] {
+            var d: [String: Any] = ["id": f.id.uuidString, "from": f.from.uuidString, "to": f.to.map(\.uuidString),
+                                    "every": f.interval, "speed": f.pace, "size": f.diameter]
+            if let c = f.color { d["color"] = String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
+            if let w = f.when { d["when"] = w }
+            if f.spread == true { d["spread"] = true }
+            return d
+        }
+
         private func describe(_ e: Element, index: [UUID: Element]? = nil) -> [String: Any] {
             let b = e.kind == .connector ? Connector.bounds(of: e, in: doc, index: index) : e.frame
             var d: [String: Any] = [
@@ -369,6 +416,22 @@ public enum DottieScript {
                 if let o = e.offset { d["offset"] = o }
                 if let g = e.args { d["args"] = g }
             }
+            if let list = e.overrides {
+                d["overrides"] = list.map { o -> [String: Any] in
+                    var x: [String: Any] = ["when": o.when]
+                    if let c = o.stroke { x["stroke"] = hex(c) }
+                    if let c = o.fill { x["fill"] = hex(c) }
+                    if let c = o.textColor { x["textColor"] = hex(c) }
+                    if let v = o.opacity { x["opacity"] = v }
+                    if let v = o.strokeWidth { x["strokeWidth"] = v }
+                    if let v = o.dash { x["dash"] = v.rawValue }
+                    if let v = o.text { x["text"] = v }
+                    if let r = o.reroute { x["reroute"] = r.mapValues(\.uuidString) }
+                    if o.offline == true { x["offline"] = true }
+                    if let v = o.cost { x["cost"] = v }
+                    return x
+                }
+            }
             if let h = e.hover {
                 var o: [String: Any] = [:]
                 if let c = h.stroke { o["stroke"] = hex(c) }
@@ -381,6 +444,7 @@ public enum DottieScript {
                 d["routing"] = c.routing.rawValue
                 if let w = c.waypoints { d["waypoints"] = w.map { ["x": $0.x, "y": $0.y] } }
                 if c.hops == true { d["hops"] = true }
+                if let cost = c.cost { d["cost"] = cost }
                 if let f = c.start.elementID { d["from"] = f.uuidString }
                 if let t = c.end.elementID { d["to"] = t.uuidString }
             }
@@ -491,6 +555,11 @@ public enum DottieScript {
                                       anchor: a.has("anchor") ? .some(a.string("anchor")) : nil,
                                       click: click, hover: hover, otherPages: otherPages)
                 if a.has("when") { try DiagramOps.setWhen(&doc, id: id, a.string("when")) }
+                if a.has("overrides"), let i = doc.elements.firstIndex(where: { $0.id == id }) {
+                    guard let list = a.list("overrides") else { throw OpsError.invalid("'overrides' must be a list of overrides, or null") }
+                    let parsed = try list.map { try $0.override() }
+                    doc.elements[i].overrides = parsed.isEmpty ? nil : parsed
+                }
                 return describe(try element(id))
 
             case "pages":
@@ -697,6 +766,34 @@ public enum DottieScript {
             case "variables":
                 return doc.variables ?? [:]
 
+            case "flow":
+                let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
+                                               speed: a.double("speed"), color: try a.color("color"), size: a.double("size"),
+                                               when: a.string("when"), spread: a.bool("spread"),
+                                               replacing: a.has("id") ? try a.uuid("id") : nil)
+                return Self.describe(f)
+
+            case "flows":
+                return (doc.flows ?? []).map(Self.describe)
+
+            case "removeFlow":
+                return DiagramOps.removeFlow(&doc, try a.uuid("id"))
+
+            case "defineState":
+                var spec = StateSpec(name: try a.require("name"))
+                if let v = a.bool("initial") { spec.initial = v }
+                spec.hide = try a.ids("hide"); spec.show = try a.ids("show"); spec.dim = try a.ids("dim"); spec.down = try a.ids("down")
+                if let v = a.double("dimOpacity") { spec.dimOpacity = v }
+                if let r = a.object("restyle") {
+                    for (k, _) in r.raw {
+                        guard let id = UUID(uuidString: k), let look = r.object(k) else { throw OpsError.invalid("'restyle' maps element ids to looks") }
+                        spec.restyle[id] = try look.override(when: spec.name)
+                    }
+                }
+                spec.reroute = try a.idMap("reroute")
+                spec.toggledBy = try a.ids("toggledBy"); spec.turnedOnBy = try a.ids("turnedOnBy"); spec.turnedOffBy = try a.ids("turnedOffBy")
+                return try DiagramOps.defineState(&doc, spec)
+
             case "follow":
                 try doc.addFollow(try a.uuid("id"), along: try a.uuid("path"), at: max(0, a.double("t") ?? 0),
                                   duration: a.double("duration") ?? 1, ease: try a.enumValue("ease", as: Ease.self),
@@ -818,6 +915,15 @@ public enum DottieScript {
         return id;
       };
       var merge = function (a, b) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) o[k] = b[k]; return o; };
+      // Element lists and maps keyed by element, as defineState takes them: one or a list; {id: value} or [[el, value]].
+      var ids = function (v) { return v === undefined ? undefined : (Array.isArray(v) ? v : [v]).map(idOf); };
+      var pairs = function (v, value) {
+        if (v === undefined) return undefined;
+        var out = {}, k;
+        if (Array.isArray(v)) v.forEach(function (p) { out[idOf(p[0])] = value(p[1]); });
+        else for (k in v) out[k] = value(v[k]);
+        return out;
+      };
       var kind = function (k) { return function (o) { return call("shape", merge(o, { kind: k })); }; };
       g.dottie = {
         elements: function (filter) { return call("elements", filter); },
@@ -828,6 +934,14 @@ public enum DottieScript {
         update: function (id, changes) {
           var o = merge(changes, { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
+          if (o.overrides === null) o.overrides = [];
+          if (Array.isArray(o.overrides)) o.overrides = o.overrides.map(function (x) {
+            if (!x || !x.reroute) return x;
+            var r = {}, k;
+            if (Array.isArray(x.reroute)) x.reroute.forEach(function (p) { r[idOf(p[0])] = idOf(p[1]); });
+            else for (k in x.reroute) r[k] = idOf(x.reroute[k]);
+            return merge(x, { reroute: r });
+          });
           if (o.url === null) o.url = "";
           if (o.click === null) o.click = "";
           if (o.hover === null) o.hover = "";
@@ -880,6 +994,19 @@ public enum DottieScript {
         loopScene: function (scene, loop) { call("editScene", { scene: String(scene), loop: loop !== false }); },
         variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
         variables: function () { return call("variables"); },
+        flow: function (from, to, o) {
+          return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
+        },
+        flows: function () { return call("flows"); },
+        removeFlow: function (flow) { return call("removeFlow", { id: idOf(flow) }); },
+        defineState: function (name, o) {
+          o = o || {};
+          return call("defineState", merge(o, {
+            name: name, hide: ids(o.hide), show: ids(o.show), dim: ids(o.dim), down: ids(o.down),
+            toggledBy: ids(o.toggledBy), turnedOnBy: ids(o.turnedOnBy), turnedOffBy: ids(o.turnedOffBy),
+            restyle: pairs(o.restyle, function (x) { return x; }), reroute: pairs(o.reroute, idOf),
+          }));
+        },
         renameScene: function (scene, name) { call("editScene", { scene: String(scene), name: name }); },
         moveScene: function (scene, t) { call("editScene", { scene: String(scene), to: t }); },
         removeScene: function (scene) { call("editScene", { scene: String(scene), remove: true }); },
@@ -1075,11 +1202,38 @@ public enum DottieScript {
     on the web, elements with a when follow them, and the timeline keeps looping. Exports and previews show the \
     starting values; the editor shows every element while stopped. Inside a symbol, when sees no variables (all false)
       dottie.variables()               {name: startingValue}
-      Example: a click that takes a region down while packets keep flowing:
-        dottie.variable("down", false);
-        dottie.update(region, {click: {toggle: "down"}});
-        dottie.update(dimmed, {when: "down"});
-        dottie.packet(eastLink, 0, {when: "!down"}); dottie.packet(westLink, 0, {when: "down"});
+      dottie.defineState(name, {initial?, hide?, show?, dim?, down?, dimOpacity?, restyle?, reroute?, toggledBy?, turnedOnBy?, \
+    turnedOffBy?})  one variable described at once; writes the when conditions, overrides and clicks it means. hide: \
+    drawn only while it is false; show: only while true; dim: faded while true; down: faded and carrying no flow \
+    traffic while true (a region that's down: flows go round it); restyle: {id: look} while true; \
+    reroute: {fromConnector: toConnector}, so the same packets take a detour while true; toggledBy, turnedOnBy, \
+    turnedOffBy: elements whose click flips, sets or clears it. Running it again changes nothing more; returns a summary
+      dottie.flow(from, to, {every?, speed?, color?, size?, when?, spread?, id?})  traffic from a shape to the first of to (a shape or \
+    a list, preferred first) it can reach over the connectors drawn: a packet every every seconds (0.5) at speed \
+    points per second (160), routed afresh each frame, so when a state hides a shape or connector the traffic goes \
+    round it with nothing more drawn. A connector carries traffic from its start to its end, and back too when its \
+    start has an arrowhead; the route is the cheapest by connector cost (1 each unless set: give a main path a lower \
+    cost than its backup). One flow per region splits traffic, each with its own color, so a failed region's \
+    packets keep its color on the regions that take them over; spread: true deals a flow's packets across every \
+    other destination it can reach while the first is down, rather than all to the next. Packets vanish into the \
+    shapes they pass through and come out the other side. Gives the page a 4-second timeline if it has none, and rounds every so the timeline \
+    loops seamlessly. With id, changes that flow. Returns {id, from, to, every, speed, size, color?, when?}
+      dottie.flows(), dottie.removeFlow(flow)  the page's flows; remove one by it or its id
+      Example: failover: api sends to east, or west when east is down:
+        dottie.flow(api, [east, west]);
+        dottie.defineState("eastDown", {down: east, toggledBy: east});   // east fades, and traffic goes to west
+      overrides (on dottie.update): [{when, stroke?, fill?, textColor?, opacity?, strokeWidth?, dash?, text?, \
+    reroute?, offline?, cost?}]: changes to one element while a condition holds, in order; opacity multiplies; cost: a \
+    connector's cost meanwhile (a degraded link); offline: still \
+    drawn but carries no flow traffic. Prefer these to a \
+    second copy of a shape with the opposite when
+      Example: a click that takes a region down while its packets keep flowing, the other way round:
+        const east = dottie.rect({x: 300, y: 0, text: "east"}), west = dottie.rect({x: 300, y: 200, text: "west"});
+        const eastLink = dottie.connect(api, east), westLink = dottie.connect(api, west);
+        dottie.packet(eastLink, 0);
+        dottie.defineState("eastDown", {dim: east, restyle: [[east, {text: "east (down)"}]],
+                                        reroute: [[eastLink, westLink]], toggledBy: east});
+      Check it with the simulate tool or an export with a state before calling it done.
       dottie.follow(id, path, t, {duration?, ease?, reverse?, orient?, laps?})  the element's center travels along \
     path (a connector's route or any shape's outline) from t, and stays at the end afterwards. orient turns it to \
     face along the path; laps > 1 goes round a closed outline more than once
@@ -1098,7 +1252,8 @@ public enum DottieScript {
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
     waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
-    (connectors: a small hop where the line crosses a connector drawn beneath it), \
+    (connectors: a small hop where the line crosses a connector drawn beneath it), cost 0-1000000 (connectors: what \
+    flow traffic pays to take the line, default 1; flows take the cheapest route), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
     exports but not embedded; "" for Helvetica Neue), fontSize 4-200, textColor hex (a shape's or connector's label; \
     "" follows the stroke again; setting stroke on update recolors the label too, as in Excalidraw).

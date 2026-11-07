@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="428" height="108" viewBox="-4 16 428 108">
+<rect x="-4" y="16" width="428" height="108" fill="#ffffff"/>
+<path d="M20 40 L120 40 L120 100 L20 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="70" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="70" y="76.48">a</tspan></text>
+<path d="M300 40 L400 40 L400 100 L300 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="350" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="350" y="76.48">b</tspan></text>
+<path d="M120 70 L300 70 M290.99 65.66 L300 70 M290.99 74.34 L300 70" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M306 70 C306 73.31 303.31 76 300 76 C296.69 76 294 73.31 294 70 C294 66.69 296.69 64 300 64 C303.31 64 306 66.69 306 70 Z" fill="#f25c54" stroke="none"/>
+<path d="M306 70 C306 73.31 303.31 76 300 76 C296.69 76 294 73.31 294 70 C294 66.69 296.69 64 300 64 C303.31 64 306 66.69 306 70 Z" fill="none" stroke="#f25c54" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M246 70 C246 73.31 243.31 76 240 76 C236.69 76 234 73.31 234 70 C234 66.69 236.69 64 240 64 C243.31 64 246 66.69 246 70 Z" fill="#f25c54" stroke="none"/>
+<path d="M246 70 C246 73.31 243.31 76 240 76 C236.69 76 234 73.31 234 70 C234 66.69 236.69 64 240 64 C243.31 64 246 66.69 246 70 Z" fill="none" stroke="#f25c54" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M186 70 C186 73.31 183.31 76 180 76 C176.69 76 174 73.31 174 70 C174 66.69 176.69 64 180 64 C183.31 64 186 66.69 186 70 Z" fill="#f25c54" stroke="none"/>
+<path d="M186 70 C186 73.31 183.31 76 180 76 C176.69 76 174 73.31 174 70 C174 66.69 176.69 64 180 64 C183.31 64 186 66.69 186 70 Z" fill="none" stroke="#f25c54" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M126 70 C126 73.31 123.31 76 120 76 C116.69 76 114 73.31 114 70 C114 66.69 116.69 64 120 64 C123.31 64 126 66.69 126 70 Z" fill="#f25c54" stroke="none"/>
+<path d="M126 70 C126 73.31 123.31 76 120 76 C116.69 76 114 73.31 114 70 C114 66.69 116.69 64 120 64 C123.31 64 126 66.69 126 70 Z" fill="none" stroke="#f25c54" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

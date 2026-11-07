@@ -243,6 +243,63 @@ extension DottieScript {
          * "east && !west". The element, and the connectors attached to it, is drawn only while it holds. */
         type Condition = string;
 
+        /** A change to an element while `when` holds; a field left out keeps the element's own. */
+        interface Override {
+            when: Condition;
+            stroke?: Color;
+            fill?: Color;
+            textColor?: Color;
+            /** Multiplies the element's opacity, 0...1. */
+            opacity?: number;
+            strokeWidth?: number;
+            dash?: "solid" | "dashed" | "dotted";
+            /** Replaces its text or label. */
+            text?: string;
+            /** For a packet (anything following connectors): connector id to the connector it takes instead, or
+             * [from, to] pairs. */
+            reroute?: Record<string, Ref> | [Ref, Ref][];
+            /** Still drawn, but carries no flow traffic (dottie.flow): flows go round it. */
+            offline?: boolean;
+            /** A connector's cost for flow traffic meanwhile: a degraded link. */
+            cost?: number;
+        }
+
+        /** A flow as dottie.flow and dottie.flows return it, defaults filled in. */
+        interface FlowInfo {
+            id: string;
+            from: string;
+            to: string[];
+            every: number;
+            speed: number;
+            size: number;
+            color?: Color;
+            when?: Condition;
+            spread?: boolean;
+        }
+
+        /** One variable described at once (dottie.defineState): what changes while it is true, and which clicks change it. */
+        interface StateSpec {
+            /** Its starting value; default false. */
+            initial?: boolean;
+            /** Drawn only while it is false; connectors attached go with them. */
+            hide?: Ref | Ref[];
+            /** Drawn only while it is true. */
+            show?: Ref | Ref[];
+            /** Faded to dimOpacity (default 0.3) while it is true. */
+            dim?: Ref | Ref[];
+            /** Down while it is true: faded like dim, and carrying no flow traffic, so flows go round them. */
+            down?: Ref | Ref[];
+            dimOpacity?: number;
+            /** Other changes while it is true: element id to look, or [element, look] pairs. */
+            restyle?: Record<string, Omit<Override, "when" | "reroute">> | [Ref, Omit<Override, "when" | "reroute">][];
+            /** While it is true, everything following the first connector follows the second: packets detour. */
+            reroute?: Record<string, Ref> | [Ref, Ref][];
+            /** Clicking these flips it, turns it on, turns it off. */
+            toggledBy?: Ref | Ref[];
+            turnedOnBy?: Ref | Ref[];
+            turnedOffBy?: Ref | Ref[];
+        }
+
         /** How a clickable shape looks under the pointer. */
         interface Hover {
             stroke?: Color;
@@ -287,6 +344,8 @@ extension DottieScript {
             /** Connectors: the bends the line runs through, and whether it hops the lines beneath it. */
             waypoints?: Point[];
             hops?: boolean;
+            /** Connectors: what a flow's traffic pays to take it, when not 1. */
+            cost?: number;
             /** Connectors: the shape at each end, when attached. */
             from?: string;
             to?: string;
@@ -321,6 +380,8 @@ extension DottieScript {
             waypoints?: Point[];
             /** Connectors only: a small hop where the line crosses a connector drawn beneath it. */
             hops?: boolean;
+            /** Connectors only: what a flow's traffic pays to take this line, default 1; flows take the cheapest route. */
+            cost?: number;
             /** Caveat, Patrick Hand or Architects Daughter (handwriting, embedded in exports), an installed font
              * (named in exports, not embedded), or "" for Helvetica Neue. */
             font?: string;
@@ -391,6 +452,8 @@ extension DottieScript {
             click?: Click | null;
             /** Drawn only while this holds; "" or null removes it. */
             when?: Condition | null;
+            /** Changes while conditions hold, in order, replacing the ones it had; null removes them. */
+            overrides?: Override[] | null;
             /** Its look under the pointer when clickable; null removes it. Not for a symbol's copies: draw a button's over state. */
             hover?: Hover | null;
             /** A symbol's copy only. */
@@ -538,6 +601,20 @@ extension DottieScript {
             variable(name: string, value?: boolean | null): Record<string, boolean>;
             /** The page's variables and their starting values. */
             variables(): Record<string, boolean>;
+            /** Writes one variable's whole story: its starting value, the conditions on what it hides and shows, overrides
+             * on what it dims, restyles and reroutes, and the clicks that change it. Running it again changes nothing
+             * more. Returns a summary. */
+            defineState(name: string, spec: StateSpec): string;
+            /** Traffic from a shape to the first of `to` (preferred first) it can reach over the connectors drawn, routed
+             * afresh each frame, so a state that hides a shape or connector sends it round. Gives the page a timeline if
+             * it has none and rounds `every` so it loops. With `id`, changes that flow. */
+            flow(from: Ref, to: Ref | Ref[], options?: { every?: number; speed?: number; color?: Color; size?: number; when?: Condition;
+                /** While the first destination is down, deal packets across every other one that can be reached. */
+                spread?: boolean; id?: Ref }): FlowInfo;
+            /** The page's flows. */
+            flows(): FlowInfo[];
+            /** Removes a flow; returns whether there was one. */
+            removeFlow(flow: Ref): boolean;
             /** Renames a scene (named by its name or its time); clicks that play it follow the new name. */
             renameScene(scene: string | number, name: string): void;
             /** Moves a scene (named by its name or its time) to t seconds. */

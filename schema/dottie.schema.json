@@ -38,7 +38,25 @@
         "guidesLocked": { "type": "boolean" },
         "timeline": { "$ref": "#/$defs/timeline" },
         "symbols": { "type": "array", "description": "Drawings placed by symbol elements, each with its own animation.", "items": { "$ref": "#/$defs/symbol" } },
-        "variables": { "type": "object", "description": "Page variables and their starting values. Clicks set and toggle them on the web; elements with a when follow them.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } }
+        "variables": { "type": "object", "description": "Page variables and their starting values. Clicks set and toggle them on the web; elements with a when follow them.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
+        "flows": { "type": "array", "items": { "$ref": "#/$defs/flow" }, "description": "Traffic the players route over the connectors drawn in each frame (ADR 0002)." }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "description": "Traffic from one shape to the first destination it can reach over the connectors drawn: packets every `every` seconds at `speed` points per second, rerouted as the page's state hides shapes and connectors.",
+      "required": ["id", "from", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "from": { "$ref": "#/$defs/uuid", "description": "The shape traffic leaves from." },
+        "to": { "type": "array", "items": { "$ref": "#/$defs/uuid" }, "description": "Destinations in order of preference." },
+        "every": { "type": "number", "description": "Seconds between packets; 0.5 by default." },
+        "speed": { "type": "number", "description": "Points per second; 160 by default." },
+        "color": { "$ref": "#/$defs/rgba" },
+        "size": { "type": "number", "description": "Packet diameter; 12 by default." },
+        "when": { "type": "string", "description": "A condition on the page's variables: nothing flows while it fails." },
+        "spread": { "type": "boolean", "description": "While the first destination can't be reached, packets are dealt in turn across every other one that can." }
       }
     },
     "variableName": { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$" },
@@ -132,6 +150,7 @@
         "anchor": { "type": "string" },
         "click": { "$ref": "#/$defs/click" },
         "hover": { "$ref": "#/$defs/hover" },
+        "overrides": { "type": "array", "items": { "$ref": "#/$defs/override" }, "description": "Changes to the element while a condition on the page's variables holds, applied in order." },
         "when": { "type": "string", "description": "A condition on the page's variables: names, each optionally after !, joined by && and || (&& binds tighter), like \"down\" or \"east && !west\". The element, and connectors attached to it, is drawn only while it holds; a missing variable is false, and a condition that can't be read never holds." },
         "symbol": { "$ref": "#/$defs/uuid", "description": "For a symbol element: the page's symbol it shows." },
         "playback": { "enum": ["loop", "once", "still", "click"], "description": "How a symbol element plays its symbol's timeline; loop by default. click rests at the start and plays once when clicked in <dottie-player>." },
@@ -228,7 +247,8 @@
         "startHead": { "$ref": "#/$defs/arrowhead" },
         "endHead": { "$ref": "#/$defs/arrowhead" },
         "waypoints": { "type": "array", "items": { "$ref": "#/$defs/waypoint" }, "description": "Bends on the canvas the line passes through, start to end, whatever its routing." },
-        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it." }
+        "hops": { "type": "boolean", "description": "Hops (small arcs) where the line crosses a connector drawn beneath it." },
+        "cost": { "type": "number", "minimum": 0, "description": "What a flow's traffic pays to take this connector; flows take the cheapest route. Absent is 1." }
       }
     },
     "waypoint": {
@@ -342,6 +362,25 @@
         "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." },
         "set": { "type": "object", "description": "Page variables to give these values, without touching the playhead.", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": "boolean" } },
         "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] }
+      }
+    },
+    "override": {
+      "type": "object",
+      "description": "A change to an element while when holds: a field it leaves out keeps the element's own.",
+      "required": ["when"],
+      "additionalProperties": false,
+      "properties": {
+        "when": { "type": "string", "description": "A condition on the page's variables, as Element.when." },
+        "stroke": { "$ref": "#/$defs/rgba" },
+        "fill": { "$ref": "#/$defs/rgba" },
+        "textColor": { "$ref": "#/$defs/rgba" },
+        "opacity": { "type": "number", "description": "Multiplies the element's opacity, 0...1." },
+        "strokeWidth": { "type": "number" },
+        "dash": { "enum": ["solid", "dashed", "dotted"] },
+        "text": { "type": "string", "description": "Replaces the element's text or label." },
+        "reroute": { "type": "object", "additionalProperties": { "$ref": "#/$defs/uuid" }, "description": "For an element that follows connectors (a packet): connector id to the connector it follows instead." },
+        "offline": { "type": "boolean", "description": "Still drawn, but carries no flow traffic: flows route round it." },
+        "cost": { "type": "number", "minimum": 0, "description": "A connector's cost for flow traffic while this applies: a degraded link." }
       }
     },
     "hover": {

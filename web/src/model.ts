@@ -48,6 +48,8 @@ export interface ConnectorData {
   waypoints: StrokePoint[] | null;
   /** Hops where the line crosses a connector drawn beneath it. */
   hops: boolean | null;
+  /** What a flow's traffic pays to take this connector (ADR 0002); null is 1. */
+  cost: number | null;
 }
 
 export interface PathSubpath { closed: boolean; coords: number[] }
@@ -57,6 +59,23 @@ export interface EmbeddedImage { data: string; format: string }
  * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
 export interface ClickAction { scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null }
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
+/** A change to an element while `when` holds (StateOverride): a field left null keeps the element's own. */
+export interface StateOverride {
+  when: string;
+  stroke: RGBA | null; fill: RGBA | null; textColor: RGBA | null;
+  /** Multiplies the element's opacity. */
+  opacity: number | null;
+  strokeWidth: number | null;
+  dash: DashStyle | null;
+  text: string | null;
+  /** Connector ids (uppercase) to the connectors a following element takes instead. */
+  reroute: Record<string, string> | null;
+  /** Still drawn, but carries no flow traffic. */
+  offline: boolean | null;
+  /** A connector's cost for flow traffic meanwhile. */
+  cost: number | null;
+}
+
 export interface HoverLook { stroke: RGBA | null; fill: RGBA | null; opacity: number | null }
 
 export interface Element {
@@ -84,6 +103,8 @@ export interface Element {
   hover: HoverLook | null;
   /** A condition on the page's variables: drawn only while it holds (Element.when; see state.ts). */
   when: string | null;
+  /** Changes to the element while a condition holds, in order (Element.overrides; see state.ts). */
+  overrides: StateOverride[] | null;
   /** For a `symbol` element: the page's symbol it shows, how it plays it, and from how far in. */
   symbol: string | null;
   playback: SymbolPlayback | null;
@@ -159,6 +180,22 @@ export interface Page {
   symbols: Symbol[] | null;
   /** The page's variables and their starting values (DottieDocument.variables). */
   variables: Record<string, boolean> | null;
+  /** Traffic routed over the connectors drawn in each frame (DottieDocument.flows; see flows.ts). */
+  flows: Flow[] | null;
+}
+
+/** Traffic from one shape to the first of `to` it can reach (Flow, ADR 0002). Numbers left null take defaults. */
+export interface Flow {
+  id: string;
+  from: string;
+  to: string[];
+  every: number | null;
+  speed: number | null;
+  color: RGBA | null;
+  size: number | null;
+  when: string | null;
+  /** When the first destination can't be reached, deal packets across every other one that can. */
+  spread: boolean | null;
 }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
@@ -192,13 +229,14 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables"],
+  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
+  flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
   style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
-    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "symbol", "playback", "offset", "args", "image", "reveal",
+    "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "overrides", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
@@ -207,7 +245,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   extensionRef: ["id", "shape", "version", "params"],
   normalizedPoint: ["x", "y"],
   normalizedRect: ["x", "y", "width", "height"],
-  connector: ["start", "end", "routing", "startHead", "endHead", "waypoints", "hops"],
+  connector: ["start", "end", "routing", "startHead", "endHead", "waypoints", "hops", "cost"],
   waypoint: ["x", "y"],
   timeline: ["fps", "duration", "boil", "settle", "poster", "tracks", "camera", "markers"],
   track: ["element", "keys", "boil", "follow", "repeats", "march"],
@@ -218,6 +256,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   marker: ["t", "name", "loop"],
   click: ["scene", "url", "set", "toggle"],
   hover: ["stroke", "fill", "opacity"],
+  override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost"],
 };
 
 export const MAX_DURATION = 3600;
@@ -242,6 +281,8 @@ const strings = (v: unknown): Record<string, string> | null =>
   isObj(v) && Object.values(v).every((x) => typeof x === "string") ? { ...(v as Record<string, string>) } : null;
 const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : undefined);
 /** UUIDs compare by value in Swift; uppercase them so string comparison agrees. */
+const NO_ID = "00000000-0000-0000-0000-000000000000";
+const UUID = /^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
 const uuid = (v: unknown): string | undefined => (typeof v === "string" ? v.toUpperCase() : undefined);
 
 export function clampTime(t: number): number {
@@ -342,6 +383,7 @@ class Reader {
         ? v.waypoints.filter(isObj).map((w) => { this.fields(w, "waypoint"); return { x: num(w.x) ?? 0, y: num(w.y) ?? 0 }; })
         : null,
       hops: typeof v.hops === "boolean" ? v.hops : null,
+      cost: typeof v.cost === "number" && Number.isFinite(v.cost) ? v.cost : null,
     };
   }
 
@@ -390,6 +432,7 @@ class Reader {
       click: this.click(v.click),
       hover: this.hover(v.hover),
       when: str(v.when) ?? null,
+      overrides: this.overrides(v.overrides),
       symbol: uuid(v.symbol) ?? null,
       playback: this.playback(v.playback),
       offset: num(v.offset) ?? null,
@@ -474,6 +517,31 @@ class Reader {
       button: bool(v.button) ?? null,
       params: strings(v.params),
     };
+  }
+
+  /** As DottieKit reads them: a reroute whose targets aren't all ids is dropped, as are keys that aren't ids. */
+  overrides(v: unknown): StateOverride[] | null {
+    if (!Array.isArray(v)) return null;
+    return v.filter(isObj).map((o) => {
+      this.fields(o, "override");
+      const dash = str(o.dash);
+      let reroute: Record<string, string> | null = null;
+      if (isObj(o.reroute) && Object.values(o.reroute).every((x) => typeof x === "string" && UUID.test(x))) {
+        reroute = {};
+        for (const [k, x] of Object.entries(o.reroute)) if (UUID.test(k)) reroute[k.toUpperCase()] = (x as string).toUpperCase();
+        if (Object.keys(reroute).length === 0) reroute = null;
+      }
+      return {
+        when: str(o.when) ?? "",
+        stroke: rgba(o.stroke) ?? null, fill: rgba(o.fill) ?? null, textColor: rgba(o.textColor) ?? null,
+        opacity: num(o.opacity) ?? null, strokeWidth: num(o.strokeWidth) ?? null,
+        dash: dash !== undefined && ["solid", "dashed", "dotted"].includes(dash) ? dash as DashStyle : null,
+        text: str(o.text) ?? null,
+        reroute,
+        offline: o.offline === true ? true : null,
+        cost: typeof o.cost === "number" && Number.isFinite(o.cost) ? o.cost : null,
+      };
+    });
   }
 
   hover(v: unknown): HoverLook | null {
@@ -584,6 +652,23 @@ class Reader {
       timeline: this.timeline(v.timeline),
       symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
       variables: this.variables(v.variables),
+      flows: Array.isArray(v.flows) ? v.flows.filter(isObj).map((f) => this.flow(f)) : null,
+    };
+  }
+
+  /** As DottieKit reads one: a missing or bad id, source or destination sends nothing; bad destinations are dropped. */
+  flow(f: Obj): Flow {
+    this.fields(f, "flow");
+    const id = (x: unknown): string => (typeof x === "string" && UUID.test(x) ? x.toUpperCase() : NO_ID);
+    const finite = (x: unknown): number | null => { const n = num(x); return n !== undefined && Number.isFinite(n) ? n : null; };
+    return {
+      id: id(f.id), from: id(f.from),
+      to: Array.isArray(f.to) && f.to.every((x) => typeof x === "string")
+        ? (f.to as string[]).filter((x) => UUID.test(x)).map((x) => x.toUpperCase()) : [],
+      every: finite(f.every), speed: finite(f.speed), size: finite(f.size),
+      color: isObj(f.color) && ["r", "g", "b", "a"].every((k) => typeof (f.color as Obj)[k] === "number") ? rgba(f.color) ?? null : null,
+      when: str(f.when) ?? null,
+      spread: f.spread === true ? true : null,
     };
   }
 }

@@ -61,7 +61,8 @@ More of the MCP tools, by purpose:
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
-| Exports | `export_svg`, `export_mermaid`, `export_animation` |
+| Interactive pages: traffic and states | `add_flow`, `define_state`, `set_variable` |
+| Exports, and checking an interactive page | `export_svg`, `export_mermaid`, `export_animation`, `simulate` |
 
 ## Animating
 
@@ -74,11 +75,28 @@ Any page can move. Most animations come from a few tools:
   steps through the scenes like slides. `loop: true` makes a scene play round instead of stopping.
 - `add_keyframe` and `set_timeline` for anything else, and `clear_animation` to start over.
 
-A diagram that keeps looping and reacts to clicks ("take us-east-1 down while packets keep flowing") uses page
-variables rather than scenes: `set_variable` adds one, `update_element` with `click_toggle` (or `click_set`) makes a
-shape flip it, and `when` on shapes, connectors and `send_packet` packets (`"down"`, `"!down"`) shows each only while
-it holds. Connectors go with a shape the state hides. Exports show the starting values; the HTML export and
-`<dottie-player>` change them on click without stopping.
+A diagram that keeps looping and reacts to clicks ("take us-east-1 down while traffic keeps flowing") uses page
+variables rather than scenes, and is easiest in two calls:
+
+1. `add_flow` sends steady traffic from a shape to the first of its destinations it can reach (`to: [east, west]`
+   fails over). It's routed afresh every frame over the connectors drawn, so nothing else needs drawing per state.
+   The route is the cheapest by connector `cost` (1 each, so fewest hops, unless set with `update_element`): give
+   the main path a lower cost than a backup. To split traffic, add one flow per destination, each with its own
+   `color` and fallbacks, e.g. `to: [use1, usw2]`, `to: [use2]`, `to: [usw2]`. With `spread: true`, a flow whose
+   first destination is down shares its packets across all the others it can reach, e.g. `to: [usw2, use1, use2]`.
+   A `define_state` `restyle` with `cost` degrades a link instead of taking it down.
+2. `define_state` describes one variable at once: what it takes `down` (faded, and traffic goes round it), `hide`s
+   (connectors go with a hidden shape), `show`s, `dim`s or `restyle`s (a new label, a red stroke), connectors whose `send_packet` packets
+   `reroute`, and which elements' clicks flip it (`toggled_by`).
+
+Lower level: `set_variable`, `update_element` with `click_toggle` / `click_set`, and `when` on shapes, connectors and
+packets (`"down"`, `"!down"`). Exports show the starting values; the HTML export and `<dottie-player>` change them on
+click without stopping.
+
+Check an interactive page before calling it done; you can't click the HTML export yourself. `simulate` plays it as
+the player would: give it steps like `{"click": "east"}`, `{"wait": 2}` and `{"snapshot": true}`, and it reports the
+time, the scene, the variables and what their conditions hide after each, with a PNG per snapshot. `export_png` and
+`export_svg` take `state: {"down": true}` to draw one state, and `export_animation` takes it as starting values.
 
 `export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page, or with `.png` a still of
 the poster frame. Watch the GIF before calling
@@ -94,6 +112,8 @@ dottie render diagram.dottie -o diagram.png        # or .svg .pdf .gif .apng .mp
 dottie render diagram.dottie --clean -p "Page 2"   # a precise look; a page by name or number
 dottie render flow.mmd -o flow.svg                 # a Mermaid flowchart, laid out and drawn
 dottie inspect diagram.dottie                      # every element's resolved frame and connector route, as JSON
+dottie render diagram.dottie --state down -o down.png   # the page with variable down true
+dottie simulate diagram.dottie --click east --wait 2 --snapshot after.png   # play it as the web player would
 dottie script-types ./types                        # dottie.d.ts, the types of the scripting API
 ```
 

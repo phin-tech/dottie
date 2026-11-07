@@ -81,3 +81,15 @@ _Avoid_: state flag, toggle (that is what a click does to one)
 **Condition**:
 An element's `when`: variable names joined by `!`, `&&` and `||`; the element is drawn only while it holds.
 _Avoid_: rule, predicate, visibility expression
+
+**Override**:
+A change to one element while a condition holds (`overrides`): dimmed, relabelled, recolored, or a packet rerouted.
+_Avoid_: variant, state style
+
+**Flow**:
+Traffic from a shape to the first of its destinations it can reach, routed afresh each frame over the connectors drawn.
+_Avoid_: stream, packet rule
+
+**Simulation**:
+Playing a page as `<dottie-player>` would, with no browser (clicks, waits, snapshots), to check an interactive page.
+_Avoid_: dry run, test run

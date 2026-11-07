@@ -47,13 +47,15 @@ private let lookProps: [String: Value] = [
                           "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
                               + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
     "hops": prop("boolean", "Connectors: draw a small hop where this line crosses a connector drawn beneath it"),
+    "cost": prop("number", "Connectors: what add_flow traffic pays to take this line, default 1. Flows take the cheapest "
+                 + "route, so give a main path a lower cost than its backup (or the backup a higher one)"),
     "text_color": prop("string", "Hex color of a shape's or connector's label; \"\" follows the stroke again. Setting stroke on "
                         + "update_element recolors the label too, as in Excalidraw"),
 ]
 
 /// The look fields a connector takes, for build_diagram's edges.
 private let edgeLookProps = lookProps.filter { ["dash", "stroke_width", "bowing", "start_head", "end_head", "font", "font_size", "hops",
-                                                 "text_color"].contains($0.key) }
+                                                 "text_color", "cost"].contains($0.key) }
 
 /// build_diagram's edge fields: what a connector is made with, and its look.
 private let buildEdgeProps: [String: Value] = {
@@ -76,6 +78,20 @@ private let clickSetProp: Value = .object(["type": "object", "additionalProperti
                                            "description": .string(clickSetDescription)])
 private let clickToggleDescription = "Page variables a click flips, e.g. \"down\": a button that takes a region down "
     + "and back while packets keep flowing"
+private let exportStateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+    "description": .string("Starting values for the page's variables here, e.g. {\"down\": true}: frames show that state, "
+        + "and an HTML player starts in it")])
+private let simulateStepItem: Value = .object(["type": "object", "properties": .object([
+    "click": .object(["type": "string"]), "wait": .object(["type": "number"]),
+    "next": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
+])])
+private let simulateStepsProp: Value = .object(["type": "array", "items": simulateStepItem,
+    "description": .string("In order. Each is one of {\"click\": element id, its first characters, its text or anchor}, "
+        + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"snapshot\": true} (return a PNG) or "
+        + "{\"snapshot\": \"/abs/path.png\"} (also save it)")])
+private let stateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+    "description": .string("Draw the page with its variables (set_variable) at these values instead of their starting "
+        + "ones, e.g. {\"down\": true}, to check each state of an interactive page; the others keep their starting values")])
 private let clickToggleProp: Value = .object(["type": .array(["string", "array"]), "items": .object(["type": "string"]),
                                               "description": .string(clickToggleDescription)])
 
@@ -83,6 +99,21 @@ private let whenProp = prop("string", "A condition on the page's variables (see 
     + "\"east && !west || maint\": the element, and connectors attached to it, is drawn only while it holds. On the web a click "
     + "that sets or toggles a variable shows and hides it without stopping the animation; exports show the starting values. "
     + "Empty string removes it")
+
+private func idListProp(_ description: String) -> Value {
+    .object(["type": "array", "items": .object(["type": "string"]), "description": .string(description + "; element ids")])
+}
+private let stateRestyleProp: Value = .object([
+    "type": "object",
+    "description": .string("Element id to how it looks while it is true: {stroke, fill, text_color (hex), opacity (multiplies), stroke_width, "
+        + "dash, text, cost (a connector's cost for add_flow traffic: a degraded link)}"),
+    "additionalProperties": .object(["type": "object", "properties": .object([
+        "stroke": .object(["type": "string"]), "fill": .object(["type": "string"]), "text_color": .object(["type": "string"]),
+        "opacity": .object(["type": "number"]), "stroke_width": .object(["type": "number"]),
+        "dash": .object(["enum": .array(["solid", "dashed", "dotted"])]), "text": .object(["type": "string"]),
+        "cost": .object(["type": "number"]),
+    ])]),
+])
 
 private struct ToolFailure: Error { var message: String }
 
@@ -120,6 +151,14 @@ private struct Args {
             guard let b = x.boolValue else { throw ToolFailure(message: "'\(k)' values must be true or false") }
             return b
         }
+    }
+    /// `state`: variable values to draw a page with, names checked.
+    func state() throws -> [String: Bool] {
+        let v = try flags("state") ?? [:]
+        for name in v.keys where !PageState.isName(name) {
+            throw ToolFailure(message: "'state' names '\(name)', which can't name a variable (letters, digits and _, not starting with a digit)")
+        }
+        return v
     }
     /// One name or a list of them (click_toggle).
     func names(_ k: String) throws -> [String]? {
@@ -187,7 +226,8 @@ private struct Args {
                         startHead: try enumValue("start_head", headValues), endHead: try enumValue("end_head", headValues),
                         rotation: double("rotation"), gridSize: double("grid_size"),
                         font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"),
-                        textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") })
+                        textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") },
+                        cost: double("cost"))
     }
 
     /// A list of {x, y} points.
@@ -333,6 +373,55 @@ actor DottieTools {
                 "value": prop("boolean", "Its starting value (default false)"),
                 "remove": prop("boolean", "Remove the variable instead (elements and clicks that name it are left as they are)"),
              ], required: ["path", "name"])),
+        Tool(name: "define_state",
+             description: "Describe one page variable all at once, instead of element by element: its starting value, what "
+                + "it hides and shows, what it dims or restyles, which connectors' packets detour onto which, and which elements' "
+                + "clicks flip or set it. Writes the when conditions, overrides and clicks this means (in one undo step); running it "
+                + "again changes nothing more. Prefer it to set_variable plus when on each element: one shape can dim and relabel "
+                + "itself, and the same packets keep flowing along a detour, instead of drawing every state twice. Check the "
+                + "result with simulate, or an export with a state.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "name": prop("string", "The variable: letters, digits and _, not starting with a digit, e.g. eastDown"),
+                "initial": prop("boolean", "Its starting value (default false)"),
+                "hide": idListProp("Drawn only while it is false (connectors attached go with them)"),
+                "show": idListProp("Drawn only while it is true"),
+                "dim": idListProp("Faded while it is true, still drawn"),
+                "down": idListProp("Down while it is true: faded like dim and carrying no traffic, so add_flow traffic goes round them"),
+                "dim_opacity": prop("number", "How faded dim makes them, 0...1 (default 0.3)"),
+                "restyle": stateRestyleProp,
+                "reroute": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                                    "description": "Connector id to connector id: while it is true, everything that follows the first (packets) follows the second"]),
+                "toggled_by": idListProp("Elements whose click flips it (on the web: the HTML export and <dottie-player>)"),
+                "turned_on_by": idListProp("Elements whose click sets it true"),
+                "turned_off_by": idListProp("Elements whose click sets it false"),
+             ], required: ["path", "name"])),
+        Tool(name: "add_flow",
+             description: "Send traffic from one shape to the first of a list of destinations (preferred first) it can reach "
+                + "over the connectors drawn: a packet every `every` seconds, routed afresh in every frame by every renderer. When "
+                + "a state hides a shape or connector (define_state hide, or when), the traffic goes round it with nothing more "
+                + "drawn, and define_state down takes a shape out of the traffic while keeping it drawn, faded: failover, outages "
+                + "and maintenance animate themselves. A connector carries traffic from its start to its "
+                + "end, and back too when its start has an arrowhead. Traffic takes the cheapest route by connector `cost` "
+                + "(1 each by default, set with update_element), so give a main path a lower cost than its backup. To split "
+                + "traffic across several regions, add one flow per region, each with its own color and its fallbacks in `to`. Gives the page a 4-second timeline if it has none and rounds "
+                + "every so the timeline loops seamlessly. With id, changes that flow; with remove, removes it. Prefer it to "
+                + "send_packet for steady traffic in a system diagram.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "from": prop("string", "Id of the shape traffic leaves from"),
+                "to": .object(["type": "array", "items": .object(["type": "string"]),
+                               "description": "Ids of the destinations, preferred first: traffic goes to the first it can reach"]),
+                "every": prop("number", "Seconds between packets (default 0.5)"),
+                "speed": prop("number", "Points per second (default 160)"),
+                "color": prop("string", "Hex color of the packets"),
+                "size": prop("number", "Packet diameter (default 12)"),
+                "when": prop("string", "A condition on page variables: nothing flows while it fails"),
+                "spread": prop("boolean", "While the first destination can't be reached, deal packets in turn across every other "
+                               + "destination that can (a downed region's traffic shared by the rest), rather than all to the next"),
+                "id": prop("string", "An existing flow's id, to change or remove it"),
+                "remove": prop("boolean", "Remove the flow named by id"),
+             ], required: ["path"])),
         Tool(name: "list_extensions",
              description: "List the extensions installed in Dottie's Extensions folder: each one's id, version, shapes and "
                 + "commands, or why it did not load. Shapes are added with add_shape (extension, shape, params); commands run with run_command.",
@@ -470,6 +559,7 @@ actor DottieTools {
                 "sketchy": prop("boolean", "Override the look for this render only"),
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
+                "state": stateProp,
              ], required: ["path"])),
         Tool(name: "export_mermaid",
              description: "Export the diagram as Mermaid flowchart text: shapes become nodes and attached connectors links "
@@ -488,6 +578,7 @@ actor DottieTools {
                 "transparent": prop("boolean", "Omit the white page background"),
                 "out_path": prop("string", "Optional absolute path ending in .svg to write the file to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
+                "state": stateProp,
              ], required: ["path"])),
         Tool(name: "set_timeline",
              description: "Animate a page, or adjust its animation: frame rate, length, hand-drawn line boil and more. "
@@ -620,7 +711,21 @@ actor DottieTools {
                 "transparent": prop("boolean", "No page background (apng, png and json only)"),
                 "sketchy": prop("boolean", "Override the look for this export only"),
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
+                "state": exportStateProp,
              ], required: ["path", "out_path"])),
+        Tool(name: "simulate",
+             description: "Play an interactive page as the web player (<dottie-player>, the HTML export) would, without a "
+                + "browser, to check it does what you built: clicks set and flip variables and jump to scenes, waits play "
+                + "on (stopping at each scene unless it loops, round a looping scene), snapshots return a PNG of that "
+                + "moment. Returns one line per step (time, scene, playing or stopped, variables, elements their "
+                + "conditions hide) and each snapshot as an image. Links and other pages are reported, not followed.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "steps": simulateStepsProp,
+                "start": prop("string", "Start at this scene, playing (default the start, as the player does)"),
+                "state": exportStateProp,
+                "scale": prop("number", "Snapshot pixel scale, 0.25 to 4 (default 1)"),
+             ], required: ["path", "steps"])),
     ]
 
     func call(name: String, arguments: [String: Value]) -> CallTool.Result {
@@ -951,6 +1056,67 @@ actor DottieTools {
             let vars = (file.pages[p].variables ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
             return text("Variables: " + (vars.isEmpty ? "none" : vars.joined(separator: ", ")) + on(file, p))
 
+        case "add_flow":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            if a.bool("remove") == true {
+                let id = try a.uuid("id")
+                guard DiagramOps.removeFlow(&file.pages[p], id) else { throw ToolFailure(message: "No flow \(id.uuidString)") }
+                try save(file, to: url)
+                return text("Removed flow \(id.uuidString)" + on(file, p))
+            }
+            let flow: Flow
+            do {
+                flow = try DiagramOps.addFlow(&file.pages[p], from: try a.uuid("from"), to: try a.uuids("to") ?? [],
+                                              every: a.double("every"), speed: a.double("speed"),
+                                              color: try a.string("color").map { s in
+                                                  guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'color' must be a hex color like #ffcc00") }
+                                                  return c
+                                              },
+                                              size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
+                                              replacing: a.string("id") == nil ? nil : try a.uuid("id"))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let line = DiagramOps.describeFlows(file.pages[p]).first { $0.contains(flow.id.uuidString) } ?? flow.id.uuidString
+            return text((a.string("id") == nil ? "Added " : "Changed ") + line + on(file, p))
+
+        case "define_state":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            var spec = StateSpec(name: try a.require("name"))
+            if let v = a.bool("initial") { spec.initial = v }
+            spec.hide = try a.uuids("hide") ?? []; spec.show = try a.uuids("show") ?? []; spec.dim = try a.uuids("dim") ?? []; spec.down = try a.uuids("down") ?? []
+            if let v = a.double("dim_opacity") { spec.dimOpacity = v }
+            func color(_ o: Args, _ k: String) throws -> RGBA? {
+                guard let s = o.string(k) else { return nil }
+                guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'restyle' \(k) must be a hex color like #ffcc00, got '\(s)'") }
+                return c
+            }
+            for (k, v) in a.raw["restyle"]?.objectValue ?? [:] {
+                guard let id = UUID(uuidString: k) else { throw ToolFailure(message: "'restyle' has an invalid element id: \(k)") }
+                let o = Args(raw: v.objectValue ?? [:])
+                spec.restyle[id] = StateOverride(when: spec.name, stroke: try color(o, "stroke"), fill: try color(o, "fill"),
+                                                 textColor: try color(o, "text_color"), opacity: o.double("opacity"),
+                                                 strokeWidth: o.double("stroke_width"),
+                                                 dash: o.string("dash").flatMap(DashStyle.init(rawValue:)), text: o.string("text"),
+                                                 cost: o.double("cost"))
+            }
+            for (k, v) in a.raw["reroute"]?.objectValue ?? [:] {
+                guard let from = UUID(uuidString: k), let to = v.stringValue.flatMap(UUID.init(uuidString:)) else {
+                    throw ToolFailure(message: "'reroute' maps connector ids to connector ids")
+                }
+                spec.reroute[from] = to
+            }
+            spec.toggledBy = try a.uuids("toggled_by") ?? []
+            spec.turnedOnBy = try a.uuids("turned_on_by") ?? []
+            spec.turnedOffBy = try a.uuids("turned_off_by") ?? []
+            let summary: String
+            do { summary = try DiagramOps.defineState(&file.pages[p], spec) } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            return text("State " + summary + on(file, p))
+
         case "script_api":
             if a.string("format") == "typescript" { return text(DottieScript.typeDefinitions) }
             let installed = DottieScript.installedModules()
@@ -1162,6 +1328,8 @@ actor DottieTools {
             let file = try load(try fileURL(a))
             let p = try pageIndex(file, a)
             var list = try json(DiagramOps.summarize(file.pages[p]))
+            let flows = DiagramOps.describeFlows(file.pages[p])
+            if !flows.isEmpty { list = "Flows:\n" + flows.map { "  " + $0 }.joined(separator: "\n") + "\n" + list }
             if let vars = file.pages[p].variables, !vars.isEmpty {
                 list = "Variables (starting values): " + vars.sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }
                     .joined(separator: ", ") + "\n" + list
@@ -1207,7 +1375,7 @@ actor DottieTools {
 
         case "export_png":
             let file = try load(try fileURL(a))
-            let page = file.pages[try pageIndex(file, a)]
+            let page = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to render") }
@@ -1237,7 +1405,7 @@ actor DottieTools {
 
         case "export_svg":
             let file = try load(try fileURL(a))
-            let page = file.pages[try pageIndex(file, a)]
+            let page = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to export") }
@@ -1254,7 +1422,7 @@ actor DottieTools {
 
         case "export_animation":
             let file = try load(try fileURL(a))
-            var doc = file.pages[try pageIndex(file, a)]
+            var doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard let timeline = doc.timeline else {
                 throw ToolFailure(message: "This page has no animation; add one with run_script (dottie.timeline, dottie.key, ...)")
@@ -1291,9 +1459,58 @@ actor DottieTools {
             if !frame.elements.isEmpty, let png = Exporter.png(frame, scale: 1) { content.insert(.png(png), at: 0) }
             return .init(content: content)
 
+        case "simulate":
+            return try simulate(a)
+
         default:
             throw ToolFailure(message: "Unknown tool '\(name)'")
         }
+    }
+
+    /// The `simulate` tool: plays the page through the steps with `Simulation`.
+    fileprivate func simulate(_ a: Args) throws -> CallTool.Result {
+        let file = try load(try fileURL(a))
+        let doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
+        guard let steps = a.array("steps"), !steps.isEmpty else { throw ToolFailure(message: "Missing required argument 'steps'") }
+        guard steps.count <= 200 else { throw ToolFailure(message: "At most 200 steps") }
+        let scale = min(max(a.double("scale") ?? 1, 0.25), 4)
+        var sim: Simulation
+        do { sim = try Simulation(doc, scene: a.string("start")) } catch { throw ToolFailure(message: "\(error)") }
+        var log = ["start: \(sim.summary)"]
+        var images: [Tool.Content] = []
+        for (n, step) in steps.enumerated() {
+            if let target = step.string("click") {
+                do { log.append("click \(target): \(try sim.click(target)). \(sim.summary)") }
+                catch {
+                    log.append("click \(target): \(error)")
+                    return .init(content: images + [.plain(log.joined(separator: "\n"))], isError: true)
+                }
+            } else if let s = step.double("wait") {
+                guard s.isFinite, s >= 0 else { throw ToolFailure(message: "Step \(n + 1): 'wait' must be seconds") }
+                sim.wait(min(s, Timeline.maxDuration * 10))
+                log.append("wait \(Self.secs(s)): \(sim.summary)")
+            } else if step.bool("next") == true {
+                sim.nextScene()
+                log.append("next: \(sim.summary)")
+            } else if step.raw["snapshot"] != nil, step.bool("snapshot") != false {
+                let picture = sim.picture
+                guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale) else {
+                    log.append("snapshot: nothing is drawn now"); continue
+                }
+                var line = "snapshot \(images.count + 1)"
+                if step.string("snapshot") != nil {
+                    let out = try fileURL(step, key: "snapshot", ext: "png")
+                    try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try png.write(to: out, options: .atomic)
+                    line += " saved to \(out.path)"
+                }
+                log.append("\(line): \(sim.summary)")
+                images.append(.png(png))
+            } else {
+                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true} or {snapshot}")
+            }
+        }
+        return .init(content: images + [.plain(log.joined(separator: "\n"))])
     }
 }
 

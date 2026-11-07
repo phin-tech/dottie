@@ -556,3 +556,16 @@ test("a click flips a page variable while the page keeps playing; a looping scen
   assert.deepEqual(errors, []);
   await close();
 });
+
+test("flows: traffic goes round a region taken down, and back when it comes up", async () => {
+  const { page, errors, close } = await open(`<dottie-player src="/fixtures/edge/flows.dottie"></dottie-player>`);
+  await ready(page);
+  const markup = () => page.evaluate(() => document.querySelector("dottie-player").shadowRoot.innerHTML);
+  // East starts down, so spare is offline (no green traffic) and the red traffic runs.
+  assert.ok((await markup()).includes("#f25c54"));
+  assert.ok(!(await markup()).includes("#4db34d"));
+  await page.evaluate(() => document.querySelector("dottie-player").setState({ eastDown: false }));
+  await page.waitForFunction(() => document.querySelector("dottie-player").shadowRoot.innerHTML.includes("#4db34d"), null, { timeout: 5000 });
+  assert.deepEqual(errors, []);
+  await close();
+});

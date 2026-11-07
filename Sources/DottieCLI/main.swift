@@ -9,7 +9,8 @@ dottie \(version): render and manage Dottie drawings from the command line.
 
 USAGE
   dottie render <file.dottie | file.mmd>... [-o <out>] [options]
-  dottie inspect <file.dottie> [-p <page>] [--at <seconds>]... [--disk]
+  dottie inspect <file.dottie> [-p <page>] [--at <seconds>]... [--state <vars>] [--disk]
+  dottie simulate <file.dottie> [-p <page>] [--scene <name>] [--click <element> | --wait <s> | --snapshot <out.png>]...
   dottie library list
   dottie library install <file.dottielib>...
   dottie script-types [<dir>]
@@ -41,6 +42,8 @@ RENDER
       --transparent     No page background (png, apng, svg, html, lottie).
       --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
                         unless set). An html export becomes a still; gif, apng, mp4 and lottie ignore it.
+      --state <vars>    Starting values for the page's variables, like down=true,east=false (a bare name
+                        is true, !name false): the render shows that state, and a player starts in it.
       --disk            Read the saved file, not the app's open copy with its unsaved edits.
 
 INSPECT
@@ -51,6 +54,23 @@ INSPECT
 
   -p, --page <page>     Only this page, by name or 1-based number (default every page).
       --at <seconds>    A time to inspect; repeat for several.
+      --state <vars>    Starting values for the page's variables, as for render.
+      --disk            Read the saved file, not the app's open copy with its unsaved edits.
+
+SIMULATE
+  Plays the page as <dottie-player> would, without a browser, through the steps in order, and prints a line
+  after each: the time, the scene, whether it is playing, the variables and what their conditions hide.
+  Playing stops at each scene (and at the end when there are scenes) unless the scene loops.
+
+  -p, --page <page>     Page to play, by name or 1-based number (default the first).
+      --scene <name>    Start at this scene, playing (default the start, as the player does).
+      --state <vars>    Starting values for the page's variables, as for render.
+      --click <element> Click an element, by id (or its first characters), text or anchor: sets and flips
+                        its variables and plays its scene. Links and pages are reported, not followed.
+      --wait <seconds>  Let it play this long.
+      --next            Press Next: on to the next scene.
+      --snapshot <png>  Write a PNG of what is drawn now.
+      --scale <n>       Snapshot pixel scale (default 2).
       --disk            Read the saved file, not the app's open copy with its unsaved edits.
 
 LIBRARY
@@ -106,6 +126,14 @@ struct RenderOptions {
     var lottieMode = Exporter.LottieMode.smooth
     /// Read the file on disk even when the app has it open with unsaved edits.
     var disk = false
+    /// Starting values for the page's variables (`--state`), so the render shows that state.
+    var state: [String: Bool] = [:]
+}
+
+/// `--state down=true,east=false` (or `down,!east`), merged into `into`.
+func parseState(_ spec: String, into: inout [String: Bool]) throws {
+    do { into.merge(try PageState.assignments(spec)) { _, new in new } }
+    catch { throw CLIError(message: "--state: \(error)", code: 2) }
 }
 
 /// The drawing at `url`: the app's open copy unless `disk` (see `LiveClient.current`), with a note on stderr when
@@ -155,6 +183,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--sketchy": o.roughness = 1
         case "--transparent": o.transparent = true
         case "--disk": o.disk = true
+        case "--state": try parseState(try value(a), into: &o.state)
         case "--lottie-mode":
             let v = try value(a)
             guard let m = Exporter.LottieMode(rawValue: v) else { throw CLIError(message: "--lottie-mode is smooth or exact", code: 2) }
@@ -286,7 +315,7 @@ func runRender(_ args: [String]) -> Int32 {
                 }
                 doc = file.pages[i]
             }
-            let bytes = try render(doc, as: format, title: name, o)
+            let bytes = try render(doc.starting(with: o.state), as: format, title: name, o)
 
             if o.output == "-" {
                 FileHandle.standardOutput.write(bytes)
@@ -308,7 +337,7 @@ func runRender(_ args: [String]) -> Int32 {
 }
 
 func runInspect(_ args: [String]) -> Int32 {
-    var input: String?, page: String?, times: [Double] = [], disk = false
+    var input: String?, page: String?, times: [Double] = [], disk = false, state: [String: Bool] = [:]
     var i = 0
     while i < args.count {
         let a = args[i]
@@ -325,6 +354,8 @@ func runInspect(_ args: [String]) -> Int32 {
             times.append(n)
         case "--json": break   // the only output there is
         case "--disk": disk = true
+        case "--state":
+            do { try parseState(value(), into: &state) } catch let e as CLIError { fail(e.message, code: 2) } catch { fail("\(error)") }
         default:
             if a.hasPrefix("-") || input != nil { fail("unknown option \(a)", code: 2) }
             input = a
@@ -332,11 +363,12 @@ func runInspect(_ args: [String]) -> Int32 {
         i += 1
     }
     guard let input else { fail("inspect needs a .dottie file", code: 2) }
-    let file: DottieFile
+    var file: DottieFile
     do {
         file = try drawing(at: absolute(input), named: input, onDisk: try? Data(contentsOf: absolute(input)), disk: disk,
                            verb: "inspecting")
     } catch let e as CLIError { fail(e.message) } catch { fail("\(error)") }
+    file.pages = file.pages.map { $0.starting(with: state) }
     var pages: [Int]?
     if let page {
         guard let p = file.pageIndex(matching: page) else { fail("\(input): no page '\(page)'") }
@@ -347,6 +379,85 @@ func runInspect(_ args: [String]) -> Int32 {
         FileHandle.standardOutput.write(Data("\n".utf8))
     } catch { fail("\(error)") }
     return 0
+}
+
+func runSimulate(_ args: [String]) -> Int32 {
+    enum Step { case click(String), wait(Double), next, snapshot(String) }
+    var input: String?, page: String?, scene: String?, disk = false, state: [String: Bool] = [:], scale = 2.0
+    var steps: [Step] = []
+    var i = 0
+    while i < args.count {
+        let a = args[i]
+        func value() -> String {
+            i += 1
+            guard i < args.count else { fail("\(a) needs a value", code: 2) }
+            return args[i]
+        }
+        switch a {
+        case "-p", "--page": page = value()
+        case "--scene": scene = value()
+        case "--disk": disk = true
+        case "--state":
+            do { try parseState(value(), into: &state) } catch let e as CLIError { fail(e.message, code: 2) } catch { fail("\(error)") }
+        case "--click": steps.append(.click(value()))
+        case "--next": steps.append(.next)
+        case "--wait":
+            let v = value()
+            guard let n = Double(v), n.isFinite, n >= 0, n <= Timeline.maxDuration * 10 else { fail("--wait must be seconds", code: 2) }
+            steps.append(.wait(n))
+        case "--snapshot": steps.append(.snapshot(value()))
+        case "-s", "--scale":
+            guard let n = Double(value()), n > 0 else { fail("--scale must be a positive number", code: 2) }
+            scale = min(max(n, 0.25), 8)
+        default:
+            if a.hasPrefix("-") || input != nil { fail("unknown option \(a)", code: 2) }
+            input = a
+        }
+        i += 1
+    }
+    guard let input else { fail("simulate needs a .dottie file", code: 2) }
+    let file: DottieFile
+    do {
+        file = try drawing(at: absolute(input), named: input, onDisk: try? Data(contentsOf: absolute(input)), disk: disk,
+                           verb: "simulating")
+    } catch let e as CLIError { fail(e.message) } catch { fail("\(error)") }
+    var doc = file.pages[0]
+    if let page {
+        guard let p = file.pageIndex(matching: page) else { fail("\(input): no page '\(page)'") }
+        doc = file.pages[p]
+    }
+    var sim: Simulation
+    do { sim = try Simulation(doc.starting(with: state), scene: scene) } catch { fail("\(error)") }
+    print("start: \(sim.summary)")
+    var failures = 0
+    for step in steps {
+        do {
+            switch step {
+            case .click(let target):
+                let did = try sim.click(target)
+                print("click \(target): \(did). \(sim.summary)")
+            case .wait(let s):
+                sim.wait(s)
+                print("wait \(s)s: \(sim.summary)")
+            case .next:
+                sim.nextScene()
+                print("next: \(sim.summary)")
+            case .snapshot(let path):
+                let picture = sim.picture
+                guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale, background: CGColor(gray: 1, alpha: 1))
+                else { throw CLIError(message: "snapshot: nothing is drawn now") }
+                let url = absolute(path)
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try png.write(to: url, options: .atomic)
+                print("snapshot \(url.path): \(sim.summary)")
+            }
+        } catch let e as CLIError {
+            warn(e.message); failures += 1
+        } catch {
+            warn("\(error)"); failures += 1
+        }
+    }
+    return failures == 0 ? 0 : 1
 }
 
 func runLibrary(_ args: [String]) -> Int32 {
@@ -494,6 +605,8 @@ case "render":
     exit(runRender(Array(argv.dropFirst())))
 case "inspect":
     exit(runInspect(Array(argv.dropFirst())))
+case "simulate", "sim":
+    exit(runSimulate(Array(argv.dropFirst())))
 case "library", "lib":
     exit(runLibrary(Array(argv.dropFirst())))
 case "script-types":

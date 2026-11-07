@@ -57,6 +57,7 @@ extension DottieDocument {
             e.id = idMap[e.id]!
             // A link follows its target into the copy; otherwise it survives only if the target is still in the file.
             if let t = e.link { e.link = idMap[t] ?? (existing.contains(t) || keepsLink(t) ? t : nil) }
+            e.remapOverrides(idMap)
             e.seed = .random(in: 1...UInt32.max)
             if !layers.contains(where: { $0.id == e.layerID && !$0.locked }) { e.layerID = fallback }
             if let g = e.groupID { e.groupID = groupMap[g, default: UUID()]; groupMap[g] = e.groupID }

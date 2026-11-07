@@ -44,6 +44,8 @@ final class SchemaTests: XCTestCase {
         box.evenOdd = true; box.rotation = 0.5; box.link = UUID(); box.anchor = "a"; box.reveal = 0.5
         box.click = ClickAction(scene: "m", url: "https://example.com", set: ["down": true], toggle: ["east"])
         box.when = "down && !east"
+        box.overrides = [StateOverride(when: "down", stroke: .black, fill: .clear, textColor: .black, opacity: 0.4,
+                                       strokeWidth: 3, dash: .dashed, text: "Down", reroute: [UUID(): UUID()], offline: true)]
         box.hover = HoverLook(stroke: .black, fill: .clear, opacity: 0.5)
         box.symbol = UUID(); box.playback = .once; box.offset = 0.5
         box.image = EmbeddedImage(data: Data([1, 2, 3]), format: "png")
@@ -53,6 +55,7 @@ final class SchemaTests: XCTestCase {
         var page = DottieDocument(name: "P", layers: [layer], elements: [box, line])
         page.theme = "midnight"; page.guidesX = [1]; page.guidesY = [2]; page.guidesLocked = true
         page.variables = ["down": false, "east": true]
+        page.flows = [Flow(from: box.id, to: [box.id], every: 0.4, speed: 100, color: .black, size: 10, when: "east")]
         var tl = Timeline(fps: 24, duration: 3, boil: 2, settle: true)
         tl.poster = 1
         tl.setKey(Keyframe(t: 0, x: 1, y: 2, width: 3, height: 4, rotation: 0.1, strokeWidth: 2, stroke: .black, fill: .clear,
@@ -86,7 +89,8 @@ final class SchemaTests: XCTestCase {
             ("timeline", tl), ("track", tl.tracks[0]), ("keyframe", Keyframe(t: 0)),
             ("follow", Follow(path: UUID(), start: 0, end: 1)), ("repeat", Repeat(start: 0, end: 1)),
             ("cameraKey", CameraKey(t: 0, rect: .zero)), ("marker", Marker(t: 0, name: "")),
-            ("click", ClickAction()), ("hover", HoverLook()), ("symbol", Symbol(name: "S", width: 1, height: 1)),
+            ("click", ClickAction()), ("hover", HoverLook()),
+            ("override", StateOverride(when: "a")), ("flow", Flow(from: UUID(), to: [])), ("symbol", Symbol(name: "S", width: 1, height: 1)),
         ]
         for (def, value) in models {
             let stored = Set(Mirror(reflecting: value).children.compactMap(\.label).map { $0.hasPrefix("_") ? String($0.dropFirst()) : $0 })

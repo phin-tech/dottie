@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None, cost=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -83,10 +83,14 @@ class Page:
             kw["connector"]["waypoints"] = [{"x": x, "y": y} for x, y in waypoints]
         if hops is not None:
             kw["connector"]["hops"] = hops
+        if cost is not None:
+            kw["connector"]["cost"] = cost
         if text:
             kw["text"] = text
         if when is not None:
             kw["when"] = when
+        if overrides is not None:
+            kw["overrides"] = overrides
         return self.add("connector", 0, 0, 0, 0, style=st or style(), layer=layer, **kw)
 
     def animate(self, duration, fps=12, **kw):
@@ -594,7 +598,106 @@ def state():
     b = q.add("rectangle", 240, 40, 120, 60, text="off", when="!on")
     q.connect(a, b, text="between")
     q.add("diamond", 40, 160, 120, 80, text="flip", click={"toggle": "on"})
-    write(EDGE / "state.dottie", [p, q])
+    # Overrides on a page with no timeline: the label changes at the starting values.
+    q.add("rectangle", 240, 160, 120, 60, text="plain", overrides=[{"when": "on", "text": "overridden"}])
+
+    o = Page("Overrides")
+    o.animate(3, fps=10)
+    o.extra = {"variables": {"down": True, "calm": False}}
+    api = o.add("rectangle", 40, 140, 100, 60, text="api")
+    east = o.add("rectangle", 340, 40, 120, 60, text="east", style=style(opacity=0.8), overrides=[
+        {"when": "down", "fill": rgba(1, 0.85, 0.85), "opacity": 0.5, "text": "east (down)", "dash": "dashed",
+         "strokeWidth": 4, "textColor": rgba(0.8, 0.1, 0.1)},
+        {"when": "calm", "text": "calm"},
+        {"when": "down && !calm", "stroke": rgba(0.8, 0.1, 0.1), "dash": "wavy"},
+        {"when": "down |", "text": "broken"},
+    ])
+    west = o.add("rectangle", 340, 240, 120, 60, text="west")
+    east_link = o.connect(api, east, text="east")
+    west_link = o.connect(api, west, text="west", overrides=[{"when": "!calm", "strokeWidth": 5, "stroke": rgba(0.1, 0.6, 0.2)}])
+    rerouted = o.add("ellipse", 0, 0, 16, 16, style=style(fill=rgba(0.2, 0.5, 1)), overrides=[
+        {"when": "down", "reroute": {east_link: west_link, "not-an-id": west_link}}])
+    o.track(rerouted, [{"t": 0, "visible": True}], follow=[{"path": east_link, "start": 0, "end": 3}])
+    # A reroute whose target isn't an id is dropped whole, so this one stays on its connector.
+    stays = o.add("ellipse", 0, 0, 16, 16, style=style(fill=rgba(1, 0.4, 0.2)), overrides=[
+        {"when": "down", "reroute": {east_link: "nowhere"}, "opacity": 0.6}])
+    o.track(stays, [{"t": 0, "visible": True}, {"t": 1, "opacity": 1}, {"t": 2, "opacity": 0.5}],
+            follow=[{"path": east_link, "start": 0.5, "end": 3}])
+    write(EDGE / "state.dottie", [p, q, o])
+
+
+def flows():
+    """Traffic flows (ADR 0002): routed each frame over the connectors drawn, to the first destination that can be
+    reached; a state that hides a region sends traffic round it; arrows say which way a connector carries it (both
+    ways with a start arrowhead); a flow under a failing condition, one with nowhere to go, and damaged ones send
+    nothing; a page with no timeline shows traffic in flight."""
+    p = Page("Failover")
+    p.animate(2, fps=10)
+    p.extra = {"variables": {"eastDown": True, "busy": False}}
+    client = p.add("rectangle", 20, 140, 100, 60, text="client")
+    api = p.add("rectangle", 200, 140, 100, 60, text="api")
+    east = p.add("rectangle", 400, 30, 100, 60, text="east", when="!eastDown")
+    west = p.add("rectangle", 400, 250, 100, 60, text="west")
+    cache = p.add("ellipse", 200, 320, 80, 60, text="cache")
+    # Drawn, faded, but offline while east is down: traffic to it stops.
+    spare = p.add("ellipse", 20, 320, 80, 60, text="spare", overrides=[{"when": "eastDown", "opacity": 0.3, "offline": True}])
+    p.connect(client, api, routing="elbow")
+    p.connect(api, east, routing="curved")
+    p.connect(api, west, routing="elbow", text="standby")
+    p.connect(cache, api, start_head="arrow")      # carries traffic both ways
+    p.connect(east, west, routing="straight")
+    p.connect(client, spare)
+    flows = [
+        {"id": uid(), "from": client, "to": [east, west], "every": 0.4, "speed": 180},
+        {"id": uid(), "from": api, "to": [cache], "every": 0.5, "color": rgba(0.2, 0.5, 1), "size": 8},
+        {"id": uid(), "from": west, "to": [client], "when": "busy"},          # its condition fails
+        {"id": uid(), "from": west, "to": [cache]},                            # nowhere to go: arrows point away
+        {"id": uid(), "from": client, "to": [spare], "color": rgba(0.3, 0.7, 0.3)},   # spare is offline
+        {"id": 7, "from": "nope", "to": ["bad", client], "every": "fast"},     # damaged
+    ]
+    p.extra["flows"] = flows
+
+    q = Page("Still")
+    a = q.add("rectangle", 20, 40, 100, 60, text="a")
+    b = q.add("rectangle", 300, 40, 100, 60, text="b")
+    q.connect(a, b)
+    q.extra = {"flows": [{"id": uid(), "from": a, "to": [b], "every": 0.3, "speed": 200}]}
+
+    # Cost: the direct line is one hop but costs 5, so traffic takes the cheaper way round; the blue flow goes
+    # alt -> hub (free) -> dst rather than through src; costs out of range are clamped to 0...1,000,000.
+    c = Page("Cost")
+    c.animate(2, fps=10)
+    src = c.add("rectangle", 20, 140, 100, 60, text="src")
+    hub = c.add("rectangle", 220, 20, 100, 60, text="hub")
+    dst = c.add("rectangle", 420, 140, 100, 60, text="dst")
+    alt = c.add("rectangle", 220, 260, 100, 60, text="alt")
+    c.connect(src, dst, text="cost 5", cost=5)
+    c.connect(src, hub)
+    c.connect(hub, dst, overrides=[{"when": "jam", "cost": 10}])   # jammed: dearer than the direct line
+    c.connect(alt, src, cost=1e12)   # clamped to a million
+    c.connect(alt, hub, cost=0)
+    c.connect(hub, src, start_head="arrow", cost=0)   # src reaches hub free, backwards
+    c.connect(dst, alt, cost="high")   # not a number: loads as cost 1
+    c.extra = {"variables": {"jam": True}, "flows": [
+        {"id": uid(), "from": src, "to": [dst], "every": 0.4},
+        {"id": uid(), "from": alt, "to": [dst], "every": 0.5, "color": rgba(0.2, 0.5, 1)},
+    ]}
+
+    # Spread: r1 is down (hidden), so the spread flow's packets take turns between r2 and r3; the plain flow sends all
+    # of its to r2; a spread flow whose first choice is up sends everything there.
+    sp = Page("Spread")
+    sp.animate(2, fps=10)
+    sp.extra = {"variables": {"r1Down": True}}
+    users = sp.add("ellipse", 20, 160, 100, 60, text="users")
+    regions = [sp.add("rectangle", 300, 40 + 120 * i, 100, 60, text=f"r{i + 1}", when="!r1Down" if i == 0 else None) for i in range(3)]
+    for r in regions:
+        sp.connect(users, r)
+    sp.extra["flows"] = [
+        {"id": uid(), "from": users, "to": regions, "every": 0.3, "spread": True, "color": rgba(0.9, 0.5, 0.1)},
+        {"id": uid(), "from": users, "to": regions, "every": 0.3, "color": rgba(0.2, 0.5, 1)},
+        {"id": uid(), "from": users, "to": [regions[2], regions[1]], "every": 0.3, "spread": True, "color": rgba(0.2, 0.7, 0.3)},
+    ]
+    write(EDGE / "flows.dottie", [p, q, c, sp])
 
 
 def links():
@@ -970,6 +1073,7 @@ def main():
     waypoints()
     text_colors()
     state()
+    flows()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

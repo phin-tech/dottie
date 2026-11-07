@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="468" height="308" viewBox="16 16 468 308">
+<rect x="16" y="16" width="468" height="308" fill="#ffffff"/>
+<path d="M40 140 L140 140 L140 200 L40 200 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="90" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="90" y="176.48">api</tspan></text>
+<g opacity="0.4">
+<path d="M340 40 L460 40 L460 100 L340 100 Z" fill="#ffd9d9" stroke="none"/>
+<path d="M340 40 L460 40 L460 100 L340 100 Z" fill="none" stroke="#cc1a1a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="16 12"/>
+<text x="400" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#cc1a1a" text-anchor="middle"><tspan x="400" y="76.48">east (down)</tspan></text>
+</g>
+<path d="M340 240 L460 240 L460 300 L340 300 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="400" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="400" y="276.48">west</tspan></text>
+<path d="M140 153.87 L340 89.35 M330.09 87.99 L340 89.35 M332.76 96.25 L340 89.35" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="216.5" y="108.11" width="47" height="27" fill="#ffffff"/>
+<text x="240" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="240" y="128.09">east</tspan></text>
+<path d="M140 186.13 L340 250.65 M321.89 233.41 L340 250.65 M315.23 254.05 L340 250.65" fill="none" stroke="#1a9933" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="215" y="204.89" width="50" height="27" fill="#ffffff"/>
+<text x="240" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1a9933" text-anchor="middle"><tspan x="240" y="224.87">west</tspan></text>
+<path d="M188.52 199.2 C188.52 203.62 184.94 207.2 180.52 207.2 C176.1 207.2 172.52 203.62 172.52 199.2 C172.52 194.78 176.1 191.2 180.52 191.2 C184.94 191.2 188.52 194.78 188.52 199.2 Z" fill="#3380ff" stroke="none"/>
+<path d="M188.52 199.2 C188.52 203.62 184.94 207.2 180.52 207.2 C176.1 207.2 172.52 203.62 172.52 199.2 C172.52 194.78 176.1 191.2 180.52 191.2 C184.94 191.2 188.52 194.78 188.52 199.2 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<g opacity="0.57">
+<path d="M159.62 150.12 C159.62 154.54 156.04 158.12 151.62 158.12 C147.2 158.12 143.62 154.54 143.62 150.12 C143.62 145.7 147.2 142.12 151.62 142.12 C156.04 142.12 159.62 145.7 159.62 150.12 Z" fill="#ff6633" stroke="none"/>
+<path d="M159.62 150.12 C159.62 154.54 156.04 158.12 151.62 158.12 C147.2 158.12 143.62 154.54 143.62 150.12 C143.62 145.7 147.2 142.12 151.62 142.12 C156.04 142.12 159.62 145.7 159.62 150.12 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>

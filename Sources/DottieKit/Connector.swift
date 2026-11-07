@@ -39,6 +39,30 @@ public struct ConnectorData: Codable, Equatable, Sendable {
     public var waypoints: [Waypoint]? = nil
     /// Hops (small arcs) where the line crosses a connector drawn beneath it.
     public var hops: Bool? = nil
+    /// What traffic pays to take this connector when a flow picks its route (ADR 0002): the cheapest route wins.
+    /// Nil is 1; a main path costs less than a backup, a slow link more.
+    public var cost: Double? = nil
+    /// `cost` as routing uses it: 1 for nil, kept within 0...1,000,000.
+    var routeCost: Double {
+        guard let cost, cost.isFinite else { return 1 }
+        return min(max(cost, 0), 1_000_000)
+    }
+    private enum CodingKeys: String, CodingKey { case start, end, routing, startHead, endHead, waypoints, hops, cost }
+
+    // Strict as ever for the line itself; lenient for `hops` and `cost`, which a file of the wrong type loses
+    // rather than failing the page.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        start = try c.decode(Endpoint.self, forKey: .start)
+        end = try c.decode(Endpoint.self, forKey: .end)
+        routing = try c.decodeIfPresent(Routing.self, forKey: .routing) ?? .straight
+        startHead = try c.decodeIfPresent(Arrowhead.self, forKey: .startHead) ?? .none
+        endHead = try c.decodeIfPresent(Arrowhead.self, forKey: .endHead) ?? .arrow
+        waypoints = try c.decodeIfPresent([Waypoint].self, forKey: .waypoints)
+        hops = (try? c.decodeIfPresent(Bool.self, forKey: .hops)) ?? nil
+        cost = ((try? c.decodeIfPresent(Double.self, forKey: .cost)) ?? nil).flatMap { $0.isFinite ? $0 : nil }
+    }
+
     public init(start: Endpoint, end: Endpoint, routing: Routing = .straight, endArrow: Bool = true) {
         self.start = start; self.end = end; self.routing = routing
         self.endHead = endArrow ? .arrow : .none
