@@ -6,7 +6,7 @@ import { clickTargets } from "../src/clicks.ts";
 import { parseDottie } from "../src/model.ts";
 import { applyClick, conditionNames, holds } from "../src/state.ts";
 import { flowRoute } from "../src/flows.ts";
-import { posed, still } from "../src/timeline.ts";
+import { posed, posedWithMetrics, still } from "../src/timeline.ts";
 import { read } from "./helpers.ts";
 
 test("conditions read as DottieKit reads them", () => {
@@ -73,8 +73,11 @@ test("flows: routed over what is drawn, round what is offline, nothing where the
   const flows = page.flows!;
   const colors = (s: Record<string, boolean>) => posed(page, 1, s).elements.filter((e) => e.text === null && e.kind === "ellipse")
     .map((e) => `${e.style.fill.r},${e.style.fill.g}`);
-  // East down (the starting value): no traffic to spare, which is offline; east up: some.
-  assert.ok(!colors({}).includes("0.3,0.7"));
+  // East down (the starting value): nothing reaches spare, which is offline, so that flow is all backlog, piled
+  // at the client (ADR 0003); east up: it flows.
+  const spareFlow = flows[4].id;
+  assert.equal(posedWithMetrics(page, 1, {}).metrics.flows.get(spareFlow)?.backlog, 1);
+  assert.equal(posedWithMetrics(page, 1, { eastDown: false }).metrics.flows.get(spareFlow)?.placed, 1);
   assert.ok(colors({ eastDown: false }).includes("0.3,0.7"));
   // The damaged flow loads, sending nothing.
   assert.equal(flows[flows.length - 1].from, "00000000-0000-0000-0000-000000000000");
@@ -97,11 +100,11 @@ test("flows take the cheapest route by connector cost, as Flows.swift does", () 
 test("spread deals a downed destination's packets across the rest; a jam override changes a connector's cost", () => {
   const pages = parseDottie(read("edge", "flows.dottie")).pages;
   const spread = pages.find((p) => p.name === "Spread")!;
-  const frame = posed(spread, 1.9, { r1Down: true });
+  const frames = [1.3, 1.45, 1.6, 1.75, 1.9].map((t) => posed(spread, t, { r1Down: true }));
   // Where each packet past x 200 is headed, by color (fill g): orange 0.5, blue 0.5 with r 0.2, green 0.7.
-  const ends = (r: number, g: number) => new Set(frame.elements
+  const ends = (r: number, g: number) => new Set(frames.flatMap((f) => f.elements)
     .filter((e) => e.text === null && e.kind === "ellipse" && e.style.fill.r === r && e.style.fill.g === g && e.x > 200)
-    .map((e) => (e.y < 250 ? "r2" : "r3")));
+    .map((e) => (e.y + e.height / 2 < 205 ? "r2" : "r3")));
   // Orange spreads over r2 and r3 while r1 is down; blue goes on to r2; green's first choice, r3, is up.
   assert.deepEqual([...ends(0.9, 0.5)].sort(), ["r2", "r3"]);
   assert.deepEqual([...ends(0.2, 0.5)], ["r2"]);

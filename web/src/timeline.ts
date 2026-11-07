@@ -10,7 +10,8 @@ import {
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
 import { activeOverrides, applyOverride, type StateChoice, stateHidden, stateValues } from "./state.ts";
-import { flowPackets } from "./flows.ts";
+import { emptyMetrics, finishing, flowFrame, type FrameMetrics } from "./measure.ts";
+import { mentionsMetric } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
 
@@ -225,6 +226,11 @@ const EMPTY_TIMELINE: Timeline = { fps: 12, duration: 0, boil: null, settle: nul
 /** The page posed at `t` seconds, instances kept, and the elements whose `when` doesn't hold under `state` left out
  * with their connectors (DottieDocument.posed(at:state:)). */
 export function posed(page: Page, t: number, state: StateChoice = "initial"): Page {
+  return posedWithMetrics(page, t, state).frame;
+}
+
+/** `posed`, and the frame's metrics (ADR 0003). */
+export function posedWithMetrics(page: Page, t: number, state: StateChoice = "initial"): { frame: Page; metrics: FrameMetrics } {
   const off = stateHidden(page, state);
   const values = stateValues(page, state);
   const active = new Map<string, StateOverride[]>();
@@ -233,8 +239,10 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     if (o.length > 0) active.set(e.id, o);
   }
   const flowing = (page.flows ?? []).length > 0;
-  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !flowing ? null : EMPTY_TIMELINE);
-  if (!timeline) return page;
+  // Gauges and overrides comparing metrics need the frame's metrics, even on a page that doesn't move.
+  const measuring = flowing || page.elements.some((e) => e.gauge || (e.overrides ?? []).some((o) => mentionsMetric(o.when)));
+  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !measuring ? null : EMPTY_TIMELINE);
+  if (!timeline) return { frame: page, metrics: emptyMetrics() };
   t = clampTime(t);
   const tracks = trackMap(timeline);
   // An override's reroute sends the element's follows along other connectors.
@@ -307,12 +315,16 @@ export function posed(page: Page, t: number, state: StateChoice = "initial"): Pa
     return pinned;
   });
   elements = elements.filter((e) => !gone.has(e.id));
-  // Flows are routed over what is left, and drawn above it.
-  if (flowing) {
+  // Flows are routed over what is left, and drawn above it; then the looks that compare metrics, and gauges.
+  let metrics = emptyMetrics();
+  if (measuring) {
     const offline = new Set([...active].filter(([, list]) => list.some((o) => o.offline === true)).map(([id]) => id));
-    elements = [...elements, ...flowPackets(page.flows, { ...page, elements, timeline: null }, t, values, offline)];
+    const frame: Page = { ...page, elements, timeline: null };
+    const out = flowFrame(page.flows, frame, t, values, offline);
+    metrics = out.metrics;
+    elements = [...finishing(elements, out.metrics, values, frame, page.flows ?? []), ...out.packets];
   }
-  return { ...page, elements, timeline: null, flows: flowing ? null : page.flows };
+  return { frame: { ...page, elements, timeline: null, flows: measuring ? null : page.flows }, metrics };
 }
 
 /** The moment a still picture of the page shows: its poster, else the end. */

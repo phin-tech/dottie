@@ -287,7 +287,7 @@ public enum DottieScript {
             }
             /// A state override (`StateOverride`); `when` may be left out where the caller supplies it.
             func override(when fallback: String? = nil) throws -> StateOverride {
-                let when = try PageState.checked(string("when") ?? fallback ?? "")
+                let when = try PageState.checked(string("when") ?? fallback ?? "", metrics: true)
                 guard let when else { throw OpsError.invalid("An override needs 'when', a condition like \"down\"") }
                 var o = StateOverride(when: when, stroke: try color("stroke"), fill: try color("fill"),
                                       textColor: try color("textColor"), opacity: double("opacity"),

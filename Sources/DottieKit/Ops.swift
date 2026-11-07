@@ -296,7 +296,7 @@ public enum DiagramOps {
         for e in edges where !seen.contains(e.from) || !seen.contains(e.to) {
             throw OpsError.invalid("Edge \(e.from) -> \(e.to) references an unknown node key")
         }
-        let whens = try edges.map { try $0.when.flatMap(PageState.checked) }
+        let whens = try edges.map { try $0.when.flatMap { try PageState.checked($0) } }
 
         let top = doc.elements.isEmpty ? 40 : Exporter.bounds(of: doc, padding: 0).maxY + 80
         let layerID = activeLayerID(&doc)

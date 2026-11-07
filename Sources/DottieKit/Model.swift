@@ -206,6 +206,13 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     public var ports: [NormalizedPoint]?
     /// Only for an extension shape: where its label goes, normalized to the frame.
     public var labelRect: NormalizedRect?
+    /// The most flow volume it carries (ADR 0003): a worker pool's throughput, a rate limit, a lane's trucks a day.
+    /// What doesn't fit takes the next cheapest route or is backlog. nil is unlimited.
+    public var capacity: Double?
+    /// Only for a shape: seconds flow traffic stays inside it when passing through (ADR 0003). nil is 0.
+    public var delay: Double?
+    /// Shows a metric (ADR 0003). When the page is posed, it's drawn as plain paths and a label in this frame.
+    public var gauge: Gauge?
 
     public init(id: UUID = UUID(), kind: ElementKind, frame: CGRect, style: Style = Style(),
                 seed: UInt32 = .random(in: 1...UInt32.max), layerID: UUID, text: String? = nil,

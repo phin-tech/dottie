@@ -27,8 +27,8 @@ have to agree exactly.
   processing time, time in a queue, time on a dock. Packets already vanish inside such a shape. With a delay they
   stay hidden that much longer, so a slow step is visibly slow. A flow's source and destinations have no delay.
   Delay is fixed: it doesn't grow with load (an override can raise it).
-- **Overrides** may set `capacity` and `delay`, as they already set `cost`. "Traffic spike" or "peak season" is
-  one `defineState` raising volumes. "Half the workers down" or "lane at half capacity" is another.
+- **Overrides** may set `capacity` and `delay`, as they already set `cost`: "half the workers down" or "lane at
+  half capacity" is one `defineState`. A "traffic spike" or "peak season" is an extra flow with `when: spike`.
 
 ### Assignment: where the volume goes
 
@@ -54,7 +54,7 @@ languages, and with one route it's every packet.
 
 ### Metrics
 
-`metrics(page, t, values)` is one function in each language (`Metrics.swift`, `web/src/metrics.ts`). It returns,
+`metrics(page, t, values)` is one function in each language (`Metrics.swift`, `web/src/measure.ts`). It returns,
 from the assignment:
 
 - per connector and shape: **throughput** (volume through it), **load** (throughput ÷ capacity) and **delay**,

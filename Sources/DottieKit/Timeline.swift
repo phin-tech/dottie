@@ -568,6 +568,11 @@ extension DottieDocument {
     /// shows and edits while stopped on the timeline (with `.all`); a page without a timeline or hidden elements
     /// is returned as is.
     public func posed(at t: Double, state: StateChoice = .initial) -> DottieDocument {
+        posedWithMetrics(at: t, state: state).frame
+    }
+
+    /// `posed(at:state:)`, and the frame's metrics (ADR 0003).
+    public func posedWithMetrics(at t: Double, state: StateChoice = .initial) -> (frame: DottieDocument, metrics: FrameMetrics) {
         let off = stateHidden(state)
         let values = stateValues(state)
         let active = Dictionary(uniqueKeysWithValues: elements.compactMap { e in
@@ -575,7 +580,9 @@ extension DottieDocument {
             return o.isEmpty ? nil : (e.id, o)
         })
         let flowing = !(flows ?? []).isEmpty
-        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !flowing ? nil : Timeline(duration: 0)) else { return self }
+        // Gauges and overrides comparing metrics need the frame's metrics, even on a page that doesn't move.
+        let measuring = flowing || elements.contains { $0.gauge != nil || $0.overrides?.contains { PageState.mentionsMetric($0.when) } == true }
+        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !measuring ? nil : Timeline(duration: 0)) else { return (self, FrameMetrics()) }
         let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
@@ -637,13 +644,16 @@ extension DottieDocument {
             copy.elements[i].connector!.end = Endpoint(elementID: nil, port: c.end.port, x: b.x, y: b.y)
         }
         copy.elements.removeAll { gone.contains($0.id) }
-        // Flows are routed over what is left, and drawn above it.
-        if flowing {
+        // Flows are routed over what is left, and drawn above it; then the looks that compare metrics, and gauges.
+        var metrics = FrameMetrics()
+        if measuring {
             let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
-            copy.elements += flowPackets(in: copy, at: t, values: values, offline: offline)
+            let (packets, m) = flowFrame(in: copy, at: t, values: values, offline: offline)
+            metrics = m
+            copy.elements = Self.finishing(copy.elements, metrics: m, values: values, frame: copy, flows: flows ?? []) + packets
             copy.flows = nil
         }
-        return copy
+        return (copy, metrics)
     }
 
     /// Elements that only exist in motion: hidden at the start and in the still (packets, mostly). The
