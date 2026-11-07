@@ -23,30 +23,45 @@ const routeCost = (cost: number | null): number =>
   cost === null || !Number.isFinite(cost) ? 1 : Math.min(Math.max(cost, 0), 1_000_000);
 
 type Edge = { to: string; via: string; back: boolean; cost: number };
-type Graph = { shapes: Set<string>; next: Map<string, Edge[]> };
+/** A network: its shapes, the connectors leaving each in page order, and the trees already grown over it. */
+type Graph = { shapes: Set<string>; next: Map<string, Edge[]>; trees: Map<string, FlowTree | null> };
 const graphs = new WeakMap<readonly Element[], { members: Element[]; graph: Graph }>();
+/** Networks by their shape: frame after frame of an animation usually has the same one, and shares its trees. */
+const networks = new Map<string, Graph>();
 
-/** Every shape in `frame` and the connectors leaving each, in page order: built once per frame however many trees
- * are grown in it (checked against the frame's members, so a page changed in place is read anew). */
+/** The network traffic in `frame` moves over. Looked up once per frame (checked against the frame's members, so a
+ * page changed in place is read anew), and shared by every frame whose shapes and connectors are the same. */
 function graphOf(frame: Page): Graph {
   const els = frame.elements;
   const hit = graphs.get(els);
   if (hit && hit.members.length === els.length && hit.members.every((e, i) => e === els[i])) return hit.graph;
   const shapes = new Set(els.filter((e) => e.kind !== "connector").map((e) => e.id));
-  const next = new Map<string, Edge[]>();
-  const add = (a: string, edge: Edge) => {
-    const list = next.get(a);
-    if (list) list.push(edge); else next.set(a, [edge]);
-  };
+  // Everything the network is made from: the shapes, and each connector's ends, cost and direction.
+  const lines: (string | null)[][] = [];
   for (const e of els) {
     const c = e.connector;
-    const a = c?.start.elementID ?? null, b = c?.end.elementID ?? null;
-    if (!c || a === null || b === null || a === b || !shapes.has(a) || !shapes.has(b)) continue;
-    const cost = routeCost(c.cost);
-    add(a, { to: b, via: e.id, back: false, cost });
-    if (c.startHead !== "none") add(b, { to: a, via: e.id, back: true, cost });
+    if (c) lines.push([e.id, c.start.elementID, c.end.elementID, String(routeCost(c.cost)), c.startHead !== "none" ? "both" : "one"]);
   }
-  const graph = { shapes, next };
+  const key = JSON.stringify([[...shapes], lines]);
+  let graph = networks.get(key);
+  if (!graph) {
+    const next = new Map<string, Edge[]>();
+    const add = (a: string, edge: Edge) => {
+      const list = next.get(a);
+      if (list) list.push(edge); else next.set(a, [edge]);
+    };
+    for (const e of els) {
+      const c = e.connector;
+      const a = c?.start.elementID ?? null, b = c?.end.elementID ?? null;
+      if (!c || a === null || b === null || a === b || !shapes.has(a) || !shapes.has(b)) continue;
+      const cost = routeCost(c.cost);
+      add(a, { to: b, via: e.id, back: false, cost });
+      if (c.startHead !== "none") add(b, { to: a, via: e.id, back: true, cost });
+    }
+    graph = { shapes, next, trees: new Map() };
+    if (networks.size >= 16) networks.clear();
+    networks.set(key, graph);
+  }
   graphs.set(els, { members: [...els], graph });
   return graph;
 }
@@ -86,9 +101,21 @@ class Frontier {
 }
 
 /** Every shape traffic from `from` can reach in `frame`, with the cheapest way to each:
- * by the connectors' cost (1 each unless set), ties to the shape reached first, earlier connectors first. */
-export function flowTree(from: string, frame: Page, offline: Set<string> = new Set()): FlowTree | null {
-  const { shapes, next } = graphOf(frame);
+ * by the connectors' cost (1 each unless set), ties to the shape reached first, earlier connectors first.
+ * With `until`, the search stops once that shape is settled: its way is final then, and it is the first goal of any
+ * list it heads, but the tree holds only the shapes settled before it. */
+export function flowTree(from: string, frame: Page, offline: Set<string> = new Set(), until?: string): FlowTree | null {
+  const graph = graphOf(frame);
+  // A tree depends only on the network, where it starts and stops, and what is offline.
+  const key = JSON.stringify([from, until ?? null, [...offline].sort()]);
+  if (graph.trees.has(key)) return graph.trees.get(key)!;
+  const tree = grow(graph, from, offline, until);
+  if (graph.trees.size >= 4096) graph.trees.clear();
+  graph.trees.set(key, tree);
+  return tree;
+}
+
+function grow({ shapes, next }: Graph, from: string, offline: Set<string>, until: string | undefined): FlowTree | null {
   if (!shapes.has(from) || offline.has(from)) return null;
   // Dijkstra, settling the cheapest shape next, ties to the one reached first. A shape reached again more cheaply
   // is queued again under its new order; the entry it leaves behind is passed over.
@@ -101,6 +128,7 @@ export function flowTree(from: string, frame: Page, offline: Set<string> = new S
     const { id: n, order: o } = open.pop();
     if (tree.settled.has(n) || order.get(n) !== o) continue;
     tree.settled.add(n);
+    if (n === until && n !== from) break;
     for (const edge of next.get(n) ?? []) {
       if (offline.has(edge.via) || offline.has(edge.to)) continue;
       if (tree.settled.has(edge.to)) continue;

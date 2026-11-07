@@ -249,6 +249,11 @@ const indexes = new WeakMap<readonly Element[], { members: Element[]; index: Ind
 
 /** Each element by id, the first with an id winning. Kept per elements array, so every follow, trace and render of
  * one frame shares it; checked against the array's members each time, so a page changed in place is indexed anew. */
+/** Whether `index` is the one `indexOf` last built for this page's elements (without checking them again). */
+export function isIndexOf(page: Page, index: Index): boolean {
+  return indexes.get(page.elements)?.index === index;
+}
+
 export function indexOf(page: Page): Index {
   const els = page.elements;
   const hit = indexes.get(els);

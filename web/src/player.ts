@@ -18,7 +18,7 @@ import { addFonts, usedFonts } from "./fonts.ts";
 import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, partsOf } from "./clicks.ts";
 import { type DottieFile, type Page, type RGBA, clampTime, luminance, parseDottie } from "./model.ts";
 import { Path, fmt, rotate } from "./path.ts";
-import { buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
+import { Expansions, buttonTime, expandingSymbols, symbolTable } from "./symbols.ts";
 import { type Plan, plan, svgParts, unchanged } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { themeNamed } from "./theme.ts";
@@ -192,7 +192,9 @@ export class Playback {
     const tc = clampTime(t);
     // Backlog piles up for as long as the state has held; a still (no performance clock) draws the page time.
     const pose = posed(this.page, tc, this.state, this.sinceChange(now), this.carried);
-    const frame = expandingSymbols(pose, tc, true, times);
+    // The over, down and hit passes reuse what every other copy made here.
+    const made = new Expansions(pose, tc, true);
+    const frame = expandingSymbols(pose, tc, true, times, made);
     const { parts } = svgParts(frame, this.background, r);
     const owned = (m: Map<string, string>, parts: { key: string; markup: string }[]) => {
       for (const p of parts) if (this.owner.has(p.key)) m.set(p.key, p.markup);
@@ -201,7 +203,7 @@ export class Playback {
     // A state is drawn only for the copies that have it.
     // Only those copies' parts are drawn again; the rest of the page is there for them to connect to.
     const state = (st: Map<string, number>) => st.size === 0 ? new Map<string, string>()
-      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st])), this.background, r, false,
+      : owned(new Map(), svgParts(expandingSymbols(pose, tc, true, new Map([...times, ...st]), made), this.background, r, false,
         (key) => st.has(this.owner.get(key) ?? "")).parts);
     // A clickable shape with a hover look holds both, a button its over and down states, and the stylesheet shows one.
     const hover = this.hoverIDs.size === 0 ? new Map<string, string>()

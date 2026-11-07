@@ -77,12 +77,26 @@ export function hasInstances(page: Page): boolean {
   return page.elements.some((e) => e.kind === "symbol");
 }
 
+/** What each instance on a page expanded into, kept so that expanding the same page again at the same moment with
+ * a few instances' times changed (a button's other states) redoes only those. */
+export class Expansions {
+  readonly page: Page;
+  readonly t: number;
+  readonly posing: boolean;
+  /** For each instance: its time override, the budget it found and left, and what it made. */
+  readonly made = new Map<Element, { override: number | undefined; before: number; after: number; out: Element[] }>();
+  constructor(page: Page, t: number, posing: boolean) { this.page = page; this.t = t; this.posing = posing; }
+}
+
 /** The page with every instance replaced by what it shows at page time `t` (DottieDocument.expandingSymbols). `times`
- * puts instances on the page at a moment of their symbol's own: a button's other states, or a clip replaying. */
-export function expandingSymbols(page: Page, t: number, posing = true, times: Map<string, number> = new Map()): Page {
+ * puts instances on the page at a moment of their symbol's own: a button's other states, or a clip replaying.
+ * `memo` records what each instance made, or, made for this page and moment, reuses it where nothing differs. */
+export function expandingSymbols(page: Page, t: number, posing = true, times: Map<string, number> = new Map(),
+  memo?: Expansions): Page {
   if (!hasInstances(page)) return page;
   const budget = { left: MAX_ELEMENTS };
-  return { ...page, elements: expand(page.elements, page, t, symbolTable(page), [], posing, budget, times) };
+  const m = memo && memo.page === page && memo.t === t && memo.posing === posing ? memo : undefined;
+  return { ...page, elements: expand(page.elements, page, t, symbolTable(page), [], posing, budget, times, m) };
 }
 
 export function symbolTable(page: Page): Map<string, Symbol> {
@@ -92,7 +106,7 @@ export function symbolTable(page: Page): Map<string, Symbol> {
 }
 
 function expand(elements: Element[], page: Page, t: number, table: Map<string, Symbol>, stack: string[], posing: boolean,
-  budget: { left: number }, times: Map<string, number> = new Map()): Element[] {
+  budget: { left: number }, times: Map<string, number> = new Map(), memo?: Expansions): Element[] {
   const instances = new Set(elements.filter((e) => e.kind === "symbol").map((e) => e.id));
   if (instances.size === 0) { budget.left -= elements.length; return elements; }
   const index = indexOf(page);
@@ -110,6 +124,16 @@ function expand(elements: Element[], page: Page, t: number, table: Map<string, S
       continue;
     }
     if (e.kind !== "symbol") { out.push(e); budget.left -= 1; continue; }
+    const override0 = stack.length === 0 ? times.get(e.id) : undefined;
+    const was = memo?.made.get(e);
+    // The same instance at the same time made the same elements, so long as the budget never ran out on it:
+    // when it ended with some left, and there is at least as much to spend now.
+    if (was && was.override === override0 && was.after > 0 && budget.left - (was.before - was.after) > 0) {
+      budget.left -= was.before - was.after;
+      for (const x of was.out) out.push(x);
+      continue;
+    }
+    const before = budget.left, from = out.length;
     budget.left -= 1;
     const id = e.symbol;
     const symbol = id === null ? undefined : table.get(id);
@@ -123,6 +147,7 @@ function expand(elements: Element[], page: Page, t: number, table: Map<string, S
     const drawn: Page = { ...inner, elements: orderedElements(inner).filter((x) => visible.has(x.layerID)),
       layers: [{ id: e.layerID, name: "", visible: true, locked: false }] };
     for (const x of expand(drawn.elements, drawn, u, table, [...stack, id], posing, budget)) out.push(placed(x, e, symbol));
+    if (memo && stack.length === 0 && !was) memo.made.set(e, { override: override0, before, after: budget.left, out: out.slice(from) });
   }
   return out;
 }

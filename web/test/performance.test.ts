@@ -7,6 +7,8 @@ import { indexOf } from "../src/connector.ts";
 import { flowTree } from "../src/flows.ts";
 import { type Page, parseDottie } from "../src/model.ts";
 import { plan, svgParts } from "../src/svg.ts";
+import { Expansions, expandingSymbols } from "../src/symbols.ts";
+import { posed } from "../src/timeline.ts";
 import { measure, wrap } from "../src/text.ts";
 import { read } from "./helpers.ts";
 
@@ -152,3 +154,51 @@ test("drawing only some parts draws them exactly as the whole page does", () => 
     assert.deepEqual(some.parts, all.parts.filter((p) => keep.has(p.key)), `${group}/${name}`);
   }
 });
+
+test("expanding again with some copies at other times reuses the rest exactly, budget and all", () => {
+  let reused = 0, budgetHit = false;
+  const files = [["edge", "buttons"], ["edge", "symbols"], ["design", "symbols"], ["edge", "params"],
+    ["edge", "waypoints-symbol"], ["js-only", "hostile-symbols"]].map(([group, name]) => [`${group}/${name}`, read(group, `${name}.dottie`)]);
+  files.push(["over budget", overBudget()]);
+  for (const [name, text] of files) {
+    for (const page of parseDottie(text).pages) {
+      for (const t of name === "over budget" ? [0] : [0, 0.7, 2]) {
+        const pose = posed(page, t);
+        const ids = pose.elements.filter((e) => e.kind === "symbol").map((e) => e.id);
+        const made = new Expansions(pose, t, true);
+        const normal = expandingSymbols(pose, t, true, new Map(), made);
+        assert.deepEqual(normal, expandingSymbols(pose, t, true));
+        // The first three copies, then each one alone, put at another moment.
+        const states = [new Map(ids.slice(0, 3).map((id) => [id, 1.5])), ...ids.map((id) => new Map([[id, 1.5]]))];
+        for (const st of states) {
+          const again = expandingSymbols(pose, t, true, st, made);
+          const fresh = expandingSymbols(pose, t, true, st);
+          // Cut short in the last copy, which was made in full before: 3 × 3,840 + 5 × 1,920 shapes wanted.
+          if (name === "over budget" && st.size === 3 && fresh.elements.length === 3 * 3840 + 4 * 1920 + 960) budgetHit = true;
+          assert.equal(again.elements.length, fresh.elements.length, `${name} at ${t}: how many elements`);
+          assert.deepEqual(again, fresh, `${name} at ${t}`);
+          reused += ids.length - st.size;
+        }
+      }
+    }
+  }
+  assert.ok(reused > 20, `${reused} copies reused`);
+  assert.ok(budgetHit, "a copy at another moment runs the page out of budget");
+});
+
+/** Eight copies of a symbol that holds four copies of a 960-shape symbol, two of them hidden until 1s. At its first
+ * moment each copy makes 1,923 elements and all eight fit the budget. Put the first three at 1.5s, when each makes
+ * 3,845, and the last copy, the same as before, has 773 to spend: it runs out between the two shapes it holds. */
+function overBudget(): string {
+  const id = (k: number) => `00000000-0000-4000-8000-${k.toString(16).padStart(12, "0")}`;
+  const style = { bowing: 1, dash: "solid", fill: { a: 0, r: 0, g: 0, b: 0 }, fillStyle: "solid", fontSize: 14, roughness: 0, stroke: { a: 1, r: 0, g: 0, b: 0 }, strokeWidth: 2 };
+  const layer = (k: number) => [{ id: id(k), name: "L", visible: true, locked: false }];
+  const shapes = Array.from({ length: 960 }, (_, k) => ({ id: id(100 + k), kind: "rectangle", layerID: id(2), seed: k, x: k % 50, y: Math.floor(k / 50), width: 1, height: 1, style }));
+  const leaf = { id: id(1), name: "leaf", width: 50, height: 20, layers: layer(2), elements: shapes, timeline: null };
+  const copy = (k: number, symbol: number, layerID: number) => ({ id: id(k), kind: "symbol", symbol: id(symbol), playback: "still", layerID: id(layerID), seed: k, x: (k % 8) * 60, y: 0, width: 50, height: 20, style });
+  const inner = [0, 1, 2, 3].map((k) => copy(2000 + k, 1, 6));
+  const wrap = { id: id(5), name: "wrap", width: 50, height: 80, layers: layer(6), elements: inner,
+    timeline: { duration: 2, fps: 10, poster: 0, tracks: inner.slice(2).map((e) => ({ element: e.id, keys: [{ t: 0, visible: false, ease: "hold" }, { t: 1, visible: true, ease: "hold" }] })) } };
+  const copies = Array.from({ length: 8 }, (_, k) => copy(10 + k, 5, 3));
+  return JSON.stringify({ version: 1, pages: [{ id: id(4), name: "p", layers: layer(3), elements: copies, symbols: [leaf, wrap] }] });
+}

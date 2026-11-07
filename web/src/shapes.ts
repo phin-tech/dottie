@@ -1,7 +1,7 @@
 // The paths an element draws (Renderer.swift): outlines, fills, hatching and connectors, sketchy or clean.
 // Pure functions of the element, cached by what they depend on, as Dottie does.
 
-import { type Index, type Route, arrowhead, endpoints, indexOf, route, routePoints } from "./connector.ts";
+import { type Index, type Route, arrowhead, endpoints, isIndexOf, route, routePoints } from "./connector.ts";
 import { type Contour, frame, shapeContours, shapePath } from "./element.ts";
 import { gridLines } from "./dungeon.ts";
 import { type DashStyle, type Element, type Page, orderedElements } from "./model.ts";
@@ -259,31 +259,30 @@ function touching(a: Box, b: Box): boolean {
 }
 
 /** One page's connectors in drawing order, each routed (with its box) once however many lines hop over it. */
-type HopFrame = { layers: Page["layers"]; first: Map<string, number>; under: { e: Element; line?: Line }[] };
+type HopFrame = { layers: Page["layers"]; first: Map<string, number>; under: Element[]; lines: Line[] };
 const hopFrames = new WeakMap<Index, HopFrame>();
 
-/** The connectors drawn beneath `e` (earlier, on a visible layer), as routed lines. */
-function linesBeneath(e: Element, page: Page, index: Index): Line[] {
+/** The connectors drawn beneath `e` (earlier, on a visible layer), as routed lines: the first `count` of `lines`,
+ * which the page's other hopping connectors share. */
+function linesBeneath(e: Element, page: Page, index: Index): { lines: Line[]; count: number } {
   let f = hopFrames.get(index);
   // Shared only while `index` is the page's own, so the routes are the ones this page draws.
-  if (!f || f.layers !== page.layers || indexOf(page) !== index) {
+  if (!f || f.layers !== page.layers || !isIndexOf(page, index)) {
     const visible = new Set(page.layers.filter((l) => l.visible).map((l) => l.id));
-    const first = new Map<string, number>(), under: HopFrame["under"] = [];
+    const first = new Map<string, number>(), under: Element[] = [];
     for (const o of orderedElements(page)) {
       if (!first.has(o.id)) first.set(o.id, under.length);
-      if (o.kind === "connector" && visible.has(o.layerID)) under.push({ e: o });
+      if (o.kind === "connector" && visible.has(o.layerID)) under.push(o);
     }
-    f = { layers: page.layers, first, under };
-    if (indexOf(page) === index) hopFrames.set(index, f);
+    f = { layers: page.layers, first, under, lines: [] };
+    if (isIndexOf(page, index)) hopFrames.set(index, f);
   }
-  const upTo = f.first.get(e.id) ?? f.under.length;
-  const out: Line[] = [];
-  for (let i = 0; i < upTo; i++) {
-    const u = f.under[i];
-    if (!u.line) { const points = routePoints(route(u.e, index)); u.line = { points, box: boxOf(points) }; }
-    out.push(u.line);
+  const count = f.first.get(e.id) ?? f.under.length;
+  while (f.lines.length < count) {
+    const points = routePoints(route(f.under[f.lines.length], index));
+    f.lines.push({ points, box: boxOf(points) });
   }
-  return out;
+  return { lines: f.lines, count };
 }
 
 /**
@@ -294,18 +293,22 @@ function linesBeneath(e: Element, page: Page, index: Index): Line[] {
 export function hopCrossings(e: Element, r: Route, page: Page, index: Index): number[][] {
   const segments = hopSamples(r);
   if (segments.length === 0) return [];
-  const beneath = linesBeneath(e, page, index);
+  const { lines, count } = linesBeneath(e, page, index);
   const rad = hopRadius(e.style.strokeWidth);
   const out: number[][] = [];
   for (const samples of segments) {
     const along = runningLengths(samples);
     const length = along[along.length - 1];
     const found: number[] = [];
+    // Only the lines near this segment at all, then those near each piece of it.
+    const near: Line[] = [];
+    const whole = boxOf(samples);
+    for (let n = 0; n < count; n++) if (touching(whole, lines[n].box)) near.push(lines[n]);
     for (let i = 0; i < samples.length - 1; i++) {
       const p = samples[i], q = samples[i + 1];
       const dx = q.x - p.x, dy = q.y - p.y;
       const box = boxOf([p, q]);
-      for (const { points: line, box: lineBox } of beneath) {
+      for (const { points: line, box: lineBox } of near) {
         // A line whose box is clear of this piece's can't cross it.
         if (!touching(box, lineBox)) continue;
         for (let k = 0; k < line.length - 1; k++) {
