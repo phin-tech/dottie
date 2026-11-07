@@ -55,3 +55,12 @@ shows interactively is played by dottie.js anyway: the HTML export is `<dottie-p
   so it would add a second path without removing one.
 - **Sending deltas of the page.** Measured first: only pages with keyframes under their flows re-send, and
   0.8 ms a frame doesn't need the extra state on both sides.
+- **Posing in dottie.js too** (keys, follows, state, symbol expansion: `posedWithMetrics` and `expandingSymbols`).
+  Measured on the `js-posing` branch: it posed all 6,776 frames of the fixtures, design drawings and worked
+  examples as Swift does (within 1e-6), and on a page that doesn't change it costs little once unchanged elements
+  come back as indices and changed ones as patches (1,000 elements, 10% moving: 3.7 ms a frame against Swift's
+  3.4, debug build). But the editor poses and expands instances on every redraw, and a page that changes every
+  frame is sent again every frame: dragging on a 1,000-element animated page took 23 to 26 ms a frame against
+  Swift's 3.5. Swift also keeps its tracks for editing (Magic Move, transitions, the timeline rows) and Lottie, so
+  little would be deleted. Worth revisiting only if posing starts drifting between the two the way the
+  simulation did.

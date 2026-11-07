@@ -16,6 +16,9 @@ final class SimulationEngineTests: XCTestCase {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         pages += try JSONDecoder().decode(DottieFile.self, from: Data(contentsOf: root.appendingPathComponent("fixtures/edge/flows.dottie"))).pages
         for doc in pages {
+            // Every element, whatever its `when`, as the editor poses it: no variables reach the simulation.
+            _ = doc.posedWithMetrics(at: 1, state: .all, since: 0.4)
+            XCTAssertNil(SimulationEngine.shared.failure, doc.name)
             let names = (doc.variables ?? [:]).keys.sorted().prefix(4)
             for bits in 0..<(1 << names.count) {
                 let state = StateChoice.values(Dictionary(uniqueKeysWithValues: names.enumerated().map { ($1, bits & (1 << $0) != 0) }))

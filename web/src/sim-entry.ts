@@ -26,6 +26,8 @@ function page(json: string): void {
 function frame(request: string): string {
   if (!current) throw new Error("no page");
   const r = JSON.parse(request) as Request;
+  // Swift leaves out keys whose value is nil: no `values` is every element whatever its `when` (StateChoice.all).
+  r.values ??= null; r.since ??= null; r.offline ??= []; r.carried ??= {};
   const page = current;
   const out = flowFrame(page.flows, page, r.t, r.values, new Set(r.offline), r.since, r.carried);
   const since = Math.max(0, Math.min(r.since ?? r.t, 1e6));
