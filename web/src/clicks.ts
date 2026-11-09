@@ -1,6 +1,6 @@
 // Clickable elements in a played drawing (Clicks.swift): what a click does, and how an element looks hovered.
 
-import { type DottieFile, type Element, type Marker, type Page, allowedURL, webLink } from "./model.ts";
+import { type ClickValue, type DottieFile, type Element, type Marker, type Page, allowedURL, webLink } from "./model.ts";
 import { changesState } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 
@@ -8,7 +8,7 @@ import { expandingSymbols } from "./symbols.ts";
  * in <dottie-player> only, show page `page` (an index into the file's pages), where the element's link points. Any
  * of them may first `set` and `toggle` page variables (ClickAction.set, .toggle), and a click may do only that. */
 export type Click = ({ scene: number } | { url: string } | { page: number } | { state: true })
-  & { set?: Record<string, boolean>; toggle?: string[]; reset?: true };
+  & { set?: Record<string, ClickValue>; toggle?: string[]; reset?: true };
 
 /** The marker called `name`: an exact match, else one that differs only in case. */
 export function sceneNamed(name: string, markers: Marker[]): number {

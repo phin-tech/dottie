@@ -122,7 +122,9 @@ Traps: `update_element`/`dottie.update` with `overrides` replaces the whole list
 gets capacity first.
 
 Lower level: `set_variable`, `update_element` with `click_toggle` / `click_set`, and `when` on shapes, connectors and
-packets (`"down"`, `"!down"`). Exports show the starting values; the HTML export and `<dottie-player>` change them on
+packets (`"down"`, `"!down"`). Variables can be numbers: `set_variable` with `value: 0`, a click that counts with
+`click_set: {"count": "count + 1"}` or cycles with `"(stage + 1) % 3"`, conditions like `"count >= 3"`, and labels
+that show a value, `"Clicked {count} times"`. Exports show the starting values; the HTML export and `<dottie-player>` change them on
 click without stopping.
 
 Check an interactive page before calling it done; you can't click the HTML export yourself. `simulate` plays it as

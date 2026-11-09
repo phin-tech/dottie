@@ -21,7 +21,7 @@ final class SimulationEngineTests: XCTestCase {
             XCTAssertNil(SimulationEngine.shared.failure, doc.name)
             let names = (doc.variables ?? [:]).keys.sorted().prefix(4)
             for bits in 0..<(1 << names.count) {
-                let state = StateChoice.values(Dictionary(uniqueKeysWithValues: names.enumerated().map { ($1, bits & (1 << $0) != 0) }))
+                let state = StateChoice.values(Dictionary(uniqueKeysWithValues: names.enumerated().map { ($1, Var.bool(bits & (1 << $0) != 0)) }))
                 let carried = doc.metrics(at: 2).carry
                 for t in [0, 0.7, 3.1] {
                     let (frame, metrics) = doc.posedWithMetrics(at: t, state: state, since: 0.4, carried: carried)

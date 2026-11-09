@@ -58,7 +58,7 @@ final class AuthoringTests: XCTestCase {
         try DiagramOps.addOverride(&doc, id: worker, { var o = StateOverride(when: "scale"); o.capacity = 10; return o }())
         try DiagramOps.addFlow(&doc, from: api, to: [table], volume: 3)
         try doc.setVariable("slow", to: false); try doc.setVariable("scale", to: false)
-        func cap(_ v: [String: Bool]) -> Double? { doc.posed(at: 1, state: .values(v)).elements.first { $0.id == worker }?.capacity }
+        func cap(_ v: [String: Var]) -> Double? { doc.posed(at: 1, state: .values(v)).elements.first { $0.id == worker }?.capacity }
         XCTAssertEqual(cap(["scale": true]), 10, "a scale-out alone raises it")
         XCTAssertEqual(cap(["scale": true, "slow": true]), 1, "together the tightest wins, whatever the order")
         // An alarm: red while its own load is at 1.

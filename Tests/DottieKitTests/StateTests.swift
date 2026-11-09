@@ -8,7 +8,7 @@ final class StateTests: XCTestCase {
     }
 
     func testConditions() {
-        let s = ["down": true, "east": false]
+        let s: [String: Var] = ["down": true, "east": false]
         XCTAssertTrue(PageState.holds("down", in: s))
         XCTAssertFalse(PageState.holds("!down", in: s))
         XCTAssertTrue(PageState.holds(" ! east ", in: s))

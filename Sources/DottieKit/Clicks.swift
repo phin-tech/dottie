@@ -81,7 +81,7 @@ extension DiagramOps {
 
     /// A click from tool or script arguments: a scene name or a link, and variables to set and flip; nil for none of
     /// them ("" for a scene or link is none), which removes it.
-    public static func click(scene: String?, url: String?, set: [String: Bool]? = nil, toggle: [String]? = nil) throws -> ClickAction? {
+    public static func click(scene: String?, url: String?, set: [String: ClickValue]? = nil, toggle: [String]? = nil) throws -> ClickAction? {
         for name in Array((set ?? [:]).keys) + (toggle ?? []) where !PageState.isName(name) {
             throw OpsError.invalid("A variable name is a letter or _, then letters, digits or _, got '\(name)'")
         }

@@ -592,6 +592,30 @@ def containers():
     write(EDGE / "containers.dottie", [p])
 
 
+def counters():
+    """Number variables and expressions (ADR 0007): a click that counts, one that cycles a stage, elements shown by
+    comparisons and arithmetic on them, a function, a flag compared to a number, and a broken expression that never
+    holds. The second page starts further on, so both renderers show the other outcomes too."""
+    pages = []
+    for name, count, stage in [("Start", 0, 0), ("Later", 4, 2)]:
+        p = Page(name)
+        p.extra = {"variables": {"count": count, "stage": stage, "open": True}}
+        p.add("rectangle", 40, 40, 140, 60, text="+1", click={"set": {"count": "count + 1"}})
+        p.add("rectangle", 220, 40, 140, 60, text="next stage", click={"set": {"stage": "(stage + 1) % 3"}, "toggle": "open"})
+        p.add("ellipse", 40, 160, 140, 60, text="three or more", when="count >= 3")
+        p.add("ellipse", 220, 160, 140, 60, text="odd", when="count % 2 == 1")
+        p.add("diamond", 400, 160, 140, 80, text="stage 2", when="stage == 2 && open")
+        p.add("rectangle", 40, 280, 140, 60, text="capped", when="min(count * 2, 5) == 5")
+        p.add("rectangle", 220, 280, 140, 60, text="open is 1", when="open == 1")
+        p.add("rectangle", 400, 280, 140, 60, text="broken", when="count >=")
+        # Labels that show values; braces holding anything else stay as written.
+        p.add("rectangle", 40, 400, 220, 60, text="Clicked {count} times")
+        p.add("rectangle", 300, 400, 240, 60, text="{count / 3} thirds, {open}, {nope}, {x + }")
+        p.add("rectangle", 580, 400, 120, 60, text="hidden", when="count > 99")
+        pages.append(p)
+    write(EDGE / "counters.dottie", pages, version=3)
+
+
 def notes():
     """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
     p = Page()
@@ -1220,6 +1244,7 @@ def main():
     elbow_around()
     palette()
     containers()
+    counters()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

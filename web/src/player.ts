@@ -25,6 +25,7 @@ import { planInWorker, plansInWorker } from "./planner.ts";
 import { pageTheme } from "./theme.ts";
 import { applyClick } from "./state.ts";
 import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
+import type { Var } from "./expression.ts";
 
 const WHITE: RGBA = { r: 1, g: 1, b: 1, a: 1 };
 
@@ -68,7 +69,7 @@ export class Playback {
   /** Whether each scene loops (Marker.loop). */
   readonly sceneLoops: boolean[];
   /** The page's variables now: their starting values until clicks change them. */
-  state: Record<string, boolean>;
+  state: Record<string, Var>;
   /** When the variables last changed (performance.now() milliseconds): backlog piles up from then (ADR 0003). */
   stateSince = typeof performance === "undefined" ? 0 : performance.now();
   /** A still (the `at` attribute): backlog is drawn for the page time, not the wall clock. */
@@ -595,10 +596,10 @@ export class DottiePlayer extends ElementBase {
   }
 
   /** The page's variables now. */
-  get variables(): Record<string, boolean> { return { ...(this.playback?.state ?? {}) }; }
+  get variables(): Record<string, Var> { return { ...(this.playback?.state ?? {}) }; }
 
   /** Gives the page's variables these values (the others keep theirs), redraws, and fires `state`. */
-  setState(values: Record<string, boolean>): void {
+  setState(values: Record<string, Var>): void {
     const p = this.playback;
     if (!p) return;
     const next = { ...p.state, ...values };

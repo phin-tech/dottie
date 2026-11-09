@@ -37,7 +37,7 @@ extension DiagramOps {
     @discardableResult
     public static func defineState(_ doc: inout DottieDocument, _ spec: StateSpec) throws -> String {
         let name = spec.name
-        try doc.setVariable(name, to: spec.initial)
+        try doc.setVariable(name, to: .bool(spec.initial))
         let ids = Set(doc.elements.map(\.id))
         func check(_ list: [UUID], _ what: String) throws {
             if let bad = list.first(where: { !ids.contains($0) }) { throw OpsError.notFound("No element \(bad.uuidString) to \(what)") }
@@ -118,7 +118,7 @@ extension DiagramOps {
                 click(id) { c in
                     c.toggle?.removeAll { $0 == name }
                     if c.toggle?.isEmpty == true { c.toggle = nil }
-                    c.set = (c.set ?? [:]).merging([name: value]) { _, new in new }
+                    c.set = (c.set ?? [:]).merging([name: .value(.bool(value))]) { _, new in new }
                 }
             }
         }

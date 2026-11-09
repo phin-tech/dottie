@@ -243,16 +243,25 @@ public enum DottieScript {
                 return out.isEmpty ? nil : out
             }
 
-            /// Variable names to values, keys as written (`ClickAction.set`).
-            func flags(_ k: String) throws -> [String: Bool]? {
+            /// Variable names to values, keys as written (`ClickAction.set`): true or false, a number, or an
+            /// expression computing one from the state before the click (ADR 0007).
+            func flags(_ k: String) throws -> [String: ClickValue]? {
                 guard let v = raw[Args.normalize(k)] else { return nil }
-                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to true or false") }
-                var out: [String: Bool] = [:]
+                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to values") }
+                var out: [String: ClickValue] = [:]
+                for (name, x) in d { out[name] = try DottieScript.clickValue(x, "\(k).\(name)") }
+                return out
+            }
+            /// Variable names to starting values: true, false or a number.
+            func values(_ k: String) throws -> [String: Var]? {
+                guard let v = raw[Args.normalize(k)] else { return nil }
+                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to values") }
+                var out: [String: Var] = [:]
                 for (name, x) in d {
-                    guard let n = x as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else {
-                        throw OpsError.invalid("'\(k).\(name)' must be true or false")
+                    guard case .value(let val) = try DottieScript.clickValue(x, "\(k).\(name)") else {
+                        throw OpsError.invalid("'\(k).\(name)' must be true, false or a number")
                     }
-                    out[name] = n.boolValue
+                    out[name] = val
                 }
                 return out
             }
@@ -431,7 +440,7 @@ public enum DottieScript {
                 var o: [String: Any] = [:]
                 if let s = c.scene { o["scene"] = s }
                 if let u = c.url { o["url"] = u }
-                if let v = c.set { o["set"] = v }
+                if let v = c.set { o["set"] = v.mapValues(\.json) }
                 if let v = c.toggle { o["toggle"] = v }
                 d["click"] = o
             }
@@ -857,15 +866,17 @@ public enum DottieScript {
             case "variable":
                 let name = try a.require("name")
                 if a.has("value") {
-                    guard let v = a.bool("value") else { throw OpsError.invalid("A variable's value must be true or false (null removes it)") }
+                    guard let x = a.raw["value"], case .value(let v) = try DottieScript.clickValue(x, "value") else {
+                        throw OpsError.invalid("A variable's value must be true, false or a number (null removes it)")
+                    }
                     try doc.setVariable(name, to: v)
                 } else {
                     try doc.setVariable(name, to: nil)
                 }
-                return doc.variables ?? [:]
+                return (doc.variables ?? [:]).mapValues(\.json)
 
             case "variables":
-                return doc.variables ?? [:]
+                return (doc.variables ?? [:]).mapValues(\.json)
 
             case "flow":
                 let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
@@ -905,7 +916,7 @@ public enum DottieScript {
 
             case "metrics":
                 let state: StateChoice = a.object("state").map { o in
-                    .values(o.raw.compactMapValues { $0 as? Bool })
+                    .values(o.raw.compactMapValues { x in (try? DottieScript.clickValue(x, "state")).flatMap { if case .value(let v) = $0 { v } else { nil } } })
                 } ?? .initial
                 let m = doc.metrics(at: a.double("at") ?? 0, state: state, since: a.double("since"))
                 var elements: [String: Any] = [:], flows: [String: Any] = [:]
@@ -934,10 +945,7 @@ public enum DottieScript {
                 spec.width = a.double("width"); spec.height = a.double("height")
                 spec.toggles = a.string("toggles"); spec.onText = a.string("onText"); spec.color = try a.color("color")
                 if let s = a.object("sets") {
-                    for (k, v) in s.raw {
-                        guard let b = (v as? NSNumber).map(\.boolValue) else { throw OpsError.invalid("'sets' maps variable names to true or false") }
-                        spec.sets[k] = b
-                    }
+                    for (k, v) in s.raw { spec.sets[k] = try DottieScript.clickValue(v, "sets.\(k)") }
                 }
                 let b = try DiagramOps.addButton(&doc, spec)
                 return describe(try element(b.id))
@@ -1364,7 +1372,8 @@ public enum DottieScript {
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
       click: {scene?, url?, set?, toggle?}: when the drawing plays on the web (HTML export, <dottie-player>), clicking \
     the element jumps to that scene (its name, which dottie.scene returns) and plays on to the next, or opens an http(s) \
-    or mailto link. set: {name: true|false} and toggle: name or [names] change page variables (dottie.variable) without \
+    or mailto link. set: {name: true|false|number|"expression"} (an expression like "count + 1" is worked out from the \
+    state before the click) and toggle: name or [names] change page variables (dottie.variable) without \
     stopping or moving the animation, alone or with a scene or link; null removes the click
       when: a condition on page variables, like "down", "!down" or "east && !west || maint": the element (and the \
     connectors attached to it) is drawn only while it holds; "" or null removes it. Packets, shapes and connectors \

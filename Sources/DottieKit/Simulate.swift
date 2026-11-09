@@ -21,7 +21,7 @@ public struct Simulation: Sendable {
     /// Whether the page is playing.
     public private(set) var playing: Bool
     /// The page's variables now.
-    public private(set) var state: [String: Bool]
+    public private(set) var state: [String: Var]
     /// Seconds played since the variables last changed: how long backlog has been piling up.
     public private(set) var sinceChange = 0.0
     /// What each queue held when the variables last changed, which it drains from (`FrameMetrics.carry`).
@@ -241,7 +241,7 @@ extension Simulation {
         /// One frame: the moment, the variables, and the queues' inputs (ADR 0003).
         public struct Frame: Sendable, Equatable {
             public var time: Double
-            public var state: [String: Bool]
+            public var state: [String: Var]
             public var since: Double
             public var carried: [String: Double]
         }
@@ -257,7 +257,7 @@ extension Simulation {
 extension DottieDocument {
     /// The page with these variables as its starting values (the others keep theirs), so every export, still and
     /// player shows that state.
-    public func starting(with values: [String: Bool]) -> DottieDocument {
+    public func starting(with values: [String: Var]) -> DottieDocument {
         guard !values.isEmpty else { return self }
         var copy = self
         copy.variables = (variables ?? [:]).merging(values) { _, new in new }
@@ -266,23 +266,28 @@ extension DottieDocument {
 }
 
 extension PageState {
-    /// Variable values written `down=true,east=false` (or `down,!east`): a bare name is true, `!name` false.
-    public static func assignments(_ spec: String) throws -> [String: Bool] {
-        var out: [String: Bool] = [:]
+    /// Variable values written `down=true,east=false,count=3` (or `down,!east`): a bare name is true, `!name`
+    /// false, a number a number.
+    public static func assignments(_ spec: String) throws -> [String: Var] {
+        var out: [String: Var] = [:]
         for part in spec.split(separator: ",") {
             var term = part.trimmingCharacters(in: .whitespaces)
             if term.isEmpty { continue }
-            var value = true
+            var value: Var = true
             if let eq = term.firstIndex(of: "=") {
                 let v = term[term.index(after: eq)...].trimmingCharacters(in: .whitespaces).lowercased()
                 switch v {
-                case "true", "1", "yes", "on": value = true
-                case "false", "0", "no", "off": value = false
-                default: throw OpsError.invalid("A variable's value is true or false, got '\(v)' in '\(spec)'")
+                case "true", "yes", "on": value = true
+                case "false", "no", "off": value = false
+                default:
+                    guard let n = Double(v), n.isFinite else {
+                        throw OpsError.invalid("A variable's value is true, false or a number, got '\(v)' in '\(spec)'")
+                    }
+                    value = .number(n)
                 }
                 term = term[..<eq].trimmingCharacters(in: .whitespaces)
             } else if term.hasPrefix("!") {
-                value = false
+                value = .bool(false)
                 term = String(term.dropFirst()).trimmingCharacters(in: .whitespaces)
             }
             try checkName(term)

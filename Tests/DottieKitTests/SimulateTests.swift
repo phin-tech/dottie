@@ -43,7 +43,7 @@ final class SimulateTests: XCTestCase {
     func testAssignments() throws {
         XCTAssertEqual(try PageState.assignments("down=true, east=false"), ["down": true, "east": false])
         XCTAssertEqual(try PageState.assignments("down,!east"), ["down": true, "east": false])
-        XCTAssertEqual(try PageState.assignments("a=off,b=1"), ["a": false, "b": true])
+        XCTAssertEqual(try PageState.assignments("a=off,b=1,c=2.5"), ["a": false, "b": 1, "c": 2.5], "numbers are numbers (ADR 0007)")
         XCTAssertThrowsError(try PageState.assignments("9x"))
         XCTAssertThrowsError(try PageState.assignments("down=maybe"))
     }

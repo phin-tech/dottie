@@ -2,6 +2,7 @@
 // damaged or hand-written file means the same thing in both. Anything dottie.js doesn't know (a newer kind,
 // fill or field) is kept and reported through `warnings` instead of failing the whole file.
 
+import type { Var } from "./expression.ts";
 import { isName } from "./state.ts";
 import { resolvingPalette } from "./theme.ts";
 
@@ -35,6 +36,9 @@ export interface Style {
   /** Which colors are palette colors, by name (ADR 0005); set from the page's palette when it is read. */
   named?: ColorNames | null;
 }
+
+/** What a click gives a variable (ClickValue): a value, or an expression over the state before the click. */
+export type ClickValue = Var | string;
 
 /** Palette names for an element's colors (Theme.swift's ColorNames). */
 export interface ColorNames { fill: string | null; stroke: string | null; textColor: string | null }
@@ -70,7 +74,7 @@ export interface EmbeddedImage { data: string; format: string }
 /** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link; and page
  * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
 export interface ClickAction {
-  scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null;
+  scene: string | null; url: string | null; set: Record<string, ClickValue> | null; toggle: string[] | null;
   /** Puts every page variable back to its starting value first. */
   reset?: boolean | null;
 }
@@ -222,7 +226,7 @@ export interface Page {
   timeline: Timeline | null;
   symbols: Symbol[] | null;
   /** The page's variables and their starting values (DottieDocument.variables). */
-  variables: Record<string, boolean> | null;
+  variables: Record<string, Var> | null;
   /** Traffic routed over the connectors drawn in each frame (DottieDocument.flows; see flows.ts). */
   flows: Flow[] | null;
 }
@@ -268,7 +272,7 @@ export interface DottieFile {
 }
 
 /** The newest file version this library was written for. Newer files still load, with a warning. */
-export const SUPPORTED_VERSION = 2;
+export const SUPPORTED_VERSION = 3;
 export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image", "symbol"];
 const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"];
 
@@ -569,10 +573,10 @@ class Reader {
     return { id, shape, version, params };
   }
 
-  variables(v: unknown): Record<string, boolean> | null {
+  variables(v: unknown): Record<string, Var> | null {
     if (!isObj(v)) return null;
-    const out: Record<string, boolean> = {};
-    for (const [k, b] of Object.entries(v)) if (typeof b === "boolean") out[k] = b;
+    const out: Record<string, Var> = {};
+    for (const [k, b] of Object.entries(v)) if (typeof b === "boolean" || (typeof b === "number" && Number.isFinite(b))) out[k] = b;
     return Object.keys(out).length > 0 ? out : null;
   }
 
@@ -583,10 +587,12 @@ class Reader {
     const safe = url === undefined ? null : allowedURL(url);
     if (url !== undefined && safe === null) this.warn("Skipped a click link that isn't http, https or mailto");
     // As DottieKit reads them: names that aren't variable names are dropped, and one toggle may stand alone.
-    let set: Record<string, boolean> | null = null;
+    let set: Record<string, ClickValue> | null = null;
     if (isObj(v.set)) {
       set = {};
-      for (const [k, b] of Object.entries(v.set)) if (typeof b === "boolean" && isName(k)) set[k] = b;
+      for (const [k, b] of Object.entries(v.set)) {
+        if (isName(k) && (typeof b === "boolean" || typeof b === "string" || (typeof b === "number" && Number.isFinite(b)))) set[k] = b;
+      }
       if (Object.keys(set).length === 0) set = null;
     }
     const raw = typeof v.toggle === "string" ? [v.toggle] : Array.isArray(v.toggle) && v.toggle.every((x) => typeof x === "string") ? v.toggle as string[] : null;

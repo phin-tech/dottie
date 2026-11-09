@@ -74,9 +74,11 @@ private let buildEdgeProps: [String: Value] = {
 }()
 
 private let clickSetDescription = "When played on the web, clicking this element gives these page variables (see "
-    + "set_variable) these values, e.g. {\"down\": true}, without stopping or moving the animation. "
+    + "set_variable) these values, e.g. {\"down\": true}, without stopping or moving the animation. A value can be a "
+    + "number, or an expression worked out from the state before the click: {\"count\": \"count + 1\"}, "
+    + "{\"stage\": \"(stage + 1) % 3\"}. "
     + "Combines with click_scene or click_url. Any click_ field replaces the whole click"
-private let clickSetProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
+private let clickSetProp: Value = .object(["type": "object", "additionalProperties": .object(["type": .array([.string("boolean"), .string("number"), .string("string")])]),
                                            "description": .string(clickSetDescription)])
 private let clickToggleDescription = "Page variables a click flips, e.g. \"down\": a button that takes a region down "
     + "and back while packets keep flowing"
@@ -101,8 +103,9 @@ private let stateProp: Value = .object(["type": "object", "additionalProperties"
 private let clickToggleProp: Value = .object(["type": .array(["string", "array"]), "items": .object(["type": "string"]),
                                               "description": .string(clickToggleDescription)])
 
-private let whenProp = prop("string", "A condition on the page's variables (see set_variable), like \"down\", \"!down\" or "
-    + "\"east && !west || maint\": the element, and connectors attached to it, is drawn only while it holds. On the web a click "
+private let whenProp = prop("string", "A condition on the page's variables (see set_variable), like \"down\", \"!down\", "
+    + "\"east && !west || maint\" or \"count >= 3 && stage % 2 == 0\" (numbers, + - * / %, comparisons, parentheses, "
+    + "min/max/abs/floor/ceil/round/clamp): the element, and connectors attached to it, is drawn only while it holds. On the web a click "
     + "that sets or toggles a variable shows and hides it without stopping the animation; exports show the starting values. "
     + "Empty string removes it")
 
@@ -150,22 +153,31 @@ private struct Args {
         return out.isEmpty ? nil : out
     }
 
-    /// Variable names to true or false (click_set).
-    func flags(_ k: String) throws -> [String: Bool]? {
+    /// Variable names to values (click_set): true or false, a number, or an expression computing one from the state
+    /// before the click, like "count + 1" (ADR 0007).
+    func flags(_ k: String) throws -> [String: ClickValue]? {
         guard let v = raw[k], !v.isNull else { return nil }
-        guard let d = v.objectValue else { throw ToolFailure(message: "'\(k)' must be an object of variable names to true or false") }
+        guard let d = v.objectValue else { throw ToolFailure(message: "'\(k)' must be an object of variable names to values") }
         return try d.mapValues { x in
-            guard let b = x.boolValue else { throw ToolFailure(message: "'\(k)' values must be true or false") }
-            return b
+            if let b = x.boolValue { return .value(.bool(b)) }
+            if let n = x.doubleValue ?? x.intValue.map(Double.init), n.isFinite { return .value(.number(n)) }
+            if let e = x.stringValue {
+                do { return .expression(try PageState.checkedValue(e)) } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            }
+            throw ToolFailure(message: "'\(k)' values must be true, false, a number or an expression like \"count + 1\"")
         }
     }
-    /// `state`: variable values to draw a page with, names checked.
-    func state() throws -> [String: Bool] {
-        let v = try flags("state") ?? [:]
-        for name in v.keys where !PageState.isName(name) {
-            throw ToolFailure(message: "'state' names '\(name)', which can't name a variable (letters, digits and _, not starting with a digit)")
+    /// `state`: variable values to draw a page with (true, false or numbers), names checked.
+    func state() throws -> [String: Var] {
+        var out: [String: Var] = [:]
+        for (name, x) in try flags("state") ?? [:] {
+            guard PageState.isName(name) else {
+                throw ToolFailure(message: "'state' names '\(name)', which can't name a variable (letters, digits and _, not starting with a digit)")
+            }
+            guard case .value(let v) = x else { throw ToolFailure(message: "'state' values are true, false or numbers") }
+            out[name] = v
         }
-        return v
+        return out
     }
     /// One name or a list of them (click_toggle).
     func names(_ k: String) throws -> [String]? {
@@ -410,7 +422,7 @@ actor DottieTools {
                         + "\"brand\": \"#0f766e\"}; makes the theme the page's own")]),
              ], required: ["path"])),
         Tool(name: "set_variable",
-             description: "Add, change or remove a page variable: a true-or-false value that clicks change on the web "
+             description: "Add, change or remove a page variable: true or false, or a number (a counter, a step), that clicks change on the web "
                 + "(update_element click_set / click_toggle) and elements follow (update_element when, send_packet when). "
                 + "This is how a diagram that keeps looping reacts to clicks: \"take a region down\" hides its shapes, "
                 + "connectors and packets, shows others, and the animation never stops. Exports and previews show the "
@@ -418,7 +430,9 @@ actor DottieTools {
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "name": prop("string", "Letters, digits and _, not starting with a digit, e.g. eastDown"),
-                "value": prop("boolean", "Its starting value (default false)"),
+                "value": .object(["type": .array([.string("boolean"), .string("number")]),
+                                  "description": .string("Its starting value: true or false (default false), or a number for a "
+                                                         + "counter or a step, read by conditions like count >= 3")]),
                 "remove": prop("boolean", "Remove the variable instead (elements and clicks that name it are left as they are)"),
              ], required: ["path", "name"])),
         Tool(name: "define_state",
@@ -453,8 +467,8 @@ actor DottieTools {
                 "text": prop("string", "The label"), "x": prop("number", "Left"), "y": prop("number", "Top"), "after": prop("string", "Instead of x and y: an element id to sit 12 points to the right of (with neither, above the content)"),
                 "width": prop("number", "Width (default fits the label, at least 100)"), "height": prop("number", "Height (default 40)"),
                 "toggles": prop("string", "The variable a click flips"),
-                "sets": .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
-                                 "description": "Variables a click sets, name to true or false"]),
+                "sets": .object(["type": "object", "additionalProperties": .object(["type": .array([.string("boolean"), .string("number"), .string("string")])]),
+                                 "description": "Variables a click sets, name to true, false, a number or an expression like \"count + 1\""]),
                 "on_text": prop("string", "The label while pressed, e.g. \"Bring east back\""),
                 "color": prop("string", "Hex color of its outline and label, and its fill while pressed (default blue)"),
              ], required: ["path", "text"])),
@@ -1345,7 +1359,8 @@ actor DottieTools {
             let p = try pageIndex(file, a)
             let name = try a.require("name")
             do {
-                try file.pages[p].setVariable(name, to: a.bool("remove") == true ? nil : (a.bool("value") ?? false))
+                let value: Var = a.bool("value").map(Var.bool) ?? a.double("value").map(Var.number) ?? false
+                try file.pages[p].setVariable(name, to: a.bool("remove") == true ? nil : value)
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             let vars = (file.pages[p].variables ?? [:]).sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }

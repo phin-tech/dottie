@@ -307,13 +307,13 @@ public struct ClickAction: Codable, Equatable, Sendable {
     /// drawing can play on someone else's site.
     public var url: String? { didSet { url = url.flatMap(Self.allowed) } }
     /// Page variables (`DottieDocument.variables`) to give these values, without touching the playhead.
-    public var set: [String: Bool]?
+    public var set: [String: ClickValue]?
     /// Page variables to flip, after `set`.
     public var toggle: [String]?
     /// Puts every page variable back to its starting value first, whatever variables the page has by then.
     public var reset: Bool?
 
-    public init(scene: String? = nil, url: String? = nil, set: [String: Bool]? = nil, toggle: [String]? = nil, reset: Bool? = nil) {
+    public init(scene: String? = nil, url: String? = nil, set: [String: ClickValue]? = nil, toggle: [String]? = nil, reset: Bool? = nil) {
         self.reset = reset == true ? true : nil
         self.scene = scene
         self.url = url.flatMap(Self.allowed)
@@ -331,7 +331,7 @@ public struct ClickAction: Codable, Equatable, Sendable {
         else { toggle = try c.decodeIfPresent(String.self, forKey: .toggle).map { [$0] } }
         self.init(scene: try c.decodeIfPresent(String.self, forKey: .scene),
                   url: try c.decodeIfPresent(String.self, forKey: .url),
-                  set: try c.decodeIfPresent([String: Bool].self, forKey: .set)?.filter { PageState.isName($0.key) },
+                  set: try c.decodeIfPresent([String: ClickValue].self, forKey: .set)?.filter { PageState.isName($0.key) },
                   toggle: toggle?.filter(PageState.isName),
                   reset: (try? c.decodeIfPresent(Bool.self, forKey: .reset)) ?? nil)
     }
@@ -391,7 +391,7 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var symbols: [Symbol]?
     /// The page's variables and their starting values (see `PageState`): clicks change them on the web, and
     /// elements with a `when` follow them.
-    public var variables: [String: Bool]?
+    public var variables: [String: Var]?
     /// Traffic the players route over the connectors drawn in each frame (`Flow`, ADR 0002).
     public var flows: [Flow]?
 

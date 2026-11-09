@@ -312,13 +312,17 @@ extension DottieScript {
             /** An http, https or mailto link, opened in a new tab. */
             url?: string;
             /** Page variables to give these values, without stopping or moving the animation. */
-            set?: Record<string, boolean>;
+            /** Page variables to give values: true or false, a number, or an expression worked out from the state
+             * before the click, like "count + 1" or "(stage + 1) % 3". */
+            set?: Record<string, boolean | number | string>;
             /** Page variables to flip, after set. */
             toggle?: string | string[];
         }
 
-        /** A condition on page variables: names, each optionally after !, joined by && and ||, like "down" or
-         * "east && !west". The element, and the connectors attached to it, is drawn only while it holds. */
+        /** A condition on page variables, like "down", "east && !west" or "count >= 3 && stage % 2 == 0": names,
+         * numbers, true and false, ! and -, * / %, + -, < <= > >= == !=, && and ||, parentheses, the functions min, max,
+         * abs, floor, ceil, round and clamp, and metrics like load(workers) (in overrides). The element, and the
+         * connectors attached to it, is drawn only while it holds. */
         type Condition = string;
 
         /** A change to an element while `when` holds; a field left out keeps the element's own. */
@@ -724,9 +728,9 @@ extension DottieScript {
             /** Makes a scene (named by its name or its time) loop, or with false stop as usual. */
             loopScene(scene: string | number, loop?: boolean): void;
             /** A page variable and its starting value (default false); null removes it. Returns every variable. */
-            variable(name: string, value?: boolean | null): Record<string, boolean>;
+            variable(name: string, value?: boolean | number | null): Record<string, boolean | number>;
             /** The page's variables and their starting values. */
-            variables(): Record<string, boolean>;
+            variables(): Record<string, boolean | number>;
             /** The page's theme and palette; with options, sets them first. Changing a palette color recolors every
              * shape whose color was given by that name. */
             theme(options?: ThemeOptions): ThemeInfo;
@@ -763,7 +767,7 @@ extension DottieScript {
              * (`update` with `overrides` replaces the list.) */
             addOverride(target: Ref, override: Override): Element;
             /** The page's metrics at a time (default 0) and state (default the starting values). */
-            metrics(options?: { at?: number; state?: Record<string, boolean>; since?: number }): Metrics;
+            metrics(options?: { at?: number; state?: Record<string, boolean | number>; since?: number }): Metrics;
             /** The page's flows. */
             flows(): FlowInfo[];
             /** Removes a flow; returns whether there was one. */
@@ -771,7 +775,7 @@ extension DottieScript {
             /** A clean button whose click (on the web) flips `toggles` or sets `sets`; it looks pressed (filled, and
              * `onText` as its label) while on. Variables it names are added, starting false. */
             button(options: { text: string; x?: number; y?: number; after?: Ref; width?: number; height?: number; toggles?: string;
-                sets?: Record<string, boolean>; onText?: string; color?: Color }): Element;
+                sets?: Record<string, boolean | number | string>; onText?: string; color?: Color }): Element;
             /** Buttons of which exactly one is on: one variable per option (`<name>_<option>`), each click setting its own
              * true and the others false. `initial` (default the first) starts on. Each button comes with its variable. */
             choice(name: string, options: string[], o?: { x?: number; y?: number; after?: Ref; direction?: "row" | "column";

@@ -3,7 +3,7 @@ import XCTest
 
 /// Controls (ADR 0003): buttons, choices, reset and legend, written as ordinary clicks, variables and overrides.
 final class ControlsTests: XCTestCase {
-    private func pick(_ doc: DottieDocument, _ id: UUID, _ values: [String: Bool]) -> Element? {
+    private func pick(_ doc: DottieDocument, _ id: UUID, _ values: [String: Var]) -> Element? {
         doc.posed(at: 0, state: .values(values)).elements.first { $0.id == id }
     }
 
@@ -80,7 +80,7 @@ final class ControlsTests: XCTestCase {
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].label.text, "a → b")
         XCTAssertEqual(doc.flows?[0].when, "show_1")
-        func packets(_ v: [String: Bool]) -> Int {
+        func packets(_ v: [String: Var]) -> Int {
             doc.posed(at: 1, state: .values(v)).elements.filter { $0.kind == .ellipse && $0.id != rows[0].swatch.id }.count
         }
         XCTAssertGreaterThan(packets(["show_1": true]), 0)

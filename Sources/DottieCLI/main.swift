@@ -131,11 +131,11 @@ struct RenderOptions {
     /// Read the file on disk even when the app has it open with unsaved edits.
     var disk = false
     /// Starting values for the page's variables (`--state`), so the render shows that state.
-    var state: [String: Bool] = [:]
+    var state: [String: Var] = [:]
 }
 
 /// `--state down=true,east=false` (or `down,!east`), merged into `into`.
-func parseState(_ spec: String, into: inout [String: Bool]) throws {
+func parseState(_ spec: String, into: inout [String: Var]) throws {
     do { into.merge(try PageState.assignments(spec)) { _, new in new } }
     catch { throw CLIError(message: "--state: \(error)", code: 2) }
 }
@@ -342,7 +342,7 @@ func runRender(_ args: [String]) -> Int32 {
 }
 
 func runInspect(_ args: [String]) -> Int32 {
-    var input: String?, page: String?, times: [Double] = [], disk = false, state: [String: Bool] = [:]
+    var input: String?, page: String?, times: [Double] = [], disk = false, state: [String: Var] = [:]
     var i = 0
     while i < args.count {
         let a = args[i]
@@ -388,7 +388,7 @@ func runInspect(_ args: [String]) -> Int32 {
 
 func runSimulate(_ args: [String]) -> Int32 {
     enum Step { case click(String), wait(Double), next, snapshot(String) }
-    var input: String?, page: String?, scene: String?, disk = false, state: [String: Bool] = [:], scale: Double?
+    var input: String?, page: String?, scene: String?, disk = false, state: [String: Var] = [:], scale: Double?
     var records: [String] = []
     var steps: [Step] = []
     var i = 0
