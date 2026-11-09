@@ -167,3 +167,83 @@ extension Exporter {
         return out
     }
 }
+
+extension DottieFile {
+    /// What `drillIn` made or found: the page the shape now leads to, the shape there its link lands on, and the
+    /// shape there that leads back.
+    public struct DrillIn: Equatable, Sendable {
+        public var page: UUID
+        public var title: UUID
+        public var back: UUID?
+        /// Whether the page is new.
+        public var newPage: Bool
+    }
+
+    /// Makes shape `id` lead to a page of its own, for a drawing people drill into: clicking it shows that page in
+    /// the app (its link) and in the web exports of every page. The page is the one the shape already links to,
+    /// else the one called `pageName` (any case), else a new page after the shape's, with its theme. Its name is
+    /// `pageName`, else the shape's first line of text, its anchor, or "Details". The link lands on a title naming
+    /// the page, made at the top if the page has none; with `back`, a "← page" shape there leads back to the shape.
+    @discardableResult
+    public mutating func drillIn(from id: UUID, pageName: String? = nil, back: Bool = true) throws -> DrillIn {
+        guard let from = pageIndex(containing: id), let source = pages[from].elements.first(where: { $0.id == id }) else {
+            throw OpsError.invalid("No element \(id.uuidString) on any page")
+        }
+        guard source.kind != .connector else { throw OpsError.invalid("A connector can't lead to a page; use a shape") }
+        let asked = pageName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let line = source.text?.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty }
+        let name = asked ?? line ?? source.anchor?.nilIfEmpty ?? "Details"
+        // The page: the one it leads to already, else one of that name, else a new one.
+        var target: Int?
+        if asked == nil, let link = source.link, let j = pageIndex(containing: link), j != from { target = j }
+        if target == nil, let j = pages.indices.first(where: { $0 != from && pages[$0].name.caseInsensitiveCompare(name) == .orderedSame }) {
+            target = j
+        }
+        let newPage = target == nil
+        if target == nil {
+            let pid = addPage(name: name, after: pages[from].id)
+            let j = index(of: pid)!
+            pages[j].theme = pages[from].theme
+            pages[j].customTheme = pages[from].customTheme
+            target = j
+        }
+        let j = target!
+        var page = pages[j]
+        let shapes = page.elements.filter { $0.kind != .connector }
+        let top = shapes.isEmpty ? 40.0 : Double(shapes.map(\.frame.minY).min()!)
+        let left = shapes.isEmpty ? 40.0 : Double(shapes.map(\.frame.minX).min()!)
+        // The title: what the shape leads to on that page already, else text naming the page, else a new one.
+        var title = source.link.flatMap { l in page.elements.first { $0.id == l } }
+            ?? page.elements.first { $0.kind == .text && $0.text?.trimmingCharacters(in: .whitespaces).caseInsensitiveCompare(page.name) == .orderedSame }
+        var above = top
+        if title == nil {
+            let y = shapes.isEmpty ? 100.0 : top - 70
+            title = try DiagramOps.addShape(&page, kind: .text, frame: nil, at: CGPoint(x: left, y: y), text: page.name,
+                                            fill: nil, stroke: nil, roughness: nil, look: DiagramOps.Look(fontSize: 28))
+            above = y
+        }
+        var backID: UUID?
+        if back {
+            if let existing = page.elements.first(where: { $0.link == id }) {
+                backID = existing.id
+            } else {
+                let y = shapes.isEmpty && newPage ? 40.0 : above - 60
+                var e = try DiagramOps.addShape(&page, kind: .rectangle, frame: nil, at: CGPoint(x: left, y: y),
+                                                text: "← \(pages[from].name)", fill: nil, stroke: nil, roughness: nil)
+                e.link = id
+                page.elements[page.elements.count - 1] = e
+                backID = e.id
+            }
+        }
+        pages[j] = page
+        if let k = pages[from].elements.firstIndex(where: { $0.id == id }) {
+            pages[from].elements[k].link = title!.id
+            pages[from].elements[k].url = nil
+        }
+        return DrillIn(page: page.id, title: title!.id, back: backID, newPage: newPage)
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}

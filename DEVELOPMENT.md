@@ -222,7 +222,12 @@ file or absolute, with an optional `#name` that `DottieFile.destination` finds a
 case) or else a page name or number. An element has one or the other: setting either clears the other. PDF export
 makes `url` web links clickable and `link`s jump, across pages in a multi-page PDF; SVG export wraps web links in
 `<a>`; the web players open a web `url` when the shape has no `click`. Links to other drawings are followed only in
-the app.
+the app. A `link` to a shape on another page works in the web players when they have that page: the HTML export of
+every page (`Exporter.player(file:)`, `--all-pages`) shows it, with the player's `history` giving each page an
+address, and the export split a page per file (`Exporter.playerPages`, `--split`, file names from
+`pageFileNames`) gives each page's player a `links` map to the other files. `DottieFile.drillIn` (MCP `drill_in`) sets up one such
+link: a page for the shape, a title it lands on, and a shape leading back. `Simulation(file:)` follows these links
+as the export of every page does, and `back()` returns.
 An element's `click` (a scene name or an `http`, `https` or `mailto` link) and `hover` look are only used by the
 web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read. A symbol with
 `button: true` is a button: its copies always show its `up` scene (else the start), whatever their playback, and
@@ -380,6 +385,8 @@ Settings writes `disabled.json` in the same folder.
 dottie render a.dottie b.dottie -f html -d out/   # several files into a directory
 dottie render diagram.dottie --clean --scale 3 -o - > clean.png
 dottie render diagram.dottie --page Details
+dottie render diagram.dottie --all-pages -o site.html   # every page in one web page, linked
+dottie render diagram.dottie --split -o site/           # index.html and a file per other page
 dottie render flow.mmd -o flow.svg                # a Mermaid flowchart, laid out like import_mermaid
 dottie render diagram.dottie -f mermaid -o -       # shapes and connectors as Mermaid text
 dottie library list

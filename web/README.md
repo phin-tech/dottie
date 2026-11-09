@@ -28,6 +28,8 @@ prefer reduced motion. A still page is just the drawing.
 | `clean` | Draw precisely instead of sketchy |
 | `no-controls`, `no-autoplay`, `no-loop` | |
 | `label` | The accessible name; the page name by default |
+| `history` | Each page a link shows gets its own address (`#` and the page's name), so Back and Forward go between pages and a link can open any of them. One such player to a page |
+| `links` | JSON from the id of an element a link points at to the web page that shows it (`{"…": "details.html"}`), for a drawing exported one page per file: a link to another page goes there. Only relative `.html` paths are followed |
 
 Elements the drawing makes clickable work with the mouse and the keyboard (Tab, then Enter or Space). A click plays
 a named scene on to the next one, opens a link in a new tab (only `http`, `https` and `mailto`), or shows the page a
@@ -43,7 +45,8 @@ region a click took down. A looping scene plays round until a click or next leav
 
 The element has `play()`, `pause()`, `nextScene()`, `prevScene()`, `activate(elementId)`, `currentTime`
 (settable), `duration`, `paused`, `variables` and `setState({name: value})`, and fires `load`, `frame`, `action`,
-`state` (with `{variables}`, after a change) and `error` events. Its page color comes from the drawing's theme; set
+`state` (with `{variables}`, after a change), `page` (with `{index, name, first}`, when the page shown changes) and
+`error` events. Its page color comes from the drawing's theme; set
 `--dottie-radius` to round it, and style its parts with `::part(stage)` and `::part(controls)`.
 
 Without modules, `dist/dottie-player.min.js` is a classic script that registers the element and sets
@@ -93,7 +96,9 @@ handwriting fonts the drawing uses (15 to 30 KB each), so one file shows it anyw
 ```
 
 `dottie-compile` takes `--page`, `--at`, `--clean`, `--no-controls`, `--no-autoplay`, `--no-loop` and `--label`;
-only the chosen page (and its pictures) goes in. The Dottie Mac app's command-line tool writes the same file:
+only the chosen page (and its pictures) goes in. With `--all-pages` every page goes in, for a drawing people drill
+into: a link to a shape on another page shows that page, each page gets its own address (`tour.html#Details`), and
+Back goes back (`--page` is then the page to start on). The Dottie Mac app's command-line tool writes the same file:
 `dottie render tour.dottie -f js`. From code: `import { compile } from "@phin-tech/dottie/compile"`.
 
 ## Use the library

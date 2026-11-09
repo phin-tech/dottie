@@ -149,6 +149,13 @@ struct DottieCommands: Commands {
             }
             .disabled(editor == nil)
             exportAnimationMenu
+            Menu("Export Pages as Web Page") {
+                Button("One File…") { editor?.exportWebPages(true) }
+                    .help("Every page in one HTML file: links between pages show them, and Back goes back")
+                Button("A File per Page…") { editor?.exportWebPages(false) }
+                    .help("A folder with index.html for the first page and a file for each other page, linked to each other")
+            }
+            .disabled(editor == nil)
         }
         CommandMenu("Page") {
             let pages = editor?.pageCount ?? 0

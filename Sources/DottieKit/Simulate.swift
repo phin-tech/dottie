@@ -6,28 +6,39 @@ import Foundation
 /// It follows the web player's rules (web/src/player.ts, `Playback.step`, `DottiePlayer.activate`, `nextScene`):
 /// playing steps whole frames of the timeline; it stops on reaching a scene, and at the end when the page has scenes
 /// (otherwise it goes round); a looping scene plays round from its end to its start. A click sets and flips its
-/// variables, then jumps to its scene and plays on. Links and other pages are reported, not followed; a symbol copy
-/// that replays when clicked isn't played.
+/// variables, then jumps to its scene and plays on. Web links are reported, not followed. Given the whole drawing
+/// (`init(file:)`), a link to a shape on another page shows that page, as the HTML export of every page does, and
+/// `back` returns as the browser's Back does; otherwise those are reported too. A symbol copy that replays when
+/// clicked isn't played.
 public struct Simulation: Sendable {
-    public let doc: DottieDocument
+    /// The page playing.
+    public private(set) var doc: DottieDocument
+    /// The whole drawing, when links to its other pages are followed.
+    public let file: DottieFile?
+    /// Which of `file`'s pages is playing.
+    public private(set) var pageIndex = 0
+    /// The pages links went from, for `back`.
+    public private(set) var visited: [Int] = []
     /// The times of the frames playing steps through (`Timeline.frameTimes`); one frame, 0, without a timeline.
-    let times: [Double]
+    private(set) var times: [Double] = [0]
     /// Each scene's first frame, its name, and whether it loops, in marker order.
-    let scenes: [Int]
-    let sceneNames: [String]
-    let sceneLoops: [Bool]
+    private(set) var scenes: [Int] = []
+    private(set) var sceneNames: [String] = []
+    private(set) var sceneLoops: [Bool] = []
     /// The frame drawn now.
-    public private(set) var frame: Int
+    public private(set) var frame = 0
     /// Whether the page is playing.
-    public private(set) var playing: Bool
+    public private(set) var playing = false
     /// The page's variables now.
-    public private(set) var state: [String: Var]
+    public private(set) var state: [String: Var] = [:]
     /// Seconds played since the variables last changed: how long backlog has been piling up.
     public private(set) var sinceChange = 0.0
     /// What each queue held when the variables last changed, which it drains from (`FrameMetrics.carry`).
     public private(set) var carried: [String: Double] = [:]
     /// Every frame shown since `record()`, for a video of the run (`Exporter.gif(_:)`, `mp4(_:)`); nil when not recording.
     public private(set) var recording: Recording?
+    /// Which of the recording's pages is showing.
+    private var recordedPage = 0
     /// Whether clicks run the page's logic (ADR 0007), as a player with `allow-logic` does; else their `set` and
     /// `toggle`.
     public var allowLogic = true
@@ -35,6 +46,22 @@ public struct Simulation: Sendable {
     /// Starts as the player does: at the start, playing unless the first scene is there and doesn't loop. With
     /// `scene`, at that scene, playing on from it.
     public init(_ doc: DottieDocument, scene: String? = nil) throws {
+        self.doc = doc
+        file = nil
+        try show(doc, scene: scene)
+    }
+
+    /// Plays page `page` of `file`, following links to its other pages.
+    public init(file: DottieFile, page: Int = 0, scene: String? = nil) throws {
+        guard file.pages.indices.contains(page) else { throw OpsError.invalid("No page \(page + 1)") }
+        doc = file.pages[page]
+        self.file = file
+        pageIndex = page
+        try show(doc, scene: scene)
+    }
+
+    /// Starts `doc` as the player does on showing a page: its starting variables, at the start (or `scene`).
+    private mutating func show(_ doc: DottieDocument, scene: String? = nil) throws {
         self.doc = doc
         let tl = doc.timeline
         times = tl?.frameTimes ?? [0]
@@ -47,6 +74,8 @@ public struct Simulation: Sendable {
         sceneNames = markers.map(\.name)
         sceneLoops = markers.map { $0.loop == true }
         state = doc.variables ?? [:]
+        sinceChange = 0
+        carried = [:]
         frame = 0
         playing = false
         if let scene {
@@ -58,6 +87,25 @@ public struct Simulation: Sendable {
         } else {
             setPlaying(!scenes.contains(0) || sceneLoops[scenes.firstIndex(of: 0)!])
         }
+    }
+
+    /// Shows page `i` of the file, as a link does; a recording goes on with it.
+    private mutating func go(to i: Int) {
+        guard let file else { return }
+        pageIndex = i
+        try? show(file.pages[i])
+        // The frames waiting records from now on show this page.
+        guard recording != nil else { return }
+        if let k = recording!.pages.firstIndex(where: { $0.id == doc.id }) { recordedPage = k }
+        else { recording!.pages.append(doc); recordedPage = recording!.pages.count - 1 }
+    }
+
+    /// Goes back to the page the last link left, as the browser's Back does. Returns what it did, in words.
+    @discardableResult
+    public mutating func back() -> String {
+        guard let last = visited.popLast(), let file else { return "nothing to go back to" }
+        go(to: last)
+        return "back to page \(file.pages[last].name)"
     }
 
     var frameCount: Int { times.count }
@@ -98,12 +146,16 @@ public struct Simulation: Sendable {
 
     /// Starts recording: from now on, every frame shown is kept, this one first (`recording`).
     public mutating func record() {
-        recording = Recording(doc: doc, fps: Timeline.clampFPS(doc.timeline?.fps ?? Recording.stillFPS), frames: [])
+        recording = Recording(doc: doc, fps: Timeline.clampFPS(doc.timeline?.fps ?? Recording.stillFPS), frames: [], pages: [doc])
+        recordedPage = 0
         recording!.frames.append(snapshot)
     }
 
     /// The moment drawn now, as a recording keeps it.
-    var snapshot: Recording.Frame { Recording.Frame(time: time, state: state, since: sinceChange, carried: carried) }
+    var snapshot: Recording.Frame {
+        Recording.Frame(time: time, state: state, since: sinceChange, carried: carried,
+                        page: recordedPage)
+    }
 
     /// Plays for `seconds` (whole frames at the timeline's rate), as the player's tick does. While recording, each
     /// frame shown is kept, played or held.
@@ -194,7 +246,19 @@ public struct Simulation: Sendable {
         } else if let url = c?.url ?? e.outsideLink?.webAddress {
             did.append("opens \(url) (not followed)")
         } else if c == nil || !(c!.changesState), let link = e.link {
-            did.append("shows the page with \(link.uuidString) (not followed)")
+            if let file, let j = file.pageIndex(containing: link) {
+                if j == pageIndex {
+                    did.append("links to \(link.uuidString) on this page, which does nothing on the web")
+                } else {
+                    visited.append(pageIndex)
+                    go(to: j)
+                    did.append("shows page \(file.pages[j].name)")
+                }
+            } else if file != nil {
+                did.append("links to \(link.uuidString), which is on no page")
+            } else {
+                did.append("shows the page with \(link.uuidString) (not followed)")
+            }
         }
         if let name = c?.scene, !name.isEmpty, DottieDocument.scene(named: name, in: markers) == nil {
             did.append("names scene '\(name)', which isn't on the page")
@@ -214,6 +278,7 @@ public struct Simulation: Sendable {
     /// One line on where the page is: time, scene, playing, variables and what they hide.
     public var summary: String {
         var parts = [String(format: "t=%.2fs", time)]
+        if let file, file.pages.count > 1 { parts.insert("page \(doc.name)", at: 0) }
         if let scene { parts.append("scene \(scene)") }
         parts.append(playing ? "playing" : "stopped")
         if !state.isEmpty { parts.append(state.keys.sorted().map { "\($0)=\(state[$0]!)" }.joined(separator: " ")) }
@@ -242,6 +307,8 @@ extension Simulation {
         /// Frames a second: the timeline's.
         public let fps: Double
         public var frames: [Frame]
+        /// The pages the run showed, `doc` first, for a run that followed links (`Frame.page`).
+        public var pages: [DottieDocument] = []
 
         /// One frame: the moment, the variables, and the queues' inputs (ADR 0003).
         public struct Frame: Sendable, Equatable {
@@ -249,11 +316,14 @@ extension Simulation {
             public var state: [String: Var]
             public var since: Double
             public var carried: [String: Double]
+            /// Which of `pages` it shows.
+            public var page = 0
         }
 
         /// Frame `i` as drawn.
         public func picture(_ i: Int) -> DottieDocument {
             let f = frames[i]
+            let doc = pages.indices.contains(f.page) ? pages[f.page] : self.doc
             return doc.resolved(at: f.time, state: .values(f.state), since: f.since, carried: f.carried)
         }
     }

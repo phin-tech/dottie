@@ -1275,7 +1275,7 @@ extension EditorActions {
             selectionCount: selectionCount, grouped: false, group: {}, ungroup: {}, contain: {},
             instanceSelected: false, editingSymbol: false, makeSymbol: {}, breakApart: {}, editSymbol: {},
             doneEditingSymbol: {}, align: { _ in }, distribute: { _ in }, reorder: { _ in }, export: { _ in },
-            exportAnimation: { _ in }, openScriptConsole: {}, runScriptFile: { _ in }, pageCount: 1, newPage: {},
+            exportAnimation: { _ in }, exportWebPages: { _ in }, openScriptConsole: {}, runScriptFile: { _ in }, pageCount: 1, newPage: {},
             duplicatePage: {}, deletePage: {}, showPage: { _ in }, renamePage: {}, movePage: { _ in }, pageIndex: 0,
             linkSelected: false, linkToElement: {}, removeLink: {}, hasAnimation: false, boils: false, settles: false,
             connectorsSelected: 0, newAnimation: {}, editTiming: {}, removeAnimation: {}, addTransition: { _ in },

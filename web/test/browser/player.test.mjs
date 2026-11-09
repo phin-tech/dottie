@@ -401,6 +401,40 @@ test("the HTML export is <dottie-player>: a click plays its scene, with hover, k
   await close();
 });
 
+test("the HTML export of every page: a link shows its page at its own address, and Back goes back", async () => {
+  const { page, errors, close } = await exported("clicks-all");
+  const shownPage = () => page.evaluate(() => document.querySelector("dottie-player").playback.page.name);
+  assert.equal(await shownPage(), "Overview");
+  await page.click(button("Details"));
+  await page.waitForFunction(() => document.querySelector("dottie-player").playback.page.name === "Details");
+  assert.equal(new URL(page.url()).hash, "#Details");
+  await page.waitForFunction(() => document.title.startsWith("Details ·"));
+  await page.goBack();
+  await page.waitForFunction(() => document.querySelector("dottie-player").playback.page.name === "Overview");
+  await page.goForward();
+  await page.waitForFunction(() => document.querySelector("dottie-player").playback.page.name === "Details");
+  // An address that names a page opens on it.
+  await page.goto("http://dottie.test/fixtures/goldens/html/clicks-all.html#details");
+  await ready(page);
+  assert.equal(await shownPage(), "Details");
+  assert.deepEqual(errors, []);
+  await close();
+});
+
+test("the HTML export split into a file per page: a link goes to the page's file, and Back comes back", async () => {
+  const { page, errors, close } = await exported("clicks-split/index");
+  await page.click(button("Details"));
+  await page.waitForURL("**/clicks-split/details.html");
+  await ready(page);
+  assert.equal(await page.evaluate(() => document.querySelector("dottie-player").playback.page.name), "Details");
+  await page.goBack();
+  await page.waitForURL("**/clicks-split/index.html");
+  await ready(page);
+  assert.equal(await page.locator(button("Details")).count(), 1);
+  assert.deepEqual(errors, []);
+  await close();
+});
+
 test("the HTML export with reduced motion jumps straight to the stop", async () => {
   const { page, close } = await exported("clicks", { reducedMotion: "reduce" });
   await page.click(button("Auth"));

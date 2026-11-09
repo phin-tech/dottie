@@ -13,6 +13,11 @@
 // `when` without touching the playhead. Each click first fires a cancelable `action` event with the element and
 // what it does, so a page can handle it itself; a change of variables then fires `state`. A looping scene
 // (`loop` on a marker) plays round until a click or next/back leaves it, instead of stopping.
+//
+// A drawing of several pages: `history` gives each page shown through a link its own address (`#` and the page's
+// name), so the browser's Back and Forward go between them and a link can open any page; a `page` event fires each
+// time the page shown changes. `links` (JSON: the id of an element a link points at, to the web page that shows it)
+// is for a drawing exported one page per file: a link to another page then goes to that file.
 
 import { addFonts, usedFonts } from "./fonts.ts";
 import { CLICK_STYLE, type Click, buttonLabel, clickTargets, hasHover, hovered, partsOf } from "./clicks.ts";
@@ -106,12 +111,13 @@ export class Playback {
   frame = -1;
   onFrame: ((frame: number) => void) | null = null;
 
-  /** `file` is the drawing `page` belongs to, so links to its other pages are clickable. */
-  constructor(page: Page, into: Element, options: { clean?: boolean; file?: DottieFile } = {}) {
+  /** `file` is the drawing `page` belongs to, so links to its other pages are clickable; `hrefs`, the web pages that
+   * show the elements links point at, for pages that aren't in it (clickTargets). */
+  constructor(page: Page, into: Element, options: { clean?: boolean; file?: DottieFile; hrefs?: Record<string, string> } = {}) {
     this.page = options.clean ? cleanCopy(page) : page;
     addFonts(usedFonts(this.page));
     this.plan = plan(this.page);
-    this.clicks = clickTargets(page, options.file);
+    this.clicks = clickTargets(page, options.file, options.hrefs);
     const table = symbolTable(this.page);
     for (const e of this.page.elements) {
       const s = e.kind === "symbol" && e.symbol !== null ? table.get(e.symbol) : undefined;
@@ -333,7 +339,7 @@ function cleanCopy(page: Page): Page {
 const ElementBase: typeof HTMLElement = typeof HTMLElement === "undefined" ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
 export class DottiePlayer extends ElementBase {
-  static observedAttributes = ["src", "page", "at", "clean", "no-controls", "label", "allow-logic"];
+  static observedAttributes = ["src", "page", "at", "clean", "no-controls", "label", "allow-logic", "history", "links"];
 
   file: DottieFile | null = null;
   playback: Playback | null = null;
@@ -358,6 +364,9 @@ export class DottiePlayer extends ElementBase {
   private stillTime: number | null = null;
   private visible = true;
   private observer: IntersectionObserver | null = null;
+  /** The page last shown, so `page` fires only when it changes. */
+  private shownPage: Page | null = null;
+  private readonly onPopState = (): void => { if (this.file) this.mount(); };
 
   constructor() {
     super();
@@ -401,6 +410,7 @@ export class DottiePlayer extends ElementBase {
       this.observer = new IntersectionObserver((entries) => { this.visible = entries.some((e) => e.isIntersecting); this.schedule(); });
       this.observer.observe(this);
     }
+    if (this.hasAttribute("history")) window.addEventListener("popstate", this.onPopState);
     void this.load();
   }
 
@@ -408,10 +418,15 @@ export class DottiePlayer extends ElementBase {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.observer?.disconnect();
+    window.removeEventListener("popstate", this.onPopState);
   }
 
   attributeChangedCallback(name: string, old: string | null, value: string | null): void {
     if (old === value || !this.isConnected) return;
+    if (name === "history") {
+      if (value === null) window.removeEventListener("popstate", this.onPopState);
+      else window.addEventListener("popstate", this.onPopState);
+    }
     if (name === "src") void this.load();
     else if (name === "label") this.stage.setAttribute("aria-label", value ?? "");
     else if (this.file) this.mount();
@@ -465,6 +480,7 @@ export class DottiePlayer extends ElementBase {
 
   private showFile(file: DottieFile): void {
     this.file = file;
+    this.shownPage = null;
     for (const w of file.warnings) console.warn(`dottie-player: ${w}`);
     this.mount(() => this.dispatchEvent(new CustomEvent("load", { detail: { file } })));
   }
@@ -473,7 +489,7 @@ export class DottiePlayer extends ElementBase {
    * showing stays until it is ready; a newer mount, file or failed load in the meantime wins. */
   private mount(mounted?: () => void): void {
     const file = this.file!;
-    const page = file.pages[pageIndex(file, this.getAttribute("page"))];
+    const page = file.pages[this.addressedPage(file) ?? pageIndex(file, this.getAttribute("page"))];
     const clean = this.hasAttribute("clean");
     const token = ++this.mountToken;
     const shown = clean ? cleanCopy(page) : page;
@@ -485,10 +501,35 @@ export class DottiePlayer extends ElementBase {
     });
   }
 
+  /** With `history`, the page the address names after its `#` (by name, any case), if it names one. */
+  private addressedPage(file: DottieFile): number | null {
+    if (!this.hasAttribute("history") || typeof location === "undefined" || location.hash.length < 2) return null;
+    let name: string;
+    try { name = decodeURIComponent(location.hash.slice(1)); } catch { return null; }
+    const i = file.pages.findIndex((p) => p.name.toLowerCase() === name.toLowerCase());
+    return i >= 0 ? i : null;
+  }
+
+  /** The `links` attribute read: element id to web page, the pages that can't be named left out. */
+  private hrefs(): Record<string, string> | undefined {
+    const raw = this.getAttribute("links");
+    if (!raw) return undefined;
+    let v: unknown;
+    try { v = JSON.parse(raw); } catch { console.warn("dottie-player: links isn't JSON"); return undefined; }
+    if (v === null || typeof v !== "object" || Array.isArray(v)) return undefined;
+    return v as Record<string, string>;
+  }
+
   private mountPage(file: DottieFile, page: Page, clean: boolean): void {
-    const p = new Playback(page, this.stage, { clean, file });
+    const p = new Playback(page, this.stage, { clean, file, hrefs: this.hrefs() });
     p.still = this.hasAttribute("at");
     this.playback = p;
+    if (this.shownPage !== page) {
+      const first = this.shownPage === null;
+      this.shownPage = page;
+      // After this mount has drawn, so a listener sees the new page.
+      queueMicrotask(() => this.dispatchEvent(new CustomEvent("page", { detail: { index: file.pages.indexOf(page), name: page.name, first } })));
+    }
     this.style.setProperty("--dottie-page", color(p.background));
     this.style.setProperty("--dottie-ink", color(p.ink));
     // Controls follow the drawing's page color, not the surrounding site's light or dark scheme.
@@ -585,7 +626,17 @@ export class DottiePlayer extends ElementBase {
     if ("url" in click) {
       if (/^(https?:|mailto:)/i.test(click.url)) window.open(click.url, "_blank", "noopener");
     } else if ("page" in click) {
-      this.setAttribute("page", String(click.page + 1));
+      const target = this.file?.pages[click.page];
+      if (this.hasAttribute("history") && target) {
+        // The address names the page, so Back comes here again; `page` stays the page to start on.
+        history.pushState(null, "", "#" + encodeURIComponent(target.name));
+        this.mount();
+      } else {
+        this.setAttribute("page", String(click.page + 1));
+      }
+    } else if ("href" in click) {
+      // A page of the drawing exported on its own: going there, in this tab, so Back returns.
+      location.assign(click.href);
     } else if (click.scene >= 0 && click.scene < p.scenes.length) {
       if (reduced || this.hasAttribute("at") || p.frameCount < 2) {
         this.setPlaying(false);

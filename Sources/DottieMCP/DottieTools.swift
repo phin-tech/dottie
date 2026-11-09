@@ -87,12 +87,12 @@ private let exportStateProp: Value = .object(["type": "object", "additionalPrope
         + "and an HTML player starts in it")])
 private let simulateStepItem: Value = .object(["type": "object", "properties": .object([
     "click": .object(["type": "string"]), "wait": .object(["type": "number"]),
-    "next": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
+    "next": .object(["type": "boolean"]), "back": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
     "metrics": .object(["type": "boolean"]), "routes": .object(["type": "boolean"]),
 ])])
 private let simulateStepsProp: Value = .object(["type": "array", "items": simulateStepItem,
     "description": .string("In order. Each is one of {\"click\": element id, its first characters, its text or anchor}, "
-        + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"snapshot\": true} (return a PNG) or "
+        + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"back\": true} (the browser's Back, after a click that followed a link to another page), {\"snapshot\": true} (return a PNG) or "
         + "{\"snapshot\": \"/abs/path.png\"} (also save it) or {\"metrics\": true} (the throughput, load, backlog and "
         + "transit of what has a capacity, delay or traffic, now) or {\"routes\": true} (each flow's ways now: the "
         + "destination, the connectors with their ids, the share of its volume, the cost, and why a flow reaches "
@@ -383,7 +383,9 @@ actor DottieTools {
                 "queue": prop("boolean", "Shapes: it's a queue (an SQS queue, a dock), so traffic that can't go on waits here, at the "
                     + "nearest queue before whatever is full, rather than right in front of it"),
                 "link": prop("string", "Id of a shape this element jumps to when its link badge is clicked in the app, on any page "
-                    + "(the app switches tabs to follow it); an empty string removes the link"),
+                    + "(the app switches tabs to follow it). On a shape on another page it is also how people drill in "
+                    + "on the web: export_animation's pages: all / split exports show that page when it is clicked "
+                    + "(drill_in sets one up, page and way back included). An empty string removes the link"),
                 "url": prop("string", "Where the link badge goes outside the drawing, instead of link: an http(s) or mailto link, or "
                     + "another drawing as a path relative to this file, optionally with #anchor (or #page name) to open it at, "
                     + "e.g. plans/next.dottie#Login. PDF and SVG exports make web links clickable, and the web players open them "
@@ -751,6 +753,20 @@ actor DottieTools {
                 "name": prop("string", "Page name; default \"Page N\". A number is added if the name is taken"),
                 "after": prop("string", "Insert after this page (name or number); default at the end"),
              ], required: ["path"])),
+        Tool(name: "drill_in",
+             description: "Make a shape lead to a page of its own, for a drawing people drill into (an overview whose "
+                + "boxes open their details): clicking the shape shows that page in the app and in export_animation's "
+                + "pages: all / split web exports. Uses the page the shape already links to, else the page called "
+                + "page_name, else adds one after the shape's page with its theme. The link lands on a title naming the "
+                + "page (added at the top if there is none), and a \"← <page>\" shape there leads back. Returns the "
+                + "page and ids; draw the details on that page with the usual tools (page: its name), then check the "
+                + "path with simulate (click the shape, then {back: true}).",
+             inputSchema: schema([
+                "path": pathProp,
+                "id": prop("string", "The shape to drill in from"),
+                "page_name": prop("string", "The page to lead to; default the shape's text (its first line), else its anchor"),
+                "back": prop("boolean", "Add a shape on that page leading back (default true)"),
+             ], required: ["path", "id"])),
         Tool(name: "rename_page",
              description: "Rename a page (tab).",
              inputSchema: schema(["path": pathProp, "page": prop("string", "Page to rename, by name or 1-based number"),
@@ -929,6 +945,11 @@ actor DottieTools {
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
                 "allow_logic": prop("boolean", "HTML only: let the page's click logic (set_logic) run in the exported page; it "
                     + "carries the sandboxed engine (about 850 KB). Off by default: clicks then do their own click_set / click_toggle"),
+                "pages": prop("string", "HTML only, for a drawing people drill into: all = every page in one .html, where a "
+                    + "link to a shape on another page shows that page, each page has its own address (#Page) and Back goes "
+                    + "back (`page` is the one to start on); split = out_path is a folder, with index.html for the first page "
+                    + "and a file named after each other page, linked to each other. Pages need no animation for either. "
+                    + "Default: just this page", enum: ["all", "split"]),
                 "state": exportStateProp,
              ], required: ["path", "out_path"])),
         Tool(name: "simulate",
@@ -936,7 +957,7 @@ actor DottieTools {
                 + "browser, to check it does what you built: clicks set and flip variables and jump to scenes, waits play "
                 + "on (stopping at each scene unless it loops, round a looping scene), snapshots return a PNG of that "
                 + "moment. Returns one line per step (time, scene, playing or stopped, variables, elements their "
-                + "conditions hide) and each snapshot as an image. Links and other pages are reported, not followed. "
+                + "conditions hide) and each snapshot as an image. A click on a shape that links to a shape on another page shows that page, as the HTML export of every page does, and {back: true} returns; web links are reported, not followed. "
                 + "With record_path, also writes the whole run, every frame a viewer would see, as a looping movie or GIF "
                 + "(end with a wait, or the last click's result never shows).",
              inputSchema: schema([
@@ -1063,6 +1084,54 @@ actor DottieTools {
             else { throw ToolFailure(message: "params.\(name) must be a number, boolean or text") }
         }
         return out
+    }
+
+    /// export_animation with `pages`: every page as one web page (`all`), or a folder of them (`split`).
+    private func exportPages(_ a: Args, mode: String) throws -> CallTool.Result {
+        guard mode == "all" || mode == "split" else { throw ToolFailure(message: "'pages' must be all or split") }
+        var file = try load(try fileURL(a))
+        let start = try pageIndex(file, a)
+        file.pages[start] = file.pages[start].starting(with: try a.state())
+        if let r = a.roughness { file.pages = file.pages.map { $0.withRoughness(r) } }
+        guard file.pages.contains(where: { !$0.elements.isEmpty }) else { throw ToolFailure(message: "The drawing is empty") }
+        let allow = a.bool("allow_logic") == true
+        // The tab's title: the drawing's file name.
+        let name = try fileURL(a).deletingPathExtension().lastPathComponent
+        var written: [String] = []
+        if mode == "all" {
+            let out = try fileURL(a, key: "out_path", ext: "html")
+            let startName = (a.string("page") ?? "").isEmpty ? nil : file.pages[start].name
+            guard let html = Exporter.player(file: file, title: name, start: startName, allowLogic: allow) else {
+                throw ToolFailure(message: "Rendering failed")
+            }
+            try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(html.utf8).write(to: out, options: .atomic)
+            written = [out.path]
+        } else {
+            let raw = (try a.require("out_path") as NSString).expandingTildeInPath
+            guard raw.hasPrefix("/") else { throw ToolFailure(message: "'out_path' must be an absolute path") }
+            guard !raw.lowercased().hasSuffix(".html") else {
+                throw ToolFailure(message: "With pages: split, out_path is a folder for the pages (index.html and the rest)")
+            }
+            let folder = URL(fileURLWithPath: raw, isDirectory: true)
+            guard let pages = Exporter.playerPages(file, title: name, allowLogic: allow) else { throw ToolFailure(message: "Rendering failed") }
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for (page, html) in pages {
+                let target = folder.appendingPathComponent(page)
+                try Data(html.utf8).write(to: target, options: .atomic)
+                written.append(target.path)
+            }
+        }
+        let links = file.pages.reduce(0) { $0 + $1.elements.filter { $0.link != nil }.count }
+        var lines = ["Exported \(file.pages.count) page\(file.pages.count == 1 ? "" : "s") (\(file.pages.map(\.name).joined(separator: ", "))) to:"]
+        lines += written.map { "  " + $0 }
+        if links == 0, file.pages.count > 1 {
+            lines.append("No shape links to another page yet: link shapes (link) so people can drill in.")
+        }
+        var content: [Tool.Content] = [.plain(lines.joined(separator: "\n"))]
+        let still = file.pages[start].still
+        if !still.elements.isEmpty, let png = Exporter.png(still, scale: 1) { content.insert(.png(png), at: 0) }
+        return .init(content: content)
     }
 
     private func fileURL(_ args: Args, key: String = "path", ext: String = "dottie") throws -> URL {
@@ -1764,6 +1833,23 @@ actor DottieTools {
             let i = file.index(of: id)!
             return text("Added page \"\(file.pages[i].name)\" (\(i + 1) of \(file.pages.count))")
 
+        case "drill_in":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let id = try a.uuid("id")
+            let made: DottieFile.DrillIn
+            do { made = try file.drillIn(from: id, pageName: a.string("page_name"), back: a.bool("back") ?? true) }
+            catch { throw ToolFailure(message: "\(error)") }
+            try save(file, to: url)
+            let i = file.index(of: made.page)!
+            var lines = ["\(made.newPage ? "Added" : "Using") page \"\(file.pages[i].name)\" (\(i + 1) of \(file.pages.count)): "
+                         + "\(id.uuidString) now leads to its title \(made.title.uuidString)"]
+            if let back = made.back { lines.append("Back: \(back.uuidString) leads back to \(id.uuidString)") }
+            lines.append("Draw the details on page \"\(file.pages[i].name)\"; export with export_animation pages: all or split.")
+            var content: [Tool.Content] = [.plain(lines.joined(separator: "\n"))]
+            if let png = Exporter.png(file.pages[i].still, scale: 1) { content.insert(.png(png), at: 0) }
+            return .init(content: content)
+
         case "rename_page":
             let url = try fileURL(a)
             var file = try load(url)
@@ -1842,6 +1928,9 @@ actor DottieTools {
             return try animation(name, a)
 
         case "export_animation":
+            if let pages = try a.string("pages") {
+                return try exportPages(a, mode: pages)
+            }
             let file = try load(try fileURL(a))
             var doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             if let r = a.roughness { doc = doc.withRoughness(r) }
@@ -1983,13 +2072,14 @@ actor DottieTools {
 
     /// The `simulate` tool: plays the page through the steps with `Simulation`.
     fileprivate func simulate(_ a: Args) throws -> CallTool.Result {
-        let file = try load(try fileURL(a))
-        let doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
+        var file = try load(try fileURL(a))
+        let start = try pageIndex(file, a)
+        file.pages[start] = file.pages[start].starting(with: try a.state())
         guard let steps = a.array("steps"), !steps.isEmpty else { throw ToolFailure(message: "Missing required argument 'steps'") }
         guard steps.count <= 200 else { throw ToolFailure(message: "At most 200 steps") }
         let scale = min(max(a.double("scale") ?? 1, 0.25), 4)
         var sim: Simulation
-        do { sim = try Simulation(doc, scene: a.string("start")) } catch { throw ToolFailure(message: "\(error)") }
+        do { sim = try Simulation(file: file, page: start, scene: a.string("start")) } catch { throw ToolFailure(message: "\(error)") }
         let recordURL = try a.string("record_path").map { path -> URL in
             let ext = URL(fileURLWithPath: path).pathExtension.lowercased()
             guard ["mp4", "gif", "png"].contains(ext) else { throw ToolFailure(message: "'record_path' must end in .mp4, .gif or .png") }
@@ -2012,6 +2102,8 @@ actor DottieTools {
             } else if step.bool("next") == true {
                 sim.nextScene()
                 log.append("next: \(sim.summary)")
+            } else if step.bool("back") == true {
+                log.append("back: \(sim.back()). \(sim.summary)")
             } else if step.bool("metrics") == true {
                 let lines = DiagramOps.describeMetrics(sim.doc, at: sim.time, state: .values(sim.state), since: sim.sinceChange,
                                                        carried: sim.carried)
@@ -2035,7 +2127,7 @@ actor DottieTools {
                 log.append("\(line): \(sim.summary)")
                 images.append(.png(png))
             } else {
-                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot}, {metrics: true} or {routes: true}")
+                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {back: true}, {snapshot}, {metrics: true} or {routes: true}")
             }
         }
         if let recordURL, let recording = sim.recording {

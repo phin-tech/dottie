@@ -146,6 +146,82 @@ extension Exporter {
     /// `allowLogic` lets the page's click logic run in it (ADR 0007).
     public static func player(_ doc: DottieDocument, title: String = "Dottie animation", allowLogic: Bool = false) -> String? {
         guard let script = try? script(doc, options: ScriptOptions(label: doc.name, allowLogic: allowLogic)) else { return nil }
+        return playerPage(script, title: title, background: doc)
+    }
+
+    /// Every page of `file` in one web page that plays them: a link to another page shows it, and each page gets its
+    /// own address (`#` and the page's name), so Back and Forward go between them and a link can open any of them.
+    /// It starts on `start` (a page's name or 1-based number), else the first. nil if it can't be compiled.
+    public static func player(file: DottieFile, title: String = "Dottie drawing", start: String? = nil,
+                              allowLogic: Bool = false) -> String? {
+        guard !file.pages.isEmpty else { return nil }
+        var options = ScriptOptions(allowLogic: allowLogic)
+        options.history = true
+        options.page = start
+        guard let script = try? script(file: file, options: options) else { return nil }
+        let first = file.pages[start.flatMap(file.pageIndex(matching:)) ?? 0]
+        // The tab names the page shown, so the history of Back reads as the pages visited.
+        let retitle = file.pages.count > 1 ? """
+            <script>
+            (function () {
+              var player = document.querySelector("dottie-player"), base = \(jsonText(title));
+              function show(name) { document.title = name + " · " + base; }
+              if (!player) return;
+              player.addEventListener("page", function (e) { show(e.detail.name); });
+              if (player.playback) show(player.playback.page.name);
+            })();
+            </script>
+
+            """ : ""
+        return playerPage(script, title: file.pages.count > 1 ? "\(first.name) · \(title)" : title, background: first, after: retitle)
+    }
+
+    /// Every page of `file` as a web page of its own, for a folder: the first is `index.html`, the rest are named
+    /// after their pages (`pageFileNames`), and a link to another page goes to its file, so Back comes back.
+    public static func playerPages(_ file: DottieFile, title: String = "Dottie drawing",
+                                   allowLogic: Bool = false) -> [(name: String, html: String)]? {
+        let names = pageFileNames(file)
+        // Which page each element is on, for the links that leave a page.
+        var pageOf: [UUID: Int] = [:]
+        for (i, p) in file.pages.enumerated() { for e in p.elements where pageOf[e.id] == nil { pageOf[e.id] = i } }
+        var out: [(name: String, html: String)] = []
+        for (i, page) in file.pages.enumerated() {
+            var options = ScriptOptions(label: page.name, allowLogic: allowLogic)
+            for e in page.elements {
+                guard let target = e.link, let j = pageOf[target], j != i else { continue }
+                options.links[target.uuidString] = names[j]
+            }
+            guard let script = try? script(page, options: options) else { return nil }
+            let heading = file.pages.count > 1 ? "\(page.name) · \(title)" : title
+            out.append((names[i], playerPage(script, title: heading, background: page)))
+        }
+        return out
+    }
+
+    /// The file each page of `file` is written to by `playerPages`: `index.html` for the first, then the page's name
+    /// in lowercase letters (accents dropped), digits and dashes (`page-3` when that leaves nothing), made unique with `-2`, `-3`.
+    public static func pageFileNames(_ file: DottieFile) -> [String] {
+        var used: Set<String> = []
+        return file.pages.enumerated().map { i, page in
+            var base = "index"
+            if i > 0 {
+                var slug = ""
+                for c in page.name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: nil).lowercased().unicodeScalars {
+                    if CharacterSet.alphanumerics.contains(c) && c.isASCII { slug.unicodeScalars.append(c) }
+                    else if !slug.isEmpty && !slug.hasSuffix("-") { slug += "-" }
+                }
+                while slug.hasSuffix("-") { slug.removeLast() }
+                base = slug.isEmpty || slug == "index" ? "page-\(i + 1)" : slug
+            }
+            var name = base, n = 2
+            while used.contains(name) { name = "\(base)-\(n)"; n += 1 }
+            used.insert(name)
+            return name + ".html"
+        }
+    }
+
+    /// A web page holding `script`, on `background`'s page color, its player centred.
+    private static func playerPage(_ script: String, title: String, background doc: DottieDocument, after: String = "") -> String {
         let page = doc.resolvedTheme?.background ?? RGBA(r: 1, g: 1, b: 1)
         func h(_ v: Double) -> String { String(format: "%02x", Int((min(max(v, 0), 1) * 255).rounded())) }
         let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
@@ -166,10 +242,18 @@ extension Exporter {
         <body>
         <script>
         \(script.replacingOccurrences(of: "</script", with: "<\\/script"))</script>
-        </body>
+        \(after)</body>
         </html>
 
         """
+    }
+
+    /// `s` as a JavaScript string literal that can't close a script tag.
+    private static func jsonText(_ s: String) -> String {
+        let data = (try? JSONSerialization.data(withJSONObject: [s])) ?? Data("[\"\"]".utf8)
+        return String(decoding: data.dropFirst().dropLast(), as: UTF8.self)
+            .replacingOccurrences(of: "</", with: "<\\/").replacingOccurrences(of: "\u{2028}", with: "\\u2028")
+            .replacingOccurrences(of: "\u{2029}", with: "\\u2029")
     }
 
 }
