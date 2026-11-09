@@ -1272,7 +1272,7 @@ extension EditorActions {
     /// Actions that do nothing, for the canvas's menus under test.
     static func inert(selectionCount: Int) -> EditorActions {
         EditorActions(
-            selectionCount: selectionCount, grouped: false, group: {}, ungroup: {},
+            selectionCount: selectionCount, grouped: false, group: {}, ungroup: {}, contain: {},
             instanceSelected: false, editingSymbol: false, makeSymbol: {}, breakApart: {}, editSymbol: {},
             doneEditingSymbol: {}, align: { _ in }, distribute: { _ in }, reorder: { _ in }, export: { _ in },
             exportAnimation: { _ in }, openScriptConsole: {}, runScriptFile: { _ in }, pageCount: 1, newPage: {},

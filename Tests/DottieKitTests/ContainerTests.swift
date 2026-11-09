@@ -98,3 +98,39 @@ final class ContainerTests: XCTestCase {
                                                       parent: doc.elements.first { $0.container != nil }!.id))
     }
 }
+
+/// Containers from other tools: draw.io swimlanes and containers, Excalidraw frames.
+final class ContainerImportTests: XCTestCase {
+    func testDrawioSwimlanesBecomeContainers() throws {
+        let xml = """
+        <mxfile><diagram><mxGraphModel><root>
+          <mxCell id="0"/><mxCell id="1" parent="0"/>
+          <mxCell id="pool" value="Pool" style="swimlane;horizontal=1;" vertex="1" parent="1"><mxGeometry x="0" y="0" width="400" height="300" as="geometry"/></mxCell>
+          <mxCell id="lane" value="Lane" style="swimlane;" vertex="1" parent="pool"><mxGeometry x="0" y="30" width="400" height="120" as="geometry"/></mxCell>
+          <mxCell id="a" value="Task" style="rounded=0;" vertex="1" parent="lane"><mxGeometry x="40" y="40" width="100" height="50" as="geometry"/></mxCell>
+        </root></mxGraphModel></diagram></mxfile>
+        """
+        let els = try DrawioImporter.importItems(from: Data(xml.utf8), layerID: UUID())[0].elements
+        let pool = try XCTUnwrap(els.first { $0.text == "Pool" }), lane = try XCTUnwrap(els.first { $0.text == "Lane" })
+        let task = try XCTUnwrap(els.first { $0.text == "Task" })
+        XCTAssertEqual(pool.container?.lanes, .rows)
+        XCTAssertNotNil(lane.container)
+        XCTAssertEqual(lane.containerID, pool.id)
+        XCTAssertEqual(task.containerID, lane.id)
+        XCTAssertTrue(lane.frame.contains(task.frame))
+    }
+
+    func testExcalidrawFramesBecomeContainers() throws {
+        let scene = """
+        {"type":"excalidraw","version":2,"elements":[
+          {"id":"f","type":"frame","x":0,"y":0,"width":300,"height":200,"name":"Team","strokeColor":"#bbb","backgroundColor":"transparent"},
+          {"id":"a","type":"rectangle","x":40,"y":60,"width":100,"height":50,"frameId":"f","strokeColor":"#1e1e1e","backgroundColor":"transparent"}
+        ]}
+        """
+        let els = try ExcalidrawImporter.importItems(from: Data(scene.utf8), layerID: UUID())[0].elements
+        let frame = try XCTUnwrap(els.first { $0.container != nil })
+        XCTAssertEqual(frame.text, "Team")
+        XCTAssertEqual(els.first { $0.kind == .rectangle && $0.container == nil }?.containerID, frame.id)
+        XCTAssertEqual(els.first?.id, frame.id, "behind what it holds")
+    }
+}

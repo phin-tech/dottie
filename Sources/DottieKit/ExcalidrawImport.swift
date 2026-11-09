@@ -179,10 +179,30 @@ public enum ExcalidrawImporter {
                     e.id = id
                     out.append(e)
                 }
+            case "frame", "magicframe":
+                // A frame holds what names it (`frameId`), drawn as a container with the frame's name.
+                var f = base(.rectangle, frame, text: r["name"] as? String ?? "Frame")
+                f.style.fill = .clear
+                f.container = ContainerData(fixed: true)
+                out.insert(f, at: 0)
             default:
-                continue // image, frame, embeddable, iframe
+                continue // image, embeddable, iframe
             }
         }
-        return out
+        // What each frame holds.
+        let frames = Dictionary(live.compactMap { r -> (String, UUID)? in
+            guard (r["type"] as? String) == "frame" || (r["type"] as? String) == "magicframe", let s = r["id"] as? String,
+                  let id = ids[s] else { return nil }
+            return (s, id)
+        }, uniquingKeysWith: { a, _ in a })
+        for r in live {
+            guard let f = r["frameId"] as? String, let parent = frames[f], let s = r["id"] as? String, let id = ids[s],
+                  let i = out.firstIndex(where: { $0.id == id }), out[i].kind != .connector else { continue }
+            out[i].containerID = parent
+        }
+        var page = DottieDocument(elements: out)
+        page.fitContainers()
+        page.keepContainersBehind()
+        return page.elements
     }
 }

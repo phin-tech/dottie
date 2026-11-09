@@ -288,11 +288,25 @@ public enum DiagramOps {
 
     // MARK: Bulk build
 
-    /// Adds nodes and edges as one laid-out block placed below existing content. Returns key -> element id.
+    /// A container `build` lays out its nodes in (ADR 0006): `nodes` are node keys, `parent` another cluster's key.
+    public struct ClusterSpec: Sendable {
+        public var key: String
+        public var title: String?
+        public var nodes: [String]
+        public var parent: String?
+        public var lanes: LaneDirection?
+        public init(key: String, title: String? = nil, nodes: [String] = [], parent: String? = nil, lanes: LaneDirection? = nil) {
+            self.key = key; self.title = title; self.nodes = nodes; self.parent = parent; self.lanes = lanes
+        }
+    }
+
+    /// Adds nodes and edges as one laid-out block placed below existing content, in `clusters` (containers) when
+    /// given. Returns key -> element id.
     @discardableResult
     public static func build(_ doc: inout DottieDocument, nodes: [NodeSpec], edges: [EdgeSpec],
                              direction: LayoutDirection = .topToBottom, roughness: Double = 1,
-                             defaultRouting: Routing = .elbow, font: String? = nil) throws -> [String: UUID] {
+                             defaultRouting: Routing = .elbow, font: String? = nil,
+                             clusters: [ClusterSpec] = []) throws -> [String: UUID] {
         let text = Look(font: font)
         var seen = Set<String>()
         for n in nodes {
@@ -300,8 +314,10 @@ public enum DiagramOps {
             guard !n.key.isEmpty else { throw OpsError.invalid("Node key must not be empty") }
             guard seen.insert(n.key).inserted else { throw OpsError.invalid("Duplicate node key '\(n.key)'") }
         }
-        for e in edges where !seen.contains(e.from) || !seen.contains(e.to) {
-            throw OpsError.invalid("Edge \(e.from) -> \(e.to) references an unknown node key")
+        // An edge can end at a cluster too: its container.
+        let clusterKeys = Set(clusters.map(\.key))
+        for e in edges where !(seen.contains(e.from) || clusterKeys.contains(e.from)) || !(seen.contains(e.to) || clusterKeys.contains(e.to)) {
+            throw OpsError.invalid("Edge \(e.from) -> \(e.to) references an unknown node or cluster key")
         }
         let whens = try edges.map { try $0.when.flatMap { try PageState.checked($0) } }
 
@@ -323,17 +339,32 @@ public enum DiagramOps {
             added.append(e)
         }
         var tmp = DottieDocument(layers: doc.layers, elements: added)
+        let clusterIDs = Dictionary(clusters.map { ($0.key, UUID()) }, uniquingKeysWith: { a, _ in a })
+        for (k, id) in clusterIDs where ids[k] == nil { ids[k] = id }
         let looks = edges.map { edge -> Look in var l = edge.look; l.font = l.font ?? font; return l }
         let laid = edges.enumerated().map { k, edge in
             Layout.Edge(from: ids[edge.from]!, to: ids[edge.to]!, label: labelSize(edge.label, look: looks[k], layerID: layerID))
         }
-        let lanes = Layout.layered(&tmp, edges: laid, direction: direction)
+        let lanes: [Layout.Lane?]
+        if clusters.isEmpty {
+            lanes = Layout.layered(&tmp, edges: laid, direction: direction)
+        } else {
+            // Each cluster laid out on its own, then as one block among its parent's; edges between clusters go
+            // round the boxes in their way instead of through lanes.
+            try layOutClusters(&tmp, clusters: clusters, clusterIDs: clusterIDs, nodeIDs: ids, edges: laid, direction: direction,
+                               roughness: roughness, layerID: layerID)
+            lanes = edges.map { _ in nil }
+        }
         var origin = Exporter.bounds(of: tmp, padding: 0).origin
         if tmp.elements.isEmpty { origin = .zero }
         let shift = CGPoint(x: 40 - origin.x, y: top - origin.y)
         for var e in tmp.elements {
             e.x += shift.x; e.y += shift.y
             doc.elements.append(e)
+        }
+        if !clusters.isEmpty {
+            doc.fitContainers()
+            doc.keepContainersBehind()
         }
         let pairs = Set(laid.map { [$0.from, $0.to] })
         for (k, edge) in edges.enumerated() {
@@ -351,13 +382,122 @@ public enum DiagramOps {
                                      arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label, look: looks[k])
             if let i = doc.elements.lastIndex(where: { $0.id == c.id }) {
                 // The layout has routed it, lanes and labels and all: it goes round shapes only when asked to.
-                if looks[k].avoid != true { doc.elements[i].connector?.avoid = nil }
+                // Between clusters there are no lanes, so an elbow goes round the boxes in its way.
+                if looks[k].avoid != true && (clusters.isEmpty || looks[k].avoid == false) { doc.elements[i].connector?.avoid = nil }
                 if !bends.isEmpty { doc.elements[i].connector?.waypoints = bends.map { Waypoint($0) } }
                 if let stroke = edge.stroke { doc.elements[i].style.stroke = stroke }
                 doc.elements[i].when = whens[k]
             }
         }
         return ids
+    }
+
+    /// Lays `doc`'s nodes out in their clusters, innermost first: each cluster's members and child clusters are laid
+    /// out as a graph of their own (child clusters as blocks of their size), and an edge counts at the level where
+    /// its ends are in different blocks. The clusters become containers, added to `doc` before their contents.
+    private static func layOutClusters(_ doc: inout DottieDocument, clusters: [ClusterSpec], clusterIDs: [String: UUID],
+                                       nodeIDs: [String: UUID], edges: [Layout.Edge], direction: LayoutDirection,
+                                       roughness: Double, layerID: UUID) throws {
+        var byKey: [String: ClusterSpec] = [:], nodeIn: [UUID: String] = [:]
+        for c in clusters {
+            guard !c.key.isEmpty, byKey[c.key] == nil, nodeIDs[c.key] == clusterIDs[c.key] else {
+                throw OpsError.invalid("Cluster key '\(c.key)' is empty, repeated or a node's key")
+            }
+            byKey[c.key] = c
+        }
+        for c in clusters {
+            if let p = c.parent, byKey[p] == nil { throw OpsError.invalid("Cluster '\(c.key)' has an unknown parent '\(p)'") }
+            var seen: Set<String> = [c.key], at = c.parent
+            while let p = at { guard seen.insert(p).inserted else { throw OpsError.invalid("Cluster '\(c.key)' is inside itself") }; at = byKey[p]?.parent }
+            for n in c.nodes {
+                guard let id = nodeIDs[n] else { throw OpsError.invalid("Cluster '\(c.key)' names an unknown node '\(n)'") }
+                if let other = nodeIn[id] { throw OpsError.invalid("Node '\(n)' is in two clusters, '\(other)' and '\(c.key)'") }
+                nodeIn[id] = c.key
+            }
+        }
+        // The containers, styled as add_container makes them.
+        var boxes: [String: Element] = [:]
+        for c in clusters {
+            var style = Style()
+            style.fill = RGBA(r: 0.5, g: 0.55, b: 0.65, a: 0.08); style.strokeWidth = 1.5; style.fontSize = 16; style.roughness = roughness
+            var e = Element(id: clusterIDs[c.key]!, kind: .rectangle, frame: .zero, style: style, layerID: layerID,
+                            text: c.title.flatMap { $0.isEmpty ? nil : $0 })
+            e.container = ContainerData(lanes: c.lanes)
+            boxes[c.key] = e
+        }
+        for c in clusters { boxes[c.key]!.containerID = c.parent.flatMap { boxes[$0]?.id } }
+        let nodes = Dictionary(doc.elements.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let keyOf = Dictionary(clusterIDs.map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+        // The block at level `level` (nil: the page) holding node or container `id`, if it is inside that level.
+        func block(_ id: UUID, at level: String?) -> UUID? {
+            var at = keyOf[id].map { byKey[$0]?.parent } ?? nodeIn[id], child: String? = nil
+            if at == level { return id }
+            while let k = at {
+                if byKey[k]?.parent == level { child = k; break }
+                at = byKey[k]?.parent
+            }
+            return child.flatMap { boxes[$0]?.id }
+        }
+        let pad = DottieDocument.containerPadding
+        // Frames relative to the level's own top left.
+        func lay(_ level: String?) -> (frames: [UUID: CGRect], size: CGSize) {
+            let kids = clusters.filter { $0.parent == level }.map(\.key)
+            var inner: [String: (frames: [UUID: CGRect], size: CGSize)] = [:]
+            for k in kids { inner[k] = lay(k) }
+            var items: [Element] = doc.elements.filter { nodeIn[$0.id] == level && nodes[$0.id] != nil }
+            for k in kids {
+                var b = boxes[k]!
+                b.frame = CGRect(origin: .zero, size: inner[k]!.size)
+                items.append(b)
+            }
+            var level_doc = DottieDocument(layers: doc.layers, elements: items)
+            if let level, byKey[level]?.lanes != nil {
+                // A swimlane's lanes, one after another; fitting stretches them across it.
+                var at = 0.0
+                for i in level_doc.elements.indices {
+                    if byKey[level]?.lanes == .rows { level_doc.elements[i].y = at; at += level_doc.elements[i].height }
+                    else { level_doc.elements[i].x = at; at += level_doc.elements[i].width }
+                }
+            } else {
+                var seen = Set<[UUID]>()
+                let here = edges.compactMap { e -> Layout.Edge? in
+                    guard let a = block(e.from, at: level), let b = block(e.to, at: level), a != b, seen.insert([a, b]).inserted else { return nil }
+                    return Layout.Edge(from: a, to: b, label: e.label)
+                }
+                _ = Layout.layered(&level_doc, edges: here, direction: direction)
+            }
+            let bounds = level_doc.elements.map(\.frame).reduce(CGRect.null) { $0.union($1) }
+            let band = level.map { DottieDocument.titleBand(boxes[$0]!) } ?? 0
+            let inset = level == nil ? CGPoint.zero : CGPoint(x: pad, y: pad + band)
+            let lanesHere = level.flatMap { byKey[$0]?.lanes } != nil
+            let offset = CGPoint(x: inset.x - (bounds.isNull ? 0 : bounds.minX) - (lanesHere ? pad : 0),
+                                 y: inset.y - (bounds.isNull ? 0 : bounds.minY) - (lanesHere ? pad : 0))
+            var frames: [UUID: CGRect] = [:]
+            for e in level_doc.elements {
+                let f = e.frame.offsetBy(dx: offset.x, dy: offset.y)
+                frames[e.id] = f
+                if let k = kids.first(where: { boxes[$0]?.id == e.id }) {
+                    for (id, g) in inner[k]!.frames { frames[id] = g.offsetBy(dx: f.minX, dy: f.minY) }
+                }
+            }
+            let size = bounds.isNull ? CGSize(width: 120, height: 80)
+                : CGSize(width: bounds.width + (lanesHere ? 0 : 2 * pad), height: bounds.height + band + (lanesHere ? 0 : 2 * pad))
+            return (frames, size)
+        }
+        let placed = lay(nil).frames
+        // Containers first, outermost first, so each is behind what it holds; then the nodes.
+        func depth(_ k: String) -> Int { var d = 0, at = byKey[k]?.parent; while let p = at { d += 1; at = byKey[p]?.parent }; return d }
+        var out: [Element] = clusters.map(\.key).sorted { depth($0) < depth($1) }.compactMap { k in
+            guard var b = boxes[k], let f = placed[b.id] else { return nil }
+            b.frame = f
+            return b
+        }
+        for var e in doc.elements {
+            if let f = placed[e.id] { e.frame = f }
+            e.containerID = nodeIn[e.id].flatMap { boxes[$0]?.id }
+            out.append(e)
+        }
+        doc.elements = out
     }
 
     /// The size a connector label `text` takes with `look` (nil for no label), for making room for it.

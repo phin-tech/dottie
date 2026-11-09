@@ -31,15 +31,18 @@ public enum MermaidError: Error, LocalizedError, CustomStringConvertible, Equata
 ///
 /// Shapes map to the nearest Dottie kind: `((circle))`, `(((double)))` and `([stadium])` are ellipses, `{diamond}` a
 /// diamond, everything else (`[rect]`, `(rounded)`, `[[subroutine]]`, `[(database)]`, `>flag]`, `{{hexagon}}`,
-/// parallelograms and trapezoids) a rectangle. Subgraphs are flattened: their nodes are kept, the frame is not drawn.
+/// parallelograms and trapezoids) a rectangle. Subgraphs become containers (nested as they are), laid out as blocks;
+/// a link to a subgraph's id goes to its container.
 /// `style X fill:#hex` and `classDef` / `class` / `:::` fills are applied; other styling is ignored.
 public enum MermaidImporter {
     public struct Diagram: Sendable {
         public var nodes: [DiagramOps.NodeSpec]
         public var edges: [DiagramOps.EdgeSpec]
         public var direction: LayoutDirection
-        /// Things the import changed or left out, worth telling the user (flattened subgraphs, flipped direction, ...).
+        /// Things the import changed or left out, worth telling the user (flipped direction, ignored lines, ...).
         public var notes: [String]
+        /// Subgraphs, as the containers `DiagramOps.build` lays nodes out in.
+        public var clusters: [DiagramOps.ClusterSpec] = []
     }
 
     public static let fileExtensions = ["mmd", "mermaid"]
@@ -60,7 +63,8 @@ public enum MermaidImporter {
     public static func build(_ doc: inout DottieDocument, mermaid text: String, roughness: Double = 1, font: String? = nil) throws
         -> (ids: [String: UUID], notes: [String]) {
         let d = try parse(text)
-        let ids = try DiagramOps.build(&doc, nodes: d.nodes, edges: d.edges, direction: d.direction, roughness: roughness, font: font)
+        let ids = try DiagramOps.build(&doc, nodes: d.nodes, edges: d.edges, direction: d.direction, roughness: roughness, font: font,
+                                       clusters: d.clusters)
         return (ids, d.notes)
     }
 
@@ -153,6 +157,13 @@ public enum MermaidImporter {
         var subgraphTitles: [String: String] = [:]
         var subgraphs = 0
         var subgraphDepth = 0
+        /// Subgraphs by key in the order they open, the open ones innermost last, and the subgraph each node first
+        /// appeared in.
+        var subgraphOrder: [String] = []
+        var subgraphParent: [String: String] = [:]
+        var open: [String] = []
+        var nodeSubgraph: [String: String] = [:]
+        var shaped: Set<String> = []
         var ignored: [String: Int] = [:]
         var invisibleLinks = 0
         var headerSeen = false
@@ -203,11 +214,12 @@ public enum MermaidImporter {
             case "end":
                 guard subgraphDepth > 0 else { throw MermaidError.syntax(line: s.line, "`end` without a `subgraph`") }
                 subgraphDepth -= 1
+                _ = open.popLast()
             case "subgraph":
                 subgraphDepth += 1; subgraphs += 1
                 subgraph(rest)
             case "direction":
-                break // Per-subgraph direction; subgraphs are flattened.
+                if subgraphDepth > 0 { note("A subgraph's own direction is drawn in the diagram's.") }
             case "style":
                 let parts = rest.split(maxSplits: 1, whereSeparator: \.isWhitespace).map(String.init)
                 if parts.count == 2, let fill = Self.fill(in: parts[1]) {
@@ -233,18 +245,26 @@ public enum MermaidImporter {
 
         /// `subgraph id`, `subgraph id [Title]`, `subgraph id["Title"]` or `subgraph Some title`.
         mutating func subgraph(_ rest: String) {
-            guard !rest.isEmpty else { return }
-            var s = Scanner(rest, line: 0)
-            let id = s.identifier()
-            s.skipSpace()
-            if !id.isEmpty, s.peek == "[" {
-                s.advance()
-                if let label = try? s.label(until: ["]"]) { subgraphTitles[id] = label }
-            } else if !id.isEmpty, s.atEnd {
-                subgraphTitles[id] = id
-            } else {
-                subgraphTitles[rest] = MermaidImporter.cleanLabel(rest.trimmingCharacters(in: CharacterSet(charactersIn: "\"")))
+            var key = "subgraph \(subgraphs)"
+            if !rest.isEmpty {
+                var s = Scanner(rest, line: 0)
+                let id = s.identifier()
+                s.skipSpace()
+                if !id.isEmpty, s.peek == "[" {
+                    s.advance()
+                    key = id
+                    subgraphTitles[id] = (try? s.label(until: ["]"])) ?? id
+                } else if !id.isEmpty, s.atEnd {
+                    key = id
+                    subgraphTitles[id] = id
+                } else {
+                    key = rest
+                    subgraphTitles[rest] = MermaidImporter.cleanLabel(rest.trimmingCharacters(in: CharacterSet(charactersIn: "\"")))
+                }
             }
+            if !subgraphOrder.contains(key) { subgraphOrder.append(key) }
+            if let up = open.last { subgraphParent[key] = up }
+            open.append(key)
         }
 
         static func fill(in style: String) -> RGBA? {
@@ -321,6 +341,9 @@ public enum MermaidImporter {
                 order.append(id)
                 nodes[id] = DiagramOps.NodeSpec(key: id, text: id)
             }
+            // As Mermaid places it: in the last subgraph that mentions it.
+            if let inside = open.last, inside != id { nodeSubgraph[id] = inside }
+            if kind != nil || label != nil { shaped.insert(id) }
             if let kind { nodes[id]!.kind = kind }
             if let label { nodes[id]!.text = label; explicitLabel.insert(id) }
         }
@@ -329,7 +352,9 @@ public enum MermaidImporter {
             guard !order.isEmpty else { throw MermaidError.empty }
             var notes = self.notes
             var list: [DiagramOps.NodeSpec] = []
-            for id in order {
+            // A subgraph's id used in a link, never given a shape or label, is the subgraph: its container.
+            let isSubgraph = Set(subgraphOrder.filter { nodes[$0] != nil && !shaped.contains($0) })
+            for id in order where !isSubgraph.contains(id) {
                 var n = nodes[id]!
                 if !explicitLabel.contains(id), let title = subgraphTitles[id] { n.text = title }
                 if let f = classFills["default"] { n.fill = f }
@@ -337,13 +362,14 @@ public enum MermaidImporter {
                 if let f = styleFills[id] { n.fill = f }
                 list.append(n)
             }
-            if subgraphs > 0 {
-                notes.append("Flattened \(subgraphs) subgraph\(subgraphs == 1 ? "" : "s"): their nodes are kept, the frames are not drawn.")
+            let clusters = subgraphOrder.map { k in
+                DiagramOps.ClusterSpec(key: k, title: subgraphTitles[k],
+                                       nodes: order.filter { nodeSubgraph[$0] == k && !isSubgraph.contains($0) }, parent: subgraphParent[k])
             }
             if invisibleLinks > 0 { notes.append("Skipped \(invisibleLinks) invisible link\(invisibleLinks == 1 ? "" : "s") (~~~).") }
             let skipped = ignored.sorted { $0.key < $1.key }.map { "\($0.value) \($0.key)" }
             if !skipped.isEmpty { notes.append("Ignored " + skipped.joined(separator: ", ") + " line(s).") }
-            return Diagram(nodes: list, edges: edges, direction: direction, notes: notes)
+            return Diagram(nodes: list, edges: edges, direction: direction, notes: notes, clusters: clusters)
         }
     }
 

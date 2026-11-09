@@ -701,8 +701,13 @@ public enum DottieScript {
                                         stroke: try e.color("stroke"), when: e.string("when"))
                 }
                 let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
+                let clusters = try (a.list("clusters") ?? []).map { c in
+                    DiagramOps.ClusterSpec(key: try c.require("key"), title: c.string("title"),
+                                           nodes: ((c.raw["nodes"] as? [Any]) ?? []).compactMap { $0 as? String },
+                                           parent: c.string("parent"), lanes: try c.enumValue("lanes", as: LaneDirection.self))
+                }
                 let ids = try DiagramOps.build(&doc, nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
-                                               font: a.string("font"))
+                                               font: a.string("font"), clusters: clusters)
                 return ids.mapValues(\.uuidString)
 
             case "layout":

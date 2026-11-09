@@ -676,7 +676,10 @@ extension DottieScript {
             /** Places a stencil item with its top-left corner at x, y; its elements are grouped. */
             stencil(options: { name: string; x?: number; y?: number; library?: string; scale?: number; keepOriginalColors?: boolean; sketchy?: boolean }): { ids: string[]; width: number; height: number };
             /** Lays nodes out below existing content and connects them. Returns node key → element id. */
-            build(options: { nodes: BuildNode[]; edges?: BuildEdge[]; direction?: Direction; sketchy?: boolean; font?: string }): Record<string, string>;
+            /** Lays nodes and edges out below what's there; returns node key (and cluster key) to element id. Clusters
+             * are containers the nodes are laid out in, each as one block. */
+            build(options: { nodes: BuildNode[]; edges?: BuildEdge[]; direction?: Direction; sketchy?: boolean; font?: string;
+                clusters?: { key: string; title?: string; nodes?: string[]; parent?: string; lanes?: "rows" | "columns" }[] }): Record<string, string>;
 
             update(id: Ref, changes: Changes): Element;
             /** Deletes and returns how many; connectors on a deleted shape stay as free arrows. */

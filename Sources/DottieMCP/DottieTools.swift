@@ -288,11 +288,21 @@ actor DottieTools {
                 "direction": prop("string", "TB = top to bottom (default), LR = left to right", enum: ["TB", "LR"]),
                 "sketchy": prop("boolean", "Hand-drawn look (default true); false for precise geometry"),
                 "font": fontProp,
+                "clusters": .object(["type": "array", "description": .string(
+                    "Containers to lay nodes out in: titled boxes that hold them and move with them (add_container). Each "
+                    + "cluster is laid out on its own, then as one block; parent nests it in another cluster, and lanes "
+                    + "makes it a swimlane whose child clusters are its lanes."),
+                    "items": .object(["type": "object", "properties": .object([
+                        "key": .object(["type": "string"]), "title": .object(["type": "string"]),
+                        "nodes": .object(["type": "array", "items": .object(["type": "string"]), "description": .string("Node keys")]),
+                        "parent": .object(["type": "string", "description": .string("Another cluster's key")]),
+                        "lanes": .object(["type": "string", "enum": .array([.string("rows"), .string("columns")])]),
+                    ]), "required": .array([.string("key")])])]),
              ], required: ["path", "nodes"])),
         Tool(name: "import_mermaid",
              description: "Draw a Mermaid flowchart (text starting with `flowchart` or `graph`): nodes, shapes, labelled, dashed, "
-                + "thick and two-way links, laid out like build_diagram and appended below existing content. Subgraphs are "
-                + "flattened and styling other than fill colors is ignored. Returns a map of Mermaid node id to element id.",
+                + "thick and two-way links, laid out like build_diagram and appended below existing content. Subgraphs become "
+                + "containers, nested as written; styling other than fill colors is ignored. Returns a map of Mermaid node id to element id.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "mermaid": prop("string", "Mermaid flowchart source, e.g. \"flowchart LR\\n  A[Start] --> B{OK?}\""),
@@ -1136,8 +1146,16 @@ actor DottieTools {
             let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
             let ids: [String: UUID]
             do {
+                let clusters = try (a.array("clusters") ?? []).map { c in
+                    DiagramOps.ClusterSpec(key: try c.require("key"), title: c.string("title"), nodes: c.raw["nodes"]?.arrayValue?.compactMap(\.stringValue) ?? [],
+                                           parent: c.string("parent"),
+                                           lanes: try c.string("lanes").map { s in
+                                               guard let l = LaneDirection(rawValue: s) else { throw ToolFailure(message: "'lanes' must be rows or columns") }
+                                               return l
+                                           })
+                }
                 ids = try DiagramOps.build(&file.pages[p], nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
-                                         font: a.string("font"))
+                                         font: a.string("font"), clusters: clusters)
                 for n in nodeArgs { if let id = ids[n.string("key") ?? ""] { try DiagramOps.nameColors(&file.pages[p], id: id, fill: n.string("fill"), stroke: nil, textColor: nil) } }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)

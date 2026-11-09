@@ -176,7 +176,7 @@ final class MermaidImportTests: XCTestCase {
         XCTAssertEqual(pairs(d), ["A>B", "C>A"])
     }
 
-    func testSubgraphsAreFlattened() throws {
+    func testSubgraphsBecomeContainers() throws {
         let d = try parse("""
         flowchart TB
           c1-->a2
@@ -189,11 +189,34 @@ final class MermaidImportTests: XCTestCase {
           end
           one --> two
         """)
-        XCTAssertEqual(Set(d.nodes.map(\.key)), ["c1", "a2", "a1", "b1", "b2", "one", "two"])
-        XCTAssertEqual(node(d, "one")?.text, "First")
-        XCTAssertEqual(node(d, "two")?.text, "two")
-        XCTAssertTrue(d.notes.contains { $0.contains("Flattened 2 subgraphs") })
+        XCTAssertEqual(Set(d.nodes.map(\.key)), ["c1", "a2", "a1", "b1", "b2"], "a link to a subgraph is to its container")
+        XCTAssertEqual(d.clusters.map(\.key), ["one", "two"])
+        XCTAssertEqual(d.clusters.map(\.title), ["First", "two"])
+        XCTAssertEqual(d.clusters[0].nodes, ["a2", "a1"], "a node goes in the last subgraph that mentions it")
+        XCTAssertEqual(d.clusters[1].nodes, ["b1", "b2"])
+        XCTAssertTrue(d.notes.contains { $0.contains("own direction") })
         XCTAssertEqual(d.direction, .topToBottom)
+
+        var doc = DottieDocument()
+        let ids = try MermaidImporter.build(&doc, mermaid: """
+        flowchart TB
+          c1-->a2
+          subgraph outer [Outer]
+            subgraph one [First]
+              a1-->a2
+            end
+            b1
+          end
+          one --> b1
+        """).ids
+        let one = try XCTUnwrap(doc.elements.first { $0.id == ids["one"] })
+        let outer = try XCTUnwrap(doc.elements.first { $0.id == ids["outer"] })
+        XCTAssertEqual(one.text, "First")
+        XCTAssertNotNil(one.container)
+        XCTAssertEqual(one.containerID, outer.id, "nested as written")
+        XCTAssertEqual(doc.elements.first { $0.id == ids["a1"] }?.containerID, one.id)
+        XCTAssertTrue(outer.frame.contains(one.frame))
+        XCTAssertTrue(doc.elements.contains { $0.connector?.start.elementID == one.id }, "the link from the subgraph is from its container")
     }
 
     func testHyphenatedIdsAndExpandedShapes() throws {

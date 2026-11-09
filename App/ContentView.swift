@@ -666,6 +666,30 @@ struct LayersSection: View {
             .disabled(layers.count < 2)
     }
 
+    /// How many containers `e` is inside.
+    private func containerDepth(_ e: Element) -> Int {
+        var d = 0, at = e.containerID, seen = Set<UUID>()
+        while let id = at, seen.insert(id).inserted, let up = document.model.elements.first(where: { $0.id == id }) { d += 1; at = up.containerID }
+        return d
+    }
+
+    /// Putting an element in a container or taking it out.
+    @ViewBuilder private func containerMenu(_ e: Element) -> some View {
+        let page = document.model
+        let banned = page.descendants(of: e.id).union([e.id])
+        let containers = page.elements.filter { $0.container != nil && !banned.contains($0.id) }
+        if e.kind != .connector, !containers.isEmpty {
+            Menu("Put in Container") {
+                ForEach(containers) { c in
+                    Button(c.text ?? "Untitled container") { edit("Put in Container") { try? DiagramOps.setParent(&$0, id: e.id, parent: c.id) } }
+                }
+            }
+        }
+        if e.containerID != nil {
+            Button("Take Out of Container") { edit("Take Out of Container") { try? DiagramOps.setParent(&$0, id: e.id, parent: nil) } }
+        }
+    }
+
     var body: some View {
         let byLayer = Dictionary(grouping: document.model.elements, by: \.layerID)
         Section("Layers") {
@@ -690,6 +714,9 @@ struct LayersSection: View {
                 if expanded.contains(layer.id) {
                     ForEach(Array(members.reversed().prefix(Self.rowLimit))) { e in
                         ElementRow(element: e, isSelected: selection.contains(e.id))
+                            // Inside a container, indented under it (ADR 0006).
+                            .padding(.leading, Double(containerDepth(e)) * 14)
+                            .contextMenu { containerMenu(e) }
                             .onTapGesture { onSelect(document.model.expandingGroups([e.id])) }
                             .draggable(dragString(for: e.id))
                             .dropDestination(for: String.self) { items, _ in

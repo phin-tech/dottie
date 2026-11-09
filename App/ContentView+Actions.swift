@@ -24,6 +24,17 @@ extension ContentView {
             grouped: document.model.elements.contains { ids.contains($0.id) && $0.groupID != nil },
             group: { edit("Group") { $0.group(ids) } },
             ungroup: { edit("Ungroup") { $0.ungroup(ids) } },
+            contain: {
+                var next = document.model
+                let shapes = next.elements.filter { ids.contains($0.id) && $0.kind != .connector }.map(\.id)
+                guard !shapes.isEmpty else { NSSound.beep(); return }
+                // A container among the selection's own container, if they share one.
+                let parents = Set(next.elements.filter { shapes.contains($0.id) }.map(\.containerID))
+                guard let made = try? DiagramOps.addContainer(&next, title: "Container", children: shapes,
+                                                              parent: parents.count == 1 ? parents.first! : nil) else { NSSound.beep(); return }
+                document.commit(next, actionName: "Put in Container", undoManager: undoManager)
+                selection = [made.id]
+            },
             instanceSelected: ids.count == 1 && document.model.elements.contains { ids.contains($0.id) && $0.kind == .symbol },
             editingSymbol: document.editingSymbol != nil,
             makeSymbol: {

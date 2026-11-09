@@ -1438,6 +1438,7 @@ final class CanvasNSView: NSView, NSTextFieldDelegate, NSMenuItemValidation {
         }
         if actions.selectionCount >= 2 { menu.addItem(ClosureMenuItem("Group", actions.group)) }
         if actions.grouped { menu.addItem(ClosureMenuItem("Ungroup", actions.ungroup)) }
+        if actions.selectionCount >= 1 { menu.addItem(ClosureMenuItem("Put in Container", actions.contain)) }
         menu.addItem(.submenu("Arrange") { m in
             m.addItem(ClosureMenuItem("Bring to Front") { actions.reorder(.toFront) })
             m.addItem(ClosureMenuItem("Bring Forward") { actions.reorder(.forward) })

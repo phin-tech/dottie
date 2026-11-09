@@ -266,9 +266,23 @@ public enum DrawioImporter {
             var e = Element(id: uid, kind: kind, frame: frame, style: st, layerID: layerID,
                             text: label.isEmpty ? nil : label)
             if !label.isEmpty { e.style.fontSize = fontStyle.fontSize }
+            // A swimlane or container cell is a container; a swimlane holding swimlanes is a pool of lanes.
+            if kind == .rectangle, base.contains("swimlane") || kv["swimlane"] != nil || kv["container"] == "1" {
+                let lanes = order.contains { byID[$0]?.attrs["parent"] == id && (byID[$0]?.attrs["style"] ?? "").contains("swimlane") }
+                e.container = ContainerData(fixed: true, lanes: lanes ? (kv["horizontal"] == "0" ? .columns : .rows) : nil)
+            }
             common(&e)
             out.append(e)
         }
-        return out
+        // What a container cell holds: the vertices whose parent it is.
+        let containers = Set(out.filter { $0.container != nil }.map(\.id))
+        for i in out.indices where out[i].kind != .connector {
+            guard let cellID = uuids.first(where: { $0.value == out[i].id })?.key, let p = byID[cellID]?.attrs["parent"],
+                  let pid = uuids[p], containers.contains(pid) else { continue }
+            out[i].containerID = pid
+        }
+        var page = DottieDocument(elements: out)
+        page.fitContainers()
+        return page.elements
     }
 }

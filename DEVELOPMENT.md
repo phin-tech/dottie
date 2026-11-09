@@ -302,8 +302,9 @@ would have added 220 KB.
 
 `MermaidImporter` parses `flowchart` / `graph` text with a hand-written scanner into `DiagramOps.build` nodes
 and edges, so an import lays out exactly like `build_diagram`. Shapes map to the nearest kind (circles and
-stadiums to ellipses, `{}` to a diamond, the rest to rectangles). BT and RL draw as TB and LR, subgraphs are
-flattened, and only `fill` survives from `style` / `classDef`. Other diagram types are refused with a clear error.
+stadiums to ellipses, `{}` to a diamond, the rest to rectangles). BT and RL draw as TB and LR, subgraphs become
+containers (nested as written, a node in the last subgraph that mentions it, a link to a subgraph's id to its
+container) and export back as subgraphs, and only `fill` survives from `style` / `classDef`. Other diagram types are refused with a clear error.
 
 `Exporter.mermaid` goes the other way (File ▸ Export As ▸ Mermaid, `dottie render -f mermaid`, `export_mermaid`):
 shapes become nodes with ids `n1`, `n2`, ... (or the element's `anchor` when it is a valid id), connectors attached
