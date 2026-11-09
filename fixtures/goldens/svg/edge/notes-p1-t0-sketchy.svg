@@ -194,11 +194,13 @@
 <path d="M750 600 L980 600 L980 880 L750 880 Z" fill="#ffe885" stroke="none"/>
 <path d="M751.09 600.64 C798.52 602.11 901.01 602.69 979.71 598.82 M750.27 599.55 C855.69 601.71 944.91 602.29 979.19 599.33 M980.85 600.45 C982.23 671.96 982.14 794.43 978.5 881.45 M979.74 599.64 C982.89 665.65 983.04 790.15 979.84 879.86 M980.01 880.17 C880.28 877.27 788.94 877.29 748.69 880.52 M980.82 879.39 C920.62 879.89 820.42 879.99 750.12 880.54 M751.02 879.85 C748.24 815.18 747.32 690.6 750.81 598.64 M750.45 880.54 C750.72 820.17 750.41 694.73 750.7 599.74" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <text y="627" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="762" font-size="16" font-style="italic">it</tspan><tspan x="775.04" font-size="16">st</tspan><tspan x="792.53" font-size="16" text-decoration="underline">ln</tspan></text>
+<text y="646" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="762" font-size="16" font-weight="bold" font-style="italic">both</tspan><tspan x="796.96" font-size="16"> and </tspan><tspan x="832.83" font-size="16" font-weight="bold">a </tspan><tspan x="846.46" font-size="16" font-weight="bold" font-style="italic">b</tspan></text>
 <line x1="775.04" y1="622.13" x2="788.08" y2="622.13" stroke="#1f1f21" stroke-width="1.14"/>
 <path d="M752 1803 L982 1803 L982 2083 L752 2083 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
 <path d="M750 1800 L980 1800 L980 2080 L750 2080 Z" fill="#ffe885" stroke="none"/>
 <path d="M750 1800 L980 1800 L980 2080 L750 2080 Z" fill="none" stroke="#1f1f21" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <text y="1824" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="762" font-size="13" font-style="italic">it</tspan><tspan x="772.6" font-size="13">st</tspan><tspan x="786.8" font-size="13" text-decoration="underline">ln</tspan></text>
+<text y="1840" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" fill="#1f1f21" xml:space="preserve"><tspan x="762" font-size="13" font-weight="bold" font-style="italic">both</tspan><tspan x="790.41" font-size="13"> and </tspan><tspan x="819.55" font-size="13" font-weight="bold">a </tspan><tspan x="830.63" font-size="13" font-weight="bold" font-style="italic">b</tspan></text>
 <line x1="772.6" y1="1820.04" x2="783.19" y2="1820.04" stroke="#1f1f21" stroke-width="1"/>
 <path d="M1002 603 L1232 603 L1232 883 L1002 883 Z" fill="#000000" fill-opacity="0.14" stroke="none"/>
 <path d="M1000 600 L1230 600 L1230 880 L1000 880 Z" fill="#ffe885" stroke="none"/>

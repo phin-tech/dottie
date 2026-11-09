@@ -100,6 +100,33 @@ final class MetricsTests: XCTestCase {
         XCTAssertEqual(m.flows[second.id]?.backlog, 1)
     }
 
+    /// simulate's routes step: each flow's ways, with the connectors, share and cost, and why one goes nowhere.
+    func testRoutesSayWhichConnectorsEachFlowTakes() throws {
+        var (doc, api, queue, workers, spare) = page()
+        set(&doc, workers) { $0.capacity = 2 }
+        let toQueue = doc.elements[4].id, toWorkers = doc.elements[5].id, toSpare = doc.elements[6].id
+        set(&doc, toSpare) { $0.connector?.cost = 3 }
+        let first = try DiagramOps.addFlow(&doc, from: api, to: [workers, spare], volume: 3)
+        let back = try DiagramOps.addFlow(&doc, from: workers, to: [api])
+        let gated = try DiagramOps.addFlow(&doc, from: api, to: [spare], when: "later")
+        let m = doc.posedWithMetrics(at: 1, routes: true).metrics
+        XCTAssertEqual(m.routes[first.id], [
+            FlowRoute(goal: workers, hops: [(toQueue, false), (toWorkers, false)], amount: 2, waits: false, cost: 2),
+            FlowRoute(goal: spare, hops: [(toQueue, false), (toSpare, false)], amount: 1, waits: false, cost: 4),
+        ])
+        XCTAssertEqual(m.routes[back.id], [], "no connector carries traffic back")
+        XCTAssertNil(m.routes[gated.id])
+        XCTAssertTrue(doc.metrics(at: 1).routes.isEmpty, "only worked out when asked for")
+        _ = queue
+
+        let lines = DiagramOps.describeRoutes(doc, at: 1)
+        XCTAssertEqual(lines.count, 5, lines.joined(separator: "\n"))
+        XCTAssertTrue(lines[0].hasSuffix("\"api\" → \"workers\" or \"spare\": 2 ways"), lines[0])
+        XCTAssertTrue(lines[1].hasPrefix("  to \"workers\": 2 (67%), cost 2, via \"api\" → \"queue\" ["), lines[1])
+        XCTAssertTrue(lines[3].hasSuffix(": reaches none of its destinations"), lines[3])
+        XCTAssertTrue(lines[4].hasSuffix(": not running (its when doesn't hold)"), lines[4])
+    }
+
     func testDelayHoldsPacketsAndAddsToTransit() throws {
         var (doc, api, queue, workers, _) = page()
         try DiagramOps.addFlow(&doc, from: api, to: [workers], every: 0.5, speed: 100)

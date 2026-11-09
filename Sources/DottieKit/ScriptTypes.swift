@@ -9,6 +9,33 @@ public struct TypeDiagnostic: Sendable, Equatable, CustomStringConvertible {
     /// tsc's text; an overload error runs over several lines.
     public var message: String
     public var description: String { "line \(line), column \(column): \(message) (TS\(code))" }
+
+    /// What kind of problem it is, so a summary can lead with the mistakes in dottie calls.
+    public enum Category: Int, CaseIterable, Sendable {
+        case unknownOption, wrongValue, unknownCall, other
+        var label: String {
+            switch self {
+            case .unknownOption: "unknown option"
+            case .wrongValue: "wrong value"
+            case .unknownCall: "unknown call or property"
+            case .other: "other"
+            }
+        }
+    }
+
+    public var category: Category {
+        switch code {
+        case 2353, 2561: .unknownOption
+        case 2322, 2345, 2769, 2820, 2554, 2555: .wrongValue
+        case 2339, 2551: .unknownCall
+        default: .other
+        }
+    }
+
+    /// A value from a list of mixed pairs: JavaScript types `[[c, 0], [d, 1]]` as (Element | number)[][].
+    var isMixedList: Bool {
+        code == 2345 && (message.contains("'number | Element'") || message.contains("'Element | number'"))
+    }
 }
 
 /// What checking a script against `dottie.d.ts` found. `compiler` is tsc's version line, like "Version 7.0.2".
@@ -28,11 +55,13 @@ extension DottieScript {
 
     /// For a folder of scripts: each `.js` file is its own module (so two scripts can both declare `const a`),
     /// checked with no DOM. modules/ is left out: libraries are `any`. ES2023 is what JavaScriptCore has on
-    /// macOS 14, the oldest Dottie runs on.
+    /// macOS 14, the oldest Dottie runs on. `strict` is off on purpose: TypeScript 7 turns it on by default, and for
+    /// plain JavaScript that buries a misspelled option under implicit-any and possibly-undefined noise.
     public static let typeScriptConfig = """
     {
       "compilerOptions": {
         "target": "es2023",
+        "strict": false,
         "lib": ["es2023"],
         "types": [],
         "allowJs": true,
@@ -69,8 +98,23 @@ extension DottieScript {
             let n = check.diagnostics.count
             guard n > 0 else { return [] }
             let version = check.compiler.replacingOccurrences(of: "Version ", with: "")
-            return ["Type check (TypeScript \(version)): \(n) problem\(n == 1 ? "" : "s"), see dottie.d.ts"]
-                + check.diagnostics.map { "  " + $0.description.replacingOccurrences(of: "\n", with: "\n  ") }
+            // The ones that name a mistake in a dottie call come first, then the rest, each in line order.
+            let sorted = check.diagnostics.enumerated().sorted {
+                ($0.element.category.rawValue, $0.offset) < ($1.element.category.rawValue, $1.offset)
+            }.map(\.element)
+            var counts: [String] = []
+            for c in TypeDiagnostic.Category.allCases {
+                let k = sorted.filter { $0.category == c }.count
+                if k > 0 { counts.append("\(k) \(c.label)") }
+            }
+            var lines = ["Type check (TypeScript \(version)): \(n) problem\(n == 1 ? "" : "s") (\(counts.joined(separator: ", "))), "
+                + "see dottie.d.ts"]
+            lines += sorted.map { "  " + $0.description.replacingOccurrences(of: "\n", with: "\n  ") }
+            if sorted.contains(where: \.isMixedList) {
+                lines.append("  A list like [[connector, 0], [connector, 1.5]] is typed as a list of (Element | number) lists. "
+                    + "Mark it as pairs to check it: /** @type {[Element, number][]} */ const pairs = [...];")
+            }
+            return lines
         } catch {
             return ["Type check skipped: \((error as? OpsError)?.description ?? "\(error)")"]
         }
@@ -221,8 +265,42 @@ extension DottieScript {
             | "popIn" | "growIn" | "wipeIn" | "dropIn" | "slideIn" | "drawIn" | "fadeIn"
             | "popOut" | "shrinkOut" | "wipeOut" | "fadeOut"
             | "pulse" | "wiggle";
-        /** A hex color like "#ffcc00", or "#ffcc0080" with alpha. */
+        /** A hex color like "#ffcc00", or "#ffcc0080" with alpha, or a color of the page's palette by name ("accent",
+         * "muted", "danger", "warning", "success", "info", or one of the page's own). A shape's fill, stroke or text
+         * color given by name stays that palette color when the palette changes. */
         type Color = string;
+        /** The page's theme and palette (`dottie.theme`). */
+        interface ThemeInfo {
+            /** A built-in's id, "custom" for the page's own, or "" for none. */
+            theme: string;
+            name?: string;
+            background?: string;
+            ink?: string;
+            palette: Record<string, string>;
+        }
+        interface ContainerOptions {
+            title?: string;
+            children?: Ref | Ref[];
+            /** A container it goes in. */
+            parent?: Ref;
+            lanes?: "rows" | "columns";
+            x?: number;
+            y?: number;
+            width?: number;
+            height?: number;
+            fill?: Color;
+            stroke?: Color;
+            sketchy?: boolean;
+        }
+        interface ThemeOptions {
+            /** A built-in to use, "" for none, or where the page's own theme starts from when the others are given. */
+            theme?: string;
+            name?: string;
+            background?: string;
+            ink?: string;
+            /** Palette colors to set or add, name to hex; any of these makes the theme the page's own. */
+            palette?: Record<string, string>;
+        }
         /** How a symbol's copy plays its animation: over and over, once, standing still on its poster frame, or resting
          * at the start until clicked (in <dottie-player>). A button's copies ignore it. */
         type Playback = "loop" | "once" | "still" | "click";
@@ -329,6 +407,13 @@ extension DottieScript {
         interface Element extends Rect {
             id: string;
             kind: ElementKind;
+            /** The container it is in. */
+            parent?: string;
+            /** It is a container (dottie.container); `lanes` when it is a swimlane. */
+            container?: boolean;
+            lanes?: "rows" | "columns";
+            /** Which of its colors are palette colors, by name. */
+            named?: { fill?: string; stroke?: string; textColor?: string };
             stroke: Color;
             sketchy: boolean;
             strokeWidth: number;
@@ -358,6 +443,8 @@ extension DottieScript {
             /** Connectors: the bends the line runs through, and whether it hops the lines beneath it. */
             waypoints?: Point[];
             hops?: boolean;
+            /** Elbow connectors: whether the line goes round the shapes in its way. */
+            avoid?: boolean;
             /** Connectors: what a flow's traffic pays to take it, when not 1. */
             cost?: number;
             /** The most flow volume it carries, and a shape's delay in seconds (ADR 0003). */
@@ -400,6 +487,9 @@ extension DottieScript {
             waypoints?: Point[];
             /** Connectors only: a small hop where the line crosses a connector drawn beneath it. */
             hops?: boolean;
+            /** Elbow connectors only: go round the shapes in the way instead of through them. dottie.connect turns it
+             * on for elbows (dottie.build's edges are routed by its layout); false keeps the plain Z or L. */
+            avoid?: boolean;
             /** Connectors only: what a flow's traffic pays to take this line, default 1; flows take the cheapest route. */
             cost?: number;
             /** The most flow volume it carries (a worker pool's throughput, a lane's); what doesn't fit takes the next
@@ -442,6 +532,8 @@ extension DottieScript {
             anchor?: string;
             /** Drawn only while this holds. */
             when?: Condition;
+            /** The container it goes in. */
+            parent?: Ref;
         }
 
         interface ConnectOptions extends Look {
@@ -449,6 +541,8 @@ extension DottieScript {
             /** Default true. */
             arrow?: boolean;
             label?: string;
+            /** The line's color; its label follows it unless textColor is set. */
+            stroke?: Color;
             sketchy?: boolean;
             /** Pins the start: a side, or the index of one of an extension shape's connection points. Default: follows the edge. */
             fromPort?: Port | number;
@@ -459,6 +553,8 @@ extension DottieScript {
         }
 
         interface Changes extends Look {
+            /** Puts it in a container, or takes it out with null. */
+            parent?: Ref | null;
             text?: string;
             x?: number;
             y?: number;
@@ -580,7 +676,10 @@ extension DottieScript {
             /** Places a stencil item with its top-left corner at x, y; its elements are grouped. */
             stencil(options: { name: string; x?: number; y?: number; library?: string; scale?: number; keepOriginalColors?: boolean; sketchy?: boolean }): { ids: string[]; width: number; height: number };
             /** Lays nodes out below existing content and connects them. Returns node key → element id. */
-            build(options: { nodes: BuildNode[]; edges?: BuildEdge[]; direction?: Direction; sketchy?: boolean; font?: string }): Record<string, string>;
+            /** Lays nodes and edges out below what's there; returns node key (and cluster key) to element id. Clusters
+             * are containers the nodes are laid out in, each as one block. */
+            build(options: { nodes: BuildNode[]; edges?: BuildEdge[]; direction?: Direction; sketchy?: boolean; font?: string;
+                clusters?: { key: string; title?: string; nodes?: string[]; parent?: string; lanes?: "rows" | "columns" }[] }): Record<string, string>;
 
             update(id: Ref, changes: Changes): Element;
             /** Deletes and returns how many; connectors on a deleted shape stay as free arrows. */
@@ -628,6 +727,14 @@ extension DottieScript {
             variable(name: string, value?: boolean | null): Record<string, boolean>;
             /** The page's variables and their starting values. */
             variables(): Record<string, boolean>;
+            /** The page's theme and palette; with options, sets them first. Changing a palette color recolors every
+             * shape whose color was given by that name. */
+            theme(options?: ThemeOptions): ThemeInfo;
+            /** A container: a titled box holding `children` (shapes or other containers), which fits round them and
+             * moves them when it moves; connectors bind to it like any shape. With `lanes` it is a swimlane, whose
+             * children should be containers (its lanes), stacked as rows or columns. Without children, give x, y,
+             * width and height, and it keeps that size. */
+            container(options?: ContainerOptions): Element;
             /** Writes one variable's whole story: its starting value, the conditions on what it hides and shows, overrides
              * on what it dims, restyles and reroutes, and the clicks that change it. Running it again changes nothing
              * more. Returns a summary. */

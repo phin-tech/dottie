@@ -209,6 +209,8 @@ struct ConnectorTool: CanvasTool {
         st.fill = .clear
         var data = ConnectorData(start: c.endpoint(at: p, in: c.model), end: .free(p), routing: c.routing)
         if Pref.bool(Pref.hops, default: true) { data.hops = true }
+        // As an elbow, it goes round the shapes in its way.
+        data.avoid = true
         let e = Element(kind: .connector, frame: .zero, style: st, layerID: layer, connector: data)
         c.model.elements.append(e)
         c.selection = [e.id]

@@ -19,7 +19,7 @@ export function packetID(flow: string, k: number): string {
 }
 
 /** `cost` as routing uses it: 1 for null, kept within 0...1,000,000 (ConnectorData.routeCost). */
-const routeCost = (cost: number | null): number =>
+export const routeCost = (cost: number | null): number =>
   cost === null || !Number.isFinite(cost) ? 1 : Math.min(Math.max(cost, 0), 1_000_000);
 
 type Edge = { to: string; via: string; back: boolean; cost: number };

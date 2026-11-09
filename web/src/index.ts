@@ -11,7 +11,7 @@ export { BUNDLED_FONTS } from "./text.ts";
 export { inspect, inspectFrame, inspectPage, sampleTimes } from "./inspect.ts";
 export { DottiePlayer, Playback, definePlayer, pageIndex, withRoughness } from "./player.ts";
 export { bounds, plan, svg, svgParts, type Plan, type Part } from "./svg.ts";
-export { themeNamed, themes, type Theme } from "./theme.ts";
+export { pageTheme, paletteColor, themeNamed, themes, type Theme } from "./theme.ts";
 export { cameraView, frameTimes, posterTime, resolved, sceneAt, still, transientElements } from "./timeline.ts";
 
 export interface RenderOptions {

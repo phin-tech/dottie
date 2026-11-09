@@ -104,7 +104,8 @@ public enum DottieScript {
             // An extension shape the script resized reflows rather than stretching; one that can't keeps its path.
             var edited = host.doc
             logs += edited.reflowExtensionShapes(from: doc, using: extensions, includingNew: true)
-            doc = edited
+            // Containers moved take their contents; new and moved shapes join the container they're in (ADR 0006).
+            doc = edited.reconcilingContainers(from: doc)
         }
         return ScriptResult(logs: logs, value: json, error: failure, operations: host.operations)
     }
@@ -330,7 +331,9 @@ public enum DottieScript {
             }
             func color(_ k: String) throws -> RGBA? {
                 guard let s = string(k) else { return nil }
-                guard let c = RGBA(hex: s) else { throw OpsError.invalid("'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                    throw OpsError.invalid("'\(k)' must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+                }
                 return c
             }
             func enumValue<T: RawRepresentable & CaseIterable>(_ k: String, as: T.Type) throws -> T? where T.RawValue == String {
@@ -349,7 +352,7 @@ public enum DottieScript {
                                 gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"),
                                 waypoints: try points("waypoints"), hops: bool("hops"),
                                 textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") },
-                                cost: double("cost"))
+                                cost: double("cost"), avoid: bool("avoid"))
             }
             /// A list of {x, y} points.
             func points(_ k: String) throws -> [CGPoint]? {
@@ -371,6 +374,8 @@ public enum DottieScript {
             }
             let parsed = try JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])
             let a = Args(parsed as? [String: Any] ?? [:])
+            // Palette names in color arguments are this page's.
+            DiagramOps.colorContext = doc
             let out: Any? = try run(name, a)
             guard let out else { return "" }
             return String(decoding: try JSONSerialization.data(withJSONObject: out, options: [.fragmentsAllowed]), as: UTF8.self)
@@ -474,10 +479,18 @@ public enum DottieScript {
                 d["hover"] = o
             }
             if let layer = doc.layers.first(where: { $0.id == e.layerID }) { d["layer"] = layer.name }
+            if let c = e.containerID { d["parent"] = c.uuidString }
+            if let c = e.container { d["container"] = true; if let l = c.lanes { d["lanes"] = l.rawValue } }
+            if let n = e.style.named {
+                var m: [String: String] = [:]
+                if let f = n.fill { m["fill"] = f }; if let st = n.stroke { m["stroke"] = st }; if let t = n.textColor { m["textColor"] = t }
+                d["named"] = m
+            }
             if let c = e.connector {
                 d["routing"] = c.routing.rawValue
                 if let w = c.waypoints { d["waypoints"] = w.map { ["x": $0.x, "y": $0.y] } }
                 if c.hops == true { d["hops"] = true }
+                if c.avoid == true { d["avoid"] = true }
                 if let cost = c.cost { d["cost"] = cost }
                 if let f = c.start.elementID { d["from"] = f.uuidString }
                 if let t = c.end.elementID { d["to"] = t.uuidString }
@@ -546,6 +559,8 @@ public enum DottieScript {
                 if let n = a.string("anchor"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].anchor = n }
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: e.id, w) }
                 try a.measure(&doc, e.id)
+                try DiagramOps.nameColors(&doc, id: e.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: a.string("textColor"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&doc, id: e.id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
                 return describe(try element(e.id))
 
             case "connector":
@@ -554,9 +569,11 @@ public enum DottieScript {
                 let c = try DiagramOps.addConnector(&doc, from: try a.uuid("from"), to: try a.uuid("to"), routing: routing,
                                                     arrow: a.bool("arrow") ?? true, port: (start.0, end.0),
                                                     portIndex: (start.1, end.1), roughness: a.roughness,
-                                                    label: a.string("label"), look: try a.look())
+                                                    label: a.string("label"), look: try a.look(),
+                                                    stroke: try a.color("stroke"))
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w) }
                 try a.measure(&doc, c.id)
+                try DiagramOps.nameColors(&doc, id: c.id, fill: nil, stroke: a.string("stroke"), textColor: a.string("textColor"))
                 return describe(try element(c.id))
 
             case "update":
@@ -597,7 +614,49 @@ public enum DottieScript {
                     doc.elements[i].overrides = parsed.isEmpty ? nil : parsed
                 }
                 try a.measure(&doc, id)
+                try DiagramOps.nameColors(&doc, id: id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: a.string("textColor"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&doc, id: id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
                 return describe(try element(id))
+
+            case "container":
+                var frame: CGRect?
+                if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: w, height: h) }
+                let parent = a.string("parent").flatMap { $0.isEmpty ? nil : UUID(uuidString: $0) }
+                let c = try DiagramOps.addContainer(&doc, title: a.string("title"), children: try a.ids("children"), frame: frame,
+                                                    lanes: try a.enumValue("lanes", as: LaneDirection.self), parent: parent,
+                                                    roughness: a.roughness, fill: try a.color("fill"), stroke: try a.color("stroke"))
+                try DiagramOps.nameColors(&doc, id: c.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: nil)
+                return describe(try element(c.id))
+
+            case "theme":
+                let custom = a.has("background") || a.has("ink") || a.has("palette") || a.has("name")
+                func given(_ k: String) throws -> RGBA? {
+                    guard let s = a.string(k) else { return nil }
+                    guard let c = RGBA(hex: s) else { throw OpsError.invalid("'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                    return c
+                }
+                if custom {
+                    let start = a.string("theme").flatMap { $0.isEmpty ? nil : Theme.named($0) }
+                    if let t = a.string("theme"), !t.isEmpty, start == nil {
+                        throw OpsError.invalid("No theme '\(t)'; the built-ins are " + Theme.all.map(\.id).joined(separator: ", "))
+                    }
+                    var theme = start.map { CustomTheme(from: $0, name: $0.name + " (custom)") } ?? doc.customTheme
+                        ?? CustomTheme(from: doc.resolvedTheme ?? .white, name: (doc.resolvedTheme?.name ?? "White") + " (custom)")
+                    if let n = a.string("name"), !n.isEmpty { theme.name = n }
+                    if let c = try given("background") { theme.background = c }
+                    if let c = try given("ink") { theme.ink = c }
+                    try DiagramOps.setTheme(&doc, id: nil, custom: theme)
+                    for (k, v) in (a.raw["palette"] as? [String: Any] ?? [:]).sorted(by: { $0.key < $1.key }) {
+                        guard let s = v as? String, let c = RGBA(hex: s) else { throw OpsError.invalid("'palette' maps names to hex colors; '\(k)' isn't one") }
+                        try DiagramOps.setPaletteColor(&doc, name: k, color: c)
+                    }
+                } else if a.has("theme") {
+                    try DiagramOps.setTheme(&doc, id: a.string("theme"))
+                }
+                var out: [String: Any] = ["theme": doc.customTheme != nil ? "custom" : (doc.theme ?? ""),
+                                          "palette": Dictionary(doc.palette.map { ($0.name, hex($0.color)) }, uniquingKeysWith: { a, _ in a })]
+                if let t = doc.resolvedTheme { out["name"] = t.name; out["background"] = hex(t.background); out["ink"] = hex(t.ink) }
+                return out
 
             case "pages":
                 let pages = file?.pages.map { $0.id == doc.id ? doc : $0 } ?? [doc]
@@ -642,8 +701,13 @@ public enum DottieScript {
                                         stroke: try e.color("stroke"), when: e.string("when"))
                 }
                 let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
+                let clusters = try (a.list("clusters") ?? []).map { c in
+                    DiagramOps.ClusterSpec(key: try c.require("key"), title: c.string("title"),
+                                           nodes: ((c.raw["nodes"] as? [Any]) ?? []).compactMap { $0 as? String },
+                                           parent: c.string("parent"), lanes: try c.enumValue("lanes", as: LaneDirection.self))
+                }
                 let ids = try DiagramOps.build(&doc, nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
-                                               font: a.string("font"))
+                                               font: a.string("font"), clusters: clusters)
                 return ids.mapValues(\.uuidString)
 
             case "layout":
@@ -1051,15 +1115,24 @@ public enum DottieScript {
         else for (k in v) out[k] = value(v[k]);
         return out;
       };
-      var kind = function (k) { return function (o) { return call("shape", merge(o, { kind: k })); }; };
+      // A container by element or id; null or "" takes the element out of its container.
+      var parented = function (o) {
+        if (!o || o.parent === undefined) return o;
+        return merge(o, { parent: o.parent === null || o.parent === "" ? "" : idOf(o.parent) });
+      };
+      var kind = function (k) { return function (o) { return call("shape", merge(parented(o), { kind: k })); }; };
       g.dottie = {
         elements: function (filter) { return call("elements", filter); },
         get: function (id) { return call("get", { id: idOf(id) }); },
-        shape: function (o) { return call("shape", o); },
+        shape: function (o) { return call("shape", parented(o)); },
+        container: function (o) {
+          o = parented(o || {});
+          return call("container", o.children === undefined ? o : merge(o, { children: ids(o.children) }));
+        },
         rect: kind("rectangle"), ellipse: kind("ellipse"), diamond: kind("diamond"), text: kind("text"), note: kind("note"),
         connect: function (from, to, o) { return call("connector", merge(o, { from: idOf(from), to: idOf(to) })); },
         update: function (id, changes) {
-          var o = merge(changes, { id: idOf(id) });
+          var o = merge(parented(changes), { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
           if (o.overrides === null) o.overrides = [];
           if (o.capacity === null) o.capacity = "";
@@ -1123,6 +1196,7 @@ public enum DottieScript {
         loopScene: function (scene, loop) { call("editScene", { scene: String(scene), loop: loop !== false }); },
         variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
         variables: function () { return call("variables"); },
+        theme: function (o) { return call("theme", o || {}); },
         flow: function (from, to, o) {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
@@ -1273,7 +1347,7 @@ public enum DottieScript {
         (a note is a sticky note: its text is GitHub Flavored Markdown, tables included, drawn from the top left;
          a single newline is a line break; the fill defaults to yellow)
       dottie.shape({kind, ...})        same, with kind as a field
-      dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, fromPort?, toPort?, ...look})   routing: straight | curved | elbow; \
+      dottie.connect(from, to, {routing?, arrow?, label?, stroke?, sketchy?, fromPort?, toPort?, ...look})   routing: straight | curved | elbow; \
         fromPort/toPort pin an end: top | right | bottom | left, or a number for an extension shape's connection points (0 up, as the shape declares them)
       dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}
       dottie.build({nodes: [{key, text, kind?, fill?, width?, height?}], edges: [{from, to, routing?, arrow?, label?}], \
@@ -1356,6 +1430,14 @@ public enum DottieScript {
     on the web, elements with a when follow them, and the timeline keeps looping. Exports and previews show the \
     starting values; the editor shows every element while stopped. Inside a symbol, when sees no variables (all false)
       dottie.variables()               {name: startingValue}
+      dottie.container({title?, children?, parent?, lanes?, x?, y?, width?, height?, fill?, stroke?})  a titled box \
+    holding shapes: it fits round them and moves them when it moves; connectors bind to it like any shape. parent \
+    nests it; lanes ("rows" | "columns") makes a swimlane whose children are containers (its lanes). parent on \
+    dottie.rect/... and dottie.update puts a shape in one (null takes it out)
+      dottie.theme({theme?, name?, background?, ink?, palette?})  the page's theme and palette ({name: hex}); with \
+    options, sets them first (background, ink or palette make the theme the page's own). Colors everywhere also take \
+    a palette name ("accent", "muted", "danger", "warning", "success", "info", or the page's own); a fill, stroke or \
+    text color given by name follows the palette when it changes
       dottie.defineState(name, {initial?, hide?, show?, dim?, down?, dimOpacity?, restyle?, reroute?, toggledBy?, turnedOnBy?, \
     turnedOffBy?})  one variable described at once; writes the when conditions, overrides and clicks it means. hide: \
     drawn only while it is false; show: only while true; dim: faded while true; down: faded and carrying no flow \
@@ -1457,7 +1539,8 @@ public enum DottieScript {
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
     waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
-    (connectors: a small hop where the line crosses a connector drawn beneath it), cost 0-1000000 (connectors: what \
+    (connectors: a small hop where the line crosses a connector drawn beneath it), avoid true|false (elbow \
+    connectors: go round the shapes in the way instead of through them; dottie.connect turns it on for elbows), cost 0-1000000 (connectors: what \
     flow traffic pays to take the line, default 1; flows take the cheapest route), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
     exports but not embedded; "" for Helvetica Neue), fontSize 4-200, textColor hex (a shape's or connector's label; \

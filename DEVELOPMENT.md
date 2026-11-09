@@ -185,7 +185,13 @@ Copies older than the first Sparkle release (0.5.3) have to be updated by hand o
 ## File format
 
 A `.dottie` file is JSON (sorted keys, pretty-printed, rounded frames, so it diffs well in git): a `DottieFile`
-with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme.
+with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme: a built-in's id, or a
+`customTheme` of its own (page color, ink and a palette). A style's `named` says which of its fill, stroke and text
+color are palette colors; they are set from the page's palette when a file is read and whenever the theme changes,
+and a color changed by hand stops being one (ADR 0005, `Theme.swift`, web/src/theme.ts). A rectangle with
+`container` data is a container: elements whose `containerID` is its id move with it, it fits round them with its
+title in a band at the top (its `labelRect`), and shapes join or leave it as they are moved in or out; all of it is
+`reconcilingContainers` in `Containers.swift`, run on every commit, MCP tool and script (ADR 0006).
 Element ids are unique across the file, which is what lets a link point at a shape on another page.
 A shape's or connector's label is drawn in its style's `textColor`, or its `stroke` when that is absent
 (`Element.labelColor`); a text box and a note always use their stroke. As in Excalidraw, setting a stroke color clears
@@ -268,7 +274,12 @@ bends). A straight line joins them, a curved one runs a Catmull-Rom curve throug
 angles, adding a corner between any two that are out of line and dropping any that fall into line
 (`Connector.route(through:)`). They stay put when the end shapes move and move with the connector itself, so
 everything that moves a connector's free ends moves them too (`ConnectorData.transformFree`). Switching between
-elbow and the other routings, and `auto_layout`, take them out. A connector with `hops: true` draws a half-circle
+elbow and the other routings, and `auto_layout`, take them out. An elbow without waypoints and with `avoid: true`
+(new elbows get it, from the app, scripts and MCP, except `build_diagram`'s, which its layout routes) keeps its plain Z or L unless that cuts through another shape;
+then `ElbowRouter` routes it over a grid of the padded edges of the shapes in the way, the shortest way with the
+fewest bends, leaving and arriving along the plain route's axes. Text, freehand lines, plain paths, invisible and
+small things (under 24 points: packets, dots) aren't in the way, nor are its own ends or a shape either end sits
+inside; web/src/elbow.ts is the same algorithm, point for point. A connector with `hops: true` draws a half-circle
 hop where it crosses a connector drawn before it on a visible layer (`Renderer.hopCrossings`), measured along
 each straight segment or each cubic of a curve (sampled as the route is), which is cut either side of the
 crossing; crossings within a hop of a bend or of another hop are skipped. Earlier versions open
@@ -291,8 +302,9 @@ would have added 220 KB.
 
 `MermaidImporter` parses `flowchart` / `graph` text with a hand-written scanner into `DiagramOps.build` nodes
 and edges, so an import lays out exactly like `build_diagram`. Shapes map to the nearest kind (circles and
-stadiums to ellipses, `{}` to a diamond, the rest to rectangles). BT and RL draw as TB and LR, subgraphs are
-flattened, and only `fill` survives from `style` / `classDef`. Other diagram types are refused with a clear error.
+stadiums to ellipses, `{}` to a diamond, the rest to rectangles). BT and RL draw as TB and LR, subgraphs become
+containers (nested as written, a node in the last subgraph that mentions it, a link to a subgraph's id to its
+container) and export back as subgraphs, and only `fill` survives from `style` / `classDef`. Other diagram types are refused with a clear error.
 
 `Exporter.mermaid` goes the other way (File ▸ Export As ▸ Mermaid, `dottie render -f mermaid`, `export_mermaid`):
 shapes become nodes with ids `n1`, `n2`, ... (or the element's `anchor` when it is a valid id), connectors attached
@@ -308,7 +320,8 @@ Tools: `build_diagram` (nodes + edges, auto-laid-out), `import_mermaid` (a Merma
 way), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `add_image`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
 work, plus each element's id and pixel box), `export_svg`, `export_mermaid`, `create_diagram`, `open_document`, `list_stencils`,
-`add_stencil`, `list_pages`, `add_page`, `rename_page`, `make_symbol`, `place_symbol`, `run_script` and `script_api`. Tools that draw, list or
+`add_stencil`, `list_pages`, `add_page`, `rename_page`, `make_symbol`, `place_symbol`, `set_theme`, `run_script` and
+`script_api`. Every color argument takes a hex color or a palette name. Tools that draw, list or
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element
 id find its page themselves. `add_shape` and `build_diagram` take kind `note` for a sticky note
 whose text is Markdown. Connectors take a `label`; shapes and connectors take `fill_style`, `dash`,

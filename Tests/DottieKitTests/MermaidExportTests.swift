@@ -93,4 +93,31 @@ final class MermaidExportTests: XCTestCase {
         let d = try MermaidImporter.parse(Exporter.mermaid(doc))
         XCTAssertEqual(d.nodes.map(\.text), [""])
     }
+
+    /// Containers export as nested subgraphs and import back as the same containers.
+    func testContainersRoundTripAsSubgraphs() throws {
+        var doc = DottieDocument()
+        let ids = try MermaidImporter.build(&doc, mermaid: """
+        flowchart TB
+          subgraph vpc [VPC]
+            lb[Load balancer]
+            subgraph app [App subnet]
+              api --> worker
+            end
+          end
+          user --> lb
+          lb --> app
+        """).ids
+        let text = Exporter.mermaid(doc)
+        XCTAssertTrue(text.contains("subgraph"), text)
+        var back = DottieDocument()
+        let again = try MermaidImporter.parse(text)
+        XCTAssertEqual(again.clusters.map(\.title), ["VPC", "App subnet"], text)
+        XCTAssertEqual(again.clusters[1].parent, again.clusters[0].key)
+        XCTAssertEqual(again.clusters[1].nodes.count, 2)
+        _ = try MermaidImporter.build(&back, mermaid: text)
+        XCTAssertEqual(back.elements.filter { $0.container != nil }.count, 2)
+        XCTAssertEqual(back.elements.filter { $0.kind == .connector }.count, doc.elements.filter { $0.kind == .connector }.count)
+        _ = ids
+    }
 }

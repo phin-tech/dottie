@@ -34,10 +34,13 @@ user restarts their session before the tools appear. Until then, the command lin
    stay attached when shapes move. `sketchy: false` gives the clean look. `import_mermaid` takes a Mermaid flowchart
    instead.
 3. **Look at it.** `export_png` returns the page as an image. Read it as the user would: overlapping labels, crossed
-   or crowded arrows, text spilling out of shapes, a layout that runs the wrong way.
+   or crowded arrows, text spilling out of shapes, a layout that runs the wrong way. For a quick look at a big page,
+   `max_width: 800` keeps the image small and `elements: "compact"` the element map; `include_image: false` with an
+   `out_path` saves the PNG and returns only its path, size and map.
 4. **Fix and look again.** `list_elements` gives the ids that `update_element`, `delete_element` and
    `add_connector` take; `auto_layout` re-ranks a page. An arrow that cuts through a shape can be routed around it
-   with `waypoints` (canvas points it bends through, on `add_connector` or `update_element`), and `hops: true` puts
+   with `waypoints` (canvas points it bends through, on `add_connector` or `update_element`); an elbow connector goes
+   round the shapes in its way by itself (`avoid`, on for new elbows), and `hops: true` puts
    a small arc where it crosses an arrow beneath it. The diagram is done when the latest PNG reads cleanly, with
    every label legible and every arrow's ends clear.
 
@@ -58,6 +61,8 @@ More of the MCP tools, by purpose:
 | For | Tools |
 | --- | --- |
 | Pages | `list_pages`, `add_page`, `rename_page` |
+| Containers and swimlanes | `add_container` (a titled box that holds shapes and moves them; `lanes` for a swimlane), `parent` on `add_shape` / `update_element` |
+| Theme and palette | `set_theme`; any color argument also takes a palette name (`accent`, `muted`, `danger`, `warning`, `success`, `info`, or the page's own), and shapes colored by name follow the palette when it changes |
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |
 | Extension shapes and commands | `list_extensions`, `add_shape` with `extension`, `run_command` |
@@ -122,7 +127,9 @@ click without stopping.
 
 Check an interactive page before calling it done; you can't click the HTML export yourself. `simulate` plays it as
 the player would: give it steps like `{"click": "east"}`, `{"wait": 2}` and `{"snapshot": true}`, and it reports the
-time, the scene, the variables and what their conditions hide after each, with a PNG per snapshot. Give it
+time, the scene, the variables and what their conditions hide after each, with a PNG per snapshot. A
+`{"routes": true}` step lists each flow's ways at that moment (destination, connectors with ids, share, cost), so
+you can check that traffic in each state takes the path you meant and not a status-return edge. Give it
 `record_path` (`.mp4`, `.gif` or `.png`) to also write the whole run as a looping video, for a README or slides where
 the page can't be clicked; end the steps with a wait so the last click's result shows. `export_png` and
 `export_svg` take `state: {"down": true}` to draw one state, and `export_animation` takes it as starting values.

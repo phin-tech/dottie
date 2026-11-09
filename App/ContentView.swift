@@ -318,6 +318,7 @@ struct Inspector: View {
         if !style.onlyTextBoxes {
             Section("Stroke") {
                 ColorPicker("Color", selection: style.stroke)
+                PaletteSwatches(palette: document.model.palette, chosen: style.named(\.stroke)) { style.name(\.stroke, $0) }
                 ValueSlider(title: "Width", value: style.binding(\.strokeWidth, "Change Stroke Width"), range: 1...12, format: Self.points)
                 Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
                     ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
@@ -327,6 +328,7 @@ struct Inspector: View {
         if style.hasFill && !style.onlyTextBoxes && !(tool == .note || (!selected.isEmpty && selected.allSatisfy { $0.kind == .note })) {
             Section("Fill") {
                 ColorPicker("Color", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true)
+                PaletteSwatches(palette: document.model.palette, chosen: style.named(\.fill)) { style.name(\.fill, $0) }
                 Picker("Pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {
                     ForEach(StyleChoices.fills, id: \.0) { Text($0.1).tag($0.0) }
                 }
@@ -375,6 +377,10 @@ struct Inspector: View {
                 }
                 Toggle("Hop over crossings", isOn: style.hops)
                     .help("Draw a small arc where the line crosses a connector beneath it")
+                if !style.selectedConnectors.isEmpty, style.routing.wrappedValue == .elbow {
+                    Toggle("Go round shapes", isOn: style.avoid)
+                        .help("Route the elbow around the shapes in its way instead of through them")
+                }
                 if !style.selectedConnectors.isEmpty {
                     Button("Remove Bends", action: style.removeBends)
                         .disabled(!style.hasBends)
@@ -453,6 +459,18 @@ struct Inspector: View {
             Picker("Theme", selection: themeBinding) {
                 Text("Automatic").tag("")
                 ForEach(Theme.all) { t in Text(t.name).tag(t.id) }
+                if let custom = document.model.customTheme { Text(custom.name).tag("custom") }
+            }
+            if document.model.customTheme == nil {
+                Button("Make a Theme of Its Own") {
+                    var next = document.model
+                    let base = next.resolvedTheme ?? .white
+                    try? DiagramOps.setTheme(&next, id: nil, custom: CustomTheme(from: base, name: base.name + " (custom)"))
+                    document.commit(next, actionName: "Make Theme", undoManager: undoManager)
+                }
+                .help("Copy this theme into the drawing, to change its page color, ink and palette")
+            } else {
+                CustomThemeEditor(document: document, undoManager: undoManager)
             }
             Toggle("Rulers and guides", isOn: $showRulers)
             if showRulers { GuidesEditor(document: document, undoManager: undoManager) }
@@ -460,10 +478,11 @@ struct Inspector: View {
     }
 
     private var themeBinding: Binding<String> {
-        Binding(get: { document.model.theme ?? "" },
+        Binding(get: { document.model.customTheme != nil ? "custom" : document.model.theme ?? "" },
                 set: { id in
+                    guard id != "custom" else { return }
                     var next = document.model
-                    next.theme = id.isEmpty ? nil : id
+                    try? DiagramOps.setTheme(&next, id: id)
                     document.commit(next, actionName: "Change Theme", undoManager: undoManager)
                 })
     }
@@ -647,6 +666,30 @@ struct LayersSection: View {
             .disabled(layers.count < 2)
     }
 
+    /// How many containers `e` is inside.
+    private func containerDepth(_ e: Element) -> Int {
+        var d = 0, at = e.containerID, seen = Set<UUID>()
+        while let id = at, seen.insert(id).inserted, let up = document.model.elements.first(where: { $0.id == id }) { d += 1; at = up.containerID }
+        return d
+    }
+
+    /// Putting an element in a container or taking it out.
+    @ViewBuilder private func containerMenu(_ e: Element) -> some View {
+        let page = document.model
+        let banned = page.descendants(of: e.id).union([e.id])
+        let containers = page.elements.filter { $0.container != nil && !banned.contains($0.id) }
+        if e.kind != .connector, !containers.isEmpty {
+            Menu("Put in Container") {
+                ForEach(containers) { c in
+                    Button(c.text ?? "Untitled container") { edit("Put in Container") { try? DiagramOps.setParent(&$0, id: e.id, parent: c.id) } }
+                }
+            }
+        }
+        if e.containerID != nil {
+            Button("Take Out of Container") { edit("Take Out of Container") { try? DiagramOps.setParent(&$0, id: e.id, parent: nil) } }
+        }
+    }
+
     var body: some View {
         let byLayer = Dictionary(grouping: document.model.elements, by: \.layerID)
         Section("Layers") {
@@ -671,6 +714,9 @@ struct LayersSection: View {
                 if expanded.contains(layer.id) {
                     ForEach(Array(members.reversed().prefix(Self.rowLimit))) { e in
                         ElementRow(element: e, isSelected: selection.contains(e.id))
+                            // Inside a container, indented under it (ADR 0006).
+                            .padding(.leading, Double(containerDepth(e)) * 14)
+                            .contextMenu { containerMenu(e) }
                             .onTapGesture { onSelect(document.model.expandingGroups([e.id])) }
                             .draggable(dragString(for: e.id))
                             .dropDestination(for: String.self) { items, _ in

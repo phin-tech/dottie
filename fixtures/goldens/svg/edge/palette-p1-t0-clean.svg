@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="808" height="108" viewBox="16 16 808 108">
+<rect x="16" y="16" width="808" height="108" fill="#fbfaf6"/>
+<path d="M40 40 L160 40 L160 100 L40 100 Z" fill="#2563eb" stroke="none"/>
+<path d="M40 40 L160 40 L160 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="76.48">accent</tspan></text>
+<path d="M200 40 L320 40 L320 100 L200 100 Z" fill="#dc2626" stroke="none"/>
+<path d="M200 40 L320 40 L320 100 L200 100 Z" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="260" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#dc2626" text-anchor="middle"><tspan x="260" y="76.48">danger</tspan></text>
+<path d="M480 70 C480 86.57 453.14 100 420 100 C386.86 100 360 86.57 360 70 C360 53.43 386.86 40 420 40 C453.14 40 480 53.43 480 70 Z" fill="none" stroke="#16a34a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#16a34a" text-anchor="middle"><tspan x="420" y="76.48">success label</tspan></text>
+<path d="M520 40 L640 40 L640 100 L520 100 Z" fill="#808080" stroke="none"/>
+<path d="M520 40 L640 40 L640 100 L520 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="580" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="580" y="76.48">brand</tspan></text>
+<path d="M680 40 L800 40 L800 100 L680 100 Z" fill="#e6ccff" stroke="none"/>
+<path d="M680 40 L800 40 L800 100 L680 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="740" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="740" y="76.48">missing</tspan></text>
+</svg>

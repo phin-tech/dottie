@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None, cost=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None, cost=None, avoid=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -85,6 +85,8 @@ class Page:
             kw["connector"]["hops"] = hops
         if cost is not None:
             kw["connector"]["cost"] = cost
+        if avoid is not None:
+            kw["connector"]["avoid"] = avoid
         if text:
             kw["text"] = text
         if when is not None:
@@ -498,13 +500,105 @@ def march():
     write(EDGE / "march.dottie", [p])
 
 
+def elbow_around():
+    """Elbow connectors go round the shapes they would cut through (ElbowRouter.swift, web/src/elbow.ts): an edge
+    that skips a rank, one past two shapes in a row and one whose way round leads past a third, with pinned ports;
+    while a frame round both ends, a small dot and a text box are not in the way, and a clear elbow keeps its Z."""
+    p = Page()
+    a = p.add("rectangle", 40, 40, 120, 60, text="A")
+    b = p.add("rectangle", 40, 180, 120, 60, text="B")
+    c = p.add("rectangle", 40, 320, 120, 60, text="C")
+    p.connect(a, b, routing="elbow", avoid=True)
+    p.connect(b, c, routing="elbow", avoid=True)
+    p.connect(a, c, routing="elbow", avoid=True, text="skips B")
+    # Without avoid, the plain line through B.
+    p.connect(a, c, routing="elbow", start_port="left", end_port="left", st=style(dash="dashed"))
+    # Left to right past two in a row, pinned.
+    d = p.add("ellipse", 260, 40, 100, 60, text="D")
+    e = p.add("diamond", 420, 30, 100, 80, text="E")
+    f = p.add("rectangle", 580, 40, 100, 60, text="F")
+    p.connect(d, f, routing="elbow", avoid=True, start_port="right", end_port="left")
+    # Going under one leads past another.
+    g = p.add("rectangle", 260, 200, 100, 60, text="G")
+    h = p.add("rectangle", 420, 190, 100, 80, text="H")
+    i = p.add("rectangle", 420, 300, 140, 40, text="I")
+    j = p.add("rectangle", 600, 200, 100, 60, text="J")
+    p.connect(g, j, routing="elbow", avoid=True, start_port="bottom", end_port="bottom")
+    p.connect(g, j, routing="elbow", avoid=True)
+    # A frame round both ends, a dot and a text box in the way: kept plain.
+    p.add("rectangle", 240, 400, 480, 200, style=style(fill=rgba(0.9, 0.95, 1)))
+    k = p.add("rectangle", 260, 440, 80, 50, text="K")
+    m = p.add("rectangle", 620, 520, 80, 50, text="M")
+    p.add("ellipse", 470, 470, 12, 12, style=style(fill=rgba(0.2, 0.2, 0.2)))
+    p.add("text", 400, 500, 120, 30, text="a caption")
+    p.connect(k, m, routing="elbow", avoid=True)
+    write(EDGE / "elbow-around.dottie", [p])
+
+
+def palette():
+    """Palette colors by name (ADR 0005): the same names on a light built-in, a dark built-in and a theme of the
+    page's own, with a name of its own, a stroke and a label color by name, a name the palette lacks (kept as
+    stored), and stored colors left stale (grey) on purpose, so a reader that doesn't resolve names draws them wrong."""
+    stale = rgba(0.5, 0.5, 0.5)
+    def shapes(p):
+        p.add("rectangle", 40, 40, 120, 60, text="accent", style=style(fill=stale, named={"fill": "accent"}))
+        p.add("rectangle", 200, 40, 120, 60, text="danger", style=style(fill=stale, stroke=stale, named={"fill": "danger", "stroke": "danger"}))
+        p.add("ellipse", 360, 40, 120, 60, text="success label",
+              style=style(stroke=stale, textColor=stale, named={"stroke": "success", "textColor": "success"}))
+        p.add("rectangle", 520, 40, 120, 60, text="brand", style=style(fill=stale, named={"fill": "Brand"}))
+        p.add("rectangle", 680, 40, 120, 60, text="missing", style=style(fill=rgba(0.9, 0.8, 1), named={"fill": "nope"}))
+    pages = []
+    for theme in ["paper", "blueprint"]:
+        page = Page(name=theme, theme=theme)
+        shapes(page)
+        pages.append(page)
+    own = Page(name="own")
+    shapes(own)
+    own.extra = {"customTheme": {"name": "Forest", "base": "chalkboard", "background": rgba(0.93, 0.96, 0.92),
+                                 "ink": rgba(0.1, 0.2, 0.12),
+                                 "palette": [{"name": "accent", "color": rgba(0.06, 0.46, 0.43)},
+                                             {"name": "danger", "color": rgba(0.75, 0.2, 0.1)},
+                                             {"name": "success", "color": rgba(0.2, 0.5, 0.1)},
+                                             {"name": "brand", "color": rgba(0.55, 0.3, 0.75)}]}}
+    pages.append(own)
+    write(EDGE / "palette.dottie", pages)
+
+
+def containers():
+    """Containers (ADR 0006): a titled box round two shapes with a connector into it from outside, one nested in
+    another, a swimlane of two lanes, and an untitled one. Drawing needs only the frame and the title band
+    (labelRect), which the app keeps; this fixture stores them as the app would."""
+    p = Page()
+    def container(x, y, w, h, title, band=34, **kw):
+        extra = {"container": kw.pop("data", {})}
+        if title:
+            extra["text"] = title
+            extra["labelRect"] = {"x": 0, "y": 0, "width": 1, "height": band / h}
+        return p.add("rectangle", x, y, w, h, style=style(fill=rgba(0.5, 0.55, 0.65, 0.08), strokeWidth=1.5, fontSize=16, roughness=0), **extra, **kw)
+    vpc = container(20, 20, 420, 200, "VPC")
+    a = p.add("rectangle", 40, 74, 120, 60, text="api", containerID=vpc)
+    sub = container(200, 54, 220, 146, "Private subnet", containerID=vpc)
+    b = p.add("rectangle", 240, 108, 120, 60, text="db", containerID=sub)
+    p.connect(a, b, text="SQL")
+    user = p.add("ellipse", 520, 80, 100, 60, text="user")
+    p.connect(user, vpc, routing="elbow")
+    pool = container(20, 260, 600, 234, "Order flow", data={"lanes": "rows"})
+    lane1 = container(20, 294, 600, 100, "Customer", containerID=pool)
+    lane2 = container(20, 394, 600, 100, "Warehouse", containerID=pool)
+    c = p.add("rectangle", 60, 330, 120, 50, text="place order", containerID=lane1)
+    d = p.add("rectangle", 300, 430, 120, 50, text="pick", containerID=lane2)
+    p.connect(c, d, routing="elbow")
+    container(660, 20, 160, 120, None, data={"fixed": True})
+    write(EDGE / "containers.dottie", [p])
+
+
 def notes():
     """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
     p = Page()
     texts = ["# H1\npara", "## H2\npara", "### H3\npara", "A\nB\nC", "para\n\npara2", "# H1\n## H2\n### H3",
              "**bold**\nplain", "plain\n**bold**", "x\n# H1", "- a\n- b\n\npara", "1. one\n2. two", "> quote\n> more",
              "```\ncode\nmore\n```\nafter", "---\nafter", "| a | b |\n|---|---|\n| 1 | 2 |\nafter",
-             "- [ ] task\n- [x] done", "- a\n  - b\n    - c", "*it* ~~st~~ [ln](http://x)",
+             "- [ ] task\n- [x] done", "- a\n  - b\n    - c", "*it* ~~st~~ [ln](http://x)\n***both*** and **a *b***",
              "| left | mid | right |\n|:--|:-:|--:|\n| 1 | two | 3 |\n| four | 5 | six six |",
              "See https://example.com/path, or www.phin.tech now",
              "A very long paragraph that keeps on going well past the bottom edge of this small note so it is cut off "
@@ -1123,6 +1217,9 @@ def main():
     text_colors()
     state()
     flows()
+    elbow_around()
+    palette()
+    containers()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

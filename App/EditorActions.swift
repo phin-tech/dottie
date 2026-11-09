@@ -81,6 +81,8 @@ struct EditorActions {
     var grouped: Bool
     var group: () -> Void
     var ungroup: () -> Void
+    /// Puts the selection in a new container (ADR 0006).
+    var contain: () -> Void
     // Symbols
     var instanceSelected: Bool
     var editingSymbol: Bool

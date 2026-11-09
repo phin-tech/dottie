@@ -106,7 +106,7 @@ extension DottieDocument {
         }
         // Page settings changed while posing apply to the page.
         next.layers = edited.layers; next.guidesX = edited.guidesX; next.guidesY = edited.guidesY
-        next.guidesLocked = edited.guidesLocked; next.theme = edited.theme; next.name = edited.name
+        next.guidesLocked = edited.guidesLocked; next.theme = edited.theme; next.customTheme = edited.customTheme; next.name = edited.name
         next.timeline = tl
         return next
     }

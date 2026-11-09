@@ -183,6 +183,9 @@ struct DottieCommands: Commands {
             Button("Ungroup") { editor?.ungroup() }
                 .keyboardShortcut("g", modifiers: [.command, .option, .shift])
                 .disabled(editor?.grouped != true)
+            Button("Put in Container") { editor?.contain() }
+                .keyboardShortcut("k", modifiers: [.command, .option])
+                .disabled(n < 1)
             Divider()
             Button("Convert to Symbol") { editor?.makeSymbol() }
                 .keyboardShortcut(KeyEquivalent(Character(UnicodeScalar(NSF8FunctionKey)!)), modifiers: [])

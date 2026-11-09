@@ -22,7 +22,7 @@ import { Expansions, buttonTime, expandingSymbols, symbolTable } from "./symbols
 import { type Plan, plan, svgParts, unchanged } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { planInWorker, plansInWorker } from "./planner.ts";
-import { themeNamed } from "./theme.ts";
+import { pageTheme } from "./theme.ts";
 import { applyClick } from "./state.ts";
 import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
 
@@ -142,7 +142,7 @@ export class Playback {
     this.sceneNames = (page.timeline?.markers ?? []).map((m) => m.name);
     this.sceneLoops = (page.timeline?.markers ?? []).map((m) => m.loop === true);
     this.state = { ...(page.variables ?? {}) };
-    const theme = themeNamed(page.theme);
+    const theme = pageTheme(page);
     this.background = theme?.background ?? WHITE;
     this.ink = theme?.ink ?? { r: 0.12, g: 0.12, b: 0.13, a: 1 };
     const ns = "http://www.w3.org/2000/svg";

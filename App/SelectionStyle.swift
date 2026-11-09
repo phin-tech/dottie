@@ -39,6 +39,8 @@ struct SelectionStyle {
             get: { selected.first?.style[keyPath: kp] ?? newStyle.wrappedValue[keyPath: kp] },
             set: { value in
                 newStyle.wrappedValue[keyPath: kp] = value
+                // A color picked by hand for new shapes isn't a palette color any more.
+                if kp == \Style.fill { newStyle.wrappedValue.named?.fill = nil }
                 guard !selection.isEmpty else { return }
                 edit(name) { next in
                     for i in next.elements.indices where selection.contains(next.elements[i].id) {
@@ -67,6 +69,8 @@ struct SelectionStyle {
         return color(Binding(get: { raw.wrappedValue }, set: { value in
             newStyle.wrappedValue.stroke = value
             newStyle.wrappedValue.textColor = nil
+            newStyle.wrappedValue.named?.stroke = nil
+            newStyle.wrappedValue.named?.textColor = nil
             guard !selection.isEmpty else { return }
             edit("Change Stroke Color") { next in
                 for i in next.elements.indices where selection.contains(next.elements[i].id) {
@@ -87,6 +91,7 @@ struct SelectionStyle {
             },
             set: { value in
                 newStyle.wrappedValue.textColor = value
+                newStyle.wrappedValue.named?.textColor = nil
                 guard !selection.isEmpty else { return }
                 edit("Change Text Color") { next in
                     for i in next.elements.indices where selection.contains(next.elements[i].id) {
@@ -157,6 +162,36 @@ struct SelectionStyle {
                     if selectedConnectors.isEmpty { UserDefaults.standard.set(on, forKey: Pref.hops); return }
                     editConnectors(on ? "Hop Over Crossings" : "Stop Hopping") { $0.hops = on ? true : nil }
                 })
+    }
+
+    /// The palette name the selection's (or the next shape's) color has, if it has one.
+    func named(_ field: WritableKeyPath<ColorNames, String?>) -> String? {
+        (selected.first?.style ?? newStyle.wrappedValue).named?[keyPath: field]
+    }
+
+    /// Gives the selection (or the next shape) a palette color by name, so it follows the palette (ADR 0005).
+    func name(_ field: WritableKeyPath<ColorNames, String?>, _ p: PaletteColor) {
+        func apply(_ s: inout Style) {
+            var n = s.named ?? ColorNames()
+            n[keyPath: field] = p.name
+            switch field {
+            case \ColorNames.fill: s.fill = p.color
+            case \ColorNames.stroke: s.stroke = p.color; if s.textColor == nil { n.textColor = nil }
+            default: s.textColor = p.color
+            }
+            s.named = n
+        }
+        apply(&newStyle.wrappedValue)
+        guard !selection.isEmpty else { return }
+        edit("Use \(p.name)") { next in
+            for i in next.elements.indices where selection.contains(next.elements[i].id) { apply(&next.elements[i].style) }
+        }
+    }
+
+    /// Whether the selected elbow connectors go round the shapes in their way.
+    var avoid: Binding<Bool> {
+        Binding(get: { selectedConnectors.first?.connector?.avoid == true },
+                set: { on in editConnectors(on ? "Go Round Shapes" : "Go Through Shapes") { $0.avoid = on ? true : nil } })
     }
 
     var hasBends: Bool { selectedConnectors.contains { $0.connector?.waypoints != nil } }

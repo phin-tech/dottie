@@ -575,8 +575,9 @@ extension DottieDocument {
     }
 
     /// `posed(at:state:since:)`, and the frame's metrics (ADR 0003).
+    /// With `routes`, the metrics also hold each flow's routes.
     public func posedWithMetrics(at t: Double, state: StateChoice = .initial, since: Double? = nil,
-                                 carried: [String: Double] = [:]) -> (frame: DottieDocument, metrics: FrameMetrics) {
+                                 carried: [String: Double] = [:], routes: Bool = false) -> (frame: DottieDocument, metrics: FrameMetrics) {
         let off = stateHidden(state)
         let values = stateValues(state)
         let active = Dictionary(uniqueKeysWithValues: elements.compactMap { e in
@@ -660,7 +661,8 @@ extension DottieDocument {
         if measuring {
             let offline = Set(active.filter { $0.value.contains { $0.offline == true } }.keys)
             // dottie.js's simulation, in JavaScriptCore (ADR 0004).
-            if let out = SimulationEngine.shared.frame(copy, at: t, values: values, offline: offline, since: since, carried: carried) {
+            if let out = SimulationEngine.shared.frame(copy, at: t, values: values, offline: offline, since: since, carried: carried,
+                                                           routes: routes) {
                 metrics = out.metrics
                 copy.elements = out.finished(copy.elements)
             }

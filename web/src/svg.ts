@@ -11,7 +11,7 @@ import { Path, type Rect, fmt, inset, midX, midY, union } from "./path.ts";
 import { cellSize, connectorParts, dashPattern, fillPath, hachurePath, outline } from "./shapes.ts";
 import { expandingSymbols, hasInstances } from "./symbols.ts";
 import { cssFamily, textSize } from "./text.ts";
-import { themeNamed } from "./theme.ts";
+import { pageTheme } from "./theme.ts";
 import { cameraView, frameTimes, resolved } from "./timeline.ts";
 
 /** The drawing's extent plus `padding`; a floor's rock hatching reaches past its shape. */
@@ -111,7 +111,7 @@ export interface Part { key: string; markup: string }
 export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, links = false,
   only?: (key: string) => boolean): { bounds: Rect; parts: Part[] } {
   if (hasInstances(page)) return svgParts(expandingSymbols(page, 0), background, fixed, links, only);
-  const theme = themeNamed(page.theme);
+  const theme = pageTheme(page);
   const bg = background ? (theme?.background ?? background) : null;
   const ink = theme?.ink ?? black;
   const d: Page = { ...page, elements: page.elements.map((e) => resolvingInk(e, ink)) };
@@ -143,7 +143,7 @@ export function svgParts(page: Page, background: RGBA | null, fixed?: Rect, link
 /** A whole page as an SVG document. Pass `background: null` for a transparent page. */
 export function svg(page: Page, background: RGBA | null = { r: 1, g: 1, b: 1, a: 1 }, fixed?: Rect): string {
   const { bounds: b, parts } = svgParts(page, background, fixed, true);
-  return svgOpen(b, themeNamed(page.theme)?.background ?? background, background !== null) + parts.map((p) => p.markup).join("") + "</svg>\n";
+  return svgOpen(b, pageTheme(page)?.background ?? background, background !== null) + parts.map((p) => p.markup).join("") + "</svg>\n";
 }
 
 /** Where a connector's label sits. */
@@ -225,7 +225,7 @@ function svgElement(e: Element, index: Index, labelBackground: RGBA | null, page
         }
       }
       s += `<path d="${outline(e).data()}" fill="none" ${strokeAttrs}/>\n`;
-      if (text) s += e.kind === "note" ? noteMarkup(text, e) : textElement(text, e.kind === "path" ? pathLabelBox(e) : frame(e), e, true);
+      if (text) s += e.kind === "note" ? noteMarkup(text, e) : textElement(text, e.kind === "path" || e.kind === "rectangle" ? pathLabelBox(e) : frame(e), e, true);
       return s;
     }
     default:
@@ -241,7 +241,8 @@ function placeholder(e: Element, strokeAttrs: string): string {
     + textElement(`${e.kind}${e.text ? `: ${e.text}` : ""}`, f, { ...e, style: { ...e.style, fontSize: Math.min(e.style.fontSize, 12) } }, true);
 }
 
-/** Where a path's label is centered: its `labelRect` within the frame, or the whole frame. */
+/** Where a path's or container's label is centered: its `labelRect` within the frame (a container's title band), or
+ * the whole frame. */
 function pathLabelBox(e: Element): Rect {
   const f = frame(e), r = e.labelRect;
   if (!r) return f;

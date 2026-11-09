@@ -1,5 +1,6 @@
 import XCTest
 import CoreGraphics
+import ImageIO
 @testable import DottieKit
 
 final class DottieKitTests: XCTestCase {
@@ -708,6 +709,27 @@ final class AgentOpsTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(notes.first { $0.text == "Start" }).x, 48, accuracy: 0.1)
         XCTAssertEqual(end.x, (200 + 24) * 2, accuracy: 0.1)
         XCTAssertEqual(end.width, 200, accuracy: 0.1)
+    }
+
+    /// export_png's max_width lowers the scale to fit (never raises it), and its compact map is a line per element.
+    func testExportScaleFitsAWidthAndTheCompactMapIsALinePerElement() throws {
+        var doc = DottieDocument()
+        _ = try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 0, y: 0, width: 100, height: 50), at: .zero,
+                                    text: "Start\nsecond line", fill: nil, stroke: nil, roughness: 0)
+        _ = try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 952, y: 100, width: 100, height: 50), at: .zero,
+                                    text: String(repeating: "x", count: 60), fill: nil, stroke: nil, roughness: 0)
+        // 1052 wide plus 24 on each side: 1100 points.
+        XCTAssertEqual(DiagramOps.exportScale(doc, scale: nil, maxWidth: 550), 0.5, accuracy: 1e-9)
+        XCTAssertEqual(DiagramOps.exportScale(doc, scale: 1, maxWidth: 5000), 1)
+        XCTAssertEqual(DiagramOps.exportScale(doc, scale: nil, maxWidth: nil), 2)
+        let png = try XCTUnwrap(Exporter.png(doc, scale: DiagramOps.exportScale(doc, scale: nil, maxWidth: 550)))
+        let image = try XCTUnwrap(CGImageSourceCreateWithData(png as CFData, nil).flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) })
+        XCTAssertEqual(image.width, 550)
+
+        let lines = DiagramOps.compactAnnotations(DiagramOps.annotations(doc, scale: 0.5)).components(separatedBy: "\n")
+        XCTAssertEqual(lines.count, 2)
+        XCTAssertTrue(lines[0].hasSuffix(" rectangle 12,12 50x25 \"Start\""), lines[0])
+        XCTAssertTrue(lines[1].hasSuffix(" \"" + String(repeating: "x", count: 39) + "…\""), lines[1])
     }
 }
 

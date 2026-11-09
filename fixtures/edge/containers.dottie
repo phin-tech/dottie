@@ -1,0 +1,542 @@
+{
+  "pages": [
+    {
+      "elements": [
+        {
+          "container": {},
+          "height": 200,
+          "id": "000002F6-0000-4000-8000-0000000002F6",
+          "kind": "rectangle",
+          "labelRect": {
+            "height": 0.17,
+            "width": 1,
+            "x": 0,
+            "y": 0
+          },
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0.08,
+              "b": 0.65,
+              "g": 0.55,
+              "r": 0.5
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1.5
+          },
+          "text": "VPC",
+          "width": 420,
+          "x": 20,
+          "y": 20
+        },
+        {
+          "containerID": "000002F6-0000-4000-8000-0000000002F6",
+          "height": 60,
+          "id": "000002F7-0000-4000-8000-0000000002F7",
+          "kind": "rectangle",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "api",
+          "width": 120,
+          "x": 40,
+          "y": 74
+        },
+        {
+          "container": {},
+          "containerID": "000002F6-0000-4000-8000-0000000002F6",
+          "height": 146,
+          "id": "000002F8-0000-4000-8000-0000000002F8",
+          "kind": "rectangle",
+          "labelRect": {
+            "height": 0.2328767123287671,
+            "width": 1,
+            "x": 0,
+            "y": 0
+          },
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0.08,
+              "b": 0.65,
+              "g": 0.55,
+              "r": 0.5
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1.5
+          },
+          "text": "Private subnet",
+          "width": 220,
+          "x": 200,
+          "y": 54
+        },
+        {
+          "containerID": "000002F8-0000-4000-8000-0000000002F8",
+          "height": 60,
+          "id": "000002F9-0000-4000-8000-0000000002F9",
+          "kind": "rectangle",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "db",
+          "width": 120,
+          "x": 240,
+          "y": 108
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002F9-0000-4000-8000-0000000002F9",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "000002F7-0000-4000-8000-0000000002F7",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002FA-0000-4000-8000-0000000002FA",
+          "kind": "connector",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "SQL",
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 60,
+          "id": "000002FB-0000-4000-8000-0000000002FB",
+          "kind": "ellipse",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 4109647057,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "user",
+          "width": 100,
+          "x": 520,
+          "y": 80
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002F6-0000-4000-8000-0000000002F6",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "elbow",
+            "start": {
+              "elementID": "000002FB-0000-4000-8000-0000000002FB",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002FC-0000-4000-8000-0000000002FC",
+          "kind": "connector",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 198874155,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "container": {
+            "lanes": "rows"
+          },
+          "height": 234,
+          "id": "000002FD-0000-4000-8000-0000000002FD",
+          "kind": "rectangle",
+          "labelRect": {
+            "height": 0.1452991452991453,
+            "width": 1,
+            "x": 0,
+            "y": 0
+          },
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 951240724,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0.08,
+              "b": 0.65,
+              "g": 0.55,
+              "r": 0.5
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1.5
+          },
+          "text": "Order flow",
+          "width": 600,
+          "x": 20,
+          "y": 260
+        },
+        {
+          "container": {},
+          "containerID": "000002FD-0000-4000-8000-0000000002FD",
+          "height": 100,
+          "id": "000002FE-0000-4000-8000-0000000002FE",
+          "kind": "rectangle",
+          "labelRect": {
+            "height": 0.34,
+            "width": 1,
+            "x": 0,
+            "y": 0
+          },
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 3110341368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0.08,
+              "b": 0.65,
+              "g": 0.55,
+              "r": 0.5
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1.5
+          },
+          "text": "Customer",
+          "width": 600,
+          "x": 20,
+          "y": 294
+        },
+        {
+          "container": {},
+          "containerID": "000002FD-0000-4000-8000-0000000002FD",
+          "height": 100,
+          "id": "000002FF-0000-4000-8000-0000000002FF",
+          "kind": "rectangle",
+          "labelRect": {
+            "height": 0.34,
+            "width": 1,
+            "x": 0,
+            "y": 0
+          },
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 3437918875,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0.08,
+              "b": 0.65,
+              "g": 0.55,
+              "r": 0.5
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1.5
+          },
+          "text": "Warehouse",
+          "width": 600,
+          "x": 20,
+          "y": 394
+        },
+        {
+          "containerID": "000002FE-0000-4000-8000-0000000002FE",
+          "height": 50,
+          "id": "00000300-0000-4000-8000-000000000300",
+          "kind": "rectangle",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 3880974472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "place order",
+          "width": 120,
+          "x": 60,
+          "y": 330
+        },
+        {
+          "containerID": "000002FF-0000-4000-8000-0000000002FF",
+          "height": 50,
+          "id": "00000301-0000-4000-8000-000000000301",
+          "kind": "rectangle",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 2959719643,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "pick",
+          "width": 120,
+          "x": 300,
+          "y": 430
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "00000301-0000-4000-8000-000000000301",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "elbow",
+            "start": {
+              "elementID": "00000300-0000-4000-8000-000000000300",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "00000302-0000-4000-8000-000000000302",
+          "kind": "connector",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 3818116956,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "container": {
+            "fixed": true
+          },
+          "height": 120,
+          "id": "00000303-0000-4000-8000-000000000303",
+          "kind": "rectangle",
+          "layerID": "000002F5-0000-4000-8000-0000000002F5",
+          "seed": 51711270,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0.08,
+              "b": 0.65,
+              "g": 0.55,
+              "r": 0.5
+            },
+            "fillStyle": "solid",
+            "fontSize": 16,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 1.5
+          },
+          "width": 160,
+          "x": 660,
+          "y": 20
+        }
+      ],
+      "id": "000002F4-0000-4000-8000-0000000002F4",
+      "layers": [
+        {
+          "id": "000002F5-0000-4000-8000-0000000002F5",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Page 1"
+    }
+  ],
+  "version": 2
+}

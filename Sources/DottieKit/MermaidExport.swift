@@ -63,7 +63,8 @@ extension Exporter {
         }
         if !skipped.isEmpty { lines.append("    %% Skipped " + skipped.joined(separator: " and ")) }
 
-        for e in nodes {
+        // Containers are subgraphs, nested as they are, each holding its nodes; links to one name its id.
+        func node(_ e: Element) -> String {
             let label = "\"" + escape(e.text ?? "") + "\""
             let shape: String
             switch e.kind {
@@ -71,8 +72,22 @@ extension Exporter {
             case .diamond: shape = "{\(label)}"
             default: shape = "[\(label)]"
             }
-            lines.append("    \(ids[e.id]!)\(shape)")
+            return ids[e.id]! + shape
         }
+        let shown = Set(nodes.map(\.id))
+        func write(in parent: UUID?, depth: Int) {
+            let pad = String(repeating: "    ", count: depth)
+            for e in nodes where (e.containerID.flatMap { shown.contains($0) ? $0 : nil }) == parent {
+                if e.container != nil {
+                    lines.append(pad + "subgraph \(ids[e.id]!) [\"" + escape(e.text ?? "") + "\"]")
+                    write(in: e.id, depth: depth + 1)
+                    lines.append(pad + "end")
+                } else {
+                    lines.append(pad + node(e))
+                }
+            }
+        }
+        write(in: nil, depth: 1)
         for (a, b, c) in edges {
             var from = a, to = b
             var start = c.connector!.startHead, end = c.connector!.endHead

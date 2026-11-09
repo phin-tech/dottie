@@ -47,6 +47,8 @@ private let lookProps: [String: Value] = [
                           "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
                               + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
     "hops": prop("boolean", "Connectors: draw a small hop where this line crosses a connector drawn beneath it"),
+    "avoid": prop("boolean", "Elbow connectors: go round the shapes in the way instead of through them (on for new elbow "
+                  + "connectors, except build_diagram's, which its layout routes; false keeps the plain Z or L)"),
     "cost": prop("number", "Connectors: what add_flow traffic pays to take this line, default 1. Flows take the cheapest "
                  + "route, so give a main path a lower cost than its backup (or the backup a higher one)"),
     "text_color": prop("string", "Hex color of a shape's or connector's label; \"\" follows the stroke again. Setting stroke on "
@@ -55,7 +57,7 @@ private let lookProps: [String: Value] = [
 
 /// The look fields a connector takes, for build_diagram's edges.
 private let edgeLookProps = lookProps.filter { ["dash", "stroke_width", "bowing", "start_head", "end_head", "font", "font_size", "hops",
-                                                 "text_color", "cost"].contains($0.key) }
+                                                 "avoid", "text_color", "cost"].contains($0.key) }
 
 /// build_diagram's edge fields: what a connector is made with, and its look.
 private let buildEdgeProps: [String: Value] = {
@@ -84,13 +86,15 @@ private let exportStateProp: Value = .object(["type": "object", "additionalPrope
 private let simulateStepItem: Value = .object(["type": "object", "properties": .object([
     "click": .object(["type": "string"]), "wait": .object(["type": "number"]),
     "next": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
-    "metrics": .object(["type": "boolean"]),
+    "metrics": .object(["type": "boolean"]), "routes": .object(["type": "boolean"]),
 ])])
 private let simulateStepsProp: Value = .object(["type": "array", "items": simulateStepItem,
     "description": .string("In order. Each is one of {\"click\": element id, its first characters, its text or anchor}, "
         + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"snapshot\": true} (return a PNG) or "
         + "{\"snapshot\": \"/abs/path.png\"} (also save it) or {\"metrics\": true} (the throughput, load, backlog and "
-        + "transit of what has a capacity, delay or traffic, now)")])
+        + "transit of what has a capacity, delay or traffic, now) or {\"routes\": true} (each flow's ways now: the "
+        + "destination, the connectors with their ids, the share of its volume, the cost, and why a flow reaches "
+        + "nothing; to check traffic in each state takes the path you meant, not a return edge)")])
 private let stateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
     "description": .string("Draw the page with its variables (set_variable) at these values instead of their starting "
         + "ones, e.g. {\"down\": true}, to check each state of an interactive page; the others keep their starting values")])
@@ -179,7 +183,9 @@ private struct Args {
     }
     func color(_ k: String) throws -> RGBA? {
         guard let s = string(k) else { return nil }
-        guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+        guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+            throw ToolFailure(message: "'\(k)' must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+        }
         return c
     }
     func kind(_ k: String, default d: ElementKind = .rectangle) throws -> ElementKind {
@@ -230,7 +236,7 @@ private struct Args {
                         rotation: double("rotation"), gridSize: double("grid_size"),
                         font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"),
                         textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") },
-                        cost: double("cost"))
+                        cost: double("cost"), avoid: bool("avoid"))
     }
 
     /// A list of {x, y} points.
@@ -249,6 +255,8 @@ private struct Args {
 /// Stateless: every call loads the file, edits, and saves atomically. The actor serializes calls
 /// so concurrent requests can't interleave read-modify-write on the same file.
 actor DottieTools {
+    /// The file the current tool read, before its edits: what saving reconciles containers against (ADR 0006).
+    private var loaded: DottieFile?
     private var currentTool = "edit"
 
     static let definitions: [Tool] = [
@@ -280,11 +288,21 @@ actor DottieTools {
                 "direction": prop("string", "TB = top to bottom (default), LR = left to right", enum: ["TB", "LR"]),
                 "sketchy": prop("boolean", "Hand-drawn look (default true); false for precise geometry"),
                 "font": fontProp,
+                "clusters": .object(["type": "array", "description": .string(
+                    "Containers to lay nodes out in: titled boxes that hold them and move with them (add_container). Each "
+                    + "cluster is laid out on its own, then as one block; parent nests it in another cluster, and lanes "
+                    + "makes it a swimlane whose child clusters are its lanes."),
+                    "items": .object(["type": "object", "properties": .object([
+                        "key": .object(["type": "string"]), "title": .object(["type": "string"]),
+                        "nodes": .object(["type": "array", "items": .object(["type": "string"]), "description": .string("Node keys")]),
+                        "parent": .object(["type": "string", "description": .string("Another cluster's key")]),
+                        "lanes": .object(["type": "string", "enum": .array([.string("rows"), .string("columns")])]),
+                    ]), "required": .array([.string("key")])])]),
              ], required: ["path", "nodes"])),
         Tool(name: "import_mermaid",
              description: "Draw a Mermaid flowchart (text starting with `flowchart` or `graph`): nodes, shapes, labelled, dashed, "
-                + "thick and two-way links, laid out like build_diagram and appended below existing content. Subgraphs are "
-                + "flattened and styling other than fill colors is ignored. Returns a map of Mermaid node id to element id.",
+                + "thick and two-way links, laid out like build_diagram and appended below existing content. Subgraphs become "
+                + "containers, nested as written; styling other than fill colors is ignored. Returns a map of Mermaid node id to element id.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "mermaid": prop("string", "Mermaid flowchart source, e.g. \"flowchart LR\\n  A[Start] --> B{OK?}\""),
@@ -306,6 +324,7 @@ actor DottieTools {
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
                 "when": whenProp,
+                "parent": prop("string", "Id of the container it goes in (add_container); \"\" takes it out. Moving the container moves it"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "x", "y"])),
         Tool(name: "add_image",
              description: "Place a picture (PNG, JPEG, HEIC, GIF, TIFF, …) from a file with its top-left corner at x, y. "
@@ -325,6 +344,7 @@ actor DottieTools {
                 "routing": prop("string", "Default straight", enum: routingValues),
                 "arrow": prop("boolean", "Arrowhead at the target, default true"),
                 "label": prop("string", "Text shown on the connector"),
+                "stroke": prop("string", "Line color, hex; its label follows it unless textColor is set"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
                 "from_port": prop("string", "Pins the start: top, right, bottom or left, or the number of one of an extension "
                     + "shape's connection points (\"0\" up, in the order the shape declares them). Default: follows the edge"),
@@ -363,6 +383,7 @@ actor DottieTools {
                 "click_set": clickSetProp,
                 "click_toggle": clickToggleProp,
                 "when": whenProp,
+                "parent": prop("string", "Id of the container it goes in (add_container); \"\" takes it out. Moving the container moves it"),
                 "hover_stroke": prop("string", "Hex stroke color while the pointer is over a clickable element; empty string clears it"),
                 "hover_fill": prop("string", "Hex fill color while the pointer is over a clickable element; empty string clears it"),
                 "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
@@ -371,6 +392,23 @@ actor DottieTools {
                 "args": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                  "description": "For a symbol instance: its values for the symbol's params, replacing the ones it had ({} clears them)"]),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "set_theme",
+             description: "Set the page's theme: page color, ink (the default line and text color) and a palette of named "
+                + "colors. Every tool that takes a hex color also takes a palette name (\"accent\", \"danger\", ...); a "
+                + "shape's fill, stroke or text color given by name stays that palette color, so changing the palette "
+                + "here recolors everything using it. With no arguments but path, returns the theme and palette.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "theme": prop("string", "A built-in to use (" + Theme.all.map(\.id).joined(separator: ", ")
+                    + "), \"\" for none (follows the system, exports on white), or the starting point for a theme of the "
+                    + "page's own when background, ink or palette are given too"),
+                "name": prop("string", "A name for the page's own theme"),
+                "background": prop("string", "Page color, hex; makes the theme the page's own"),
+                "ink": prop("string", "Default line and text color, hex; makes the theme the page's own"),
+                "palette": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                    "description": .string("Palette colors to set or add, name to hex, e.g. {\"accent\": \"#7c3aed\", "
+                        + "\"brand\": \"#0f766e\"}; makes the theme the page's own")]),
+             ], required: ["path"])),
         Tool(name: "set_variable",
              description: "Add, change or remove a page variable: a true-or-false value that clicks change on the web "
                 + "(update_element click_set / click_toggle) and elements follow (update_element when, send_packet when). "
@@ -503,8 +541,26 @@ actor DottieTools {
                 "reroute": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                     "description": .string("Connector id to connector id: send_packet packets following the first take the second")]),
              ], required: ["path", "id", "when"])),
+        Tool(name: "add_container",
+             description: "A container: a titled box holding shapes (a subsystem, an account, a VPC), which fits round them, "
+                + "moves them when it moves, and takes connectors like any shape. Nest them with parent. With lanes it is a "
+                + "swimlane, and its children should be containers (one per lane), stacked as rows or columns across it. "
+                + "Shapes join one with parent on add_shape or update_element; in the app, by being dropped in.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "title": prop("string", "Its title, at the top"),
+                "ids": idListProp("The shapes (or containers) it holds, if any"),
+                "parent": prop("string", "Id of a container it goes in"),
+                "lanes": prop("string", "Make it a swimlane: its child containers as rows or columns", enum: ["rows", "columns"]),
+                "x": prop("number", "Left, for an empty container"), "y": prop("number", "Top, for an empty container"),
+                "width": prop("number", "Width, for an empty container (it then keeps its size)"),
+                "height": prop("number", "Height, for an empty container"),
+                "fill": prop("string", "Fill, hex or palette name (default a faint grey-blue)"),
+                "stroke": prop("string", "Outline, hex or palette name"),
+             ], required: ["path"])),
         Tool(name: "add_group",
-             description: "Draw a labelled dashed frame behind some elements: a region, an account, a VPC, a site.",
+             description: "Draw a labelled dashed frame behind some elements: a region, an account, a VPC, a site. It is "
+                + "drawn once and doesn't follow them; add_container makes a box that holds them.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "ids": idListProp("The elements it frames"),
@@ -686,6 +742,12 @@ actor DottieTools {
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
                 "state": stateProp,
+                "max_width": prop("number", "Largest image width in pixels: the scale is lowered to fit, e.g. 600 for a "
+                    + "small preview"),
+                "include_image": prop("boolean", "Default true. false (with out_path) saves the image but returns only its "
+                    + "path, size and the element map, keeping the result small"),
+                "elements": prop("string", "The element map returned: full (JSON, the default), compact (one short line "
+                    + "each) or none", enum: ["full", "compact", "none"]),
              ], required: ["path"])),
         Tool(name: "export_mermaid",
              description: "Export the diagram as Mermaid flowchart text: shapes become nodes and attached connectors links "
@@ -983,6 +1045,12 @@ actor DottieTools {
     }
 
     private func load(_ url: URL, createIfMissing: Bool = false) throws -> DottieFile {
+        let file = try read(url, createIfMissing: createIfMissing)
+        loaded = file
+        return file
+    }
+
+    private func read(_ url: URL, createIfMissing: Bool) throws -> DottieFile {
         // Live mode: if the Dottie app has this file open, edit that copy instead of the file on disk.
         if url == Self.currentURL {
             guard let live = LiveClient.get(path: "current") else {
@@ -1001,6 +1069,13 @@ actor DottieTools {
 
     /// The page a tool works on: `page` when given, else the page holding `element`, else the first.
     private func pageIndex(_ file: DottieFile, _ a: Args, element: UUID? = nil) throws -> Int {
+        let i = try findPage(file, a, element: element)
+        // Palette names in color arguments are that page's.
+        DiagramOps.colorContext = file.pages[i]
+        return i
+    }
+
+    private func findPage(_ file: DottieFile, _ a: Args, element: UUID?) throws -> Int {
         if let spec = a.string("page"), !spec.isEmpty {
             guard let i = file.pageIndex(matching: spec) else {
                 throw ToolFailure(message: "No page '\(spec)'. Pages: " + file.pages.map { "\"\($0.name)\"" }.joined(separator: ", "))
@@ -1020,6 +1095,7 @@ actor DottieTools {
     }
 
     private func save(_ doc: DottieFile, to url: URL) throws {
+        let doc = doc.reconcilingContainers(from: loaded)
         if url == Self.currentURL {
             guard LiveClient.put(doc, path: "current", actionName: "Agent: \(currentTool)") else {
                 throw ToolFailure(message: "The Dottie window is no longer available.")
@@ -1070,8 +1146,17 @@ actor DottieTools {
             let direction = LayoutDirection(rawValue: a.string("direction") ?? "TB") ?? .topToBottom
             let ids: [String: UUID]
             do {
+                let clusters = try (a.array("clusters") ?? []).map { c in
+                    DiagramOps.ClusterSpec(key: try c.require("key"), title: c.string("title"), nodes: c.raw["nodes"]?.arrayValue?.compactMap(\.stringValue) ?? [],
+                                           parent: c.string("parent"),
+                                           lanes: try c.string("lanes").map { s in
+                                               guard let l = LaneDirection(rawValue: s) else { throw ToolFailure(message: "'lanes' must be rows or columns") }
+                                               return l
+                                           })
+                }
                 ids = try DiagramOps.build(&file.pages[p], nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
-                                         font: a.string("font"))
+                                         font: a.string("font"), clusters: clusters)
+                for n in nodeArgs { if let id = ids[n.string("key") ?? ""] { try DiagramOps.nameColors(&file.pages[p], id: id, fill: n.string("fill"), stroke: nil, textColor: nil) } }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             let map = ids.mapValues(\.uuidString)
@@ -1116,6 +1201,11 @@ actor DottieTools {
             if let w = a.string("when") {
                 do { try DiagramOps.setWhen(&file.pages[p], id: e.id, w) } catch let e as OpsError { throw ToolFailure(message: e.description) }
             }
+            do {
+                try DiagramOps.nameColors(&file.pages[p], id: e.id, fill: a.string("fill"), stroke: a.string("stroke"),
+                                          textColor: a.string("text_color"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&file.pages[p], id: e.id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
 
@@ -1149,8 +1239,10 @@ actor DottieTools {
                 c = try DiagramOps.addConnector(&file.pages[p], from: from, to: to,
                                                 routing: try a.routing("routing") ?? .straight, arrow: a.bool("arrow") ?? true,
                                                 port: (start.0, end.0), portIndex: (start.1, end.1),
-                                                roughness: a.roughness, label: a.string("label"), look: try a.look())
+                                                roughness: a.roughness, label: a.string("label"), look: try a.look(),
+                                                stroke: try a.color("stroke"))
                 if let w = a.string("when") { try DiagramOps.setWhen(&file.pages[p], id: c.id, w) }
+                try DiagramOps.nameColors(&file.pages[p], id: c.id, fill: nil, stroke: a.string("stroke"), textColor: a.string("text_color"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("id: \(c.id.uuidString)")
@@ -1199,11 +1291,53 @@ actor DottieTools {
                 let capacity = measure("capacity"), delay = measure("delay")
                 if capacity != nil || delay != nil { try DiagramOps.setCapacity(&file.pages[p], id: id, capacity: capacity, delay: delay) }
                 if let q = a.bool("queue") { try DiagramOps.setQueue(&file.pages[p], id: id, q) }
+                try DiagramOps.nameColors(&file.pages[p], id: id, fill: a.string("fill"), stroke: a.string("stroke"),
+                                          textColor: a.string("text_color"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&file.pages[p], id: id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
             let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
             try save(file, to: url)
             return text((["Updated"] + problems).joined(separator: "\n"))
+
+        case "set_theme":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let custom = a.string("background") != nil || a.string("ink") != nil || a.raw["palette"] != nil || a.string("name") != nil
+            func hex(_ k: String) throws -> RGBA? {
+                guard let s = a.string(k) else { return nil }
+                guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                return c
+            }
+            do {
+                if custom {
+                    let start = a.string("theme").flatMap { $0.isEmpty ? nil : Theme.named($0) }
+                    if let t = a.string("theme"), !t.isEmpty, start == nil {
+                        throw ToolFailure(message: "No theme '\(t)'; the built-ins are " + Theme.all.map(\.id).joined(separator: ", "))
+                    }
+                    var theme = start.map { CustomTheme(from: $0, name: $0.name + " (custom)") } ?? file.pages[p].customTheme
+                        ?? CustomTheme(from: file.pages[p].resolvedTheme ?? .white, name: (file.pages[p].resolvedTheme?.name ?? "White") + " (custom)")
+                    if let n = a.string("name"), !n.isEmpty { theme.name = n }
+                    if let c = try hex("background") { theme.background = c }
+                    if let c = try hex("ink") { theme.ink = c }
+                    try DiagramOps.setTheme(&file.pages[p], id: nil, custom: theme)
+                    for (k, v) in a.raw["palette"]?.objectValue ?? [:] {
+                        guard let s = v.stringValue, let c = RGBA(hex: s) else {
+                            throw ToolFailure(message: "'palette' maps names to hex colors; '\(k)' isn't one")
+                        }
+                        try DiagramOps.setPaletteColor(&file.pages[p], name: k, color: c)
+                    }
+                } else if let t = a.string("theme") {
+                    try DiagramOps.setTheme(&file.pages[p], id: t)
+                }
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            if custom || a.string("theme") != nil { try save(file, to: url) }
+            let page = file.pages[p]
+            func h(_ c: RGBA) -> String { String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
+            let head = page.resolvedTheme.map { "Theme: \($0.name)" + (page.customTheme != nil ? " (the page's own)" : "") + ", page \(h($0.background)), ink \(h($0.ink))" }
+                ?? "Theme: none (follows the system; exports on white)"
+            return text(head + "\nPalette: " + page.palette.map { "\($0.name) \(h($0.color))" }.joined(separator: ", ") + on(file, p))
 
         case "set_variable":
             let url = try fileURL(a)
@@ -1232,7 +1366,9 @@ actor DottieTools {
                 flow = try DiagramOps.addFlow(&file.pages[p], from: try a.uuid("from"), to: try a.uuids("to") ?? [],
                                               every: a.double("every"), speed: a.double("speed"),
                                               color: try a.string("color").map { s in
-                                                  guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'color' must be a hex color like #ffcc00") }
+                                                  guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                                                      throw ToolFailure(message: "'color' must be \(RGBA.expected(in: DiagramOps.colorContext))")
+                                                  }
                                                   return c
                                               },
                                               size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
@@ -1259,7 +1395,9 @@ actor DottieTools {
             if let v = a.double("dim_opacity") { spec.dimOpacity = v }
             func color(_ o: Args, _ k: String) throws -> RGBA? {
                 guard let s = o.string(k) else { return nil }
-                guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'restyle' \(k) must be a hex color like #ffcc00, got '\(s)'") }
+                guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                    throw ToolFailure(message: "'restyle' \(k) must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+                }
                 return c
             }
             for (k, v) in a.raw["restyle"]?.objectValue ?? [:] {
@@ -1605,9 +1743,19 @@ actor DottieTools {
             var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to render") }
-            let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
+            let includeImage = a.bool("include_image") ?? true
+            guard includeImage || a.string("out_path") != nil else {
+                throw ToolFailure(message: "include_image: false needs an out_path to save the image to")
+            }
+            let listing = a.string("elements") ?? "full"
+            guard ["full", "compact", "none"].contains(listing) else {
+                throw ToolFailure(message: "'elements' must be full, compact or none, got '\(listing)'")
+            }
+            let scale = DiagramOps.exportScale(doc, scale: a.double("scale"), maxWidth: a.double("max_width"))
             guard let png = Exporter.png(doc, scale: scale) else { throw ToolFailure(message: "Rendering failed") }
-            var note = "Rendered \(doc.elements.count) elements"
+            let size = Exporter.bounds(of: doc)
+            var note = "Rendered \(doc.elements.count) elements, \(Int((size.width * scale).rounded()))x\(Int((size.height * scale).rounded())) "
+                + "pixels at scale \((scale * 1000).rounded() / 1000)"
             if a.string("out_path") != nil {
                 let out = try fileURL(a, key: "out_path", ext: "png")
                 try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1615,8 +1763,12 @@ actor DottieTools {
                 note += ", saved to \(out.path)"
             }
             let map = DiagramOps.annotations(doc, scale: scale)
-            return .init(content: [.png(png),
-                                   .plain(note + "\nElements in the image (pixels from its top-left):\n" + (try json(map)))])
+            switch listing {
+            case "none": break
+            case "compact": note += "\nElements in the image (id kind x,y widthxheight, pixels from its top-left):\n" + DiagramOps.compactAnnotations(map)
+            default: note += "\nElements in the image (pixels from its top-left):\n" + (try json(map))
+            }
+            return .init(content: (includeImage ? [.png(png)] : []) + [.plain(note)])
 
         case "export_mermaid":
             let file = try load(try fileURL(a))
@@ -1687,6 +1839,27 @@ actor DottieTools {
 
         case "simulate":
             return try simulate(a)
+
+        case "add_container":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let c: Element
+            do {
+                var frame: CGRect?
+                if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: w, height: h) }
+                c = try DiagramOps.addContainer(&file.pages[p], title: a.string("title"), children: try a.uuids("ids") ?? [], frame: frame,
+                                                lanes: try a.string("lanes").map { s in
+                                                    guard let l = LaneDirection(rawValue: s) else { throw ToolFailure(message: "'lanes' must be rows or columns") }
+                                                    return l
+                                                },
+                                                parent: a.string("parent").flatMap { $0.isEmpty ? nil : UUID(uuidString: $0) },
+                                                roughness: a.roughness, fill: try a.color("fill"), stroke: try a.color("stroke"))
+                try DiagramOps.nameColors(&file.pages[p], id: c.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: nil)
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let saved = file.reconcilingContainers(from: loaded).pages[p].elements.first { $0.id == c.id } ?? c
+            return text("id: \(c.id.uuidString)\nframe: x=\(saved.x) y=\(saved.y) w=\(saved.width) h=\(saved.height)" + on(file, p))
 
         case "add_group":
             let url = try fileURL(a)
@@ -1800,6 +1973,10 @@ actor DottieTools {
                 let lines = DiagramOps.describeMetrics(sim.doc, at: sim.time, state: .values(sim.state), since: sim.sinceChange,
                                                        carried: sim.carried)
                 log.append("metrics: " + (lines.isEmpty ? "no traffic" : "\n  " + lines.joined(separator: "\n  ")))
+            } else if step.bool("routes") == true {
+                let lines = DiagramOps.describeRoutes(sim.doc, at: sim.time, state: .values(sim.state), since: sim.sinceChange,
+                                                      carried: sim.carried)
+                log.append("routes: " + (lines.isEmpty ? "no flows" : "\n  " + lines.joined(separator: "\n  ")))
             } else if step.raw["snapshot"] != nil, step.bool("snapshot") != false {
                 let picture = sim.picture
                 guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale) else {
@@ -1815,7 +1992,7 @@ actor DottieTools {
                 log.append("\(line): \(sim.summary)")
                 images.append(.png(png))
             } else {
-                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot} or {metrics: true}")
+                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot}, {metrics: true} or {routes: true}")
             }
         }
         if let recordURL, let recording = sim.recording {

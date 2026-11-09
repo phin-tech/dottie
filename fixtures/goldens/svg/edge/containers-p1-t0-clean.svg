@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="848" height="522" viewBox="-4 -4 848 522">
+<rect x="-4" y="-4" width="848" height="522" fill="#ffffff"/>
+<path d="M20 20 L440 20 L440 220 L20 220 Z" fill="#808ca6" fill-opacity="0.08" stroke="none"/>
+<path d="M20 20 L440 20 L440 220 L20 220 Z" fill="none" stroke="#1f1f21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="230" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#1f1f21" text-anchor="middle"><tspan x="230" y="42.76">VPC</tspan></text>
+<path d="M40 74 L160 74 L160 134 L40 134 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="100" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="100" y="110.48">api</tspan></text>
+<path d="M200 54 L420 54 L420 200 L200 200 Z" fill="#808ca6" fill-opacity="0.08" stroke="none"/>
+<path d="M200 54 L420 54 L420 200 L200 200 Z" fill="none" stroke="#1f1f21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="310" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#1f1f21" text-anchor="middle"><tspan x="310" y="76.76">Private subnet</tspan></text>
+<path d="M240 108 L360 108 L360 168 L240 168 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="300" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="300" y="144.48">db</tspan></text>
+<path d="M160 114.2 L240 127.8 M231.84 122.01 L240 127.8 M230.39 130.57 L240 127.8" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="176" y="107.5" width="48" height="27" fill="#ffffff"/>
+<text x="200" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="200" y="127.48">SQL</tspan></text>
+<path d="M620 110 C620 126.57 597.61 140 570 140 C542.39 140 520 126.57 520 110 C520 93.43 542.39 80 570 80 C597.61 80 620 93.43 620 110 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="570" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="570" y="116.48">user</tspan></text>
+<path d="M520.06 111.47 L480.03 111.47 M480.03 111.47 L480.03 113.82 M480.03 113.82 L440 113.82 M449.01 118.16 L440 113.82 M449.01 109.48 L440 113.82" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M20 260 L620 260 L620 494 L20 494 Z" fill="#808ca6" fill-opacity="0.08" stroke="none"/>
+<path d="M20 260 L620 260 L620 494 L20 494 Z" fill="none" stroke="#1f1f21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="320" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#1f1f21" text-anchor="middle"><tspan x="320" y="282.76">Order flow</tspan></text>
+<path d="M20 294 L620 294 L620 394 L20 394 Z" fill="#808ca6" fill-opacity="0.08" stroke="none"/>
+<path d="M20 294 L620 294 L620 394 L20 394 Z" fill="none" stroke="#1f1f21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="320" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#1f1f21" text-anchor="middle"><tspan x="320" y="316.76">Customer</tspan></text>
+<path d="M20 394 L620 394 L620 494 L20 494 Z" fill="#808ca6" fill-opacity="0.08" stroke="none"/>
+<path d="M20 394 L620 394 L620 494 L20 494 Z" fill="none" stroke="#1f1f21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="320" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="16" fill="#1f1f21" text-anchor="middle"><tspan x="320" y="416.76">Warehouse</tspan></text>
+<path d="M60 330 L180 330 L180 380 L60 380 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="120" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="120" y="361.48">place order</tspan></text>
+<path d="M300 430 L420 430 L420 480 L300 480 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="360" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="360" y="461.48">pick</tspan></text>
+<path d="M180 380 L240 380 M240 380 L240 430 M240 430 L300 430 M290.99 425.66 L300 430 M290.99 434.34 L300 430" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M660 20 L820 20 L820 140 L660 140 Z" fill="#808ca6" fill-opacity="0.08" stroke="none"/>
+<path d="M660 20 L820 20 L820 140 L660 140 Z" fill="none" stroke="#1f1f21" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

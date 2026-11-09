@@ -67,9 +67,30 @@ public struct FlowMetrics: Equatable, Sendable {
     public var transit: Double?
 }
 
+/// One way a flow's traffic takes in a frame (`FlowRoute` in web/src/measure.ts).
+public struct FlowRoute: Equatable, Sendable {
+    /// The shape it reaches: a destination, or the queue it waits in when `waits`.
+    public var goal: UUID
+    /// The connectors it takes, in order, and whether each is taken backwards (end to start).
+    public var hops: [(connector: UUID, backwards: Bool)]
+    /// The share of the flow's volume on it.
+    public var amount: Double
+    public var waits: Bool
+    /// The connectors' costs added up.
+    public var cost: Double
+
+    public static func == (a: FlowRoute, b: FlowRoute) -> Bool {
+        a.goal == b.goal && a.amount == b.amount && a.waits == b.waits && a.cost == b.cost
+            && a.hops.map(\.connector) == b.hops.map(\.connector) && a.hops.map(\.backwards) == b.hops.map(\.backwards)
+    }
+}
+
 /// Every metric of one frame (ADR 0003).
 public struct FrameMetrics: Equatable, Sendable {
     public var elements: [UUID: ElementMetrics] = [:]
+    /// The ways each flow that runs takes, only when asked for (`posedWithMetrics(routes: true)`); a flow that runs
+    /// but reaches nothing has none.
+    public var routes: [UUID: [FlowRoute]] = [:]
     public var flows: [UUID: FlowMetrics] = [:]
     /// What a player carries over when the state changes: how much each flow's queue at each shape holds
     /// (`DottieDocument.queueKey`), so it drains from there, and each gauge's reading (`gaugeKey`), so it eases from
@@ -199,15 +220,48 @@ extension DiagramOps {
 
     /// One line per element and flow with something to show, at the starting values: for a listing or a step of
     /// `simulate`.
-    public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial,
-                                       since: Double? = nil, carried: [String: Double] = [:]) -> [String] {
-        let m = doc.metrics(at: t, state: state, since: since, carried: carried)
+    /// What an element is called in a report: its first line of text, its anchor, or its id; an unlabelled
+    /// connector by its ends.
+    static func reportNames(_ doc: DottieDocument) -> [UUID: String] {
         var names = Dictionary(doc.elements.map { ($0.id, $0.text.map { "\"\($0.components(separatedBy: "\n")[0])\"" } ?? $0.anchor ?? $0.id.uuidString) },
                                uniquingKeysWith: { a, _ in a })
-        // An unlabelled connector is named by its ends.
         for e in doc.elements where e.kind == .connector && e.text == nil && e.anchor == nil {
             if let a = e.connector?.start.elementID, let b = e.connector?.end.elementID, let na = names[a], let nb = names[b] { names[e.id] = "\(na) → \(nb)" }
         }
+        return names
+    }
+
+    /// The ways each flow's traffic takes at `t` in `state`, one line per flow then one per way: where it goes, the
+    /// connectors (with ids, so they can be changed), its share and the cost; and why a flow goes nowhere.
+    public static func describeRoutes(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial,
+                                      since: Double? = nil, carried: [String: Double] = [:]) -> [String] {
+        let m = doc.posedWithMetrics(at: t, state: state, since: since, carried: carried, routes: true).metrics
+        let names = reportNames(doc)
+        func n(_ v: Double) -> String { DottieDocument.number(v, places: 2) }
+        var out: [String] = []
+        for f in doc.flows ?? [] {
+            let head = "flow \(f.id.uuidString.prefix(8)) \(names[f.from] ?? "?") → \(f.to.map { names[$0] ?? "?" }.joined(separator: " or "))"
+            guard let ways = m.routes[f.id] else { out.append(head + ": not running (its when doesn't hold)"); continue }
+            guard !ways.isEmpty else {
+                let shown = doc.posed(at: t, state: state).elements.contains { $0.id == f.from }
+                out.append(head + (shown ? ": reaches none of its destinations" : ": its source isn't drawn")); continue
+            }
+            let volume = m.flows[f.id]?.volume ?? 0
+            out.append(head + (ways.count > 1 ? ": \(ways.count) ways" : ""))
+            for w in ways {
+                let share = volume > 0 ? " (\(DottieDocument.formatted("load", w.amount / volume)))" : ""
+                let via = w.hops.map { "\(names[$0.connector] ?? "?") [\($0.connector.uuidString.prefix(8))]\($0.backwards ? " backwards" : "")" }
+                out.append("  \(w.waits ? "waits at" : "to") \(names[w.goal] ?? "?"): \(n(w.amount))\(share), cost \(n(w.cost)), via "
+                           + (via.isEmpty ? "nothing" : via.joined(separator: ", ")))
+            }
+        }
+        return out
+    }
+
+    public static func describeMetrics(_ doc: DottieDocument, at t: Double = 0, state: StateChoice = .initial,
+                                       since: Double? = nil, carried: [String: Double] = [:]) -> [String] {
+        let m = doc.metrics(at: t, state: state, since: since, carried: carried)
+        let names = reportNames(doc)
         func n(_ v: Double) -> String { DottieDocument.number(v, places: 2) }
         var out: [String] = []
         for e in doc.elements {
