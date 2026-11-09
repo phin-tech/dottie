@@ -237,8 +237,12 @@ holds. Conditions and computed values are one small expression language (ADR 000
 `web/src/expression.ts`): names, numbers, `!` `-`, `* / %`, `+ -`, comparisons, `&&` `||`, parentheses, metrics and
 `min`/`max`/`abs`/`floor`/`ceil`/`round`/`clamp`, with no loops or code. `fixtures/expressions.json` is a table of
 expressions and their values that both test suites check. Text can show values: `{count}` or `{count * 2}` in a
-label is filled in when the page is posed with its state. A file with number variables or computed clicks is
-version 3. `posed(at:state:)` leaves out what
+label is filled in when the page is posed with its state. A file with number variables, computed clicks or logic is
+version 3. A page's `logic` is JavaScript defining handlers a click `run`s (ADR 0007, step 2): `web/src/logic.ts`
+runs each in a fresh QuickJS context compiled to WebAssembly (`quickjs-emscripten`), sealed (no `Date`,
+`Math.random`, timers, network or DOM) with a memory and operation budget; `<dottie-player allow-logic>` loads
+`dist/dottie-logic.min.js` for it (`logic-loader.ts`), and DottieKit runs the same bundle in JavaScriptCore
+(`LogicEngine.swift`) for `simulate` and recordings. Without permission a click does its own `set` and `toggle`. `posed(at:state:)` leaves out what
 the state hides, with the connectors attached to it, even ones with visible keys of their own; a condition that
 can't be read never holds, and inside a symbol `when` sees no variables. Everything that draws a still, an export
 or the editor's playback uses the starting values; the editor shows every element while posing (`.all`), so each

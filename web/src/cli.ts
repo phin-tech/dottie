@@ -22,6 +22,7 @@ OPTIONS
       --at <seconds>    Show that moment as a still
       --clean           Draw precisely instead of sketchy
       --no-controls, --no-autoplay, --no-loop
+      --allow-logic        let the page's click logic run (ADR 0007); it carries the engine (about 850 KB)
       --label <text>    The player's accessible name
 `;
 
@@ -32,6 +33,7 @@ function fail(message: string, code = 2): never {
 
 const args = process.argv.slice(2);
 const options: CompileOptions = {};
+let allowLogic = false;
 let input: string | undefined, output: string | undefined;
 for (let i = 0; i < args.length; i++) {
   const a = args[i];
@@ -51,6 +53,7 @@ for (let i = 0; i < args.length; i++) {
     case "--no-controls": options.noControls = true; break;
     case "--no-autoplay": options.noAutoplay = true; break;
     case "--no-loop": options.noLoop = true; break;
+    case "--allow-logic": allowLogic = true; break;
     case "--label": options.label = value(); break;
     default:
       if (a.startsWith("-") || input) fail(`unknown option ${a}\n\n${usage}`);
@@ -68,7 +71,8 @@ try {
   const fontData = (family: string, face: Face): string | undefined => {
     try { return readFileSync(new URL(`./fonts/${fontFile(family, face)}`, import.meta.url)).toString("base64"); } catch { return undefined; }
   };
-  const js = compile(source, runtime, { ...options, fontData });
+  const logicEngine = allowLogic ? readFileSync(new URL("./dottie-logic.min.js", import.meta.url), "utf8") : undefined;
+  const js = compile(source, runtime, { ...options, fontData, logicEngine });
   if (output === "-") process.stdout.write(js);
   else {
     const target = output ?? input.replace(/\.dottie$/i, "") + ".js";

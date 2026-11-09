@@ -95,6 +95,11 @@ An element's `when`: an expression over variables (`down`, `east && !west`, `cou
 only while it holds. The expressions are a small language with no loops or code (ADR 0007).
 _Avoid_: rule, predicate, visibility expression
 
+**Logic**:
+A page's JavaScript handlers that a click can **run** (ADR 0007): each gets the variables and the click and
+returns new values, sealed and only where allowed. The only code a drawing carries.
+_Avoid_: script (that's `run_script`, which edits a drawing), macro
+
 **Override**:
 A change to one element while a condition holds (`overrides`): dimmed, relabelled, recolored, or a packet rerouted.
 _Avoid_: variant, state style

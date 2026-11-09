@@ -8,7 +8,7 @@ import { expandingSymbols } from "./symbols.ts";
  * in <dottie-player> only, show page `page` (an index into the file's pages), where the element's link points. Any
  * of them may first `set` and `toggle` page variables (ClickAction.set, .toggle), and a click may do only that. */
 export type Click = ({ scene: number } | { url: string } | { page: number } | { state: true })
-  & { set?: Record<string, ClickValue>; toggle?: string[]; reset?: true };
+  & { set?: Record<string, ClickValue>; toggle?: string[]; reset?: true; run?: string };
 
 /** The marker called `name`: an exact match, else one that differs only in case. */
 export function sceneNamed(name: string, markers: Marker[]): number {
@@ -26,7 +26,8 @@ export function clickTargets(page: Page, file?: DottieFile): Map<string, Click> 
   for (const e of page.elements) {
     const c = e.click;
     const state = c && changesState(c)
-      ? { ...(c.set ? { set: c.set } : {}), ...(c.toggle ? { toggle: c.toggle } : {}), ...(c.reset ? { reset: true as const } : {}) } : null;
+      ? { ...(c.set ? { set: c.set } : {}), ...(c.toggle ? { toggle: c.toggle } : {}), ...(c.reset ? { reset: true as const } : {}),
+        ...(c.run ? { run: c.run } : {}) } : null;
     if (c?.scene) {
       const i = sceneNamed(c.scene, markers);
       if (i >= 0) { out.set(e.id, { scene: i, ...state }); continue; }

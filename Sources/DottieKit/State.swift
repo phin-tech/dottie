@@ -137,7 +137,7 @@ extension DottieDocument {
 
 extension ClickAction {
     /// Whether the click sets or flips a variable.
-    public var changesState: Bool { reset == true || !(set ?? [:]).isEmpty || !(toggle ?? []).isEmpty }
+    public var changesState: Bool { reset == true || !(set ?? [:]).isEmpty || !(toggle ?? []).isEmpty || run != nil }
 
     /// `state` after the click: the starting values (`initial`) back if it resets, then its `set` values, then each
     /// `toggle` flipped (a missing variable starts false).

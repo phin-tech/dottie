@@ -59,6 +59,7 @@
         "elements": { "type": "array", "description": "Back to front within each layer.", "items": { "$ref": "#/$defs/element" } },
         "theme": { "type": "string", "description": "paper, white, sepia, blueprint, chalkboard or midnight." },
         "customTheme": { "$ref": "#/$defs/customTheme" },
+        "logic": { "type": "string", "description": "JavaScript defining handlers that clicks run (version 3, ADR 0007): each gets the variables and the click and returns new variable values. Run only on clicks, in a sealed QuickJS sandbox, and only where allowed (<dottie-player allow-logic>)." },
         "guidesX": { "type": "array", "items": { "type": "number" } },
         "guidesY": { "type": "array", "items": { "type": "number" } },
         "guidesLocked": { "type": "boolean" },
@@ -439,6 +440,7 @@
         "scene": { "type": "string", "description": "A marker's name: jump there and play on to the next scene." },
         "url": { "type": "string", "pattern": "^([Hh][Tt][Tt][Pp][Ss]?://|[Mm][Aa][Ii][Ll][Tt][Oo]:)", "description": "Opened in a new tab; readers drop any other scheme." },
         "set": { "type": "object", "description": "Page variables to give these values, without touching the playhead: true or false, a number, or an expression worked out from the state before the click, like \"count + 1\" (version 3, ADR 0007).", "propertyNames": { "$ref": "#/$defs/variableName" }, "additionalProperties": { "type": ["boolean", "number", "string"] } },
+        "run": { "$ref": "#/$defs/variableName", "description": "A handler in the page's logic to run (ADR 0007). Where logic may not run, set and toggle are what the click does instead." },
         "toggle": { "description": "Page variables to flip, after set: one name or a list.", "oneOf": [{ "$ref": "#/$defs/variableName" }, { "type": "array", "items": { "$ref": "#/$defs/variableName" } }] },
         "reset": { "type": "boolean", "description": "Puts every page variable back to its starting value first, before set and toggle." }
       }

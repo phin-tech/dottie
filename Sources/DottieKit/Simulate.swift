@@ -28,6 +28,9 @@ public struct Simulation: Sendable {
     public private(set) var carried: [String: Double] = [:]
     /// Every frame shown since `record()`, for a video of the run (`Exporter.gif(_:)`, `mp4(_:)`); nil when not recording.
     public private(set) var recording: Recording?
+    /// Whether clicks run the page's logic (ADR 0007), as a player with `allow-logic` does; else their `set` and
+    /// `toggle`.
+    public var allowLogic = true
 
     /// Starts as the player does: at the start, playing unless the first scene is there and doesn't loop. With
     /// `scene`, at that scene, playing on from it.
@@ -171,7 +174,9 @@ public struct Simulation: Sendable {
         if let c, c.changesState {
             let before = state, hiddenBefore = Set(hiddenByState.map(\.id))
             let queues = doc.metrics(at: time, state: .values(before), since: sinceChange, carried: carried).carry
-            state = c.applied(to: state, initial: doc.variables ?? [:])
+            let (after, problem) = doc.clicked(e, state: state, time: time, scene: scene, allowLogic: allowLogic)
+            state = after
+            if let problem { did.append("logic failed: \(problem)") }
             if state != before { sinceChange = 0; carried = queues }
             let changed = state.keys.sorted().filter { before[$0] ?? false != state[$0] ?? false }
             did.append(changed.isEmpty ? "changed no variable" : "set " + changed.map { "\($0)=\(state[$0]!)" }.joined(separator: ", "))

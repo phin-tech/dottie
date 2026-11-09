@@ -46,12 +46,14 @@
     "prepublishOnly": "npm test && node build.mjs"
   },
   "devDependencies": {
+    "@jitl/quickjs-singlefile-browser-release-sync": "^0.32.0",
     "@types/node": "^24.19.2",
     "@types/pngjs": "^6.0.5",
     "esbuild": "^0.25.12",
     "pixelmatch": "^7.2.0",
     "playwright": "^1.64.1",
     "pngjs": "^7.0.0",
+    "quickjs-emscripten-core": "^0.32.0",
     "typescript": "^5.9.3"
   },
   "publishConfig": {

@@ -312,16 +312,21 @@ public struct ClickAction: Codable, Equatable, Sendable {
     public var toggle: [String]?
     /// Puts every page variable back to its starting value first, whatever variables the page has by then.
     public var reset: Bool?
+    /// A handler in the page's `logic` to run (ADR 0007): it gets the variables and the click and returns new values.
+    /// Where logic may not run, `set` and `toggle` are what the click does instead.
+    public var run: String?
 
-    public init(scene: String? = nil, url: String? = nil, set: [String: ClickValue]? = nil, toggle: [String]? = nil, reset: Bool? = nil) {
+    public init(scene: String? = nil, url: String? = nil, set: [String: ClickValue]? = nil, toggle: [String]? = nil, reset: Bool? = nil,
+                run: String? = nil) {
         self.reset = reset == true ? true : nil
+        self.run = run.flatMap { PageState.isName($0) ? $0 : nil }
         self.scene = scene
         self.url = url.flatMap(Self.allowed)
         self.set = set.flatMap { $0.isEmpty ? nil : $0 }
         self.toggle = toggle.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle, reset }
+    private enum CodingKeys: String, CodingKey { case scene, url, set, toggle, reset, run }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -333,7 +338,8 @@ public struct ClickAction: Codable, Equatable, Sendable {
                   url: try c.decodeIfPresent(String.self, forKey: .url),
                   set: try c.decodeIfPresent([String: ClickValue].self, forKey: .set)?.filter { PageState.isName($0.key) },
                   toggle: toggle?.filter(PageState.isName),
-                  reset: (try? c.decodeIfPresent(Bool.self, forKey: .reset)) ?? nil)
+                  reset: (try? c.decodeIfPresent(Bool.self, forKey: .reset)) ?? nil,
+                  run: (try? c.decodeIfPresent(String.self, forKey: .run)) ?? nil)
     }
 
     /// `url` trimmed, if it is a link a page may open.
@@ -378,6 +384,9 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var elements: [Element]
     /// A `Theme` id (page color and ink); nil follows the system appearance and exports on white.
     public var theme: String?
+    /// JavaScript defining handlers that clicks `run` (ADR 0007): run only on clicks, in a sealed sandbox, and only
+    /// where allowed.
+    public var logic: String?
     /// A theme made in the drawing (ADR 0005); it takes the place of `theme`.
     public var customTheme: CustomTheme?
     /// Ruler guides: x positions of vertical guides and y positions of horizontal ones.

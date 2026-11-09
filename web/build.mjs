@@ -20,6 +20,8 @@ await Promise.all([
     define: { "import.meta.url": "undefined", __DOTTIE_WORKER__: '"self"' } }),
   // The simulation DottieKit runs in JavaScriptCore (scripts/update-player-script.py, SimulationEngine.swift).
   build({ ...common, entryPoints: ["src/sim-entry.ts"], format: "iife", minify: true, outfile: "dist/dottie-sim.min.js" }),
+  // Click logic (ADR 0007): the QuickJS engine, loaded only for a page with logic it may run (logic.ts).
+  build({ ...common, entryPoints: ["src/logic-entry.ts"], format: "iife", minify: true, outfile: "dist/dottie-logic.min.js" }),
   build({ ...common, entryPoints: ["src/compile.ts"], format: "esm", outfile: "dist/compile.js" }),
   build({ ...common, entryPoints: ["src/cli.ts"], format: "esm", platform: "node", outfile: "dist/dottie-compile.mjs",
     banner: { js: "#!/usr/bin/env node\n" + banner.js } }),

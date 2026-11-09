@@ -616,6 +616,17 @@ def counters():
     write(EDGE / "counters.dottie", pages, version=3)
 
 
+def logic():
+    """Click logic (ADR 0007): a page whose clicks run handlers from its logic, with set and toggle as their fallback
+    where logic may not run. A still draws the starting values, so this checks that the fields are read and kept."""
+    p = Page("Logic")
+    p.extra = {"variables": {"stage": 0, "count": 0},
+               "logic": "function next(state, click) {\n  return { stage: (state.stage + 1) % 3, count: state.count + 1 };\n}\n"}
+    p.add("rectangle", 40, 40, 160, 60, text="next", click={"run": "next", "set": {"stage": "(stage + 1) % 3"}})
+    p.add("ellipse", 240, 40, 140, 60, text="stage {stage}", when="stage >= 0")
+    write(EDGE / "logic.dottie", [p], version=3)
+
+
 def notes():
     """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
     p = Page()
@@ -1245,6 +1256,7 @@ def main():
     palette()
     containers()
     counters()
+    logic()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

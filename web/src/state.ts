@@ -99,7 +99,7 @@ export function applyOverride(o: StateOverride, e: Element): Element {
 
 /** Whether a click sets or flips a variable. */
 export function changesState(c: ClickAction | null): boolean {
-  return !!c && (c.reset === true || Object.keys(c.set ?? {}).length > 0 || (c.toggle ?? []).length > 0);
+  return !!c && (c.reset === true || Object.keys(c.set ?? {}).length > 0 || (c.toggle ?? []).length > 0 || !!c.run);
 }
 
 /** `state` after the click: the starting values (`initial`) back if it resets, then its `set` values, then each

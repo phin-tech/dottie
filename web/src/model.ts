@@ -77,6 +77,8 @@ export interface ClickAction {
   scene: string | null; url: string | null; set: Record<string, ClickValue> | null; toggle: string[] | null;
   /** Puts every page variable back to its starting value first. */
   reset?: boolean | null;
+  /** A handler in the page's `logic` to run (ADR 0007); where logic may not run, `set` and `toggle` stand in. */
+  run?: string | null;
 }
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
 /** A change to an element while `when` holds (StateOverride): a field left null keeps the element's own. */
@@ -221,6 +223,8 @@ export interface Page {
   layers: Layer[];
   elements: Element[];
   theme: string | null;
+  /** JavaScript defining the handlers clicks `run` (ADR 0007), run only on clicks, sealed, where allowed. */
+  logic?: string | null;
   /** A theme of the page's own (ADR 0005), in place of `theme`. */
   customTheme?: CustomTheme | null;
   timeline: Timeline | null;
@@ -280,7 +284,7 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "customTheme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
+  page: ["id", "name", "layers", "elements", "theme", "customTheme", "logic", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
   flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume", "overrides"],
   flowOverride: ["when", "volume"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
@@ -311,7 +315,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   repeat: ["start", "end", "count"],
   cameraKey: ["t", "x", "y", "width", "height", "ease"],
   marker: ["t", "name", "loop"],
-  click: ["scene", "url", "set", "toggle", "reset"],
+  click: ["scene", "url", "set", "toggle", "reset", "run"],
   hover: ["stroke", "fill", "opacity"],
   override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost", "capacity", "delay"],
 };
@@ -597,7 +601,9 @@ class Reader {
     }
     const raw = typeof v.toggle === "string" ? [v.toggle] : Array.isArray(v.toggle) && v.toggle.every((x) => typeof x === "string") ? v.toggle as string[] : null;
     const toggle = raw ? raw.filter(isName) : null;
-    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null, reset: v.reset === true ? true : null };
+    const run = str(v.run);
+    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null, reset: v.reset === true ? true : null,
+      run: run !== undefined && isName(run) ? run : null };
   }
 
   playback(v: unknown): SymbolPlayback | null {
@@ -759,6 +765,7 @@ class Reader {
       elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
       theme: str(v.theme) ?? null,
       customTheme: this.customTheme(v.customTheme),
+      logic: typeof v.logic === "string" && v.logic.length > 0 ? v.logic : null,
       timeline: this.timeline(v.timeline),
       symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
       variables: this.variables(v.variables),

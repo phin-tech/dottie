@@ -1,5 +1,5 @@
 ---
-status: proposed
+status: accepted
 ---
 
 # Richer conditions, then sandboxed click logic; frames stay a pure function of state
@@ -36,18 +36,24 @@ Two steps, the first useful on its own and the base for the second.
 ### 2. Click handlers in a sandbox
 
 - **Logic runs on clicks, never while drawing.** A page may have `logic`: JavaScript defining handlers. A click can
-  `run` one: `handler(state, event)` gets the variables and the click (the element's id and anchor, the time, the
-  scene) and returns new variable values, and optionally a scene to jump to. The frame is still a pure function of the
+  `run` one: `handler(state, click)` gets the variables and the click (the element's id, anchor and first line of
+  text, the time, the scene) and returns new variable values. A click's own `scene` or link still applies with it;
+  a handler doesn't move the playhead. The frame is still a pure function of the
   state, so planning, seeking, exports, `simulate` and recordings keep working: a recorded run replays its clicks.
 - **One engine, sealed.** Handlers run in QuickJS compiled to WebAssembly, the same build in the browser and in
   Dottie's JavaScriptCore, never in the page's own JavaScript. They get an instruction and memory budget, and no
   DOM, network, timers, clock or randomness (`Math.random` and `Date` are absent); the same click on the same state
   gives the same result everywhere. A handler that throws or runs out of budget leaves the state as it was.
-- **Off unless allowed.** `<dottie-player>` runs logic only with an `allow-logic` attribute; the HTML export asks
-  whether to allow it; QuickLook never runs it. Dottie asks once per drawing that came from elsewhere, the way Office
-  asks about macros. Where logic can't run, a click falls back to its own `set` / `toggle`.
-- **Paid for only when used.** The engine (about 0.5 to 1 MB) loads only for a page with logic, beside
-  `dottie-player.min.js` as the planning worker does.
+- **Off unless allowed.** `<dottie-player>` runs logic only with an `allow-logic` attribute. The app's HTML export
+  asks whether to allow it, and `export_animation`, `dottie render` and `dottie-compile` take `allow_logic` /
+  `--allow-logic`; only then does the export carry the engine and the attribute. QuickLook and the editor never run
+  logic (Dottie plays no clicks there); `simulate` and recordings run it, in the same sandbox, so an agent can check
+  a page. Where logic can't run, a click falls back to its own `set` / `toggle`, which is why a click with `run`
+  keeps them. A handler that fails leaves the state as it was, and the player fires `logicerror`.
+- **Paid for only when used.** The engine (`dottie-logic.min.js`, about 850 KB) loads only when a page with logic
+  it may run is clicked, from beside the player (or from the page, when an export inlined it). Dottie carries it as
+  base64 in `PlayerScript.logic`, since its minified source holds bytes a Swift string can't, and polyfills the
+  `TextDecoder`, `TextEncoder` and `atob` JavaScriptCore lacks.
 - **ADR 0001 is narrowed, not dropped:** extension code still never goes in documents; the only code a document may
   carry is this click logic, in this sandbox.
 

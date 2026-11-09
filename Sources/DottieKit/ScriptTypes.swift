@@ -317,6 +317,8 @@ extension DottieScript {
             set?: Record<string, boolean | number | string>;
             /** Page variables to flip, after set. */
             toggle?: string | string[];
+            /** A handler in the page's logic (dottie.logic) to run; where logic may not run, set and toggle stand in. */
+            run?: string;
         }
 
         /** A condition on page variables, like "down", "east && !west" or "count >= 3 && stage % 2 == 0": names,
@@ -734,6 +736,11 @@ extension DottieScript {
             /** The page's theme and palette; with options, sets them first. Changing a palette color recolors every
              * shape whose color was given by that name. */
             theme(options?: ThemeOptions): ThemeInfo;
+            /** The page's click logic (ADR 0007), and the handlers it defines; with source, sets it first ("" or null
+             * removes it). A handler gets (state, click) and returns new variable values; clicks name it with
+             * click: {run}. It runs only on clicks, sealed (no page, network, timers, clock or randomness), and only
+             * where allowed; elsewhere a click does its own set and toggle. */
+            logic(source?: string | null): { logic: string; handlers: string[] };
             /** A container: a titled box holding `children` (shapes or other containers), which fits round them and
              * moves them when it moves; connectors bind to it like any shape. With `lanes` it is a swimlane, whose
              * children should be containers (its lanes), stacked as rows or columns. Without children, give x, y,

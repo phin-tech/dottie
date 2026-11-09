@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="388" height="108" viewBox="16 16 388 108">
+<rect x="16" y="16" width="388" height="108" fill="#ffffff"/>
+<path d="M40 40 L200 40 L200 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="120" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="120" y="76.48">next</tspan></text>
+<path d="M380 70 C380 86.57 348.66 100 310 100 C271.34 100 240 86.57 240 70 C240 53.43 271.34 40 310 40 C348.66 40 380 53.43 380 70 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="310" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="310" y="76.48">stage 0</tspan></text>
+</svg>

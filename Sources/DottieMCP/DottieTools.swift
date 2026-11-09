@@ -393,6 +393,8 @@ actor DottieTools {
                 "click_url": prop("string", "When played on the web, clicking this element opens this http(s) or mailto link in a "
                     + "new tab. Empty string removes the click"),
                 "click_set": clickSetProp,
+                "click_run": prop("string", "A handler in the page's logic (set_logic) that clicking runs; it returns new variable "
+                    + "values. Where logic may not run, the click does its click_set / click_toggle instead. \"\" removes it"),
                 "click_toggle": clickToggleProp,
                 "when": whenProp,
                 "parent": prop("string", "Id of the container it goes in (add_container); \"\" takes it out. Moving the container moves it"),
@@ -421,6 +423,18 @@ actor DottieTools {
                     "description": .string("Palette colors to set or add, name to hex, e.g. {\"accent\": \"#7c3aed\", "
                         + "\"brand\": \"#0f766e\"}; makes the theme the page's own")]),
              ], required: ["path"])),
+        Tool(name: "set_logic",
+             description: "Set the page's click logic: JavaScript defining handlers that clicks run (update_element click_run), "
+                + "for what conditions and click_set can't say. A handler gets (state, click), the page's variables and "
+                + "{id, anchor, text, time, scene}, and returns new variable values, e.g. "
+                + "function next(s) { return { stage: (s.stage + 1) % 3 }; }. It runs only on clicks, in a sealed sandbox "
+                + "(QuickJS): no page, network, timers, clock or randomness, and a time and memory limit, so the same click "
+                + "on the same state always gives the same result. A player runs it only with allow-logic (export_animation "
+                + "allow_logic); elsewhere a click does its own click_set / click_toggle. simulate runs it. \"\" removes it.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "logic": prop("string", "The JavaScript, at most 64 KB; \"\" removes it"),
+             ], required: ["path", "logic"])),
         Tool(name: "set_variable",
              description: "Add, change or remove a page variable: true or false, or a number (a counter, a step), that clicks change on the web "
                 + "(update_element click_set / click_toggle) and elements follow (update_element when, send_packet when). "
@@ -913,6 +927,8 @@ actor DottieTools {
                 "transparent": prop("boolean", "No page background (apng, png and json only)"),
                 "sketchy": prop("boolean", "Override the look for this export only"),
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
+                "allow_logic": prop("boolean", "HTML only: let the page's click logic (set_logic) run in the exported page; it "
+                    + "carries the sandboxed engine (about 850 KB). Off by default: clicks then do their own click_set / click_toggle"),
                 "state": exportStateProp,
              ], required: ["path", "out_path"])),
         Tool(name: "simulate",
@@ -1271,9 +1287,11 @@ actor DottieTools {
             if let s = a.string("link") { link = .some(s.isEmpty ? nil : try a.uuid("link")) }
             do {
                 var click: ClickAction?? = nil
-                if a.string("click_scene") != nil || a.string("click_url") != nil || a.raw["click_set"] != nil || a.raw["click_toggle"] != nil {
+                if a.string("click_scene") != nil || a.string("click_url") != nil || a.raw["click_set"] != nil || a.raw["click_toggle"] != nil
+                    || a.string("click_run") != nil {
                     click = .some(try DiagramOps.click(scene: a.string("click_scene"), url: a.string("click_url"),
-                                                       set: try a.flags("click_set"), toggle: try a.names("click_toggle")))
+                                                       set: try a.flags("click_set"), toggle: try a.names("click_toggle"),
+                                                       run: a.string("click_run")))
                 }
                 var hover: HoverLook?? = nil
                 if a.string("hover_stroke") != nil || a.string("hover_fill") != nil || a.double("hover_opacity") != nil {
@@ -1352,6 +1370,16 @@ actor DottieTools {
             let head = page.resolvedTheme.map { "Theme: \($0.name)" + (page.customTheme != nil ? " (the page's own)" : "") + ", page \(h($0.background)), ink \(h($0.ink))" }
                 ?? "Theme: none (follows the system; exports on white)"
             return text(head + "\nPalette: " + page.palette.map { "\($0.name) \(h($0.color))" }.joined(separator: ", ") + on(file, p))
+
+        case "set_logic":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let handlers: [String]
+            do { handlers = try DiagramOps.setLogic(&file.pages[p], a.string("logic")) } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            return text(file.pages[p].logic == nil ? "Removed the page's logic" + on(file, p)
+                        : "Handlers: " + (handlers.isEmpty ? "none found at the top level" : handlers.joined(separator: ", ")) + on(file, p))
 
         case "set_variable":
             let url = try fileURL(a)
@@ -1841,7 +1869,7 @@ actor DottieTools {
             case "apng": Exporter.apng(doc, scale: scale, background: a.bool("transparent") == true ? nil : CGColor(gray: 1, alpha: 1))
             case "mp4": Exporter.mp4(doc, scale: scale)
             case "json": Exporter.lottie(doc, mode: lottieMode, transparent: a.bool("transparent") == true, name: doc.name)
-            default: Exporter.player(doc, title: doc.name).map { Data($0.utf8) }
+            default: Exporter.player(doc, title: doc.name, allowLogic: a.bool("allow_logic") == true).map { Data($0.utf8) }
             }
             guard let data else { throw ToolFailure(message: "Rendering failed") }
             try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)

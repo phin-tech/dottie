@@ -594,7 +594,7 @@ public enum DottieScript {
                 if a.has("click") {
                     let c = a.object("click")
                     click = .some(try DiagramOps.click(scene: c?.string("scene"), url: c?.string("url"),
-                                                       set: try c?.flags("set"), toggle: try c?.names("toggle")))
+                                                       set: try c?.flags("set"), toggle: try c?.names("toggle"), run: c?.string("run")))
                 }
                 var hover: HoverLook?? = nil
                 if a.has("hover") {
@@ -636,6 +636,10 @@ public enum DottieScript {
                                                     roughness: a.roughness, fill: try a.color("fill"), stroke: try a.color("stroke"))
                 try DiagramOps.nameColors(&doc, id: c.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: nil)
                 return describe(try element(c.id))
+
+            case "logic":
+                if a.has("source") { try DiagramOps.setLogic(&doc, a.string("source")) }
+                return ["logic": doc.logic ?? "", "handlers": LogicEngine.handlers(in: doc.logic ?? "")]
 
             case "theme":
                 let custom = a.has("background") || a.has("ink") || a.has("palette") || a.has("name")
@@ -1205,6 +1209,7 @@ public enum DottieScript {
         variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
         variables: function () { return call("variables"); },
         theme: function (o) { return call("theme", o || {}); },
+        logic: function (source) { return call("logic", source === undefined ? {} : { source: source === null ? "" : source }); },
         flow: function (from, to, o) {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
@@ -1443,6 +1448,10 @@ public enum DottieScript {
     holding shapes: it fits round them and moves them when it moves; connectors bind to it like any shape. parent \
     nests it; lanes ("rows" | "columns") makes a swimlane whose children are containers (its lanes). parent on \
     dottie.rect/... and dottie.update puts a shape in one (null takes it out)
+      dottie.logic(source?)  the page's click logic and its handlers; with source, sets it (null removes it). \
+    A handler, function name(state, click) { return {count: state.count + 1}; }, runs when a click with \
+    click: {run: "name"} is clicked: in a sealed sandbox (no page, network, timers, Date or Math.random; a time and \
+    memory limit), only where allowed (<dottie-player allow-logic>, simulate); elsewhere the click's set and toggle
       dottie.theme({theme?, name?, background?, ink?, palette?})  the page's theme and palette ({name: hex}); with \
     options, sets them first (background, ink or palette make the theme the page's own). Colors everywhere also take \
     a palette name ("accent", "muted", "danger", "warning", "success", "info", or the page's own); a fill, stroke or \

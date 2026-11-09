@@ -45,6 +45,9 @@ export interface CompileOptions {
   noAutoplay?: boolean;
   noLoop?: boolean;
   label?: string;
+  /** The click-logic engine (dist/dottie-logic.min.js): with it the page's logic may run (ADR 0007), and the player
+   * gets allow-logic; without it a click does its own set and toggle. */
+  logicEngine?: string;
   /** A bundled font's file (`fontFile`) as base64, so the drawing carries the fonts it uses; without it the
    * player fetches them from beside itself. dottie-compile reads them from dist/fonts. */
   fontData?: (family: string, face: Face) => string | undefined;
@@ -64,6 +67,7 @@ export function playerAttributes(options: CompileOptions): Record<string, string
   if (options.noAutoplay) out["no-autoplay"] = "";
   if (options.noLoop) out["no-loop"] = "";
   if (options.label !== undefined) out.label = options.label;
+  if (options.logicEngine) out["allow-logic"] = "";
   return out;
 }
 
@@ -94,8 +98,10 @@ export function compile(source: string | unknown, runtime: string, options: Comp
   // One pass over the template, so a drawing's text that spells out a placeholder is never taken for one.
   const fill: Record<string, () => string> = {
     DOTTIE_DATA: () => scriptJSON(data),
-    DOTTIE_OPTIONS: () => scriptJSON(playerAttributes(options)),
+    DOTTIE_OPTIONS: () => scriptJSON(playerAttributes(file.pages[i].logic ? options : { ...options, logicEngine: undefined })),
     DOTTIE_FONTS: () => scriptJSON(fonts),
   };
-  return runtime.trimEnd() + "\n" + LOADER.replace(/\bDOTTIE_(?:DATA|OPTIONS|FONTS)\b/g, (m) => fill[m]());
+  // With logic, the engine first, so the player finds it on the page (logic-loader.ts).
+  const engine = options.logicEngine && file.pages[i].logic ? options.logicEngine.trimEnd() + "\n" : "";
+  return engine + runtime.trimEnd() + "\n" + LOADER.replace(/\bDOTTIE_(?:DATA|OPTIONS|FONTS)\b/g, (m) => fill[m]());
 }

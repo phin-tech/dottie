@@ -143,8 +143,9 @@ extension Exporter {
     /// with play/pause, a scrubber and keys, its scenes as a click-through, its clicks and links, and its variables,
     /// redrawn as clicks change them. It stays sharp at any size, and its size doesn't grow with the animation's
     /// length. nil if the page can't be compiled.
-    public static func player(_ doc: DottieDocument, title: String = "Dottie animation") -> String? {
-        guard let script = try? script(doc, options: ScriptOptions(label: doc.name)) else { return nil }
+    /// `allowLogic` lets the page's click logic run in it (ADR 0007).
+    public static func player(_ doc: DottieDocument, title: String = "Dottie animation", allowLogic: Bool = false) -> String? {
+        guard let script = try? script(doc, options: ScriptOptions(label: doc.name, allowLogic: allowLogic)) else { return nil }
         let page = doc.resolvedTheme?.background ?? RGBA(r: 1, g: 1, b: 1)
         func h(_ v: Double) -> String { String(format: "%02x", Int((min(max(v, 0), 1) * 255).rounded())) }
         let safeTitle = title.replacingOccurrences(of: "&", with: "&amp;")
