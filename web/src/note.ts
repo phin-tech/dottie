@@ -177,7 +177,17 @@ export function inline(src: string, style: Omit<Inline, "text"> = {}): Inline[] 
     if ((m = /^\[([^\]]+)\]\([^)]*\)/.exec(rest))) { emit(); out.push(...inline(m[1], { ...style, link: true })); i += m[0].length; continue; }
     if ((m = /^<((?:https?|ftp|mailto):[^>\s]+)>/.exec(rest))) { emit(); push(m[1], { ...style, link: true }); i += m[0].length; continue; }
     if ((m = /^~~(?=\S)([\s\S]*?\S)~~/.exec(rest))) { emit(); out.push(...inline(m[1], { ...style, strike: true })); i += m[0].length; continue; }
-    if ((m = /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/.exec(rest))) { emit(); out.push(...inline(m[2], { ...style, bold: true })); i += m[0].length; continue; }
+    // ***both*** is bold italic.
+    if ((m = /^(\*\*\*|___)(?=\S)([\s\S]*?\S)\1(?!\*|_)/.exec(rest))) {
+      emit(); out.push(...inline(m[2], { ...style, bold: true, italic: true })); i += m[0].length; continue;
+    }
+    if ((m = /^(\*\*|__)(?=\S)([\s\S]*?\S)\1/.exec(rest))) {
+      // In **a *b***, the closing ** comes after the italic's *: an odd number of single * inside, and a * right
+      // after, means that * belongs inside.
+      let body = m[2], length = m[0].length;
+      if (m[1] === "**" && rest[length] === "*" && (body.replace(/\*\*/g, "").match(/\*/g) ?? []).length % 2 === 1) { body += "*"; length++; }
+      emit(); out.push(...inline(body, { ...style, bold: true })); i += length; continue;
+    }
     if ((m = /^(\*|_)(?=\S)([\s\S]*?\S)\1(?!\1)/.exec(rest)) && (m[1] === "*" || !/\w/.test(src[i - 1] ?? ""))) {
       emit(); out.push(...inline(m[2], { ...style, italic: true })); i += m[0].length; continue;
     }

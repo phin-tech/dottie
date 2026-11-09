@@ -504,7 +504,7 @@ def notes():
     texts = ["# H1\npara", "## H2\npara", "### H3\npara", "A\nB\nC", "para\n\npara2", "# H1\n## H2\n### H3",
              "**bold**\nplain", "plain\n**bold**", "x\n# H1", "- a\n- b\n\npara", "1. one\n2. two", "> quote\n> more",
              "```\ncode\nmore\n```\nafter", "---\nafter", "| a | b |\n|---|---|\n| 1 | 2 |\nafter",
-             "- [ ] task\n- [x] done", "- a\n  - b\n    - c", "*it* ~~st~~ [ln](http://x)",
+             "- [ ] task\n- [x] done", "- a\n  - b\n    - c", "*it* ~~st~~ [ln](http://x)\n***both*** and **a *b***",
              "| left | mid | right |\n|:--|:-:|--:|\n| 1 | two | 3 |\n| four | 5 | six six |",
              "See https://example.com/path, or www.phin.tech now",
              "A very long paragraph that keeps on going well past the bottom edge of this small note so it is cut off "

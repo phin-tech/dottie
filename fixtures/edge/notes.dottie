@@ -1083,7 +1083,7 @@
             },
             "strokeWidth": 1
           },
-          "text": "*it* ~~st~~ [ln](http://x)",
+          "text": "*it* ~~st~~ [ln](http://x)\n***both*** and **a *b***",
           "width": 230,
           "x": 750,
           "y": 600
@@ -1114,7 +1114,7 @@
             },
             "strokeWidth": 1
           },
-          "text": "*it* ~~st~~ [ln](http://x)",
+          "text": "*it* ~~st~~ [ln](http://x)\n***both*** and **a *b***",
           "width": 230,
           "x": 750,
           "y": 1800
