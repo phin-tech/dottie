@@ -58,6 +58,7 @@
         "layers": { "type": "array", "items": { "$ref": "#/$defs/layer" } },
         "elements": { "type": "array", "description": "Back to front within each layer.", "items": { "$ref": "#/$defs/element" } },
         "theme": { "type": "string", "description": "paper, white, sepia, blueprint, chalkboard or midnight." },
+        "customTheme": { "$ref": "#/$defs/customTheme" },
         "guidesX": { "type": "array", "items": { "type": "number" } },
         "guidesY": { "type": "array", "items": { "type": "number" } },
         "guidesLocked": { "type": "boolean" },
@@ -148,7 +149,40 @@
         "textColor": {
           "$ref": "#/$defs/rgba",
           "description": "The color of a shape's or connector's label. Absent follows stroke. Text boxes and notes are drawn in their stroke."
-        }
+        },
+        "named": { "$ref": "#/$defs/colorNames" }
+      }
+    },
+    "colorNames": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Which of the style's colors are palette colors, by name (ADR 0005). Readers set those colors from the page's palette; the stored color is what it was when written.",
+      "properties": {
+        "fill": { "type": "string" },
+        "stroke": { "type": "string" },
+        "textColor": { "type": "string" }
+      }
+    },
+    "customTheme": {
+      "type": "object",
+      "required": ["name", "background", "ink", "palette"],
+      "additionalProperties": false,
+      "description": "A theme of the page's own, in place of theme: page color, ink (automatic strokes) and a palette of named colors.",
+      "properties": {
+        "name": { "type": "string" },
+        "background": { "$ref": "#/$defs/rgba" },
+        "ink": { "$ref": "#/$defs/rgba" },
+        "palette": { "type": "array", "items": { "$ref": "#/$defs/paletteColor" } },
+        "base": { "type": "string", "description": "The built-in theme it was made from." }
+      }
+    },
+    "paletteColor": {
+      "type": "object",
+      "required": ["name", "color"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "color": { "$ref": "#/$defs/rgba" }
       }
     },
     "element": {

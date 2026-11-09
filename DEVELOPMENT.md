@@ -185,7 +185,10 @@ Copies older than the first Sparkle release (0.5.3) have to be updated by hand o
 ## File format
 
 A `.dottie` file is JSON (sorted keys, pretty-printed, rounded frames, so it diffs well in git): a `DottieFile`
-with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme.
+with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme: a built-in's id, or a
+`customTheme` of its own (page color, ink and a palette). A style's `named` says which of its fill, stroke and text
+color are palette colors; they are set from the page's palette when a file is read and whenever the theme changes,
+and a color changed by hand stops being one (ADR 0005, `Theme.swift`, web/src/theme.ts).
 Element ids are unique across the file, which is what lets a link point at a shape on another page.
 A shape's or connector's label is drawn in its style's `textColor`, or its `stroke` when that is absent
 (`Element.labelColor`); a text box and a note always use their stroke. As in Excalidraw, setting a stroke color clears
@@ -313,7 +316,8 @@ Tools: `build_diagram` (nodes + edges, auto-laid-out), `import_mermaid` (a Merma
 way), `add_shape`, `add_connector`, `update_element`,
 `delete_element`, `add_image`, `list_elements`, `auto_layout`, `export_png` (returns an image so the agent can check its
 work, plus each element's id and pixel box), `export_svg`, `export_mermaid`, `create_diagram`, `open_document`, `list_stencils`,
-`add_stencil`, `list_pages`, `add_page`, `rename_page`, `make_symbol`, `place_symbol`, `run_script` and `script_api`. Tools that draw, list or
+`add_stencil`, `list_pages`, `add_page`, `rename_page`, `make_symbol`, `place_symbol`, `set_theme`, `run_script` and
+`script_api`. Every color argument takes a hex color or a palette name. Tools that draw, list or
 export take an optional `page` (name or 1-based number) and default to the first page; tools given an element
 id find its page themselves. `add_shape` and `build_diagram` take kind `note` for a sticky note
 whose text is Markdown. Connectors take a `label`; shapes and connectors take `fill_style`, `dash`,

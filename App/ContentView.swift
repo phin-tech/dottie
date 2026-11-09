@@ -318,6 +318,7 @@ struct Inspector: View {
         if !style.onlyTextBoxes {
             Section("Stroke") {
                 ColorPicker("Color", selection: style.stroke)
+                PaletteSwatches(palette: document.model.palette, chosen: style.named(\.stroke)) { style.name(\.stroke, $0) }
                 ValueSlider(title: "Width", value: style.binding(\.strokeWidth, "Change Stroke Width"), range: 1...12, format: Self.points)
                 Picker("Line", selection: style.binding(\.dash, "Change Line Style")) {
                     ForEach(StyleChoices.dashes, id: \.0) { Text($0.1).tag($0.0) }
@@ -327,6 +328,7 @@ struct Inspector: View {
         if style.hasFill && !style.onlyTextBoxes && !(tool == .note || (!selected.isEmpty && selected.allSatisfy { $0.kind == .note })) {
             Section("Fill") {
                 ColorPicker("Color", selection: style.color(\.fill, "Change Fill Color"), supportsOpacity: true)
+                PaletteSwatches(palette: document.model.palette, chosen: style.named(\.fill)) { style.name(\.fill, $0) }
                 Picker("Pattern", selection: style.binding(\.fillStyle, "Change Fill Pattern")) {
                     ForEach(StyleChoices.fills, id: \.0) { Text($0.1).tag($0.0) }
                 }
@@ -457,6 +459,18 @@ struct Inspector: View {
             Picker("Theme", selection: themeBinding) {
                 Text("Automatic").tag("")
                 ForEach(Theme.all) { t in Text(t.name).tag(t.id) }
+                if let custom = document.model.customTheme { Text(custom.name).tag("custom") }
+            }
+            if document.model.customTheme == nil {
+                Button("Make a Theme of Its Own") {
+                    var next = document.model
+                    let base = next.resolvedTheme ?? .white
+                    try? DiagramOps.setTheme(&next, id: nil, custom: CustomTheme(from: base, name: base.name + " (custom)"))
+                    document.commit(next, actionName: "Make Theme", undoManager: undoManager)
+                }
+                .help("Copy this theme into the drawing, to change its page color, ink and palette")
+            } else {
+                CustomThemeEditor(document: document, undoManager: undoManager)
             }
             Toggle("Rulers and guides", isOn: $showRulers)
             if showRulers { GuidesEditor(document: document, undoManager: undoManager) }
@@ -464,10 +478,11 @@ struct Inspector: View {
     }
 
     private var themeBinding: Binding<String> {
-        Binding(get: { document.model.theme ?? "" },
+        Binding(get: { document.model.customTheme != nil ? "custom" : document.model.theme ?? "" },
                 set: { id in
+                    guard id != "custom" else { return }
                     var next = document.model
-                    next.theme = id.isEmpty ? nil : id
+                    try? DiagramOps.setTheme(&next, id: id)
                     document.commit(next, actionName: "Change Theme", undoManager: undoManager)
                 })
     }

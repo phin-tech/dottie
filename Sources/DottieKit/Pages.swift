@@ -188,6 +188,7 @@ public struct DottieFile: Codable, Equatable, Sendable {
         // and every element showing it shares one buffer.
         let stored = try dec.decode(ImagesOnly.self, from: data).images ?? [:]
         dec.userInfo[.dottieImages] = ImageTable(stored.mapValues { EmbeddedImage(data: $0.data, format: $0.format) })
-        return try dec.decode(DottieFile.self, from: data)
+        // Named colors follow the palette the file has now, even if it was edited by hand.
+        return try dec.decode(DottieFile.self, from: data).resolvingPalette()
     }
 }

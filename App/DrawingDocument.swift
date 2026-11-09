@@ -84,6 +84,8 @@ final class DrawingDocument: ReferenceFileDocument, ObservableObject, @unchecked
     @MainActor
     private func apply(_ new: DottieFile, actionName: String, undoManager: UndoManager?, show: UUID?) {
         let old = file
+        // A color changed by hand stops being the palette color it was named after; named colors follow the theme.
+        let new = new.reconcilingColorNames(from: old)
         guard old != new else { return }
         let oldIndex = old.index(of: currentPageID) ?? 0
         file = new

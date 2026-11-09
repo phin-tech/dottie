@@ -3,6 +3,7 @@
 // fill or field) is kept and reported through `warnings` instead of failing the whole file.
 
 import { isName } from "./state.ts";
+import { resolvingPalette } from "./theme.ts";
 
 export interface RGBA { r: number; g: number; b: number; a: number }
 export type FillStyle = "solid" | "hachure" | "crossHatch" | "grid";
@@ -31,7 +32,16 @@ export interface Style {
   dashOffset: number | null;
   /** The color of a shape's or connector's label; null follows `stroke`. Text boxes and notes ignore it. */
   textColor: RGBA | null;
+  /** Which colors are palette colors, by name (ADR 0005); set from the page's palette when it is read. */
+  named?: ColorNames | null;
 }
+
+/** Palette names for an element's colors (Theme.swift's ColorNames). */
+export interface ColorNames { fill: string | null; stroke: string | null; textColor: string | null }
+/** A named color in a theme's palette. */
+export interface PaletteColor { name: string; color: RGBA }
+/** A theme made in the drawing (CustomTheme): it takes the place of the page's `theme`. */
+export interface CustomTheme { name: string; background: RGBA; ink: RGBA; palette: PaletteColor[]; base: string | null }
 
 /** `portIndex` pins the end to one of the bound element's `ports`, and wins over `port`. */
 export interface Endpoint { elementID: string | null; port: Port | null; portIndex?: number | null; x: number; y: number }
@@ -203,6 +213,8 @@ export interface Page {
   layers: Layer[];
   elements: Element[];
   theme: string | null;
+  /** A theme of the page's own (ADR 0005), in place of `theme`. */
+  customTheme?: CustomTheme | null;
   timeline: Timeline | null;
   symbols: Symbol[] | null;
   /** The page's variables and their starting values (DottieDocument.variables). */
@@ -260,13 +272,16 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
+  page: ["id", "name", "layers", "elements", "theme", "customTheme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
   flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume", "overrides"],
   flowOverride: ["when", "volume"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
-  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor"],
+  style: ["stroke", "fill", "fillStyle", "strokeWidth", "dash", "roughness", "bowing", "fontSize", "font", "gridSize", "opacity", "dashOffset", "textColor", "named"],
+  colorNames: ["fill", "stroke", "textColor"],
+  customTheme: ["name", "background", "ink", "palette", "base"],
+  paletteColor: ["name", "color"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "overrides", "symbol", "playback", "offset", "args", "image", "reveal",
     "ports", "labelRect", "extension", "capacity", "delay", "queue", "gauge"],
@@ -382,7 +397,28 @@ class Reader {
       opacity: num(s.opacity) ?? null,
       dashOffset: num(s.dashOffset) ?? null,
       textColor: rgba(s.textColor) ?? null,
+      named: this.colorNames(s.named),
     };
+  }
+
+  colorNames(v: unknown): ColorNames | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "colorNames");
+    const n = { fill: str(v.fill) ?? null, stroke: str(v.stroke) ?? null, textColor: str(v.textColor) ?? null };
+    return n.fill === null && n.stroke === null && n.textColor === null ? null : n;
+  }
+
+  customTheme(v: unknown): CustomTheme | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "customTheme");
+    const background = rgba(v.background), ink = rgba(v.ink);
+    if (!background || !ink) { this.warn("A custom theme needs a background and an ink; drawn without it"); return null; }
+    const palette = (Array.isArray(v.palette) ? v.palette : []).filter(isObj).flatMap((p): PaletteColor[] => {
+      this.fields(p, "paletteColor");
+      const name = str(p.name), color = rgba(p.color);
+      return name && color ? [{ name, color }] : [];
+    });
+    return { name: str(v.name) ?? "Custom", background, ink, palette, base: str(v.base) ?? null };
   }
 
   endpoint(v: unknown): Endpoint {
@@ -703,6 +739,7 @@ class Reader {
       layers,
       elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
       theme: str(v.theme) ?? null,
+      customTheme: this.customTheme(v.customTheme),
       timeline: this.timeline(v.timeline),
       symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
       variables: this.variables(v.variables),
@@ -764,7 +801,8 @@ export function parseDottie(source: string | unknown): DottieFile {
       if (isObj(v) && typeof v.data === "string") images[k] = reader.picture(v.data, str(v.format));
     }
   }
-  const pages = json.pages.map((p, i) => reader.page(p, images, i + 1));
+  // Named colors follow the palette the file has now, even if it was edited by hand.
+  const pages = json.pages.map((p, i) => resolvingPalette(reader.page(p, images, i + 1)));
   if (new Set(pages.map((p) => p.id)).size !== pages.length) throw new DottieFormatError("Two pages share an id");
   return { version, pages, warnings: reader.warnings };
 }
@@ -781,6 +819,7 @@ export function cloneElement(e: Element): Element {
     style: {
       ...e.style, stroke: { ...e.style.stroke }, fill: { ...e.style.fill },
       textColor: e.style.textColor ? { ...e.style.textColor } : null,
+      named: e.style.named ? { ...e.style.named } : e.style.named,
     },
     connector: e.connector ? {
       ...e.connector, start: { ...e.connector.start }, end: { ...e.connector.end },

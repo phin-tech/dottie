@@ -48,6 +48,9 @@ public struct Style: Codable, Equatable, Sendable {
     /// The color of a shape's or connector's label; nil follows `stroke`. A text box or note is drawn in its
     /// stroke and ignores it.
     public var textColor: RGBA?
+    /// Which of `fill`, `stroke` and `textColor` are palette colors, by name (ADR 0005); they are set from the page's
+    /// palette whenever it changes.
+    public var named: ColorNames?
     public init() {}
 
     public static let defaultGridSize = 50.0
@@ -81,6 +84,7 @@ public struct Style: Codable, Equatable, Sendable {
         opacity = try c.decodeIfPresent(Double.self, forKey: .opacity)
         dashOffset = try c.decodeIfPresent(Double.self, forKey: .dashOffset).flatMap { $0.isFinite ? $0 : nil }
         textColor = try c.decodeIfPresent(RGBA.self, forKey: .textColor)
+        named = ((try? c.decodeIfPresent(ColorNames.self, forKey: .named)) ?? nil).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -370,6 +374,8 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     public var elements: [Element]
     /// A `Theme` id (page color and ink); nil follows the system appearance and exports on white.
     public var theme: String?
+    /// A theme made in the drawing (ADR 0005); it takes the place of `theme`.
+    public var customTheme: CustomTheme?
     /// Ruler guides: x positions of vertical guides and y positions of horizontal ones.
     public var guidesX: [Double]?
     public var guidesY: [Double]?
@@ -470,6 +476,6 @@ public struct DottieDocument: Codable, Equatable, Identifiable, Sendable {
     }
 
     public static func decode(_ data: Data) throws -> DottieDocument {
-        try JSONDecoder().decode(DottieDocument.self, from: data)
+        try JSONDecoder().decode(DottieDocument.self, from: data).resolvingPalette()
     }
 }

@@ -535,6 +535,35 @@ def elbow_around():
     write(EDGE / "elbow-around.dottie", [p])
 
 
+def palette():
+    """Palette colors by name (ADR 0005): the same names on a light built-in, a dark built-in and a theme of the
+    page's own, with a name of its own, a stroke and a label color by name, a name the palette lacks (kept as
+    stored), and stored colors left stale (grey) on purpose, so a reader that doesn't resolve names draws them wrong."""
+    stale = rgba(0.5, 0.5, 0.5)
+    def shapes(p):
+        p.add("rectangle", 40, 40, 120, 60, text="accent", style=style(fill=stale, named={"fill": "accent"}))
+        p.add("rectangle", 200, 40, 120, 60, text="danger", style=style(fill=stale, stroke=stale, named={"fill": "danger", "stroke": "danger"}))
+        p.add("ellipse", 360, 40, 120, 60, text="success label",
+              style=style(stroke=stale, textColor=stale, named={"stroke": "success", "textColor": "success"}))
+        p.add("rectangle", 520, 40, 120, 60, text="brand", style=style(fill=stale, named={"fill": "Brand"}))
+        p.add("rectangle", 680, 40, 120, 60, text="missing", style=style(fill=rgba(0.9, 0.8, 1), named={"fill": "nope"}))
+    pages = []
+    for theme in ["paper", "blueprint"]:
+        page = Page(name=theme, theme=theme)
+        shapes(page)
+        pages.append(page)
+    own = Page(name="own")
+    shapes(own)
+    own.extra = {"customTheme": {"name": "Forest", "base": "chalkboard", "background": rgba(0.93, 0.96, 0.92),
+                                 "ink": rgba(0.1, 0.2, 0.12),
+                                 "palette": [{"name": "accent", "color": rgba(0.06, 0.46, 0.43)},
+                                             {"name": "danger", "color": rgba(0.75, 0.2, 0.1)},
+                                             {"name": "success", "color": rgba(0.2, 0.5, 0.1)},
+                                             {"name": "brand", "color": rgba(0.55, 0.3, 0.75)}]}}
+    pages.append(own)
+    write(EDGE / "palette.dottie", pages)
+
+
 def notes():
     """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
     p = Page()
@@ -1161,6 +1190,7 @@ def main():
     state()
     flows()
     elbow_around()
+    palette()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

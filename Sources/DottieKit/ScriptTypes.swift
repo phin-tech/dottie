@@ -265,8 +265,28 @@ extension DottieScript {
             | "popIn" | "growIn" | "wipeIn" | "dropIn" | "slideIn" | "drawIn" | "fadeIn"
             | "popOut" | "shrinkOut" | "wipeOut" | "fadeOut"
             | "pulse" | "wiggle";
-        /** A hex color like "#ffcc00", or "#ffcc0080" with alpha. */
+        /** A hex color like "#ffcc00", or "#ffcc0080" with alpha, or a color of the page's palette by name ("accent",
+         * "muted", "danger", "warning", "success", "info", or one of the page's own). A shape's fill, stroke or text
+         * color given by name stays that palette color when the palette changes. */
         type Color = string;
+        /** The page's theme and palette (`dottie.theme`). */
+        interface ThemeInfo {
+            /** A built-in's id, "custom" for the page's own, or "" for none. */
+            theme: string;
+            name?: string;
+            background?: string;
+            ink?: string;
+            palette: Record<string, string>;
+        }
+        interface ThemeOptions {
+            /** A built-in to use, "" for none, or where the page's own theme starts from when the others are given. */
+            theme?: string;
+            name?: string;
+            background?: string;
+            ink?: string;
+            /** Palette colors to set or add, name to hex; any of these makes the theme the page's own. */
+            palette?: Record<string, string>;
+        }
         /** How a symbol's copy plays its animation: over and over, once, standing still on its poster frame, or resting
          * at the start until clicked (in <dottie-player>). A button's copies ignore it. */
         type Playback = "loop" | "once" | "still" | "click";
@@ -679,6 +699,9 @@ extension DottieScript {
             variable(name: string, value?: boolean | null): Record<string, boolean>;
             /** The page's variables and their starting values. */
             variables(): Record<string, boolean>;
+            /** The page's theme and palette; with options, sets them first. Changing a palette color recolors every
+             * shape whose color was given by that name. */
+            theme(options?: ThemeOptions): ThemeInfo;
             /** Writes one variable's whole story: its starting value, the conditions on what it hides and shows, overrides
              * on what it dims, restyles and reroutes, and the clicks that change it. Running it again changes nothing
              * more. Returns a summary. */

@@ -465,6 +465,7 @@ extension DottieDocument {
         var p = s.page
         p.symbols = symbols
         p.theme = theme
+        p.customTheme = customTheme
         return p
     }
 

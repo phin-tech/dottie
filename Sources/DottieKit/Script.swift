@@ -330,7 +330,9 @@ public enum DottieScript {
             }
             func color(_ k: String) throws -> RGBA? {
                 guard let s = string(k) else { return nil }
-                guard let c = RGBA(hex: s) else { throw OpsError.invalid("'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                    throw OpsError.invalid("'\(k)' must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+                }
                 return c
             }
             func enumValue<T: RawRepresentable & CaseIterable>(_ k: String, as: T.Type) throws -> T? where T.RawValue == String {
@@ -371,6 +373,8 @@ public enum DottieScript {
             }
             let parsed = try JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed])
             let a = Args(parsed as? [String: Any] ?? [:])
+            // Palette names in color arguments are this page's.
+            DiagramOps.colorContext = doc
             let out: Any? = try run(name, a)
             guard let out else { return "" }
             return String(decoding: try JSONSerialization.data(withJSONObject: out, options: [.fragmentsAllowed]), as: UTF8.self)
@@ -547,6 +551,7 @@ public enum DottieScript {
                 if let n = a.string("anchor"), !n.isEmpty, let i = doc.elements.firstIndex(where: { $0.id == e.id }) { doc.elements[i].anchor = n }
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: e.id, w) }
                 try a.measure(&doc, e.id)
+                try DiagramOps.nameColors(&doc, id: e.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: a.string("textColor"))
                 return describe(try element(e.id))
 
             case "connector":
@@ -559,6 +564,7 @@ public enum DottieScript {
                                                     stroke: try a.color("stroke"))
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w) }
                 try a.measure(&doc, c.id)
+                try DiagramOps.nameColors(&doc, id: c.id, fill: nil, stroke: a.string("stroke"), textColor: a.string("textColor"))
                 return describe(try element(c.id))
 
             case "update":
@@ -599,7 +605,38 @@ public enum DottieScript {
                     doc.elements[i].overrides = parsed.isEmpty ? nil : parsed
                 }
                 try a.measure(&doc, id)
+                try DiagramOps.nameColors(&doc, id: id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: a.string("textColor"))
                 return describe(try element(id))
+
+            case "theme":
+                let custom = a.has("background") || a.has("ink") || a.has("palette") || a.has("name")
+                func given(_ k: String) throws -> RGBA? {
+                    guard let s = a.string(k) else { return nil }
+                    guard let c = RGBA(hex: s) else { throw OpsError.invalid("'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                    return c
+                }
+                if custom {
+                    let start = a.string("theme").flatMap { $0.isEmpty ? nil : Theme.named($0) }
+                    if let t = a.string("theme"), !t.isEmpty, start == nil {
+                        throw OpsError.invalid("No theme '\(t)'; the built-ins are " + Theme.all.map(\.id).joined(separator: ", "))
+                    }
+                    var theme = start.map { CustomTheme(from: $0, name: $0.name + " (custom)") } ?? doc.customTheme
+                        ?? CustomTheme(from: doc.resolvedTheme ?? .white, name: (doc.resolvedTheme?.name ?? "White") + " (custom)")
+                    if let n = a.string("name"), !n.isEmpty { theme.name = n }
+                    if let c = try given("background") { theme.background = c }
+                    if let c = try given("ink") { theme.ink = c }
+                    try DiagramOps.setTheme(&doc, id: nil, custom: theme)
+                    for (k, v) in (a.raw["palette"] as? [String: Any] ?? [:]).sorted(by: { $0.key < $1.key }) {
+                        guard let s = v as? String, let c = RGBA(hex: s) else { throw OpsError.invalid("'palette' maps names to hex colors; '\(k)' isn't one") }
+                        try DiagramOps.setPaletteColor(&doc, name: k, color: c)
+                    }
+                } else if a.has("theme") {
+                    try DiagramOps.setTheme(&doc, id: a.string("theme"))
+                }
+                var out: [String: Any] = ["theme": doc.customTheme != nil ? "custom" : (doc.theme ?? ""),
+                                          "palette": Dictionary(doc.palette.map { ($0.name, hex($0.color)) }, uniquingKeysWith: { a, _ in a })]
+                if let t = doc.resolvedTheme { out["name"] = t.name; out["background"] = hex(t.background); out["ink"] = hex(t.ink) }
+                return out
 
             case "pages":
                 let pages = file?.pages.map { $0.id == doc.id ? doc : $0 } ?? [doc]
@@ -1125,6 +1162,7 @@ public enum DottieScript {
         loopScene: function (scene, loop) { call("editScene", { scene: String(scene), loop: loop !== false }); },
         variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
         variables: function () { return call("variables"); },
+        theme: function (o) { return call("theme", o || {}); },
         flow: function (from, to, o) {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
@@ -1358,6 +1396,10 @@ public enum DottieScript {
     on the web, elements with a when follow them, and the timeline keeps looping. Exports and previews show the \
     starting values; the editor shows every element while stopped. Inside a symbol, when sees no variables (all false)
       dottie.variables()               {name: startingValue}
+      dottie.theme({theme?, name?, background?, ink?, palette?})  the page's theme and palette ({name: hex}); with \
+    options, sets them first (background, ink or palette make the theme the page's own). Colors everywhere also take \
+    a palette name ("accent", "muted", "danger", "warning", "success", "info", or the page's own); a fill, stroke or \
+    text color given by name follows the palette when it changes
       dottie.defineState(name, {initial?, hide?, show?, dim?, down?, dimOpacity?, restyle?, reroute?, toggledBy?, turnedOnBy?, \
     turnedOffBy?})  one variable described at once; writes the when conditions, overrides and clicks it means. hide: \
     drawn only while it is false; show: only while true; dim: faded while true; down: faded and carrying no flow \

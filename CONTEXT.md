@@ -28,6 +28,11 @@ _Avoid_: control point (that is a pen stroke's), vertex
 The small arc a connector draws where it crosses a connector beneath it, so the two read as unconnected.
 _Avoid_: jump, bridge, crossover
 
+**Palette**:
+A theme's named colors (`accent`, `muted`, `danger`, `warning`, `success`, `info`, and a page's own). A fill,
+stroke or text color given by name is a **palette color**: it changes when the palette does (ADR 0005).
+_Avoid_: swatch set, color scheme
+
 ### Extensions
 
 **Extension**:

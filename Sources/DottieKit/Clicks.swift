@@ -107,7 +107,9 @@ extension DiagramOps {
         var look = base ?? HoverLook()
         func color(_ s: String, _ name: String) throws -> RGBA? {
             if s.isEmpty { return nil }
-            guard let c = RGBA(hex: s) else { throw OpsError.invalid("'\(name)' must be a hex color like #ffcc00, got '\(s)'") }
+            guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                throw OpsError.invalid("'\(name)' must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+            }
             return c
         }
         if let stroke { look.stroke = try color(stroke, "hover stroke") }

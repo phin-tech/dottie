@@ -183,7 +183,9 @@ private struct Args {
     }
     func color(_ k: String) throws -> RGBA? {
         guard let s = string(k) else { return nil }
-        guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+        guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+            throw ToolFailure(message: "'\(k)' must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+        }
         return c
     }
     func kind(_ k: String, default d: ElementKind = .rectangle) throws -> ElementKind {
@@ -376,6 +378,23 @@ actor DottieTools {
                 "args": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                  "description": "For a symbol instance: its values for the symbol's params, replacing the ones it had ({} clears them)"]),
              ].merging(lookProps) { a, _ in a }, required: ["path", "id"])),
+        Tool(name: "set_theme",
+             description: "Set the page's theme: page color, ink (the default line and text color) and a palette of named "
+                + "colors. Every tool that takes a hex color also takes a palette name (\"accent\", \"danger\", ...); a "
+                + "shape's fill, stroke or text color given by name stays that palette color, so changing the palette "
+                + "here recolors everything using it. With no arguments but path, returns the theme and palette.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "theme": prop("string", "A built-in to use (" + Theme.all.map(\.id).joined(separator: ", ")
+                    + "), \"\" for none (follows the system, exports on white), or the starting point for a theme of the "
+                    + "page's own when background, ink or palette are given too"),
+                "name": prop("string", "A name for the page's own theme"),
+                "background": prop("string", "Page color, hex; makes the theme the page's own"),
+                "ink": prop("string", "Default line and text color, hex; makes the theme the page's own"),
+                "palette": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
+                    "description": .string("Palette colors to set or add, name to hex, e.g. {\"accent\": \"#7c3aed\", "
+                        + "\"brand\": \"#0f766e\"}; makes the theme the page's own")]),
+             ], required: ["path"])),
         Tool(name: "set_variable",
              description: "Add, change or remove a page variable: a true-or-false value that clicks change on the web "
                 + "(update_element click_set / click_toggle) and elements follow (update_element when, send_packet when). "
@@ -1012,6 +1031,13 @@ actor DottieTools {
 
     /// The page a tool works on: `page` when given, else the page holding `element`, else the first.
     private func pageIndex(_ file: DottieFile, _ a: Args, element: UUID? = nil) throws -> Int {
+        let i = try findPage(file, a, element: element)
+        // Palette names in color arguments are that page's.
+        DiagramOps.colorContext = file.pages[i]
+        return i
+    }
+
+    private func findPage(_ file: DottieFile, _ a: Args, element: UUID?) throws -> Int {
         if let spec = a.string("page"), !spec.isEmpty {
             guard let i = file.pageIndex(matching: spec) else {
                 throw ToolFailure(message: "No page '\(spec)'. Pages: " + file.pages.map { "\"\($0.name)\"" }.joined(separator: ", "))
@@ -1083,6 +1109,7 @@ actor DottieTools {
             do {
                 ids = try DiagramOps.build(&file.pages[p], nodes: nodes, edges: edges, direction: direction, roughness: a.roughness ?? 1,
                                          font: a.string("font"))
+                for n in nodeArgs { if let id = ids[n.string("key") ?? ""] { try DiagramOps.nameColors(&file.pages[p], id: id, fill: n.string("fill"), stroke: nil, textColor: nil) } }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             let map = ids.mapValues(\.uuidString)
@@ -1127,6 +1154,10 @@ actor DottieTools {
             if let w = a.string("when") {
                 do { try DiagramOps.setWhen(&file.pages[p], id: e.id, w) } catch let e as OpsError { throw ToolFailure(message: e.description) }
             }
+            do {
+                try DiagramOps.nameColors(&file.pages[p], id: e.id, fill: a.string("fill"), stroke: a.string("stroke"),
+                                          textColor: a.string("text_color"))
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
 
@@ -1163,6 +1194,7 @@ actor DottieTools {
                                                 roughness: a.roughness, label: a.string("label"), look: try a.look(),
                                                 stroke: try a.color("stroke"))
                 if let w = a.string("when") { try DiagramOps.setWhen(&file.pages[p], id: c.id, w) }
+                try DiagramOps.nameColors(&file.pages[p], id: c.id, fill: nil, stroke: a.string("stroke"), textColor: a.string("text_color"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("id: \(c.id.uuidString)")
@@ -1211,11 +1243,52 @@ actor DottieTools {
                 let capacity = measure("capacity"), delay = measure("delay")
                 if capacity != nil || delay != nil { try DiagramOps.setCapacity(&file.pages[p], id: id, capacity: capacity, delay: delay) }
                 if let q = a.bool("queue") { try DiagramOps.setQueue(&file.pages[p], id: id, q) }
+                try DiagramOps.nameColors(&file.pages[p], id: id, fill: a.string("fill"), stroke: a.string("stroke"),
+                                          textColor: a.string("text_color"))
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
             let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
             try save(file, to: url)
             return text((["Updated"] + problems).joined(separator: "\n"))
+
+        case "set_theme":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let custom = a.string("background") != nil || a.string("ink") != nil || a.raw["palette"] != nil || a.string("name") != nil
+            func hex(_ k: String) throws -> RGBA? {
+                guard let s = a.string(k) else { return nil }
+                guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'\(k)' must be a hex color like #ffcc00, got '\(s)'") }
+                return c
+            }
+            do {
+                if custom {
+                    let start = a.string("theme").flatMap { $0.isEmpty ? nil : Theme.named($0) }
+                    if let t = a.string("theme"), !t.isEmpty, start == nil {
+                        throw ToolFailure(message: "No theme '\(t)'; the built-ins are " + Theme.all.map(\.id).joined(separator: ", "))
+                    }
+                    var theme = start.map { CustomTheme(from: $0, name: $0.name + " (custom)") } ?? file.pages[p].customTheme
+                        ?? CustomTheme(from: file.pages[p].resolvedTheme ?? .white, name: (file.pages[p].resolvedTheme?.name ?? "White") + " (custom)")
+                    if let n = a.string("name"), !n.isEmpty { theme.name = n }
+                    if let c = try hex("background") { theme.background = c }
+                    if let c = try hex("ink") { theme.ink = c }
+                    try DiagramOps.setTheme(&file.pages[p], id: nil, custom: theme)
+                    for (k, v) in a.raw["palette"]?.objectValue ?? [:] {
+                        guard let s = v.stringValue, let c = RGBA(hex: s) else {
+                            throw ToolFailure(message: "'palette' maps names to hex colors; '\(k)' isn't one")
+                        }
+                        try DiagramOps.setPaletteColor(&file.pages[p], name: k, color: c)
+                    }
+                } else if let t = a.string("theme") {
+                    try DiagramOps.setTheme(&file.pages[p], id: t)
+                }
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            if custom || a.string("theme") != nil { try save(file, to: url) }
+            let page = file.pages[p]
+            func h(_ c: RGBA) -> String { String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
+            let head = page.resolvedTheme.map { "Theme: \($0.name)" + (page.customTheme != nil ? " (the page's own)" : "") + ", page \(h($0.background)), ink \(h($0.ink))" }
+                ?? "Theme: none (follows the system; exports on white)"
+            return text(head + "\nPalette: " + page.palette.map { "\($0.name) \(h($0.color))" }.joined(separator: ", ") + on(file, p))
 
         case "set_variable":
             let url = try fileURL(a)
@@ -1244,7 +1317,9 @@ actor DottieTools {
                 flow = try DiagramOps.addFlow(&file.pages[p], from: try a.uuid("from"), to: try a.uuids("to") ?? [],
                                               every: a.double("every"), speed: a.double("speed"),
                                               color: try a.string("color").map { s in
-                                                  guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'color' must be a hex color like #ffcc00") }
+                                                  guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                                                      throw ToolFailure(message: "'color' must be \(RGBA.expected(in: DiagramOps.colorContext))")
+                                                  }
                                                   return c
                                               },
                                               size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
@@ -1271,7 +1346,9 @@ actor DottieTools {
             if let v = a.double("dim_opacity") { spec.dimOpacity = v }
             func color(_ o: Args, _ k: String) throws -> RGBA? {
                 guard let s = o.string(k) else { return nil }
-                guard let c = RGBA(hex: s) else { throw ToolFailure(message: "'restyle' \(k) must be a hex color like #ffcc00, got '\(s)'") }
+                guard let c = RGBA.parse(s, in: DiagramOps.colorContext)?.color else {
+                    throw ToolFailure(message: "'restyle' \(k) must be \(RGBA.expected(in: DiagramOps.colorContext)), got '\(s)'")
+                }
                 return c
             }
             for (k, v) in a.raw["restyle"]?.objectValue ?? [:] {
