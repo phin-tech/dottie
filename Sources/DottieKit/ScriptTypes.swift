@@ -9,6 +9,33 @@ public struct TypeDiagnostic: Sendable, Equatable, CustomStringConvertible {
     /// tsc's text; an overload error runs over several lines.
     public var message: String
     public var description: String { "line \(line), column \(column): \(message) (TS\(code))" }
+
+    /// What kind of problem it is, so a summary can lead with the mistakes in dottie calls.
+    public enum Category: Int, CaseIterable, Sendable {
+        case unknownOption, wrongValue, unknownCall, other
+        var label: String {
+            switch self {
+            case .unknownOption: "unknown option"
+            case .wrongValue: "wrong value"
+            case .unknownCall: "unknown call or property"
+            case .other: "other"
+            }
+        }
+    }
+
+    public var category: Category {
+        switch code {
+        case 2353, 2561: .unknownOption
+        case 2322, 2345, 2769, 2820, 2554, 2555: .wrongValue
+        case 2339, 2551: .unknownCall
+        default: .other
+        }
+    }
+
+    /// A value from a list of mixed pairs: JavaScript types `[[c, 0], [d, 1]]` as (Element | number)[][].
+    var isMixedList: Bool {
+        code == 2345 && (message.contains("'number | Element'") || message.contains("'Element | number'"))
+    }
 }
 
 /// What checking a script against `dottie.d.ts` found. `compiler` is tsc's version line, like "Version 7.0.2".
@@ -28,11 +55,13 @@ extension DottieScript {
 
     /// For a folder of scripts: each `.js` file is its own module (so two scripts can both declare `const a`),
     /// checked with no DOM. modules/ is left out: libraries are `any`. ES2023 is what JavaScriptCore has on
-    /// macOS 14, the oldest Dottie runs on.
+    /// macOS 14, the oldest Dottie runs on. `strict` is off on purpose: TypeScript 7 turns it on by default, and for
+    /// plain JavaScript that buries a misspelled option under implicit-any and possibly-undefined noise.
     public static let typeScriptConfig = """
     {
       "compilerOptions": {
         "target": "es2023",
+        "strict": false,
         "lib": ["es2023"],
         "types": [],
         "allowJs": true,
@@ -69,8 +98,23 @@ extension DottieScript {
             let n = check.diagnostics.count
             guard n > 0 else { return [] }
             let version = check.compiler.replacingOccurrences(of: "Version ", with: "")
-            return ["Type check (TypeScript \(version)): \(n) problem\(n == 1 ? "" : "s"), see dottie.d.ts"]
-                + check.diagnostics.map { "  " + $0.description.replacingOccurrences(of: "\n", with: "\n  ") }
+            // The ones that name a mistake in a dottie call come first, then the rest, each in line order.
+            let sorted = check.diagnostics.enumerated().sorted {
+                ($0.element.category.rawValue, $0.offset) < ($1.element.category.rawValue, $1.offset)
+            }.map(\.element)
+            var counts: [String] = []
+            for c in TypeDiagnostic.Category.allCases {
+                let k = sorted.filter { $0.category == c }.count
+                if k > 0 { counts.append("\(k) \(c.label)") }
+            }
+            var lines = ["Type check (TypeScript \(version)): \(n) problem\(n == 1 ? "" : "s") (\(counts.joined(separator: ", "))), "
+                + "see dottie.d.ts"]
+            lines += sorted.map { "  " + $0.description.replacingOccurrences(of: "\n", with: "\n  ") }
+            if sorted.contains(where: \.isMixedList) {
+                lines.append("  A list like [[connector, 0], [connector, 1.5]] is typed as a list of (Element | number) lists. "
+                    + "Mark it as pairs to check it: /** @type {[Element, number][]} */ const pairs = [...];")
+            }
+            return lines
         } catch {
             return ["Type check skipped: \((error as? OpsError)?.description ?? "\(error)")"]
         }
@@ -449,6 +493,8 @@ extension DottieScript {
             /** Default true. */
             arrow?: boolean;
             label?: string;
+            /** The line's color; its label follows it unless textColor is set. */
+            stroke?: Color;
             sketchy?: boolean;
             /** Pins the start: a side, or the index of one of an extension shape's connection points. Default: follows the edge. */
             fromPort?: Port | number;

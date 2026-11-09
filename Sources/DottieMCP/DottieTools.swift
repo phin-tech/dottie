@@ -325,6 +325,7 @@ actor DottieTools {
                 "routing": prop("string", "Default straight", enum: routingValues),
                 "arrow": prop("boolean", "Arrowhead at the target, default true"),
                 "label": prop("string", "Text shown on the connector"),
+                "stroke": prop("string", "Line color, hex; its label follows it unless textColor is set"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
                 "from_port": prop("string", "Pins the start: top, right, bottom or left, or the number of one of an extension "
                     + "shape's connection points (\"0\" up, in the order the shape declares them). Default: follows the edge"),
@@ -1149,7 +1150,8 @@ actor DottieTools {
                 c = try DiagramOps.addConnector(&file.pages[p], from: from, to: to,
                                                 routing: try a.routing("routing") ?? .straight, arrow: a.bool("arrow") ?? true,
                                                 port: (start.0, end.0), portIndex: (start.1, end.1),
-                                                roughness: a.roughness, label: a.string("label"), look: try a.look())
+                                                roughness: a.roughness, label: a.string("label"), look: try a.look(),
+                                                stroke: try a.color("stroke"))
                 if let w = a.string("when") { try DiagramOps.setWhen(&file.pages[p], id: c.id, w) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)

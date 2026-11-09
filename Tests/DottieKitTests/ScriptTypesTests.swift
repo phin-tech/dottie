@@ -126,6 +126,29 @@ final class ScriptTypesTests: XCTestCase {
         XCTAssertTrue(check.diagnostics[1].message.contains(#""elbow""#), check.diagnostics[1].message)
     }
 
+    /// Plain JavaScript checks against dottie.d.ts, not TypeScript 7's strict default: untyped helpers and lookups
+    /// that may find nothing aren't problems, a connector's stroke is an option, and a list of [connector, time]
+    /// pairs gets a hint for how to type it.
+    func testPlainJavaScriptChecksWithoutStrictNoise() throws {
+        let tsc = try compiler()
+        let source = """
+            const a = dottie.rect({x: 0, y: 0, text: "A"});
+            const b = dottie.rect({x: 300, y: 0, text: "B"});
+            const c = dottie.connect(a, b, {stroke: "#ff0000", strok: 1});
+            function box(x, label) { return dottie.rect({x, y: 100, text: label}); }
+            const found = dottie.elements().find(e => e.text === "A");
+            dottie.update(found.id, {fill: "#eeeeee"});
+            for (const [l, t] of [[c, 0], [c, 1.5]]) dottie.packet(l, t);
+            box(5, "x");
+            """
+        let check = try DottieScript.typeCheck(source, compiler: tsc.url, version: tsc.version)
+        XCTAssertEqual(check.diagnostics.map(\.code), [2561, 2345], check.diagnostics.map(\.description).joined(separator: "\n"))
+        XCTAssertEqual(check.diagnostics.map(\.category), [.unknownOption, .wrongValue])
+        let summary = try XCTUnwrap(DottieScript.typeCheckSummary(source))
+        XCTAssertTrue(summary[0].contains("2 problems (1 unknown option, 1 wrong value)"), summary[0])
+        XCTAssertTrue(summary.last?.contains("@type {[Element, number][]}") == true, summary.joined(separator: "\n"))
+    }
+
     /// The library the check uses must cover what JavaScriptCore runs on macOS 14 (ES2023), or valid scripts
     /// get warnings.
     func testAcceptsES2023() throws {

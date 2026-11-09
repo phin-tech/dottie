@@ -23,6 +23,18 @@ final class ScriptTests: XCTestCase {
         XCTAssertEqual(r.value, ##"{"n":3,"fill":"#ffeeaa"}"##)
     }
 
+    func testConnectTakesAStroke() {
+        var doc = DottieDocument()
+        let r = run("""
+            const a = dottie.rect({x: 0, y: 0, text: "A"});
+            const b = dottie.rect({x: 300, y: 0, text: "B"});
+            return dottie.connect(a, b, {stroke: "#ff0000", label: "go"}).stroke;
+            """, &doc)
+        XCTAssertNil(r.error)
+        XCTAssertEqual(r.value, ##""#ff0000""##)
+        XCTAssertEqual(doc.elements[2].style.stroke, RGBA(r: 1, g: 0, b: 0, a: 1))
+    }
+
     /// An error from a dottie call gives the script line that made it (not the prelude's), the one the type check
     /// reports too, including when a top-level return has the script run wrapped in a function.
     func testConnectorsTakeBendsAndHopsAndReportThem() {

@@ -200,7 +200,8 @@ public enum DiagramOps {
     @discardableResult
     public static func addConnector(_ doc: inout DottieDocument, from: UUID, to: UUID, routing: Routing = .straight,
                                     arrow: Bool = true, port: (Port?, Port?) = (nil, nil), portIndex: (Int?, Int?) = (nil, nil),
-                                    roughness: Double? = nil, label: String? = nil, look: Look = Look()) throws -> Element {
+                                    roughness: Double? = nil, label: String? = nil, look: Look = Look(),
+                                    stroke: RGBA? = nil) throws -> Element {
         func shape(_ id: UUID) throws -> Element {
             guard let e = doc.elements.first(where: { $0.id == id }) else { throw OpsError.notFound("No element \(id.uuidString)") }
             guard e.kind != .connector else { throw OpsError.invalid("Connectors can only attach to shapes") }
@@ -221,6 +222,7 @@ public enum DiagramOps {
         _ = try shape(from); _ = try shape(to)
         var style = Style()
         if let roughness { style.roughness = roughness }
+        if let stroke { style.stroke = stroke }
         let data = ConnectorData(start: try end(from, port.0, portIndex.0), end: try end(to, port.1, portIndex.1),
                                  routing: routing, endArrow: arrow)
         var e = Element(kind: .connector, frame: .zero, style: style, layerID: activeLayerID(&doc), text: label, connector: data)

@@ -554,7 +554,8 @@ public enum DottieScript {
                 let c = try DiagramOps.addConnector(&doc, from: try a.uuid("from"), to: try a.uuid("to"), routing: routing,
                                                     arrow: a.bool("arrow") ?? true, port: (start.0, end.0),
                                                     portIndex: (start.1, end.1), roughness: a.roughness,
-                                                    label: a.string("label"), look: try a.look())
+                                                    label: a.string("label"), look: try a.look(),
+                                                    stroke: try a.color("stroke"))
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: c.id, w) }
                 try a.measure(&doc, c.id)
                 return describe(try element(c.id))
@@ -1273,7 +1274,7 @@ public enum DottieScript {
         (a note is a sticky note: its text is GitHub Flavored Markdown, tables included, drawn from the top left;
          a single newline is a line break; the fill defaults to yellow)
       dottie.shape({kind, ...})        same, with kind as a field
-      dottie.connect(from, to, {routing?, arrow?, label?, sketchy?, fromPort?, toPort?, ...look})   routing: straight | curved | elbow; \
+      dottie.connect(from, to, {routing?, arrow?, label?, stroke?, sketchy?, fromPort?, toPort?, ...look})   routing: straight | curved | elbow; \
         fromPort/toPort pin an end: top | right | bottom | left, or a number for an extension shape's connection points (0 up, as the shape declares them)
       dottie.stencil({name, x, y, library?, scale?, keepOriginalColors?, sketchy?})  returns {ids, width, height}
       dottie.build({nodes: [{key, text, kind?, fill?, width?, height?}], edges: [{from, to, routing?, arrow?, label?}], \
