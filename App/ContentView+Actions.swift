@@ -193,9 +193,20 @@ extension ContentView {
         panel.nameFieldStringValue = "\(base).\(format.fileExtension)"
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        // Click logic runs in the exported page only if asked (ADR 0007).
+        var allowLogic = false
+        if format == .player, !(model.logic ?? "").isEmpty {
+            let alert = NSAlert()
+            alert.messageText = "Let the exported page run this page's click logic?"
+            alert.informativeText = "Its handlers run in a sealed sandbox with no access to the page, the network or the clock. "
+                + "Without it, clicks do their own Set and Toggle. The engine adds about 850 KB."
+            alert.addButton(withTitle: "Allow")
+            alert.addButton(withTitle: "Don't Allow")
+            allowLogic = alert.runModal() == .alertFirstButtonReturn
+        }
         Task.detached(priority: .userInitiated) {
             let failure: String?
-            do { try format.write(model, to: url); failure = nil } catch { failure = error.localizedDescription }
+            do { try format.write(model, to: url, allowLogic: allowLogic); failure = nil } catch { failure = error.localizedDescription }
             await MainActor.run {
                 guard let failure else { return }
                 Alerts.show("Couldn't export the animation", failure)

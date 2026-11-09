@@ -48,7 +48,7 @@ struct ClickSection: View {
             }
             .help("On the web, a click flips these page variables without stopping the animation")
             CommitField(label: "Shown when", prompt: "e.g. !down", value: sharedWhen ?? "",
-                        problem: { (try? PageState.checked($0)) == nil ? "Variable names, each optionally after !, joined by && or ||." : nil }) { text in
+                        problem: { (try? PageState.checked($0)) == nil ? "An expression over variables, like down, !down && east or count >= 3." : nil }) { text in
                 edit(text.isEmpty ? "Always Show" : "Show When") { $0.when = try? PageState.checked(text) }
             }
             .help("Drawn only while this holds; exports and previews use the variables' starting values")

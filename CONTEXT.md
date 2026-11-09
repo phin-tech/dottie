@@ -86,12 +86,19 @@ A scene the players don't stop at: on reaching its end they go back to its start
 _Avoid_: loop marker, hold
 
 **Variable**:
-A named true-or-false value on a page (`variables`) that clicks set or toggle without touching the playhead.
+A named value on a page (`variables`), true or false or a number, that clicks set, compute or toggle without
+touching the playhead (ADR 0007).
 _Avoid_: state flag, toggle (that is what a click does to one)
 
 **Condition**:
-An element's `when`: variable names joined by `!`, `&&` and `||`; the element is drawn only while it holds.
+An element's `when`: an expression over variables (`down`, `east && !west`, `count >= 3`); the element is drawn
+only while it holds. The expressions are a small language with no loops or code (ADR 0007).
 _Avoid_: rule, predicate, visibility expression
+
+**Logic**:
+A page's JavaScript handlers that a click can **run** (ADR 0007): each gets the variables and the click and
+returns new values, sealed and only where allowed. The only code a drawing carries.
+_Avoid_: script (that's `run_script`, which edits a drawing), macro
 
 **Override**:
 A change to one element while a condition holds (`overrides`): dimmed, relabelled, recolored, or a packet rerouted.

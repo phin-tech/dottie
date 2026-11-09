@@ -41,6 +41,7 @@ RENDER
       --clean           Render precisely instead of sketchy.
       --sketchy         Render sketchy even if the drawing is clean.
       --transparent     No page background (png, apng, svg, html, lottie).
+      --allow-logic     html, js: let the page's click logic run (it carries the engine, about 850 KB).
       --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
                         unless set). An html export becomes a still; gif, apng, mp4 and lottie ignore it.
       --state <vars>    Starting values for the page's variables, like down=true,east=false (a bare name
@@ -126,16 +127,18 @@ struct RenderOptions {
     var scale = 2.0
     var roughness: Double?
     var transparent = false
+    /// HTML and js: let the page's click logic run (ADR 0007).
+    var allowLogic = false
     var at: Double?
     var lottieMode = Exporter.LottieMode.smooth
     /// Read the file on disk even when the app has it open with unsaved edits.
     var disk = false
     /// Starting values for the page's variables (`--state`), so the render shows that state.
-    var state: [String: Bool] = [:]
+    var state: [String: Var] = [:]
 }
 
 /// `--state down=true,east=false` (or `down,!east`), merged into `into`.
-func parseState(_ spec: String, into: inout [String: Bool]) throws {
+func parseState(_ spec: String, into: inout [String: Var]) throws {
     do { into.merge(try PageState.assignments(spec)) { _, new in new } }
     catch { throw CLIError(message: "--state: \(error)", code: 2) }
 }
@@ -186,6 +189,7 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--clean": o.roughness = 0
         case "--sketchy": o.roughness = 1
         case "--transparent": o.transparent = true
+        case "--allow-logic": o.allowLogic = true
         case "--disk": o.disk = true
         case "--state": try parseState(try value(a), into: &o.state)
         case "--lottie-mode":
@@ -224,7 +228,7 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
     if format == .js {
         // The drawing goes in as it is; the player poses it, so --at and --clean become its attributes.
         guard !doc.elements.isEmpty else { throw CLIError(message: "the drawing is empty; nothing to render") }
-        return Data(try Exporter.script(doc, options: Exporter.ScriptOptions(at: o.at, clean: o.roughness == 0)).utf8)
+        return Data(try Exporter.script(doc, options: Exporter.ScriptOptions(at: o.at, clean: o.roughness == 0, allowLogic: o.allowLogic)).utf8)
     }
     let plays = format == .gif || format == .apng || format == .mp4 || format == .lottie || (format == .html && (doc.timeline != nil || doc.usesState) && o.at == nil)
     var doc = plays ? doc : o.at.map(doc.resolved) ?? doc.still
@@ -247,7 +251,7 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
         return Data(Exporter.svg(doc, background: o.transparent ? nil : white).utf8)
     case .html:
         if plays {
-            guard let page = Exporter.player(doc, title: title) else { throw CLIError(message: "rendering failed") }
+            guard let page = Exporter.player(doc, title: title, allowLogic: o.allowLogic) else { throw CLIError(message: "rendering failed") }
             return Data(page.utf8)
         }
         return Data(Exporter.html(doc, title: title, background: o.transparent ? nil : white).utf8)
@@ -342,7 +346,7 @@ func runRender(_ args: [String]) -> Int32 {
 }
 
 func runInspect(_ args: [String]) -> Int32 {
-    var input: String?, page: String?, times: [Double] = [], disk = false, state: [String: Bool] = [:]
+    var input: String?, page: String?, times: [Double] = [], disk = false, state: [String: Var] = [:]
     var i = 0
     while i < args.count {
         let a = args[i]
@@ -388,7 +392,7 @@ func runInspect(_ args: [String]) -> Int32 {
 
 func runSimulate(_ args: [String]) -> Int32 {
     enum Step { case click(String), wait(Double), next, snapshot(String) }
-    var input: String?, page: String?, scene: String?, disk = false, state: [String: Bool] = [:], scale: Double?
+    var input: String?, page: String?, scene: String?, disk = false, state: [String: Var] = [:], scale: Double?
     var records: [String] = []
     var steps: [Step] = []
     var i = 0

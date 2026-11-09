@@ -25,6 +25,8 @@ import { planInWorker, plansInWorker } from "./planner.ts";
 import { pageTheme } from "./theme.ts";
 import { applyClick } from "./state.ts";
 import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
+import type { Var } from "./expression.ts";
+import { logicEngine } from "./logic-loader.ts";
 
 const WHITE: RGBA = { r: 1, g: 1, b: 1, a: 1 };
 
@@ -68,7 +70,7 @@ export class Playback {
   /** Whether each scene loops (Marker.loop). */
   readonly sceneLoops: boolean[];
   /** The page's variables now: their starting values until clicks change them. */
-  state: Record<string, boolean>;
+  state: Record<string, Var>;
   /** When the variables last changed (performance.now() milliseconds): backlog piles up from then (ADR 0003). */
   stateSince = typeof performance === "undefined" ? 0 : performance.now();
   /** A still (the `at` attribute): backlog is drawn for the page time, not the wall clock. */
@@ -331,7 +333,7 @@ function cleanCopy(page: Page): Page {
 const ElementBase: typeof HTMLElement = typeof HTMLElement === "undefined" ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
 export class DottiePlayer extends ElementBase {
-  static observedAttributes = ["src", "page", "at", "clean", "no-controls", "label"];
+  static observedAttributes = ["src", "page", "at", "clean", "no-controls", "label", "allow-logic"];
 
   file: DottieFile | null = null;
   playback: Playback | null = null;
@@ -572,7 +574,10 @@ export class DottiePlayer extends ElementBase {
       this.scheduleReplay();
     }
     if (!click) return;
-    if (click.set || click.toggle || click.reset) {
+    if (click.run && p.page.logic && this.hasAttribute("allow-logic")) {
+      // Logic the page may run (ADR 0007): in its sandbox, on this click alone; a failure leaves the state as it was.
+      this.runLogic(click.run, id, click.reset === true);
+    } else if (click.set || click.toggle || click.reset) {
       this.setState(applyClick({ scene: null, url: null, set: click.set ?? null, toggle: click.toggle ?? null, reset: click.reset ?? null },
         p.state, p.page.variables ?? {}));
     }
@@ -594,11 +599,35 @@ export class DottiePlayer extends ElementBase {
     }
   }
 
+  /** Runs handler `handler` from the page's logic for a click on `id` (DottieDocument.clicked). Clicks take turns, so
+   * each handler sees the state the one before left. */
+  private logicQueue: Promise<void> = Promise.resolve();
+  private runLogic(handler: string, id: string, reset: boolean): void {
+    const p = this.playback;
+    if (!p) return;
+    const e = p.page.elements.find((x) => x.id === id);
+    const s = p.sceneAt(p.frame);
+    const event = { id, anchor: e?.anchor ?? null, text: e?.text?.split("\n")[0] ?? null, time: this.currentTime,
+      scene: s < 0 ? null : p.sceneNames[s] };
+    this.logicQueue = this.logicQueue.then(async () => {
+      const engine = await logicEngine();
+      const now = this.playback;
+      if (!now || now !== p || !now.page.logic) return;
+      let start = now.state;
+      if (reset) { start = {}; for (const k of Object.keys(now.state)) start[k] = false; Object.assign(start, now.page.variables ?? {}); }
+      const r = engine.runLogic(now.page.logic, handler, start, event);
+      if (r.ok) this.setState({ ...start, ...r.set });
+      else this.dispatchEvent(new CustomEvent("logicerror", { detail: { element: id, handler, error: r.error } }));
+    }).catch((err: Error) => {
+      this.dispatchEvent(new CustomEvent("logicerror", { detail: { element: id, handler, error: err.message } }));
+    });
+  }
+
   /** The page's variables now. */
-  get variables(): Record<string, boolean> { return { ...(this.playback?.state ?? {}) }; }
+  get variables(): Record<string, Var> { return { ...(this.playback?.state ?? {}) }; }
 
   /** Gives the page's variables these values (the others keep theirs), redraws, and fires `state`. */
-  setState(values: Record<string, boolean>): void {
+  setState(values: Record<string, Var>): void {
     const p = this.playback;
     if (!p) return;
     const next = { ...p.state, ...values };

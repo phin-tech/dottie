@@ -610,7 +610,7 @@ public enum DiagramOps {
         /// For a connector: what a flow's traffic pays to take it, when not 1.
         public var cost: Double? = nil
         /// The page variables a click sets and flips, and the condition the element is drawn under.
-        public var clickSet: [String: Bool]? = nil
+        public var clickSet: [String: ClickValue]? = nil
         public var clickToggle: [String]? = nil
         public var when: String? = nil
         /// Its overrides, one line each: "down: opacity 0.3, text …, reroutes 1".

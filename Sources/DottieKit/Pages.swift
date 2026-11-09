@@ -15,7 +15,14 @@ public struct DottieFile: Codable, Equatable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(version, forKey: .version)
+        // Number variables and computed clicks (ADR 0007) are what version 3 adds; without them a file stays as
+        // readable by older Dottie as it was.
+        let new = pages.contains { p in
+            p.logic != nil || p.elements.contains { $0.click?.run != nil }
+                || (p.variables ?? [:]).values.contains(where: \.isNumber)
+                || p.elements.contains { ($0.click?.set ?? [:]).values.contains(where: \.isNew) }
+        }
+        try c.encode(max(version, new ? 3 : 2), forKey: .version)
         try c.encode(pages, forKey: .pages)
         // Each distinct picture once, keyed by digest; elements refer to it (see `EmbeddedImage`).
         if encoder.userInfo[.dottieImages] != nil {

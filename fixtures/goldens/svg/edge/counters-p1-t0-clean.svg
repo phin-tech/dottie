@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="548" height="468" viewBox="16 16 548 468">
+<rect x="16" y="16" width="548" height="468" fill="#ffffff"/>
+<path d="M40 40 L180 40 L180 100 L40 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="110" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="110" y="76.48">+1</tspan></text>
+<path d="M220 40 L360 40 L360 100 L220 100 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="290" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="290" y="76.48">next stage</tspan></text>
+<path d="M220 280 L360 280 L360 340 L220 340 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="290" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="290" y="316.48">open is 1</tspan></text>
+<path d="M40 400 L260 400 L260 460 L40 460 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="150" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="150" y="436.48">Clicked 0 times</tspan></text>
+<path d="M300 400 L540 400 L540 460 L300 460 Z" fill="none" stroke="#1f1f21" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="420" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="18" fill="#1f1f21" text-anchor="middle"><tspan x="420" y="436.48">0 thirds, true, {nope}, {x + }</tspan></text>
+</svg>

@@ -10,8 +10,11 @@ extension Exporter {
         public var noAutoplay = false
         public var noLoop = false
         public var label: String?
-        public init(at: Double? = nil, clean: Bool = false, label: String? = nil) {
-            self.at = at; self.clean = clean; self.label = label
+        /// Lets the page's click logic run (ADR 0007): the player gets `allow-logic`, and the engine goes in too.
+        /// Without it a click does its own `set` and `toggle`.
+        public var allowLogic = false
+        public init(at: Double? = nil, clean: Bool = false, label: String? = nil, allowLogic: Bool = false) {
+            self.at = at; self.clean = clean; self.label = label; self.allowLogic = allowLogic
         }
     }
 
@@ -30,6 +33,8 @@ extension Exporter {
         if options.noAutoplay { attrs.append(("no-autoplay", "")) }
         if options.noLoop { attrs.append(("no-loop", "")) }
         if let label = options.label { attrs.append(("label", label)) }
+        let logic = options.allowLogic && !(doc.logic ?? "").isEmpty
+        if logic { attrs.append(("allow-logic", "")) }
         let optionsJSON = "{" + attrs.map { "\(jsonString($0.0)):\(jsonString($0.1))" }.joined(separator: ",") + "}"
         // The bundled fonts the page uses, each face as base64, so the file shows them anywhere.
         var fonts: [String: [String: String]] = [:]
@@ -37,7 +42,8 @@ extension Exporter {
         let fontEncoder = JSONEncoder()
         fontEncoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let fontsJSON = String(decoding: try fontEncoder.encode(fonts), as: UTF8.self)
-        return PlayerScript.runtime + "\n"
+        // With logic, the engine first, so the player finds it on the page (logic-loader.ts).
+        return (logic ? PlayerScript.logic + "\n" : "") + PlayerScript.runtime + "\n"
             + PlayerScript.loader.replacingOccurrences(of: "DOTTIE_DATA", with: scriptSafe(data))
                 .replacingOccurrences(of: "DOTTIE_OPTIONS", with: scriptSafe(optionsJSON))
                 .replacingOccurrences(of: "DOTTIE_FONTS", with: scriptSafe(fontsJSON)) + "\n"

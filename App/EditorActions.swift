@@ -50,12 +50,12 @@ enum AnimationExportFormat: CaseIterable {
     }
     /// Draws `model`'s animation in this format and writes it to `url`. Slow for long animations: call it off
     /// the main thread.
-    func write(_ model: DottieDocument, to url: URL) throws {
+    func write(_ model: DottieDocument, to url: URL, allowLogic: Bool = false) throws {
         let data: Data? = switch self {
         case .gif: Exporter.gif(model, scale: 1.5)
         case .apng: Exporter.apng(model, scale: 1.5)
         case .mp4: Exporter.mp4(model, scale: 2)
-        case .player: Exporter.player(model, title: model.name).map { Data($0.utf8) }
+        case .player: Exporter.player(model, title: model.name, allowLogic: allowLogic).map { Data($0.utf8) }
         case .lottieSmooth: Exporter.lottie(model, mode: .smooth, name: model.name)
         case .lottieExact: Exporter.lottie(model, mode: .exact, name: model.name)
         }

@@ -70,8 +70,8 @@ extension DiagramOps {
         for e in doc.elements {
             let conditions = (e.when.map { [$0] } ?? []) + (e.overrides ?? []).map(\.when)
             for c in conditions {
-                for term in c.components(separatedBy: "||").flatMap({ $0.components(separatedBy: "&&") }) {
-                    guard let m = PageState.metricTerm(term), !exists(m.target), seen.insert(m.target).inserted else { continue }
+                for m in Expr.parse(c)?.metrics ?? [] {
+                    guard !exists(m.target), seen.insert(m.target).inserted else { continue }
                     var line = "`\(m.metric)(\(m.target))` names no element's anchor (or element or flow id), so it never holds"
                     if let s = similar(m.target, in: Array(anchors)) { line += ". Did you mean `\(s)`?" }
                     out.append(line)

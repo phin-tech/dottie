@@ -37,7 +37,7 @@ public struct Flow: Codable, Equatable, Sendable, Identifiable {
     }
 
     /// The volume it carries with these variable values (nil: its own).
-    func amount(_ values: [String: Bool]?) -> Double {
+    func amount(_ values: [String: Var]?) -> Double {
         guard let values, let list = overrides else { return amount }
         let v = list.last { $0.volume != nil && !PageState.mentionsMetric($0.when) && PageState.holds($0.when, in: values) }?.volume
         return v.map { min(max($0.isFinite ? $0 : 1, 0), 1e12) } ?? amount

@@ -2,6 +2,7 @@
 // damaged or hand-written file means the same thing in both. Anything dottie.js doesn't know (a newer kind,
 // fill or field) is kept and reported through `warnings` instead of failing the whole file.
 
+import type { Var } from "./expression.ts";
 import { isName } from "./state.ts";
 import { resolvingPalette } from "./theme.ts";
 
@@ -35,6 +36,9 @@ export interface Style {
   /** Which colors are palette colors, by name (ADR 0005); set from the page's palette when it is read. */
   named?: ColorNames | null;
 }
+
+/** What a click gives a variable (ClickValue): a value, or an expression over the state before the click. */
+export type ClickValue = Var | string;
 
 /** Palette names for an element's colors (Theme.swift's ColorNames). */
 export interface ColorNames { fill: string | null; stroke: string | null; textColor: string | null }
@@ -70,9 +74,11 @@ export interface EmbeddedImage { data: string; format: string }
 /** What clicking an element does in a played drawing: a scene to jump to and play on from, or a link; and page
  * variables to set and flip (ClickAction.set, .toggle), which change what shows without touching the playhead. */
 export interface ClickAction {
-  scene: string | null; url: string | null; set: Record<string, boolean> | null; toggle: string[] | null;
+  scene: string | null; url: string | null; set: Record<string, ClickValue> | null; toggle: string[] | null;
   /** Puts every page variable back to its starting value first. */
   reset?: boolean | null;
+  /** A handler in the page's `logic` to run (ADR 0007); where logic may not run, `set` and `toggle` stand in. */
+  run?: string | null;
 }
 /** How a clickable element looks under the pointer or with keyboard focus; null keeps its own. */
 /** A change to an element while `when` holds (StateOverride): a field left null keeps the element's own. */
@@ -217,12 +223,14 @@ export interface Page {
   layers: Layer[];
   elements: Element[];
   theme: string | null;
+  /** JavaScript defining the handlers clicks `run` (ADR 0007), run only on clicks, sealed, where allowed. */
+  logic?: string | null;
   /** A theme of the page's own (ADR 0005), in place of `theme`. */
   customTheme?: CustomTheme | null;
   timeline: Timeline | null;
   symbols: Symbol[] | null;
   /** The page's variables and their starting values (DottieDocument.variables). */
-  variables: Record<string, boolean> | null;
+  variables: Record<string, Var> | null;
   /** Traffic routed over the connectors drawn in each frame (DottieDocument.flows; see flows.ts). */
   flows: Flow[] | null;
 }
@@ -268,7 +276,7 @@ export interface DottieFile {
 }
 
 /** The newest file version this library was written for. Newer files still load, with a warning. */
-export const SUPPORTED_VERSION = 2;
+export const SUPPORTED_VERSION = 3;
 export const KINDS: readonly string[] = ["rectangle", "ellipse", "diamond", "text", "connector", "freehand", "path", "note", "image", "symbol"];
 const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "hold", "spring", "bounce", "elastic"];
 
@@ -276,7 +284,7 @@ const EASES: readonly string[] = ["linear", "easeIn", "easeOut", "easeInOut", "h
  * in a file is newer than this version and is reported in `warnings`. */
 export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
-  page: ["id", "name", "layers", "elements", "theme", "customTheme", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
+  page: ["id", "name", "layers", "elements", "theme", "customTheme", "logic", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
   flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume", "overrides"],
   flowOverride: ["when", "volume"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
@@ -307,7 +315,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   repeat: ["start", "end", "count"],
   cameraKey: ["t", "x", "y", "width", "height", "ease"],
   marker: ["t", "name", "loop"],
-  click: ["scene", "url", "set", "toggle", "reset"],
+  click: ["scene", "url", "set", "toggle", "reset", "run"],
   hover: ["stroke", "fill", "opacity"],
   override: ["when", "stroke", "fill", "textColor", "opacity", "strokeWidth", "dash", "text", "reroute", "offline", "cost", "capacity", "delay"],
 };
@@ -569,10 +577,10 @@ class Reader {
     return { id, shape, version, params };
   }
 
-  variables(v: unknown): Record<string, boolean> | null {
+  variables(v: unknown): Record<string, Var> | null {
     if (!isObj(v)) return null;
-    const out: Record<string, boolean> = {};
-    for (const [k, b] of Object.entries(v)) if (typeof b === "boolean") out[k] = b;
+    const out: Record<string, Var> = {};
+    for (const [k, b] of Object.entries(v)) if (typeof b === "boolean" || (typeof b === "number" && Number.isFinite(b))) out[k] = b;
     return Object.keys(out).length > 0 ? out : null;
   }
 
@@ -583,15 +591,19 @@ class Reader {
     const safe = url === undefined ? null : allowedURL(url);
     if (url !== undefined && safe === null) this.warn("Skipped a click link that isn't http, https or mailto");
     // As DottieKit reads them: names that aren't variable names are dropped, and one toggle may stand alone.
-    let set: Record<string, boolean> | null = null;
+    let set: Record<string, ClickValue> | null = null;
     if (isObj(v.set)) {
       set = {};
-      for (const [k, b] of Object.entries(v.set)) if (typeof b === "boolean" && isName(k)) set[k] = b;
+      for (const [k, b] of Object.entries(v.set)) {
+        if (isName(k) && (typeof b === "boolean" || typeof b === "string" || (typeof b === "number" && Number.isFinite(b)))) set[k] = b;
+      }
       if (Object.keys(set).length === 0) set = null;
     }
     const raw = typeof v.toggle === "string" ? [v.toggle] : Array.isArray(v.toggle) && v.toggle.every((x) => typeof x === "string") ? v.toggle as string[] : null;
     const toggle = raw ? raw.filter(isName) : null;
-    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null, reset: v.reset === true ? true : null };
+    const run = str(v.run);
+    return { scene: str(v.scene) ?? null, url: safe, set, toggle: toggle && toggle.length > 0 ? toggle : null, reset: v.reset === true ? true : null,
+      run: run !== undefined && isName(run) ? run : null };
   }
 
   playback(v: unknown): SymbolPlayback | null {
@@ -753,6 +765,7 @@ class Reader {
       elements: (Array.isArray(v.elements) ? v.elements : []).map((e) => this.element(e, images)).filter((e): e is Element => e !== null),
       theme: str(v.theme) ?? null,
       customTheme: this.customTheme(v.customTheme),
+      logic: typeof v.logic === "string" && v.logic.length > 0 ? v.logic : null,
       timeline: this.timeline(v.timeline),
       symbols: Array.isArray(v.symbols) ? v.symbols.map((x) => this.symbol(x, images)).filter((x): x is Symbol => x !== null) : null,
       variables: this.variables(v.variables),

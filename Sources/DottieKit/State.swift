@@ -36,83 +36,58 @@ public enum PageState {
         }
     }
 
-    /// `term` (trimmed) read as a metric comparison, or nil. Without a target (`load >= 1`) it's the element's own.
+    /// `term` (trimmed) read as one metric comparison, `metric(target) op number`, or nil.
     static func metricTerm(_ term: String) -> MetricTerm? {
-        let t = Array(term.trimmingCharacters(in: .whitespaces).unicodeScalars)
-        if !t.contains("("), let op = t.firstIndex(where: { ">=<!".unicodeScalars.contains($0) }) {
-            let name = String(String.UnicodeScalarView(t[..<op])).trimmingCharacters(in: .whitespaces)
-            guard metricNames.contains(name) else { return nil }
-            return metricTerm(name + "() " + String(String.UnicodeScalarView(t[op...]))).map { var m = $0; m.target = ""; return m }
+        guard case .binary(let op, .metric(let m, let t), let right)? = Expr.parse(term),
+              ["<", "<=", ">", ">=", "==", "!="].contains(op) else { return nil }
+        let value: Double
+        switch right {
+        case .literal(.number(let n)): value = n
+        case .negate(.literal(.number(let n))): value = -n
+        default: return nil
         }
-        guard let open = t.firstIndex(of: "("), let close = t.firstIndex(of: ")"), open < close else { return nil }
-        let name = String(String.UnicodeScalarView(t[..<open])).trimmingCharacters(in: .whitespaces)
-        let target = String(String.UnicodeScalarView(t[(open + 1)..<close])).trimmingCharacters(in: .whitespaces)
-        var rest = String(String.UnicodeScalarView(t[(close + 1)...])).trimmingCharacters(in: .whitespaces)
-        guard metricNames.contains(name), !target.contains("(") else { return nil }
-        guard let op = [">=", "<=", "==", "!=", ">", "<"].first(where: { rest.hasPrefix($0) }) else { return nil }
-        rest = String(rest.dropFirst(op.count)).trimmingCharacters(in: .whitespaces)
-        guard isNumber(rest), let value = Double(rest) else { return nil }
-        return MetricTerm(metric: name, target: target, op: op, value: value)
+        return MetricTerm(metric: m, target: t, op: op, value: value)
     }
 
-    /// `-`, digits, and optionally `.` and digits: the numbers a condition writes.
-    private static func isNumber(_ s: String) -> Bool {
-        var u = Substring(s)
-        if u.hasPrefix("-") { u = u.dropFirst() }
-        let parts = u.split(separator: ".", omittingEmptySubsequences: false)
-        guard (1...2).contains(parts.count) else { return false }
-        return parts.allSatisfy { !$0.isEmpty && $0.unicodeScalars.allSatisfy { ("0"..."9").contains($0) } }
-    }
-
-    /// Whether `condition` compares a metric anywhere.
+    /// Whether `condition` reads a metric anywhere.
     public static func mentionsMetric(_ condition: String) -> Bool {
-        condition.components(separatedBy: "||").contains { $0.components(separatedBy: "&&").contains { metricTerm($0) != nil } }
+        !(Expr.parse(condition)?.metrics.isEmpty ?? true)
     }
 
-    /// The variable names `condition` reads, or nil when it isn't one: names, each optionally after `!`, or metric
-    /// comparisons (`load(workers) > 0.9`), joined by `&&` (both) and `||` (either; `&&` binds tighter), as in
-    /// `down`, `!down`, `east && !west || maint`.
+    /// The variable names `condition` reads, or nil when it isn't one (ADR 0007's expressions: `down`, `!down`,
+    /// `east && !west || maint`, `count >= 3`, `load(workers) > 0.9`).
     public static func names(in condition: String) -> [String]? {
-        var out: [String] = []
-        for any in condition.components(separatedBy: "||") {
-            for all in any.components(separatedBy: "&&") {
-                if metricTerm(all) != nil { continue }
-                var term = all.trimmingCharacters(in: .whitespaces)
-                if term.hasPrefix("!") { term = String(term.dropFirst()).trimmingCharacters(in: .whitespaces) }
-                guard isName(term) else { return nil }
-                out.append(term)
-            }
-        }
-        return out
+        Expr.parse(condition)?.names
     }
 
     /// Whether `condition` holds with these values, and `metric` giving the frame's metrics (ADR 0003). A variable
-    /// missing from `state` is false, and so is a comparison whose metric can't be had; a condition that can't be
-    /// read never holds, so a damaged file hides the element rather than showing every state at once.
-    public static func holds(_ condition: String, in state: [String: Bool], metric: ((MetricTerm) -> Double?)? = nil) -> Bool {
-        guard names(in: condition) != nil else { return false }
-        return condition.components(separatedBy: "||").contains { any in
-            any.components(separatedBy: "&&").allSatisfy { all in
-                if let m = metricTerm(all) { return metric?(m).map(m.passes) ?? false }
-                var term = all.trimmingCharacters(in: .whitespaces)
-                var negated = false
-                if term.hasPrefix("!") { negated = true; term = String(term.dropFirst()).trimmingCharacters(in: .whitespaces) }
-                return (state[term] ?? false) != negated
-            }
-        }
+    /// missing from `state` is false, and a comparison with a metric that can't be had fails; a condition that can't
+    /// be read never holds, so a damaged file hides the element rather than showing every state at once.
+    public static func holds(_ condition: String, in state: [String: Var], metric: ((MetricTerm) -> Double?)? = nil) -> Bool {
+        Expr.parse(condition)?.value(state, metric: metric).truthy ?? false
     }
 
     /// `condition` checked for a tool or script: trimmed, nil for "" (no condition), or an error naming the problem.
-    /// Only an override's condition may compare metrics (`metrics`), and then it changes only looks (ADR 0003).
+    /// Only an override's condition may read metrics (`metrics`), and then it changes only looks (ADR 0003).
     public static func checked(_ condition: String, metrics: Bool = false) throws -> String? {
         let c = condition.trimmingCharacters(in: .whitespacesAndNewlines)
         if c.isEmpty { return nil }
-        guard names(in: c) != nil else {
-            throw OpsError.invalid("A condition is variable names, each optionally after !, or metric comparisons like "
-                                   + "load(workers) > 0.9, joined by && or ||, like \"down\" or \"east && !west\"; got '\(condition)'")
+        guard Expr.parse(c) != nil else {
+            throw OpsError.invalid("A condition is an expression over page variables: names, numbers, ! - * / % + -, "
+                                   + "comparisons (< <= > >= == !=), && and ||, parentheses, min/max/abs/floor/ceil/round/clamp "
+                                   + "and metrics like load(workers), e.g. \"down\", \"east && !west\" or \"count >= 3\"; got '\(condition)'")
         }
         if !metrics, mentionsMetric(c) {
             throw OpsError.invalid("Only an override's condition can compare metrics (and then changes only looks); got '\(condition)'")
+        }
+        return c
+    }
+
+    /// `expression` checked as a value a click computes (`set: {count: "count + 1"}`): no metrics.
+    public static func checkedValue(_ expression: String) throws -> String {
+        let c = expression.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let e = Expr.parse(c), e.metrics.isEmpty else {
+            throw OpsError.invalid("A click computes a value from page variables, like \"count + 1\" or \"(stage + 1) % 3\"; got '\(expression)'")
         }
         return c
     }
@@ -123,7 +98,7 @@ public enum StateChoice: Sendable, Equatable {
     /// The variables' starting values: what exports, previews and playback in the editor show.
     case initial
     /// These values; a variable missing from them takes its starting value.
-    case values([String: Bool])
+    case values([String: Var])
     /// Every element, whatever its `when`: what the editor shows while posing, so each state stays editable.
     case all
 }
@@ -135,7 +110,7 @@ extension DottieDocument {
     }
 
     /// The values `choice` gives each variable; nil for `.all`.
-    public func stateValues(_ choice: StateChoice) -> [String: Bool]? {
+    public func stateValues(_ choice: StateChoice) -> [String: Var]? {
         switch choice {
         case .all: return nil
         case .initial: return variables ?? [:]
@@ -150,7 +125,7 @@ extension DottieDocument {
     }
 
     /// Sets a variable's starting value (adding it), or with nil removes it. Returns an error for a bad name.
-    public mutating func setVariable(_ name: String, to value: Bool?) throws {
+    public mutating func setVariable(_ name: String, to value: Var?) throws {
         guard PageState.isName(name) else {
             throw OpsError.invalid("A variable name is a letter or _, then letters, digits or _ (at most \(PageState.maxName)), got '\(name)'")
         }
@@ -162,15 +137,17 @@ extension DottieDocument {
 
 extension ClickAction {
     /// Whether the click sets or flips a variable.
-    public var changesState: Bool { reset == true || !(set ?? [:]).isEmpty || !(toggle ?? []).isEmpty }
+    public var changesState: Bool { reset == true || !(set ?? [:]).isEmpty || !(toggle ?? []).isEmpty || run != nil }
 
     /// `state` after the click: the starting values (`initial`) back if it resets, then its `set` values, then each
     /// `toggle` flipped (a missing variable starts false).
-    public func applied(to state: [String: Bool], initial: [String: Bool] = [:]) -> [String: Bool] {
+    /// Expressions in `set` are worked out from the state before any of them is given (after a reset).
+    public func applied(to state: [String: Var], initial: [String: Var] = [:]) -> [String: Var] {
         var out = state
-        if reset == true { out = state.mapValues { _ in false }.merging(initial) { _, start in start } }
-        for (k, v) in set ?? [:] { out[k] = v }
-        for k in toggle ?? [] { out[k] = !(out[k] ?? false) }
+        if reset == true { out = state.mapValues { _ in .bool(false) }.merging(initial) { _, start in start } }
+        let before = out
+        for k in (set ?? [:]).keys.sorted() { out[k] = set![k]!.value(in: before, current: before[k]) }
+        for k in toggle ?? [] { out[k] = .bool(!(out[k] ?? .bool(false)).truthy) }
         return out
     }
 }
@@ -295,7 +272,7 @@ extension Element {
 
     /// The overrides whose condition holds under `values`, in order; none for nil (`.all`, the editor). Overrides
     /// comparing metrics wait for the frame's metrics (`metricOverrides`).
-    func activeOverrides(_ values: [String: Bool]?) -> [StateOverride] {
+    func activeOverrides(_ values: [String: Var]?) -> [StateOverride] {
         guard let values, let overrides else { return [] }
         return overrides.filter { !PageState.mentionsMetric($0.when) && PageState.holds($0.when, in: values) }
     }

@@ -27,6 +27,8 @@ file system, network or timers, and code is never embedded in documents.
   Like commands, tools get no keyboard shortcut from the manifest.
 - Later: fill styles and connector styles.
 - Out of scope: importers and exporters; shapes regenerated per animation frame; extension code inside documents.
+  (ADR 0007 lets a page carry one kind of code, click logic, run sealed and only where allowed; extension code still
+  never goes in a document.)
 
 **Bundle.** An extension is a folder, `<name>.dottieext/`, in `~/Library/Application Support/Dottie/Extensions/`,
 holding `manifest.json`, `main.js` and an icon. The manifest carries `id` (reverse-DNS), `name`, a semver `version`,

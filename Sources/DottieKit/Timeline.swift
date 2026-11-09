@@ -587,7 +587,9 @@ extension DottieDocument {
         let flowing = !(flows ?? []).isEmpty
         // Gauges and overrides comparing metrics need the frame's metrics, even on a page that doesn't move.
         let measuring = flowing || elements.contains { $0.gauge != nil || $0.overrides?.contains { PageState.mentionsMetric($0.when) } == true }
-        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !measuring ? nil : Timeline(duration: 0)) else { return (self, FrameMetrics()) }
+        // Text showing a variable's value, like "{count} left" (ADR 0007).
+        let filling = values.map { !$0.isEmpty && PageState.fills(elements) } ?? false
+        guard let timeline = timeline ?? (off.isEmpty && active.isEmpty && !measuring && !filling ? nil : Timeline(duration: 0)) else { return (self, FrameMetrics()) }
         let t = Timeline.clampTime(t)
         var copy = self
         copy.timeline = nil   // a frame is a still; resolving it again changes nothing
@@ -619,6 +621,7 @@ extension DottieDocument {
             let e = copy.elements[i]
             if let track = tracks[e.id] { copy.elements[i] = track.apply(to: e, at: t) }
             for o in active[e.id] ?? [] { copy.elements[i] = o.apply(to: copy.elements[i]) }
+            if filling, let values, let text = copy.elements[i].text { copy.elements[i].text = PageState.filling(text, values) }
             // Overrides that hold together: the tightest capacity and the longest delay win (ADR 0003), whatever
             // their order, so "half the workers down" still caps a scaled-out pool.
             if let list = active[e.id] {

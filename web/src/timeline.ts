@@ -14,6 +14,7 @@ import { emptyMetrics, finishing, flowFrame, type FrameMetrics } from "./measure
 import { mentionsMetric } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
 import { dashPattern, outline } from "./shapes.ts";
+import { filling } from "./expression.ts";
 
 export function applyEase(ease: Ease, u: number): number {
   switch (ease) {
@@ -248,7 +249,10 @@ export function posedWithMetrics(page: Page, t: number, state: StateChoice = "in
   const flowing = (page.flows ?? []).length > 0;
   // Gauges and overrides comparing metrics need the frame's metrics, even on a page that doesn't move.
   const measuring = flowing || page.elements.some((e) => e.gauge || (e.overrides ?? []).some((o) => mentionsMetric(o.when)));
-  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !measuring ? null : EMPTY_TIMELINE);
+  // Text showing a variable's value, like "{count} left" (ADR 0007).
+  const fills = values !== null && Object.keys(values).length > 0
+    && page.elements.some((e) => e.text?.includes("{") || (e.overrides ?? []).some((o) => o.text?.includes("{")));
+  const timeline = page.timeline ?? (off.size === 0 && active.size === 0 && !measuring && !fills ? null : EMPTY_TIMELINE);
   if (!timeline) return { frame: page, metrics: emptyMetrics() };
   t = clampTime(t);
   const tracks = trackMap(timeline);
@@ -286,6 +290,7 @@ export function posedWithMetrics(page: Page, t: number, state: StateChoice = "in
     const track = tracks.get(e.id);
     let out = track ? applyTrack(track, e, t) : e;
     for (const o of active.get(e.id) ?? []) out = applyOverride(o, out);
+    if (fills && values && out.text) { const text = filling(out.text, values); if (text !== out.text) out = { ...out, text }; }
     // Overrides that hold together: the tightest capacity and the longest delay win, whatever their order.
     const list = active.get(e.id);
     if (list) {

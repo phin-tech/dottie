@@ -9,6 +9,7 @@ import { Polyline, type Point } from "./path.ts";
 import { applyOverride, holds, looksOnly, mentionsMetric, type MetricTerm } from "./state.ts";
 import { tracing } from "./timeline.ts";
 import { indexOf } from "./connector.ts";
+import type { Var } from "./expression.ts";
 
 /** A connector's or shape's metrics in one frame (ElementMetrics). */
 export interface ElementMetrics { throughput: number; load: number | null; delay: number; backlog: number; inFlight: number; depth: number }
@@ -49,7 +50,7 @@ const TINY = 1e-9;
 const amount = (f: Flow): number => clamp(f.volume, 1, 0, 1e12);
 
 /** The volume a flow carries with these values (Flow.amount(_:)): the last override that holds, else its own. */
-function amountIn(f: Flow, values: Record<string, boolean> | null): number {
+function amountIn(f: Flow, values: Record<string, Var> | null): number {
   if (values === null || !f.overrides) return amount(f);
   let v: number | null = null;
   for (const o of f.overrides) if (o.volume !== null && !mentionsMetric(o.when) && holds(o.when, values)) v = o.volume;
@@ -77,7 +78,7 @@ export const queueKey = (shape: string, flow: string): string => shape + "|" + f
  * and the frame's metrics. `since` is the seconds since the page's state last changed
  * (null: `t`), and `carried` how much each flow's queue held at that moment: since then a queue grows by its
  * backlog, or drains at the room its way on has left. */
-export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
+export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, Var> | null,
   offline: Set<string> = new Set(), sinceChange: number | null = null,
   carried: Record<string, number> = {}): { packets: Element[]; metrics: FrameMetrics; routes: Map<string, FlowRoute[]> } {
   const since = Math.max(0, Math.min(sinceChange ?? t, 1e6));
@@ -399,7 +400,7 @@ export interface Finish { applied: number[]; gauge: { value: number | null } | n
 /** For each of `elements`, the overrides that compare metrics that hold and the reading a gauge shows (easing, over
  * `GAUGE_EASE` seconds since the state changed, from its reading then, `carried`); with no values ("all", the
  * editor), nothing. The readings come back to carry over. */
-export function finishPlan(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
+export function finishPlan(elements: Element[], metrics: FrameMetrics, values: Record<string, Var> | null,
   frame: Page, since = Infinity, carried: Record<string, number> = {}): { plan: Finish[]; readings: Record<string, number> } {
   const lookup = metricLookup(metrics, frame);
   const plan: Finish[] = [], readings: Record<string, number> = {};
@@ -427,7 +428,7 @@ export function finishPlan(elements: Element[], metrics: FrameMetrics, values: R
 
 /** `elements` with the looks of overrides that compare metrics applied, and gauges drawn as plain elements; with
  * no values ("all", the editor), both are left as they are (`finishPlan`). */
-export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, boolean> | null,
+export function finishing(elements: Element[], metrics: FrameMetrics, values: Record<string, Var> | null,
   frame: Page, flows: Flow[], since = Infinity, carried: Record<string, number> = {}): { elements: Element[]; readings: Record<string, number> } {
   const { plan, readings } = finishPlan(elements, metrics, values, frame, since, carried);
   const out: Element[] = [];

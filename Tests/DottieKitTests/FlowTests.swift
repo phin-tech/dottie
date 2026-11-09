@@ -176,7 +176,7 @@ final class FlowTests: XCTestCase {
         let red = try XCTUnwrap(costPage.flows?.first)
         let direct = try XCTUnwrap(costPage.elements.first { $0.connector?.cost == 5 })
         func route(jam: Bool) throws -> Set<UUID> {
-            try XCTUnwrap(self.route(costPage, from: red.from, to: red.to, state: .values(["jam": jam])))
+            try XCTUnwrap(self.route(costPage, from: red.from, to: red.to, state: .values(["jam": .bool(jam)])))
         }
         XCTAssertNotEqual(try route(jam: false), [direct.id])
         XCTAssertEqual(try route(jam: true), [direct.id])   // hub → dst jammed at cost 10: the direct line (5) wins

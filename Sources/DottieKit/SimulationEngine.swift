@@ -35,7 +35,7 @@ final class SimulationEngine: @unchecked Sendable {
 
     private struct Request: Encodable {
         var t: Double
-        var values: [String: Bool]?
+        var values: [String: Var]?
         var offline: [String]
         var since: Double?
         var carried: [String: Double]
@@ -161,7 +161,7 @@ final class SimulationEngine: @unchecked Sendable {
     }
 
     /// One frame of `frame`, the page posed at `t` with its flows still on it; nil if the simulation can't run.
-    func frame(_ frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID>,
+    func frame(_ frame: DottieDocument, at t: Double, values: [String: Var]?, offline: Set<UUID>,
                since: Double?, carried: [String: Double], routes: Bool = false) -> Frame? {
         var page = frame
         // Pictures don't affect traffic, and would cost an encoding.

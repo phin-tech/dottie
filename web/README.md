@@ -56,6 +56,21 @@ when it is showing. The classic script starts the worker from its own source (a 
 loads `dottie-player.min.js` from beside itself, so host the two together. Where a worker can't start, as under a
 `worker-src` policy that refuses it, the player works it out in place as before. Small drawings always do.
 
+**Click logic.** Variables can be numbers, and conditions and clicks are small expressions (`count >= 3`,
+`"count + 1"`, `{count}` in a label). For more, a page can carry `logic`: JavaScript handlers a click `run`s, each
+getting the variables and the click and returning new values. The player runs them only with `allow-logic`:
+
+```html
+<dottie-player src="game.dottie" allow-logic></dottie-player>
+```
+
+Each click's handler runs in a fresh QuickJS sandbox compiled to WebAssembly, never in your page's JavaScript: it has
+no `window`, `document`, network, timers, `Date` or `Math.random`, and a time and memory limit, so the same click on
+the same state gives the same result everywhere. A handler that fails leaves the state as it was and fires
+`logicerror` (with `{element, handler, error}`). Without `allow-logic`, a click does its own `set` and `toggle`
+instead. The engine (`dottie-logic.min.js`, about 850 KB) is loaded from beside the player only when a page with
+logic is clicked, so host it with the player; `dottie-compile --allow-logic` puts it in the compiled script instead.
+
 **Fonts.** Text in Dottie's handwriting fonts (Caveat, Patrick Hand, Architects Daughter; SIL Open Font License)
 is drawn in them: the player loads the ones a drawing uses from `fonts/` beside its own script, as `dist/fonts` on
 npm and the CDNs. If you host the player yourself, copy that folder with it, or call `Dottie.setFontBase(url)`

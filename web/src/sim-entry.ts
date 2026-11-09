@@ -6,10 +6,11 @@
 import { finishPlan, flowFrame, gauge } from "./measure.ts";
 import { parseDottie, type Page, type PathSubpath, type RGBA } from "./model.ts";
 import { applyOverride, looksOnly } from "./state.ts";
+import type { Var } from "./expression.ts";
 
 interface Request {
   t: number;
-  values: Record<string, boolean> | null;
+  values: Record<string, Var> | null;
   offline: string[];
   since: number | null;
   carried: Record<string, number>;

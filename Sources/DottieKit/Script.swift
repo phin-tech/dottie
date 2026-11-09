@@ -243,16 +243,25 @@ public enum DottieScript {
                 return out.isEmpty ? nil : out
             }
 
-            /// Variable names to values, keys as written (`ClickAction.set`).
-            func flags(_ k: String) throws -> [String: Bool]? {
+            /// Variable names to values, keys as written (`ClickAction.set`): true or false, a number, or an
+            /// expression computing one from the state before the click (ADR 0007).
+            func flags(_ k: String) throws -> [String: ClickValue]? {
                 guard let v = raw[Args.normalize(k)] else { return nil }
-                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to true or false") }
-                var out: [String: Bool] = [:]
+                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to values") }
+                var out: [String: ClickValue] = [:]
+                for (name, x) in d { out[name] = try DottieScript.clickValue(x, "\(k).\(name)") }
+                return out
+            }
+            /// Variable names to starting values: true, false or a number.
+            func values(_ k: String) throws -> [String: Var]? {
+                guard let v = raw[Args.normalize(k)] else { return nil }
+                guard let d = v as? [String: Any] else { throw OpsError.invalid("'\(k)' must be an object of variable names to values") }
+                var out: [String: Var] = [:]
                 for (name, x) in d {
-                    guard let n = x as? NSNumber, CFGetTypeID(n) == CFBooleanGetTypeID() else {
-                        throw OpsError.invalid("'\(k).\(name)' must be true or false")
+                    guard case .value(let val) = try DottieScript.clickValue(x, "\(k).\(name)") else {
+                        throw OpsError.invalid("'\(k).\(name)' must be true, false or a number")
                     }
-                    out[name] = n.boolValue
+                    out[name] = val
                 }
                 return out
             }
@@ -431,7 +440,7 @@ public enum DottieScript {
                 var o: [String: Any] = [:]
                 if let s = c.scene { o["scene"] = s }
                 if let u = c.url { o["url"] = u }
-                if let v = c.set { o["set"] = v }
+                if let v = c.set { o["set"] = v.mapValues(\.json) }
                 if let v = c.toggle { o["toggle"] = v }
                 d["click"] = o
             }
@@ -585,7 +594,7 @@ public enum DottieScript {
                 if a.has("click") {
                     let c = a.object("click")
                     click = .some(try DiagramOps.click(scene: c?.string("scene"), url: c?.string("url"),
-                                                       set: try c?.flags("set"), toggle: try c?.names("toggle")))
+                                                       set: try c?.flags("set"), toggle: try c?.names("toggle"), run: c?.string("run")))
                 }
                 var hover: HoverLook?? = nil
                 if a.has("hover") {
@@ -627,6 +636,10 @@ public enum DottieScript {
                                                     roughness: a.roughness, fill: try a.color("fill"), stroke: try a.color("stroke"))
                 try DiagramOps.nameColors(&doc, id: c.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: nil)
                 return describe(try element(c.id))
+
+            case "logic":
+                if a.has("source") { try DiagramOps.setLogic(&doc, a.string("source")) }
+                return ["logic": doc.logic ?? "", "handlers": LogicEngine.handlers(in: doc.logic ?? "")]
 
             case "theme":
                 let custom = a.has("background") || a.has("ink") || a.has("palette") || a.has("name")
@@ -857,15 +870,17 @@ public enum DottieScript {
             case "variable":
                 let name = try a.require("name")
                 if a.has("value") {
-                    guard let v = a.bool("value") else { throw OpsError.invalid("A variable's value must be true or false (null removes it)") }
+                    guard let x = a.raw["value"], case .value(let v) = try DottieScript.clickValue(x, "value") else {
+                        throw OpsError.invalid("A variable's value must be true, false or a number (null removes it)")
+                    }
                     try doc.setVariable(name, to: v)
                 } else {
                     try doc.setVariable(name, to: nil)
                 }
-                return doc.variables ?? [:]
+                return (doc.variables ?? [:]).mapValues(\.json)
 
             case "variables":
-                return doc.variables ?? [:]
+                return (doc.variables ?? [:]).mapValues(\.json)
 
             case "flow":
                 let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
@@ -905,7 +920,7 @@ public enum DottieScript {
 
             case "metrics":
                 let state: StateChoice = a.object("state").map { o in
-                    .values(o.raw.compactMapValues { $0 as? Bool })
+                    .values(o.raw.compactMapValues { x in (try? DottieScript.clickValue(x, "state")).flatMap { if case .value(let v) = $0 { v } else { nil } } })
                 } ?? .initial
                 let m = doc.metrics(at: a.double("at") ?? 0, state: state, since: a.double("since"))
                 var elements: [String: Any] = [:], flows: [String: Any] = [:]
@@ -934,10 +949,7 @@ public enum DottieScript {
                 spec.width = a.double("width"); spec.height = a.double("height")
                 spec.toggles = a.string("toggles"); spec.onText = a.string("onText"); spec.color = try a.color("color")
                 if let s = a.object("sets") {
-                    for (k, v) in s.raw {
-                        guard let b = (v as? NSNumber).map(\.boolValue) else { throw OpsError.invalid("'sets' maps variable names to true or false") }
-                        spec.sets[k] = b
-                    }
+                    for (k, v) in s.raw { spec.sets[k] = try DottieScript.clickValue(v, "sets.\(k)") }
                 }
                 let b = try DiagramOps.addButton(&doc, spec)
                 return describe(try element(b.id))
@@ -1197,6 +1209,7 @@ public enum DottieScript {
         variable: function (name, value) { return call("variable", value === null ? { name: name } : { name: name, value: value === undefined ? false : value }); },
         variables: function () { return call("variables"); },
         theme: function (o) { return call("theme", o || {}); },
+        logic: function (source) { return call("logic", source === undefined ? {} : { source: source === null ? "" : source }); },
         flow: function (from, to, o) {
           return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
         },
@@ -1364,7 +1377,8 @@ public enum DottieScript {
       anchor: a hidden label for finding and linking to the element (never drawn); "" removes it
       click: {scene?, url?, set?, toggle?}: when the drawing plays on the web (HTML export, <dottie-player>), clicking \
     the element jumps to that scene (its name, which dottie.scene returns) and plays on to the next, or opens an http(s) \
-    or mailto link. set: {name: true|false} and toggle: name or [names] change page variables (dottie.variable) without \
+    or mailto link. set: {name: true|false|number|"expression"} (an expression like "count + 1" is worked out from the \
+    state before the click) and toggle: name or [names] change page variables (dottie.variable) without \
     stopping or moving the animation, alone or with a scene or link; null removes the click
       when: a condition on page variables, like "down", "!down" or "east && !west || maint": the element (and the \
     connectors attached to it) is drawn only while it holds; "" or null removes it. Packets, shapes and connectors \
@@ -1434,6 +1448,10 @@ public enum DottieScript {
     holding shapes: it fits round them and moves them when it moves; connectors bind to it like any shape. parent \
     nests it; lanes ("rows" | "columns") makes a swimlane whose children are containers (its lanes). parent on \
     dottie.rect/... and dottie.update puts a shape in one (null takes it out)
+      dottie.logic(source?)  the page's click logic and its handlers; with source, sets it (null removes it). \
+    A handler, function name(state, click) { return {count: state.count + 1}; }, runs when a click with \
+    click: {run: "name"} is clicked: in a sealed sandbox (no page, network, timers, Date or Math.random; a time and \
+    memory limit), only where allowed (<dottie-player allow-logic>, simulate); elsewhere the click's set and toggle
       dottie.theme({theme?, name?, background?, ink?, palette?})  the page's theme and palette ({name: hex}); with \
     options, sets them first (background, ink or palette make the theme the page's own). Colors everywhere also take \
     a palette name ("accent", "muted", "danger", "warning", "success", "info", or the page's own); a fill, stroke or \

@@ -10,7 +10,7 @@ public struct ButtonSpec: Equatable, Sendable {
     /// The variable a click flips; its pressed look shows while the variable is true.
     public var toggles: String?
     /// Variables a click sets; its pressed look shows while they all have these values.
-    public var sets: [String: Bool] = [:]
+    public var sets: [String: ClickValue] = [:]
     /// The label while pressed.
     public var onText: String?
     /// The button's color: its outline and label, and its fill while pressed. Nil is blue.
@@ -48,7 +48,14 @@ extension DiagramOps {
         if let t = spec.toggles {
             on = t
         } else {
-            on = spec.sets.keys.sorted().reduce(nil as String?) { c, k in PageState.joining(c, spec.sets[k]! ? k : "!" + k) } ?? ""
+            // Pressed while what it sets holds: a flag as set, a number equal; a computed value has no pressed look.
+            on = spec.sets.keys.sorted().reduce(nil as String?) { c, k in
+                switch spec.sets[k]! {
+                case .value(.bool(let b)): return PageState.joining(c, b ? k : "!" + k)
+                case .value(.number(let n)): return PageState.joining(c, "\(k) == \(Var.number(n).literal)")
+                case .expression: return c
+                }
+            } ?? ""
         }
         var pressed = StateOverride(when: on, fill: color, textColor: RGBA(r: 1, g: 1, b: 1))
         pressed.text = spec.onText
@@ -73,7 +80,7 @@ extension DiagramOps {
             names.append(n)
         }
         let start = options.firstIndex(of: initial ?? options[0]) ?? 0
-        for (i, n) in names.enumerated() { try doc.setVariable(n, to: i == start) }
+        for (i, n) in names.enumerated() { try doc.setVariable(n, to: .bool(i == start)) }
         let fontSize = 16.0
         let width = options.map { max(defaultSize(for: .rectangle, text: $0, fontSize: fontSize).width, 100) }.max() ?? 100
         var out: [(Element, String)] = []
@@ -83,7 +90,7 @@ extension DiagramOps {
             spec.y = row ? y : y + Double(i) * 50
             spec.width = width
             spec.color = color
-            spec.sets = Dictionary(uniqueKeysWithValues: names.enumerated().map { ($0.element, $0.offset == i) })
+            spec.sets = Dictionary(uniqueKeysWithValues: names.enumerated().map { ($0.element, ClickValue.value(.bool($0.offset == i))) })
             var b = try addButton(&doc, spec)
             // Pressed while its own option is on; the others being off is implied.
             b.overrides = b.overrides?.map { o in var o = o; o.when = names[i]; return o }

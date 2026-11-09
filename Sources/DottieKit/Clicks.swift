@@ -81,19 +81,35 @@ extension DiagramOps {
 
     /// A click from tool or script arguments: a scene name or a link, and variables to set and flip; nil for none of
     /// them ("" for a scene or link is none), which removes it.
-    public static func click(scene: String?, url: String?, set: [String: Bool]? = nil, toggle: [String]? = nil) throws -> ClickAction? {
+    /// `run` names a handler in the page's logic (ADR 0007).
+    public static func click(scene: String?, url: String?, set: [String: ClickValue]? = nil, toggle: [String]? = nil,
+                             run: String? = nil) throws -> ClickAction? {
         for name in Array((set ?? [:]).keys) + (toggle ?? []) where !PageState.isName(name) {
             throw OpsError.invalid("A variable name is a letter or _, then letters, digits or _, got '\(name)'")
         }
+        let run = run.flatMap { $0.isEmpty ? nil : $0 }
+        if let run, !PageState.isName(run) { throw OpsError.invalid("A handler's name is a letter or _, then letters, digits or _, got '\(run)'") }
         let set = (set ?? [:]).isEmpty ? nil : set, toggle = (toggle ?? []).isEmpty ? nil : toggle
-        if let scene, !scene.isEmpty { return ClickAction(scene: scene, set: set, toggle: toggle) }
+        if let scene, !scene.isEmpty { return ClickAction(scene: scene, set: set, toggle: toggle, run: run) }
         if let url, !url.isEmpty {
             guard let ok = ClickAction.allowed(url) else {
                 throw OpsError.invalid("A click link must start with http://, https:// or mailto:, got '\(url)'")
             }
-            return ClickAction(url: ok, set: set, toggle: toggle)
+            return ClickAction(url: ok, set: set, toggle: toggle, run: run)
         }
-        return set == nil && toggle == nil ? nil : ClickAction(set: set, toggle: toggle)
+        return set == nil && toggle == nil && run == nil ? nil : ClickAction(set: set, toggle: toggle, run: run)
+    }
+
+    /// Sets the page's click logic (ADR 0007), or removes it with nil or "". Throws when it is too long or doesn't
+    /// compile; returns the handlers it defines.
+    @discardableResult
+    public static func setLogic(_ doc: inout DottieDocument, _ source: String?) throws -> [String] {
+        let s = source.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        guard let s else { doc.logic = nil; return [] }
+        guard s.count <= 64 * 1024 else { throw OpsError.invalid("A page's logic is at most 64 KB") }
+        if let problem = LogicEngine.shared.check(s) { throw OpsError.invalid("The logic doesn't run: \(problem)") }
+        doc.logic = s
+        return LogicEngine.handlers(in: s)
     }
 
     /// Gives element `id` the condition `when` (see `PageState`); nil or "" removes it.
