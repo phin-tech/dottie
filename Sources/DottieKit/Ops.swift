@@ -105,6 +105,8 @@ public enum DiagramOps {
         public var waypoints: [CGPoint]?
         /// Whether a connector hops over the connectors beneath it.
         public var hops: Bool?
+        /// Whether an elbow connector goes round the shapes in its way.
+        public var avoid: Bool?
         /// What a flow's traffic pays to take a connector; 1 (the default) clears it.
         public var cost: Double?
         /// A shape's or connector's label color; `.some(nil)` goes back to following the stroke.
@@ -112,11 +114,11 @@ public enum DiagramOps {
         public init(fillStyle: FillStyle? = nil, dash: DashStyle? = nil, strokeWidth: Double? = nil, bowing: Double? = nil,
                     startHead: Arrowhead? = nil, endHead: Arrowhead? = nil, rotation: Double? = nil, gridSize: Double? = nil,
                     font: String? = nil, fontSize: Double? = nil, waypoints: [CGPoint]? = nil, hops: Bool? = nil,
-                    textColor: RGBA?? = nil, cost: Double? = nil) {
+                    textColor: RGBA?? = nil, cost: Double? = nil, avoid: Bool? = nil) {
             self.fillStyle = fillStyle; self.dash = dash; self.strokeWidth = strokeWidth; self.bowing = bowing
             self.startHead = startHead; self.endHead = endHead; self.rotation = rotation; self.gridSize = gridSize
             self.font = font; self.fontSize = fontSize; self.waypoints = waypoints; self.hops = hops
-            self.textColor = textColor; self.cost = cost
+            self.textColor = textColor; self.cost = cost; self.avoid = avoid
         }
 
         /// Sets the font and text size, the part of the look a shape's default size depends on.
@@ -142,6 +144,7 @@ public enum DiagramOps {
                 if let endHead { e.connector?.endHead = endHead }
                 if let waypoints { e.connector?.waypoints = waypoints.isEmpty ? nil : waypoints.map(Waypoint.init) }
                 if let hops { e.connector?.hops = hops ? true : nil }
+                if let avoid { e.connector?.avoid = avoid ? true : nil }
                 if let cost, cost.isFinite {
                     let c = min(max(cost, 0), 1_000_000)
                     e.connector?.cost = c == 1 ? nil : c
@@ -226,6 +229,8 @@ public enum DiagramOps {
         let data = ConnectorData(start: try end(from, port.0, portIndex.0), end: try end(to, port.1, portIndex.1),
                                  routing: routing, endArrow: arrow)
         var e = Element(kind: .connector, frame: .zero, style: style, layerID: activeLayerID(&doc), text: label, connector: data)
+        // A new elbow goes round the shapes in its way unless told not to.
+        if routing == .elbow { e.connector?.avoid = true }
         look.apply(to: &e)
         doc.elements.append(e)
         return e
@@ -345,6 +350,8 @@ public enum DiagramOps {
             let c = try addConnector(&doc, from: ids[edge.from]!, to: ids[edge.to]!, routing: routing,
                                      arrow: edge.arrow, port: ports, roughness: roughness, label: edge.label, look: looks[k])
             if let i = doc.elements.lastIndex(where: { $0.id == c.id }) {
+                // The layout has routed it, lanes and labels and all: it goes round shapes only when asked to.
+                if looks[k].avoid != true { doc.elements[i].connector?.avoid = nil }
                 if !bends.isEmpty { doc.elements[i].connector?.waypoints = bends.map { Waypoint($0) } }
                 if let stroke = edge.stroke { doc.elements[i].style.stroke = stroke }
                 doc.elements[i].when = whens[k]
@@ -458,6 +465,8 @@ public enum DiagramOps {
         /// For a connector: the bends it runs through, and whether it hops the lines beneath it.
         public var waypoints: [Waypoint]?
         public var hops: Bool?
+        /// For an elbow connector: whether it goes round the shapes in its way.
+        public var avoid: Bool?
         /// For a connector: what a flow's traffic pays to take it, when not 1.
         public var cost: Double? = nil
         /// The page variables a click sets and flips, and the condition the element is drawn under.
@@ -486,6 +495,7 @@ public enum DiagramOps {
                                   symbol: e.symbol.map { id in doc.symbolIndex[id]?.name ?? id.uuidString },
                                   playback: e.kind == .symbol ? (e.playback ?? .loop).rawValue : nil, args: e.args,
                                   waypoints: e.connector?.waypoints, hops: e.connector?.hops)
+            s.avoid = e.connector?.avoid
             s.clickSet = e.click?.set; s.clickToggle = e.click?.toggle; s.when = e.when
             s.cost = e.connector?.cost
             s.overrides = e.overrides.map { $0.map(\.summary) }

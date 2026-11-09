@@ -349,7 +349,7 @@ public enum DottieScript {
                                 gridSize: double("gridSize"), font: string("font"), fontSize: double("fontSize"),
                                 waypoints: try points("waypoints"), hops: bool("hops"),
                                 textColor: try string("textColor").map { $0.isEmpty ? nil : try color("textColor") },
-                                cost: double("cost"))
+                                cost: double("cost"), avoid: bool("avoid"))
             }
             /// A list of {x, y} points.
             func points(_ k: String) throws -> [CGPoint]? {
@@ -478,6 +478,7 @@ public enum DottieScript {
                 d["routing"] = c.routing.rawValue
                 if let w = c.waypoints { d["waypoints"] = w.map { ["x": $0.x, "y": $0.y] } }
                 if c.hops == true { d["hops"] = true }
+                if c.avoid == true { d["avoid"] = true }
                 if let cost = c.cost { d["cost"] = cost }
                 if let f = c.start.elementID { d["from"] = f.uuidString }
                 if let t = c.end.elementID { d["to"] = t.uuidString }
@@ -1458,7 +1459,8 @@ public enum DottieScript {
     gridSize 8-400 (cell size of a grid fill: a dungeon floor ruled on a page-wide lattice, Dyson hatching around it), \
     strokeWidth 0.5-24, bowing 0-3, rotation degrees, startHead/endHead none|arrow|triangle|dot|bar (connectors), \
     waypoints [{x, y}, ...] (connectors: points the line bends through, start to end; [] removes them), hops true|false \
-    (connectors: a small hop where the line crosses a connector drawn beneath it), cost 0-1000000 (connectors: what \
+    (connectors: a small hop where the line crosses a connector drawn beneath it), avoid true|false (elbow \
+    connectors: go round the shapes in the way instead of through them; dottie.connect turns it on for elbows), cost 0-1000000 (connectors: what \
     flow traffic pays to take the line, default 1; flows take the cheapest route), \
     font (Caveat, Patrick Hand or Architects Daughter: handwriting, embedded in exports; an installed font, named in \
     exports but not embedded; "" for Helvetica Neue), fontSize 4-200, textColor hex (a shape's or connector's label; \

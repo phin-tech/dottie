@@ -402,6 +402,8 @@ extension DottieScript {
             /** Connectors: the bends the line runs through, and whether it hops the lines beneath it. */
             waypoints?: Point[];
             hops?: boolean;
+            /** Elbow connectors: whether the line goes round the shapes in its way. */
+            avoid?: boolean;
             /** Connectors: what a flow's traffic pays to take it, when not 1. */
             cost?: number;
             /** The most flow volume it carries, and a shape's delay in seconds (ADR 0003). */
@@ -444,6 +446,9 @@ extension DottieScript {
             waypoints?: Point[];
             /** Connectors only: a small hop where the line crosses a connector drawn beneath it. */
             hops?: boolean;
+            /** Elbow connectors only: go round the shapes in the way instead of through them. dottie.connect turns it
+             * on for elbows (dottie.build's edges are routed by its layout); false keeps the plain Z or L. */
+            avoid?: boolean;
             /** Connectors only: what a flow's traffic pays to take this line, default 1; flows take the cheapest route. */
             cost?: number;
             /** The most flow volume it carries (a worker pool's throughput, a lane's); what doesn't fit takes the next

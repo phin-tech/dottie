@@ -178,4 +178,34 @@ final class WaypointTests: XCTestCase {
         XCTAssertLessThan(box.minX, 100 - Renderer.hopRadius(2) + 0.5) // the hop bulges out to the left
         XCTAssertEqual(box.minX, 100 - Renderer.hopRadius(2), accuracy: 1)
     }
+    /// An elbow that would cut through a shape goes round it (ElbowRouter); one that wouldn't keeps its plain Z,
+    /// and with waypoints it goes where it is told.
+    func testElbowsGoRoundShapesInTheWay() throws {
+        var doc = DottieDocument()
+        func box(_ y: Double, _ t: String) throws -> Element {
+            try DiagramOps.addShape(&doc, kind: .rectangle, frame: CGRect(x: 0, y: y, width: 120, height: 60), at: .zero,
+                                    text: t, fill: nil, stroke: nil, roughness: 0)
+        }
+        let a = try box(0, "A"), b = try box(140, "B"), c = try box(280, "C")
+        let skip = try DiagramOps.addConnector(&doc, from: a.id, to: c.id, routing: .elbow)
+        let next = try DiagramOps.addConnector(&doc, from: a.id, to: b.id, routing: .elbow)
+        let index = doc.elementIndex
+        let around = Connector.route(of: skip, in: doc, index: index).points
+        XCTAssertEqual(around.first, CGPoint(x: 60, y: 60))
+        XCTAssertEqual(around.last, CGPoint(x: 60, y: 280))
+        XCTAssertFalse(ElbowRouter.crosses(around, b.frame), "\(around)")
+        XCTAssertGreaterThanOrEqual(around.map(\.x).max()!, 120 + ElbowRouter.margin, "it keeps the margin")
+        XCTAssertEqual(skip.connector?.avoid, true, "new elbows go round")
+        XCTAssertEqual(Connector.simplified(Connector.route(of: next, in: doc, index: index).points),
+                       [CGPoint(x: 60, y: 60), CGPoint(x: 60, y: 140)])
+        // B out of the way: straight down again.
+        var moved = doc
+        moved.elements[1].x = 400
+        let i = moved.elements.firstIndex { $0.id == skip.id }!
+        XCTAssertEqual(Connector.simplified(Connector.route(of: moved.elements[i], in: moved).points).count, 2)
+        // Without avoid, through B.
+        moved = doc
+        moved.elements[i].connector?.avoid = nil
+        XCTAssertTrue(ElbowRouter.crosses(Connector.route(of: moved.elements[i], in: moved).points, b.frame))
+    }
 }

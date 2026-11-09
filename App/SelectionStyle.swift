@@ -159,6 +159,12 @@ struct SelectionStyle {
                 })
     }
 
+    /// Whether the selected elbow connectors go round the shapes in their way.
+    var avoid: Binding<Bool> {
+        Binding(get: { selectedConnectors.first?.connector?.avoid == true },
+                set: { on in editConnectors(on ? "Go Round Shapes" : "Go Through Shapes") { $0.avoid = on ? true : nil } })
+    }
+
     var hasBends: Bool { selectedConnectors.contains { $0.connector?.waypoints != nil } }
 
     func removeBends() { editConnectors("Remove Bends") { $0.waypoints = nil } }

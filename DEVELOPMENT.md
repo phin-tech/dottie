@@ -268,7 +268,12 @@ bends). A straight line joins them, a curved one runs a Catmull-Rom curve throug
 angles, adding a corner between any two that are out of line and dropping any that fall into line
 (`Connector.route(through:)`). They stay put when the end shapes move and move with the connector itself, so
 everything that moves a connector's free ends moves them too (`ConnectorData.transformFree`). Switching between
-elbow and the other routings, and `auto_layout`, take them out. A connector with `hops: true` draws a half-circle
+elbow and the other routings, and `auto_layout`, take them out. An elbow without waypoints and with `avoid: true`
+(new elbows get it, from the app, scripts and MCP, except `build_diagram`'s, which its layout routes) keeps its plain Z or L unless that cuts through another shape;
+then `ElbowRouter` routes it over a grid of the padded edges of the shapes in the way, the shortest way with the
+fewest bends, leaving and arriving along the plain route's axes. Text, freehand lines, plain paths, invisible and
+small things (under 24 points: packets, dots) aren't in the way, nor are its own ends or a shape either end sits
+inside; web/src/elbow.ts is the same algorithm, point for point. A connector with `hops: true` draws a half-circle
 hop where it crosses a connector drawn before it on a visible layer (`Renderer.hopCrossings`), measured along
 each straight segment or each cubic of a curve (sampled as the route is), which is cut either side of the
 crossing; crossings within a hop of a bend or of another hop are skipped. Earlier versions open

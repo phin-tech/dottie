@@ -39,6 +39,8 @@ public struct ConnectorData: Codable, Equatable, Sendable {
     public var waypoints: [Waypoint]? = nil
     /// Hops (small arcs) where the line crosses a connector drawn beneath it.
     public var hops: Bool? = nil
+    /// An elbow line goes round the shapes in its way instead of through them (ElbowRouter).
+    public var avoid: Bool? = nil
     /// What traffic pays to take this connector when a flow picks its route (ADR 0002): the cheapest route wins.
     /// Nil is 1; a main path costs less than a backup, a slow link more.
     public var cost: Double? = nil
@@ -47,9 +49,9 @@ public struct ConnectorData: Codable, Equatable, Sendable {
         guard let cost, cost.isFinite else { return 1 }
         return min(max(cost, 0), 1_000_000)
     }
-    private enum CodingKeys: String, CodingKey { case start, end, routing, startHead, endHead, waypoints, hops, cost }
+    private enum CodingKeys: String, CodingKey { case start, end, routing, startHead, endHead, waypoints, hops, avoid, cost }
 
-    // Strict as ever for the line itself; lenient for `hops` and `cost`, which a file of the wrong type loses
+    // Strict as ever for the line itself; lenient for `hops`, `avoid` and `cost`, which a file of the wrong type loses
     // rather than failing the page.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -60,6 +62,7 @@ public struct ConnectorData: Codable, Equatable, Sendable {
         endHead = try c.decodeIfPresent(Arrowhead.self, forKey: .endHead) ?? .arrow
         waypoints = try c.decodeIfPresent([Waypoint].self, forKey: .waypoints)
         hops = (try? c.decodeIfPresent(Bool.self, forKey: .hops)) ?? nil
+        avoid = (try? c.decodeIfPresent(Bool.self, forKey: .avoid)) ?? nil
         cost = ((try? c.decodeIfPresent(Double.self, forKey: .cost)) ?? nil).flatMap { $0.isFinite ? $0 : nil }
     }
 
@@ -252,18 +255,24 @@ public enum Connector {
             // A pinned port decides the axis the connector leaves / arrives along; otherwise use the dominant axis.
             let startV = vertical(c.start.port) ?? !horizontal
             let endV = vertical(c.end.port) ?? !horizontal
+            let plain: [CGPoint]
             switch (startV, endV) {
             case (true, true):
                 let my = a.y + dy / 2
-                return .polyline([a, CGPoint(x: a.x, y: my), CGPoint(x: b.x, y: my), b])
+                plain = [a, CGPoint(x: a.x, y: my), CGPoint(x: b.x, y: my), b]
             case (false, false):
                 let mx = a.x + dx / 2
-                return .polyline([a, CGPoint(x: mx, y: a.y), CGPoint(x: mx, y: b.y), b])
+                plain = [a, CGPoint(x: mx, y: a.y), CGPoint(x: mx, y: b.y), b]
             case (true, false):
-                return .polyline([a, CGPoint(x: a.x, y: b.y), b])
+                plain = [a, CGPoint(x: a.x, y: b.y), b]
             case (false, true):
-                return .polyline([a, CGPoint(x: b.x, y: a.y), b])
+                plain = [a, CGPoint(x: b.x, y: a.y), b]
             }
+            guard c.avoid == true else { return .polyline(plain) }
+            // It goes round the shapes it would cut through (ElbowRouter).
+            let ends = Set([c.start.elementID, c.end.elementID].compactMap { $0 })
+            return .polyline(ElbowRouter.avoiding(plain, from: a, to: b, startVertical: startV, endVertical: endV,
+                                                  in: doc, except: ends))
         }
     }
 

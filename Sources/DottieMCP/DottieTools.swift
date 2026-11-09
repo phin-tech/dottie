@@ -47,6 +47,8 @@ private let lookProps: [String: Value] = [
                           "description": .string("Connectors: canvas points the line bends through, start to end, e.g. [{\"x\":300,\"y\":40}] "
                               + "to route it round something in the way. An elbow line passes through each with right angles. [] removes them")]),
     "hops": prop("boolean", "Connectors: draw a small hop where this line crosses a connector drawn beneath it"),
+    "avoid": prop("boolean", "Elbow connectors: go round the shapes in the way instead of through them (on for new elbow "
+                  + "connectors, except build_diagram's, which its layout routes; false keeps the plain Z or L)"),
     "cost": prop("number", "Connectors: what add_flow traffic pays to take this line, default 1. Flows take the cheapest "
                  + "route, so give a main path a lower cost than its backup (or the backup a higher one)"),
     "text_color": prop("string", "Hex color of a shape's or connector's label; \"\" follows the stroke again. Setting stroke on "
@@ -55,7 +57,7 @@ private let lookProps: [String: Value] = [
 
 /// The look fields a connector takes, for build_diagram's edges.
 private let edgeLookProps = lookProps.filter { ["dash", "stroke_width", "bowing", "start_head", "end_head", "font", "font_size", "hops",
-                                                 "text_color", "cost"].contains($0.key) }
+                                                 "avoid", "text_color", "cost"].contains($0.key) }
 
 /// build_diagram's edge fields: what a connector is made with, and its look.
 private let buildEdgeProps: [String: Value] = {
@@ -232,7 +234,7 @@ private struct Args {
                         rotation: double("rotation"), gridSize: double("grid_size"),
                         font: string("font"), fontSize: double("font_size"), waypoints: try points("waypoints"), hops: bool("hops"),
                         textColor: try string("text_color").map { $0.isEmpty ? nil : try color("text_color") },
-                        cost: double("cost"))
+                        cost: double("cost"), avoid: bool("avoid"))
     }
 
     /// A list of {x, y} points.

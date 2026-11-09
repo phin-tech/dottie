@@ -122,6 +122,31 @@ final class PerformanceTests: XCTestCase {
         XCTAssertLessThan(drawMs, 20_000); XCTAssertLessThan(svgMs, 20_000)
     }
 
+    /// 400 shapes and 300 elbows that go round shapes, most of them across several rows: a frame drawn, every route
+    /// worked out (as a frame's hit test does), and 20 clicks.
+    func testElbowsGoingRoundShapesOnABusyPage() throws {
+        var doc = Self.bigDocument(shapes: 400, strokes: 0)
+        let shapes = doc.elements.filter { $0.kind != .connector }.map(\.id)
+        var rng = SeededRNG(seed: 9)
+        for _ in 0..<300 {
+            let a = shapes[Int(rng.next() % 400)], b = shapes[Int(rng.next() % 400)]
+            guard a != b else { continue }
+            _ = try DiagramOps.addConnector(&doc, from: a, to: b, routing: .elbow)
+        }
+        let index = doc.elementIndex
+        let connectors = doc.elements.filter { $0.kind == .connector }
+        let (_, cold) = time("every route, cold") { for c in connectors { _ = Connector.route(of: c, in: doc, index: index) } }
+        let (_, warm) = time("every route, warm") { for c in connectors { _ = Connector.route(of: c, in: doc, index: index) } }
+        let ctx = CGContext(data: nil, width: 1600, height: 1000, bitsPerComponent: 8, bytesPerRow: 0,
+                            space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        let (_, drawMs) = time("draw everything") { Renderer.draw(doc, in: ctx, background: CGColor(gray: 1, alpha: 1)) }
+        let (_, hitMs) = time("element(at:) x20") {
+            for i in 0..<20 { _ = doc.element(at: CGPoint(x: Double(i) * 97, y: Double(i) * 61)) }
+        }
+        XCTAssertLessThan(cold, 10_000); XCTAssertLessThan(warm, 2_000)
+        XCTAssertLessThan(drawMs, 10_000); XCTAssertLessThan(hitMs / 20, 500) // per click, debug build
+    }
+
     func testLiveDragCostOnAMediumDocument() {
         // What a mouse move costs while dragging in a 1,000 shape drawing: copy the baseline, move
         // the selection, compare and snap against everything else.

@@ -375,6 +375,10 @@ struct Inspector: View {
                 }
                 Toggle("Hop over crossings", isOn: style.hops)
                     .help("Draw a small arc where the line crosses a connector beneath it")
+                if !style.selectedConnectors.isEmpty, style.routing.wrappedValue == .elbow {
+                    Toggle("Go round shapes", isOn: style.avoid)
+                        .help("Route the elbow around the shapes in its way instead of through them")
+                }
                 if !style.selectedConnectors.isEmpty {
                     Button("Remove Bends", action: style.removeBends)
                         .disabled(!style.hasBends)

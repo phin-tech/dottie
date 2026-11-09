@@ -69,7 +69,7 @@ class Page:
         return e["id"]
 
     def connect(self, a, b, routing="straight", start_port=None, end_port=None, start_head="none", end_head="arrow",
-                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None, cost=None):
+                text=None, st=None, free_start=None, free_end=None, waypoints=None, hops=None, layer=None, when=None, overrides=None, cost=None, avoid=None):
         def ep(target, port, free):
             if free is not None:
                 return {"x": free[0], "y": free[1]}
@@ -85,6 +85,8 @@ class Page:
             kw["connector"]["hops"] = hops
         if cost is not None:
             kw["connector"]["cost"] = cost
+        if avoid is not None:
+            kw["connector"]["avoid"] = avoid
         if text:
             kw["text"] = text
         if when is not None:
@@ -496,6 +498,41 @@ def march():
     p.track(widen, [{"t": 0, "strokeWidth": 2}, {"t": 1.5, "strokeWidth": 5}], march=30)
     p.add("rectangle", 40, 180, 100, 60, style=style(dash="dashed", dashOffset=7))   # a still offset
     write(EDGE / "march.dottie", [p])
+
+
+def elbow_around():
+    """Elbow connectors go round the shapes they would cut through (ElbowRouter.swift, web/src/elbow.ts): an edge
+    that skips a rank, one past two shapes in a row and one whose way round leads past a third, with pinned ports;
+    while a frame round both ends, a small dot and a text box are not in the way, and a clear elbow keeps its Z."""
+    p = Page()
+    a = p.add("rectangle", 40, 40, 120, 60, text="A")
+    b = p.add("rectangle", 40, 180, 120, 60, text="B")
+    c = p.add("rectangle", 40, 320, 120, 60, text="C")
+    p.connect(a, b, routing="elbow", avoid=True)
+    p.connect(b, c, routing="elbow", avoid=True)
+    p.connect(a, c, routing="elbow", avoid=True, text="skips B")
+    # Without avoid, the plain line through B.
+    p.connect(a, c, routing="elbow", start_port="left", end_port="left", st=style(dash="dashed"))
+    # Left to right past two in a row, pinned.
+    d = p.add("ellipse", 260, 40, 100, 60, text="D")
+    e = p.add("diamond", 420, 30, 100, 80, text="E")
+    f = p.add("rectangle", 580, 40, 100, 60, text="F")
+    p.connect(d, f, routing="elbow", avoid=True, start_port="right", end_port="left")
+    # Going under one leads past another.
+    g = p.add("rectangle", 260, 200, 100, 60, text="G")
+    h = p.add("rectangle", 420, 190, 100, 80, text="H")
+    i = p.add("rectangle", 420, 300, 140, 40, text="I")
+    j = p.add("rectangle", 600, 200, 100, 60, text="J")
+    p.connect(g, j, routing="elbow", avoid=True, start_port="bottom", end_port="bottom")
+    p.connect(g, j, routing="elbow", avoid=True)
+    # A frame round both ends, a dot and a text box in the way: kept plain.
+    p.add("rectangle", 240, 400, 480, 200, style=style(fill=rgba(0.9, 0.95, 1)))
+    k = p.add("rectangle", 260, 440, 80, 50, text="K")
+    m = p.add("rectangle", 620, 520, 80, 50, text="M")
+    p.add("ellipse", 470, 470, 12, 12, style=style(fill=rgba(0.2, 0.2, 0.2)))
+    p.add("text", 400, 500, 120, 30, text="a caption")
+    p.connect(k, m, routing="elbow", avoid=True)
+    write(EDGE / "elbow-around.dottie", [p])
 
 
 def notes():
@@ -1123,6 +1160,7 @@ def main():
     text_colors()
     state()
     flows()
+    elbow_around()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 

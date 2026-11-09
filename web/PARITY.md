@@ -24,6 +24,7 @@ fixture, so the gap is visible rather than silent.
 | Ports and edge-following, rotated shapes, free ends | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Connectors and labels on outlines (ADR 0001) | Supported | [edge/extensions](../fixtures/edge/extensions.dottie) | Edge-following meets a `.path`'s actual outline, not its box (ray against 16-step flattened curves). Endpoints pinned with `portIndex` attach to the element's `ports`. A path's label goes in its `labelRect`. |
 | Extension shapes as stored (ADR 0001) | Supported | [edge/extensions](../fixtures/edge/extensions.dottie) | Drawn from the stored path with no extension installed. The `extension` field is kept as metadata and nothing runs. Parameters, commands and handles are Dottie-only. |
+| Elbows that go round shapes (`avoid`) | Supported | [edge/elbow-around](../fixtures/edge/elbow-around.dottie) | The same grid router, point for point (`ElbowRouter.swift`, `elbow.ts`). |
 | Waypoints (bends) on every routing, and hops | Supported | [edge/waypoints](../fixtures/edge/waypoints.dottie), [edge/waypoints-symbol](../fixtures/edge/waypoints-symbol.dottie) | Hops need the page, so `connectorParts` takes it; without one a line draws none. |
 | Arrowheads: arrow, triangle, dot, bar | Supported | [edge/connectors](../fixtures/edge/connectors.dottie) | |
 | Label colors (`textColor`, apart from the stroke) | Supported | [edge/text-colors](../fixtures/edge/text-colors.dottie) | Text boxes and notes ignore it, as in Dottie |

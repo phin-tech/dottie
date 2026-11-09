@@ -2,6 +2,7 @@
 
 import { angle, center, frame, rotated, shapeContours, unrotated } from "./element.ts";
 import type { ConnectorData, Element, Endpoint, Page, Port } from "./model.ts";
+import { avoiding } from "./elbow.ts";
 import { type Point, type Rect, bezierPoint, maxX, maxY, midX, midY } from "./path.ts";
 
 export type Index = Map<string, Element>;
@@ -193,16 +194,20 @@ export function route(e: Element, index: Index): Route {
     case "elbow": {
       const startV = vertical(c.start.port) ?? !horizontal;
       const endV = vertical(c.end.port) ?? !horizontal;
+      let plain: Point[];
       if (startV && endV) {
         const my = a.y + dy / 2;
-        return { kind: "polyline", points: [a, { x: a.x, y: my }, { x: b.x, y: my }, b] };
-      }
-      if (!startV && !endV) {
+        plain = [a, { x: a.x, y: my }, { x: b.x, y: my }, b];
+      } else if (!startV && !endV) {
         const mx = a.x + dx / 2;
-        return { kind: "polyline", points: [a, { x: mx, y: a.y }, { x: mx, y: b.y }, b] };
-      }
-      if (startV) return { kind: "polyline", points: [a, { x: a.x, y: b.y }, b] };
-      return { kind: "polyline", points: [a, { x: b.x, y: a.y }, b] };
+        plain = [a, { x: mx, y: a.y }, { x: mx, y: b.y }, b];
+      } else if (startV) plain = [a, { x: a.x, y: b.y }, b];
+      else plain = [a, { x: b.x, y: a.y }, b];
+      if (c.avoid !== true) return { kind: "polyline", points: plain };
+      // It goes round the shapes it would cut through (elbow.ts).
+      const ends = new Set([c.start.elementID, c.end.elementID].filter((x): x is string => x !== null));
+      const routed = avoiding(plain, a, b, startV, endV, index.values(), ends);
+      return { kind: "polyline", points: routed === plain ? plain : simplified(routed) };
     }
   }
 }

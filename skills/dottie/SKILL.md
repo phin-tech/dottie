@@ -39,7 +39,8 @@ user restarts their session before the tools appear. Until then, the command lin
    `out_path` saves the PNG and returns only its path, size and map.
 4. **Fix and look again.** `list_elements` gives the ids that `update_element`, `delete_element` and
    `add_connector` take; `auto_layout` re-ranks a page. An arrow that cuts through a shape can be routed around it
-   with `waypoints` (canvas points it bends through, on `add_connector` or `update_element`), and `hops: true` puts
+   with `waypoints` (canvas points it bends through, on `add_connector` or `update_element`); an elbow connector goes
+   round the shapes in its way by itself (`avoid`, on for new elbows), and `hops: true` puts
    a small arc where it crosses an arrow beneath it. The diagram is done when the latest PNG reads cleanly, with
    every label legible and every arrow's ends clear.
 
