@@ -84,13 +84,15 @@ private let exportStateProp: Value = .object(["type": "object", "additionalPrope
 private let simulateStepItem: Value = .object(["type": "object", "properties": .object([
     "click": .object(["type": "string"]), "wait": .object(["type": "number"]),
     "next": .object(["type": "boolean"]), "snapshot": .object(["type": .array(["string", "boolean"])]),
-    "metrics": .object(["type": "boolean"]),
+    "metrics": .object(["type": "boolean"]), "routes": .object(["type": "boolean"]),
 ])])
 private let simulateStepsProp: Value = .object(["type": "array", "items": simulateStepItem,
     "description": .string("In order. Each is one of {\"click\": element id, its first characters, its text or anchor}, "
         + "{\"wait\": seconds}, {\"next\": true} (the Next button), {\"snapshot\": true} (return a PNG) or "
         + "{\"snapshot\": \"/abs/path.png\"} (also save it) or {\"metrics\": true} (the throughput, load, backlog and "
-        + "transit of what has a capacity, delay or traffic, now)")])
+        + "transit of what has a capacity, delay or traffic, now) or {\"routes\": true} (each flow's ways now: the "
+        + "destination, the connectors with their ids, the share of its volume, the cost, and why a flow reaches "
+        + "nothing; to check traffic in each state takes the path you meant, not a return edge)")])
 private let stateProp: Value = .object(["type": "object", "additionalProperties": .object(["type": "boolean"]),
     "description": .string("Draw the page with its variables (set_variable) at these values instead of their starting "
         + "ones, e.g. {\"down\": true}, to check each state of an interactive page; the others keep their starting values")])
@@ -687,6 +689,12 @@ actor DottieTools {
                 "out_path": prop("string", "Optional absolute path ending in .png to also write the image to"),
                 "at": prop("number", "For an animated page, the second to draw (default its poster frame, the end)"),
                 "state": stateProp,
+                "max_width": prop("number", "Largest image width in pixels: the scale is lowered to fit, e.g. 600 for a "
+                    + "small preview"),
+                "include_image": prop("boolean", "Default true. false (with out_path) saves the image but returns only its "
+                    + "path, size and the element map, keeping the result small"),
+                "elements": prop("string", "The element map returned: full (JSON, the default), compact (one short line "
+                    + "each) or none", enum: ["full", "compact", "none"]),
              ], required: ["path"])),
         Tool(name: "export_mermaid",
              description: "Export the diagram as Mermaid flowchart text: shapes become nodes and attached connectors links "
@@ -1607,9 +1615,19 @@ actor DottieTools {
             var doc = a.double("at").map(page.resolved) ?? page.still
             if let r = a.roughness { doc = doc.withRoughness(r) }
             guard !doc.elements.isEmpty else { throw ToolFailure(message: "The diagram is empty; nothing to render") }
-            let scale = min(max(a.double("scale") ?? 2, 0.25), 4)
+            let includeImage = a.bool("include_image") ?? true
+            guard includeImage || a.string("out_path") != nil else {
+                throw ToolFailure(message: "include_image: false needs an out_path to save the image to")
+            }
+            let listing = a.string("elements") ?? "full"
+            guard ["full", "compact", "none"].contains(listing) else {
+                throw ToolFailure(message: "'elements' must be full, compact or none, got '\(listing)'")
+            }
+            let scale = DiagramOps.exportScale(doc, scale: a.double("scale"), maxWidth: a.double("max_width"))
             guard let png = Exporter.png(doc, scale: scale) else { throw ToolFailure(message: "Rendering failed") }
-            var note = "Rendered \(doc.elements.count) elements"
+            let size = Exporter.bounds(of: doc)
+            var note = "Rendered \(doc.elements.count) elements, \(Int((size.width * scale).rounded()))x\(Int((size.height * scale).rounded())) "
+                + "pixels at scale \((scale * 1000).rounded() / 1000)"
             if a.string("out_path") != nil {
                 let out = try fileURL(a, key: "out_path", ext: "png")
                 try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -1617,8 +1635,12 @@ actor DottieTools {
                 note += ", saved to \(out.path)"
             }
             let map = DiagramOps.annotations(doc, scale: scale)
-            return .init(content: [.png(png),
-                                   .plain(note + "\nElements in the image (pixels from its top-left):\n" + (try json(map)))])
+            switch listing {
+            case "none": break
+            case "compact": note += "\nElements in the image (id kind x,y widthxheight, pixels from its top-left):\n" + DiagramOps.compactAnnotations(map)
+            default: note += "\nElements in the image (pixels from its top-left):\n" + (try json(map))
+            }
+            return .init(content: (includeImage ? [.png(png)] : []) + [.plain(note)])
 
         case "export_mermaid":
             let file = try load(try fileURL(a))
@@ -1802,6 +1824,10 @@ actor DottieTools {
                 let lines = DiagramOps.describeMetrics(sim.doc, at: sim.time, state: .values(sim.state), since: sim.sinceChange,
                                                        carried: sim.carried)
                 log.append("metrics: " + (lines.isEmpty ? "no traffic" : "\n  " + lines.joined(separator: "\n  ")))
+            } else if step.bool("routes") == true {
+                let lines = DiagramOps.describeRoutes(sim.doc, at: sim.time, state: .values(sim.state), since: sim.sinceChange,
+                                                      carried: sim.carried)
+                log.append("routes: " + (lines.isEmpty ? "no flows" : "\n  " + lines.joined(separator: "\n  ")))
             } else if step.raw["snapshot"] != nil, step.bool("snapshot") != false {
                 let picture = sim.picture
                 guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale) else {
@@ -1817,7 +1843,7 @@ actor DottieTools {
                 log.append("\(line): \(sim.summary)")
                 images.append(.png(png))
             } else {
-                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot} or {metrics: true}")
+                throw ToolFailure(message: "Step \(n + 1) must be {click}, {wait}, {next: true}, {snapshot}, {metrics: true} or {routes: true}")
             }
         }
         if let recordURL, let recording = sim.recording {

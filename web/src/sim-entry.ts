@@ -13,6 +13,8 @@ interface Request {
   offline: string[];
   since: number | null;
   carried: Record<string, number>;
+  /** Also send each flow's routes (`simulate`'s routes step). */
+  routes?: boolean;
 }
 
 let current: Page | null = null;
@@ -47,6 +49,9 @@ function frame(request: string): string {
     flows: Object.fromEntries(out.metrics.flows),
     carry: { ...out.metrics.carry, ...readings },
     finish,
+    // Per flow that runs: [goal, [[connector, backwards], ...], amount, waits, cost] for each way it takes.
+    routes: r.routes ? Object.fromEntries([...out.routes].map(([id, list]) =>
+      [id, list.map((w) => [w.goal, w.hops, w.amount, w.waits, w.cost])])) : undefined,
   });
 }
 

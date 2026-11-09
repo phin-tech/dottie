@@ -39,6 +39,7 @@ final class SimulationEngine: @unchecked Sendable {
         var offline: [String]
         var since: Double?
         var carried: [String: Double]
+        var routes: Bool
     }
 
     private struct Response: Decodable {
@@ -49,6 +50,28 @@ final class SimulationEngine: @unchecked Sendable {
         var flows: [String: Flow]
         var carry: [String: Double]
         var finish: [Finish]
+        var routes: [String: [Route]]?
+    }
+
+    /// One way a flow takes: `[goal, [[connector, backwards], ...], amount, waits, cost]`.
+    private struct Route: Decodable {
+        var route: FlowRoute
+        init(from decoder: Decoder) throws {
+            var c = try decoder.unkeyedContainer()
+            func id(_ s: String) throws -> UUID {
+                guard let u = UUID(uuidString: s) else { throw DecodingError.dataCorruptedError(in: c, debugDescription: "not an id") }
+                return u
+            }
+            let goal = try id(try c.decode(String.self))
+            var hops: [(connector: UUID, backwards: Bool)] = []
+            var list = try c.nestedUnkeyedContainer()
+            while !list.isAtEnd {
+                var hop = try list.nestedUnkeyedContainer()
+                hops.append((try id(try hop.decode(String.self)), try hop.decode(Bool.self)))
+            }
+            route = FlowRoute(goal: goal, hops: hops, amount: try c.decode(Double.self), waits: try c.decode(Bool.self),
+                              cost: try c.decode(Double.self))
+        }
     }
 
     /// What finishing does to one element (`finishPlan` in web/src/measure.ts): the overrides comparing metrics whose
@@ -139,11 +162,12 @@ final class SimulationEngine: @unchecked Sendable {
 
     /// One frame of `frame`, the page posed at `t` with its flows still on it; nil if the simulation can't run.
     func frame(_ frame: DottieDocument, at t: Double, values: [String: Bool]?, offline: Set<UUID>,
-               since: Double?, carried: [String: Double]) -> Frame? {
+               since: Double?, carried: [String: Double], routes: Bool = false) -> Frame? {
         var page = frame
         // Pictures don't affect traffic, and would cost an encoding.
         for i in page.elements.indices where page.elements[i].image != nil { page.elements[i].image = nil }
-        let request = Request(t: t, values: values, offline: offline.map(\.uuidString).sorted(), since: since, carried: carried)
+        let request = Request(t: t, values: values, offline: offline.map(\.uuidString).sorted(), since: since, carried: carried,
+                              routes: routes)
         guard let data = try? JSONEncoder().encode(request) else { return nil }
         let text = String(decoding: data, as: UTF8.self)
 
@@ -174,6 +198,9 @@ final class SimulationEngine: @unchecked Sendable {
             metrics.flows[id] = FlowMetrics(volume: m.volume, placed: m.placed, backlog: m.backlog, backup: m.backup, transit: m.transit)
         }
         metrics.carry = response.carry
+        for (key, list) in response.routes ?? [:] {
+            if let id = UUID(uuidString: key) { metrics.routes[id] = list.map(\.route) }
+        }
 
         // A packet's id starts with its flow's first 24 digits (`Flow.packetID`), which gives its look.
         var styles: [Substring: Style] = [:]

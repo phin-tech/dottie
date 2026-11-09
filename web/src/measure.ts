@@ -4,7 +4,7 @@
 // assignment, so a frame stays a pure function of the page, the time and the variables.
 
 import type { Element, Flow, Gauge, Page, PathSubpath, RGBA, Style } from "./model.ts";
-import { clamp, DEFAULT_COLOR, DEFAULT_EVERY, DEFAULT_SIZE, DEFAULT_SPEED, flowTree, packetID, type FlowTree } from "./flows.ts";
+import { clamp, DEFAULT_COLOR, DEFAULT_EVERY, DEFAULT_SIZE, DEFAULT_SPEED, flowTree, packetID, routeCost, type FlowTree } from "./flows.ts";
 import { Polyline, type Point } from "./path.ts";
 import { applyOverride, holds, looksOnly, mentionsMetric, type MetricTerm } from "./state.ts";
 import { tracing } from "./timeline.ts";
@@ -64,6 +64,10 @@ export function delayOf(e: Element): number {
 }
 
 interface Placement { hops: [string, boolean][]; shapes: string[]; goal: string; amount: number; waits?: boolean }
+/** One way a flow's traffic takes in a frame (`flowFrame`'s routes): to `goal` over the connectors `hops`
+ * ([connector, backwards]), carrying `amount` of its volume at a cost of `cost`; `waits` when it goes only as far as
+ * the queue it waits in. */
+export interface FlowRoute { goal: string; hops: [string, boolean][]; amount: number; waits: boolean; cost: number }
 interface Way { line: Polyline; length: number; inside: [number, number, number][]; stretches: [string, number, number][] }
 
 /** The key of a flow's queue at a shape in `FrameMetrics.carry` and `carried` (DottieDocument.queueKey). */
@@ -75,7 +79,7 @@ export const queueKey = (shape: string, flow: string): string => shape + "|" + f
  * backlog, or drains at the room its way on has left. */
 export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: Record<string, boolean> | null,
   offline: Set<string> = new Set(), sinceChange: number | null = null,
-  carried: Record<string, number> = {}): { packets: Element[]; metrics: FrameMetrics } {
+  carried: Record<string, number> = {}): { packets: Element[]; metrics: FrameMetrics; routes: Map<string, FlowRoute[]> } {
   const since = Math.max(0, Math.min(sinceChange ?? t, 1e6));
   const byID = indexOf(frame);
   // Each connector's line, traced once however many ways go along it.
@@ -86,6 +90,8 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     return pts;
   };
   const metrics = emptyMetrics();
+  // The ways each flow that runs takes, for inspecting them (none when it reaches nothing).
+  const routes = new Map<string, FlowRoute[]>();
   for (const e of frame.elements) {
     if (e.kind === "connector" && !e.connector) continue;
     metrics.elements.set(e.id, { throughput: 0, load: null, delay: e.kind !== "connector" ? delayOf(e) : 0, backlog: 0, inFlight: 0, depth: 0 });
@@ -164,6 +170,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     if (flow.when !== null && values !== null && !holds(flow.when, values)) continue;
     const source = byID.get(flow.from);
     const base = source ? baseTree(flow.from) : null;
+    routes.set(flow.id, []);
     if (!source || !base) continue;
     const volume = amountIn(flow, values);
     const fm: FlowMetrics = { volume, placed: 0, backlog: 0, backup: 0, transit: null };
@@ -218,6 +225,8 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
       if (existing) existing[1] += left; else waiting.push([at, left]);
     }
     waitingBy.set(flow.id, waiting);
+    routes.set(flow.id, placements.map((p) => ({ goal: p.goal, hops: p.hops, amount: p.amount, waits: p.waits === true,
+      cost: p.hops.reduce((s, [id]) => s + routeCost(byID.get(id)?.connector?.cost ?? null), 0) })));
 
     // Metrics.
     for (const p of placements) {
@@ -349,7 +358,7 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     if (c === null || !Number.isFinite(c) || !m) continue;
     m.load = c > 0 ? m.throughput / c : 1;
   }
-  return { packets, metrics };
+  return { packets, metrics, routes };
 }
 
 const BLANK: Omit<Element, "id" | "kind" | "layerID" | "x" | "y" | "width" | "height" | "style"> = {

@@ -409,6 +409,28 @@ public enum DiagramOps {
         }
     }
 
+    /// The pixel scale to render `doc` at: `scale` (0.25-4), lowered so the image is at most `maxWidth` pixels wide.
+    public static func exportScale(_ doc: DottieDocument, scale: Double?, maxWidth: Double?) -> Double {
+        var s = min(max(scale ?? 2, 0.25), 4)
+        if let maxWidth, maxWidth >= 1 {
+            let width = Exporter.bounds(of: doc).width
+            if width * s > maxWidth { s = max(0.01, maxWidth / width) }
+        }
+        return s
+    }
+
+    /// `annotations` as one short line each, `id kind x,y wxh "text"`, with whole pixels and the first line of the
+    /// text cut to 40 characters: a fraction of the JSON map's size, for a page with many elements.
+    public static func compactAnnotations(_ list: [Annotation]) -> String {
+        list.map { a in
+            var line = "\(a.id) \(a.kind) \(Int(a.x.rounded())),\(Int(a.y.rounded())) \(Int(a.width.rounded()))x\(Int(a.height.rounded()))"
+            if let t = a.text?.components(separatedBy: "\n").first, !t.isEmpty {
+                line += " \"" + (t.count > 40 ? t.prefix(39) + "…" : t) + "\""
+            }
+            return line
+        }.joined(separator: "\n")
+    }
+
     public struct ElementSummary: Codable, Equatable, Sendable {
         public var id: String
         public var kind: String
