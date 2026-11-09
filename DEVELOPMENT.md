@@ -188,7 +188,10 @@ A `.dottie` file is JSON (sorted keys, pretty-printed, rounded frames, so it dif
 with `version` and `pages`. Each page (`DottieDocument`) has an id, a name, layers, elements, guides and a theme: a built-in's id, or a
 `customTheme` of its own (page color, ink and a palette). A style's `named` says which of its fill, stroke and text
 color are palette colors; they are set from the page's palette when a file is read and whenever the theme changes,
-and a color changed by hand stops being one (ADR 0005, `Theme.swift`, web/src/theme.ts).
+and a color changed by hand stops being one (ADR 0005, `Theme.swift`, web/src/theme.ts). A rectangle with
+`container` data is a container: elements whose `containerID` is its id move with it, it fits round them with its
+title in a band at the top (its `labelRect`), and shapes join or leave it as they are moved in or out; all of it is
+`reconcilingContainers` in `Containers.swift`, run on every commit, MCP tool and script (ADR 0006).
 Element ids are unique across the file, which is what lets a link point at a shape on another page.
 A shape's or connector's label is drawn in its style's `textColor`, or its `stroke` when that is absent
 (`Element.labelColor`); a text box and a note always use their stroke. As in Excalidraw, setting a stroke color clears

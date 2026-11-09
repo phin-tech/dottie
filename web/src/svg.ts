@@ -225,7 +225,7 @@ function svgElement(e: Element, index: Index, labelBackground: RGBA | null, page
         }
       }
       s += `<path d="${outline(e).data()}" fill="none" ${strokeAttrs}/>\n`;
-      if (text) s += e.kind === "note" ? noteMarkup(text, e) : textElement(text, e.kind === "path" ? pathLabelBox(e) : frame(e), e, true);
+      if (text) s += e.kind === "note" ? noteMarkup(text, e) : textElement(text, e.kind === "path" || e.kind === "rectangle" ? pathLabelBox(e) : frame(e), e, true);
       return s;
     }
     default:
@@ -241,7 +241,8 @@ function placeholder(e: Element, strokeAttrs: string): string {
     + textElement(`${e.kind}${e.text ? `: ${e.text}` : ""}`, f, { ...e, style: { ...e.style, fontSize: Math.min(e.style.fontSize, 12) } }, true);
 }
 
-/** Where a path's label is centered: its `labelRect` within the frame, or the whole frame. */
+/** Where a path's or container's label is centered: its `labelRect` within the frame (a container's title band), or
+ * the whole frame. */
 function pathLabelBox(e: Element): Rect {
   const f = frame(e), r = e.labelRect;
   if (!r) return f;

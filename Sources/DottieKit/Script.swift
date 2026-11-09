@@ -104,7 +104,8 @@ public enum DottieScript {
             // An extension shape the script resized reflows rather than stretching; one that can't keeps its path.
             var edited = host.doc
             logs += edited.reflowExtensionShapes(from: doc, using: extensions, includingNew: true)
-            doc = edited
+            // Containers moved take their contents; new and moved shapes join the container they're in (ADR 0006).
+            doc = edited.reconcilingContainers(from: doc)
         }
         return ScriptResult(logs: logs, value: json, error: failure, operations: host.operations)
     }
@@ -478,6 +479,13 @@ public enum DottieScript {
                 d["hover"] = o
             }
             if let layer = doc.layers.first(where: { $0.id == e.layerID }) { d["layer"] = layer.name }
+            if let c = e.containerID { d["parent"] = c.uuidString }
+            if let c = e.container { d["container"] = true; if let l = c.lanes { d["lanes"] = l.rawValue } }
+            if let n = e.style.named {
+                var m: [String: String] = [:]
+                if let f = n.fill { m["fill"] = f }; if let st = n.stroke { m["stroke"] = st }; if let t = n.textColor { m["textColor"] = t }
+                d["named"] = m
+            }
             if let c = e.connector {
                 d["routing"] = c.routing.rawValue
                 if let w = c.waypoints { d["waypoints"] = w.map { ["x": $0.x, "y": $0.y] } }
@@ -552,6 +560,7 @@ public enum DottieScript {
                 if let w = a.string("when") { try DiagramOps.setWhen(&doc, id: e.id, w) }
                 try a.measure(&doc, e.id)
                 try DiagramOps.nameColors(&doc, id: e.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: a.string("textColor"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&doc, id: e.id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
                 return describe(try element(e.id))
 
             case "connector":
@@ -606,7 +615,18 @@ public enum DottieScript {
                 }
                 try a.measure(&doc, id)
                 try DiagramOps.nameColors(&doc, id: id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: a.string("textColor"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&doc, id: id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
                 return describe(try element(id))
+
+            case "container":
+                var frame: CGRect?
+                if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: w, height: h) }
+                let parent = a.string("parent").flatMap { $0.isEmpty ? nil : UUID(uuidString: $0) }
+                let c = try DiagramOps.addContainer(&doc, title: a.string("title"), children: try a.ids("children"), frame: frame,
+                                                    lanes: try a.enumValue("lanes", as: LaneDirection.self), parent: parent,
+                                                    roughness: a.roughness, fill: try a.color("fill"), stroke: try a.color("stroke"))
+                try DiagramOps.nameColors(&doc, id: c.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: nil)
+                return describe(try element(c.id))
 
             case "theme":
                 let custom = a.has("background") || a.has("ink") || a.has("palette") || a.has("name")
@@ -1090,15 +1110,24 @@ public enum DottieScript {
         else for (k in v) out[k] = value(v[k]);
         return out;
       };
-      var kind = function (k) { return function (o) { return call("shape", merge(o, { kind: k })); }; };
+      // A container by element or id; null or "" takes the element out of its container.
+      var parented = function (o) {
+        if (!o || o.parent === undefined) return o;
+        return merge(o, { parent: o.parent === null || o.parent === "" ? "" : idOf(o.parent) });
+      };
+      var kind = function (k) { return function (o) { return call("shape", merge(parented(o), { kind: k })); }; };
       g.dottie = {
         elements: function (filter) { return call("elements", filter); },
         get: function (id) { return call("get", { id: idOf(id) }); },
-        shape: function (o) { return call("shape", o); },
+        shape: function (o) { return call("shape", parented(o)); },
+        container: function (o) {
+          o = parented(o || {});
+          return call("container", o.children === undefined ? o : merge(o, { children: ids(o.children) }));
+        },
         rect: kind("rectangle"), ellipse: kind("ellipse"), diamond: kind("diamond"), text: kind("text"), note: kind("note"),
         connect: function (from, to, o) { return call("connector", merge(o, { from: idOf(from), to: idOf(to) })); },
         update: function (id, changes) {
-          var o = merge(changes, { id: idOf(id) });
+          var o = merge(parented(changes), { id: idOf(id) });
           if (o.link !== undefined) o.link = o.link === null ? "" : idOf(o.link); // null is dropped by the bridge
           if (o.overrides === null) o.overrides = [];
           if (o.capacity === null) o.capacity = "";
@@ -1396,6 +1425,10 @@ public enum DottieScript {
     on the web, elements with a when follow them, and the timeline keeps looping. Exports and previews show the \
     starting values; the editor shows every element while stopped. Inside a symbol, when sees no variables (all false)
       dottie.variables()               {name: startingValue}
+      dottie.container({title?, children?, parent?, lanes?, x?, y?, width?, height?, fill?, stroke?})  a titled box \
+    holding shapes: it fits round them and moves them when it moves; connectors bind to it like any shape. parent \
+    nests it; lanes ("rows" | "columns") makes a swimlane whose children are containers (its lanes). parent on \
+    dottie.rect/... and dottie.update puts a shape in one (null takes it out)
       dottie.theme({theme?, name?, background?, ink?, palette?})  the page's theme and palette ({name: hex}); with \
     options, sets them first (background, ink or palette make the theme the page's own). Colors everywhere also take \
     a palette name ("accent", "muted", "danger", "warning", "success", "info", or the page's own); a fill, stroke or \

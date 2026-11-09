@@ -53,10 +53,10 @@ extension Element {
         return out
     }
 
-    /// Where a shape's own text goes: its `labelRect` when an extension shape gives one, otherwise the frame inset
-    /// by 6 points.
+    /// Where a shape's own text goes: its `labelRect` when an extension shape or a container gives one (a container's
+    /// title band), otherwise the frame inset by 6 points.
     public var labelFrame: CGRect {
-        guard kind == .path, let l = labelRect else { return frame.insetBy(dx: 6, dy: 6) }
+        guard kind == .path || kind == .rectangle, let l = labelRect else { return frame.insetBy(dx: 6, dy: 6) }
         return CGRect(x: frame.minX + l.x * frame.width, y: frame.minY + l.y * frame.height,
                       width: l.width * frame.width, height: l.height * frame.height)
     }

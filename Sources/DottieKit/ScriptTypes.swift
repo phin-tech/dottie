@@ -278,6 +278,20 @@ extension DottieScript {
             ink?: string;
             palette: Record<string, string>;
         }
+        interface ContainerOptions {
+            title?: string;
+            children?: Ref | Ref[];
+            /** A container it goes in. */
+            parent?: Ref;
+            lanes?: "rows" | "columns";
+            x?: number;
+            y?: number;
+            width?: number;
+            height?: number;
+            fill?: Color;
+            stroke?: Color;
+            sketchy?: boolean;
+        }
         interface ThemeOptions {
             /** A built-in to use, "" for none, or where the page's own theme starts from when the others are given. */
             theme?: string;
@@ -393,6 +407,13 @@ extension DottieScript {
         interface Element extends Rect {
             id: string;
             kind: ElementKind;
+            /** The container it is in. */
+            parent?: string;
+            /** It is a container (dottie.container); `lanes` when it is a swimlane. */
+            container?: boolean;
+            lanes?: "rows" | "columns";
+            /** Which of its colors are palette colors, by name. */
+            named?: { fill?: string; stroke?: string; textColor?: string };
             stroke: Color;
             sketchy: boolean;
             strokeWidth: number;
@@ -511,6 +532,8 @@ extension DottieScript {
             anchor?: string;
             /** Drawn only while this holds. */
             when?: Condition;
+            /** The container it goes in. */
+            parent?: Ref;
         }
 
         interface ConnectOptions extends Look {
@@ -530,6 +553,8 @@ extension DottieScript {
         }
 
         interface Changes extends Look {
+            /** Puts it in a container, or takes it out with null. */
+            parent?: Ref | null;
             text?: string;
             x?: number;
             y?: number;
@@ -702,6 +727,11 @@ extension DottieScript {
             /** The page's theme and palette; with options, sets them first. Changing a palette color recolors every
              * shape whose color was given by that name. */
             theme(options?: ThemeOptions): ThemeInfo;
+            /** A container: a titled box holding `children` (shapes or other containers), which fits round them and
+             * moves them when it moves; connectors bind to it like any shape. With `lanes` it is a swimlane, whose
+             * children should be containers (its lanes), stacked as rows or columns. Without children, give x, y,
+             * width and height, and it keeps that size. */
+            container(options?: ContainerOptions): Element;
             /** Writes one variable's whole story: its starting value, the conditions on what it hides and shows, overrides
              * on what it dims, restyles and reroutes, and the clicks that change it. Running it again changes nothing
              * more. Returns a summary. */

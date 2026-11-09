@@ -153,6 +153,15 @@
         "named": { "$ref": "#/$defs/colorNames" }
       }
     },
+    "container": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "On a rectangle: it's a container, a titled box holding the elements whose containerID is its id. Its title band is its labelRect.",
+      "properties": {
+        "fixed": { "type": "boolean", "description": "Keeps the size it was given instead of fitting its contents." },
+        "lanes": { "enum": ["rows", "columns"], "description": "A swimlane: its child containers are its lanes, stacked this way." }
+      }
+    },
     "colorNames": {
       "type": "object",
       "additionalProperties": false,
@@ -226,6 +235,8 @@
         "capacity": { "type": "number", "minimum": 0, "description": "The most flow volume it carries (ADR 0003); what doesn't fit takes the next cheapest route or is backlog. Absent is unlimited." },
         "delay": { "type": "number", "minimum": 0, "description": "A shape's seconds that flow traffic stays inside it when passing through (ADR 0003)." },
         "queue": { "type": "boolean", "description": "A shape that is a queue: traffic that can't go on waits at the nearest one before whatever is full (ADR 0003)." },
+        "containerID": { "$ref": "#/$defs/uuid", "description": "The container this element is in (ADR 0006): it moves with it, and the container fits round it." },
+        "container": { "$ref": "#/$defs/container" },
         "gauge": { "$ref": "#/$defs/gauge" }
       }
     },

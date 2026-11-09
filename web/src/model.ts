@@ -142,6 +142,10 @@ export interface Element {
   delay?: number | null;
   /** A shape that is a queue: backlog waits at the nearest one before whatever is full. */
   queue?: boolean | null;
+  /** The container this element is in (ADR 0006). */
+  containerID?: string | null;
+  /** On a rectangle: it's a container. Its title band is its `labelRect`, kept by the app, so drawing needs nothing more. */
+  container?: { fixed: boolean | null; lanes: "rows" | "columns" | null } | null;
   /** Shows a metric; drawn as plain paths and a label when the page is posed (metrics.ts). */
   gauge?: Gauge | null;
 }
@@ -284,7 +288,8 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   paletteColor: ["name", "color"],
   element: ["id", "kind", "x", "y", "width", "height", "style", "seed", "layerID", "text", "connector", "groupID", "points",
     "path", "subpaths", "evenOdd", "rotation", "link", "url", "anchor", "click", "hover", "when", "overrides", "symbol", "playback", "offset", "args", "image", "reveal",
-    "ports", "labelRect", "extension", "capacity", "delay", "queue", "gauge"],
+    "ports", "labelRect", "extension", "capacity", "delay", "queue", "gauge", "containerID", "container"],
+  container: ["fixed", "lanes"],
   gauge: ["metric", "of", "max", "warn", "alarm", "style", "label"],
   strokePoint: ["x", "y"],
   subpath: ["closed", "coords"],
@@ -399,6 +404,12 @@ class Reader {
       textColor: rgba(s.textColor) ?? null,
       named: this.colorNames(s.named),
     };
+  }
+
+  container(v: unknown): { fixed: boolean | null; lanes: "rows" | "columns" | null } | null {
+    if (!isObj(v)) return null;
+    this.fields(v, "container");
+    return { fixed: v.fixed === true ? true : null, lanes: v.lanes === "rows" || v.lanes === "columns" ? v.lanes : null };
   }
 
   colorNames(v: unknown): ColorNames | null {
@@ -516,6 +527,8 @@ class Reader {
       delay: num(v.delay) ?? null,
       queue: v.queue === true ? true : null,
       gauge: this.gauge(v.gauge),
+      containerID: uuid(v.containerID) ?? null,
+      container: this.container(v.container),
     };
   }
 

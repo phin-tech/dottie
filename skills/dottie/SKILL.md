@@ -61,6 +61,7 @@ More of the MCP tools, by purpose:
 | For | Tools |
 | --- | --- |
 | Pages | `list_pages`, `add_page`, `rename_page` |
+| Containers and swimlanes | `add_container` (a titled box that holds shapes and moves them; `lanes` for a swimlane), `parent` on `add_shape` / `update_element` |
 | Theme and palette | `set_theme`; any color argument also takes a palette name (`accent`, `muted`, `danger`, `warning`, `success`, `info`, or the page's own), and shapes colored by name follow the palette when it changes |
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
 | Symbols, defined once and placed many times | `make_symbol`, `place_symbol` |

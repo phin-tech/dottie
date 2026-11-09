@@ -255,6 +255,8 @@ private struct Args {
 /// Stateless: every call loads the file, edits, and saves atomically. The actor serializes calls
 /// so concurrent requests can't interleave read-modify-write on the same file.
 actor DottieTools {
+    /// The file the current tool read, before its edits: what saving reconciles containers against (ADR 0006).
+    private var loaded: DottieFile?
     private var currentTool = "edit"
 
     static let definitions: [Tool] = [
@@ -312,6 +314,7 @@ actor DottieTools {
                 "fill": prop("string", "Hex fill color"), "stroke": prop("string", "Hex stroke color"),
                 "sketchy": prop("boolean", "Hand-drawn look (default true)"),
                 "when": whenProp,
+                "parent": prop("string", "Id of the container it goes in (add_container); \"\" takes it out. Moving the container moves it"),
              ].merging(lookProps) { a, _ in a }, required: ["path", "x", "y"])),
         Tool(name: "add_image",
              description: "Place a picture (PNG, JPEG, HEIC, GIF, TIFF, …) from a file with its top-left corner at x, y. "
@@ -370,6 +373,7 @@ actor DottieTools {
                 "click_set": clickSetProp,
                 "click_toggle": clickToggleProp,
                 "when": whenProp,
+                "parent": prop("string", "Id of the container it goes in (add_container); \"\" takes it out. Moving the container moves it"),
                 "hover_stroke": prop("string", "Hex stroke color while the pointer is over a clickable element; empty string clears it"),
                 "hover_fill": prop("string", "Hex fill color while the pointer is over a clickable element; empty string clears it"),
                 "hover_opacity": prop("number", "Opacity 0-1 while the pointer is over a clickable element; -1 clears it"),
@@ -527,8 +531,26 @@ actor DottieTools {
                 "reroute": .object(["type": "object", "additionalProperties": .object(["type": "string"]),
                                     "description": .string("Connector id to connector id: send_packet packets following the first take the second")]),
              ], required: ["path", "id", "when"])),
+        Tool(name: "add_container",
+             description: "A container: a titled box holding shapes (a subsystem, an account, a VPC), which fits round them, "
+                + "moves them when it moves, and takes connectors like any shape. Nest them with parent. With lanes it is a "
+                + "swimlane, and its children should be containers (one per lane), stacked as rows or columns across it. "
+                + "Shapes join one with parent on add_shape or update_element; in the app, by being dropped in.",
+             inputSchema: schema([
+                "path": pathProp, "page": pageProp,
+                "title": prop("string", "Its title, at the top"),
+                "ids": idListProp("The shapes (or containers) it holds, if any"),
+                "parent": prop("string", "Id of a container it goes in"),
+                "lanes": prop("string", "Make it a swimlane: its child containers as rows or columns", enum: ["rows", "columns"]),
+                "x": prop("number", "Left, for an empty container"), "y": prop("number", "Top, for an empty container"),
+                "width": prop("number", "Width, for an empty container (it then keeps its size)"),
+                "height": prop("number", "Height, for an empty container"),
+                "fill": prop("string", "Fill, hex or palette name (default a faint grey-blue)"),
+                "stroke": prop("string", "Outline, hex or palette name"),
+             ], required: ["path"])),
         Tool(name: "add_group",
-             description: "Draw a labelled dashed frame behind some elements: a region, an account, a VPC, a site.",
+             description: "Draw a labelled dashed frame behind some elements: a region, an account, a VPC, a site. It is "
+                + "drawn once and doesn't follow them; add_container makes a box that holds them.",
              inputSchema: schema([
                 "path": pathProp, "page": pageProp,
                 "ids": idListProp("The elements it frames"),
@@ -1013,6 +1035,12 @@ actor DottieTools {
     }
 
     private func load(_ url: URL, createIfMissing: Bool = false) throws -> DottieFile {
+        let file = try read(url, createIfMissing: createIfMissing)
+        loaded = file
+        return file
+    }
+
+    private func read(_ url: URL, createIfMissing: Bool) throws -> DottieFile {
         // Live mode: if the Dottie app has this file open, edit that copy instead of the file on disk.
         if url == Self.currentURL {
             guard let live = LiveClient.get(path: "current") else {
@@ -1057,6 +1085,7 @@ actor DottieTools {
     }
 
     private func save(_ doc: DottieFile, to url: URL) throws {
+        let doc = doc.reconcilingContainers(from: loaded)
         if url == Self.currentURL {
             guard LiveClient.put(doc, path: "current", actionName: "Agent: \(currentTool)") else {
                 throw ToolFailure(message: "The Dottie window is no longer available.")
@@ -1157,6 +1186,7 @@ actor DottieTools {
             do {
                 try DiagramOps.nameColors(&file.pages[p], id: e.id, fill: a.string("fill"), stroke: a.string("stroke"),
                                           textColor: a.string("text_color"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&file.pages[p], id: e.id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             try save(file, to: url)
             return text("id: \(e.id.uuidString)\nframe: x=\(e.x) y=\(e.y) w=\(e.width) h=\(e.height)" + on(file, p))
@@ -1245,6 +1275,7 @@ actor DottieTools {
                 if let q = a.bool("queue") { try DiagramOps.setQueue(&file.pages[p], id: id, q) }
                 try DiagramOps.nameColors(&file.pages[p], id: id, fill: a.string("fill"), stroke: a.string("stroke"),
                                           textColor: a.string("text_color"))
+                if let parent = a.string("parent") { try DiagramOps.setParent(&file.pages[p], id: id, parent: parent.isEmpty ? nil : try a.uuid("parent")) }
             } catch let e as OpsError { throw ToolFailure(message: e.description) }
             // A resized extension shape reflows rather than stretching; one whose extension fails keeps its path.
             let problems = file.pages[p].reflowExtensionShapes(from: before, using: loadedRuntimes())
@@ -1790,6 +1821,27 @@ actor DottieTools {
 
         case "simulate":
             return try simulate(a)
+
+        case "add_container":
+            let url = try fileURL(a)
+            var file = try load(url)
+            let p = try pageIndex(file, a)
+            let c: Element
+            do {
+                var frame: CGRect?
+                if let w = a.double("width"), let h = a.double("height") { frame = CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: w, height: h) }
+                c = try DiagramOps.addContainer(&file.pages[p], title: a.string("title"), children: try a.uuids("ids") ?? [], frame: frame,
+                                                lanes: try a.string("lanes").map { s in
+                                                    guard let l = LaneDirection(rawValue: s) else { throw ToolFailure(message: "'lanes' must be rows or columns") }
+                                                    return l
+                                                },
+                                                parent: a.string("parent").flatMap { $0.isEmpty ? nil : UUID(uuidString: $0) },
+                                                roughness: a.roughness, fill: try a.color("fill"), stroke: try a.color("stroke"))
+                try DiagramOps.nameColors(&file.pages[p], id: c.id, fill: a.string("fill"), stroke: a.string("stroke"), textColor: nil)
+            } catch let e as OpsError { throw ToolFailure(message: e.description) }
+            try save(file, to: url)
+            let saved = file.reconcilingContainers(from: loaded).pages[p].elements.first { $0.id == c.id } ?? c
+            return text("id: \(c.id.uuidString)\nframe: x=\(saved.x) y=\(saved.y) w=\(saved.width) h=\(saved.height)" + on(file, p))
 
         case "add_group":
             let url = try fileURL(a)

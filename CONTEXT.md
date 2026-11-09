@@ -28,6 +28,12 @@ _Avoid_: control point (that is a pen stroke's), vertex
 The small arc a connector draws where it crosses a connector beneath it, so the two read as unconnected.
 _Avoid_: jump, bridge, crossover
 
+**Container**:
+A titled box that holds shapes and other containers: they move with it and it fits round them (ADR 0006). A
+**swimlane** is a container whose containers are its lanes, stacked in rows or columns.
+_Avoid_: group (that's `groupID`, invisible), frame (that's `add_group`'s, which holds nothing), cluster (except as
+build_diagram's argument)
+
 **Palette**:
 A theme's named colors (`accent`, `muted`, `danger`, `warning`, `success`, `info`, and a page's own). A fill,
 stroke or text color given by name is a **palette color**: it changes when the palette does (ADR 0005).

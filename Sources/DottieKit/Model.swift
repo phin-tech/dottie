@@ -218,6 +218,10 @@ public struct Element: Codable, Equatable, Identifiable, Sendable {
     /// Only for a shape: it's a queue, so traffic that can't go on waits here, the nearest queue before whatever is
     /// full, rather than right in front of it (ADR 0003): an SQS queue in front of workers and the table they write to.
     public var queue: Bool?
+    /// The container this element is in (ADR 0006): it moves with it, and the container fits round it.
+    public var containerID: UUID?
+    /// Only for a rectangle: it's a container, a titled box holding the elements that name it as theirs.
+    public var container: ContainerData?
     /// Shows a metric (ADR 0003). When the page is posed, it's drawn as plain paths and a label in this frame.
     public var gauge: Gauge?
 

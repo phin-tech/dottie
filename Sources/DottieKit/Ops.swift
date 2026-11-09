@@ -79,7 +79,7 @@ public enum DiagramOps {
         }
     }
 
-    private static func activeLayerID(_ doc: inout DottieDocument) -> UUID {
+    static func activeLayerID(_ doc: inout DottieDocument) -> UUID {
         if let l = doc.layers.first(where: { !$0.locked }) { return l.id }
         let l = Layer(name: "Layer \(doc.layers.count + 1)")
         doc.layers.append(l)

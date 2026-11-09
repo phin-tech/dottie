@@ -564,6 +564,34 @@ def palette():
     write(EDGE / "palette.dottie", pages)
 
 
+def containers():
+    """Containers (ADR 0006): a titled box round two shapes with a connector into it from outside, one nested in
+    another, a swimlane of two lanes, and an untitled one. Drawing needs only the frame and the title band
+    (labelRect), which the app keeps; this fixture stores them as the app would."""
+    p = Page()
+    def container(x, y, w, h, title, band=34, **kw):
+        extra = {"container": kw.pop("data", {})}
+        if title:
+            extra["text"] = title
+            extra["labelRect"] = {"x": 0, "y": 0, "width": 1, "height": band / h}
+        return p.add("rectangle", x, y, w, h, style=style(fill=rgba(0.5, 0.55, 0.65, 0.08), strokeWidth=1.5, fontSize=16, roughness=0), **extra, **kw)
+    vpc = container(20, 20, 420, 200, "VPC")
+    a = p.add("rectangle", 40, 74, 120, 60, text="api", containerID=vpc)
+    sub = container(200, 54, 220, 146, "Private subnet", containerID=vpc)
+    b = p.add("rectangle", 240, 108, 120, 60, text="db", containerID=sub)
+    p.connect(a, b, text="SQL")
+    user = p.add("ellipse", 520, 80, 100, 60, text="user")
+    p.connect(user, vpc, routing="elbow")
+    pool = container(20, 260, 600, 234, "Order flow", data={"lanes": "rows"})
+    lane1 = container(20, 294, 600, 100, "Customer", containerID=pool)
+    lane2 = container(20, 394, 600, 100, "Warehouse", containerID=pool)
+    c = p.add("rectangle", 60, 330, 120, 50, text="place order", containerID=lane1)
+    d = p.add("rectangle", 300, 430, 120, 50, text="pick", containerID=lane2)
+    p.connect(c, d, routing="elbow")
+    container(660, 20, 160, 120, None, data={"fixed": True})
+    write(EDGE / "containers.dottie", [p])
+
+
 def notes():
     """Sticky notes: the Markdown Dottie lays out, at two sizes, plus wrapping, overflow and alignment."""
     p = Page()
@@ -1191,6 +1219,7 @@ def main():
     flows()
     elbow_around()
     palette()
+    containers()
     print("wrote", ", ".join(sorted(p.name for p in [*EDGE.glob("*.dottie"), *JS_ONLY.glob("*.dottie")])))
 
 
