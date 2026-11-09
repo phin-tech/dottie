@@ -72,7 +72,9 @@ SIMULATE
       --scene <name>    Start at this scene, playing (default the start, as the player does).
       --state <vars>    Starting values for the page's variables, as for render.
       --click <element> Click an element, by id (or its first characters), text or anchor: sets and flips
-                        its variables and plays its scene. Links and pages are reported, not followed.
+                        its variables and plays its scene; a link to a shape on another page shows that
+                        page, as the HTML export of every page does. Web links are reported, not followed.
+      --back            Go back to the page the last link left, as the browser's Back does.
       --wait <seconds>  Let it play this long.
       --next            Press Next: on to the next scene.
       --snapshot <png>  Write a PNG of what is drawn now.
@@ -455,7 +457,7 @@ func runInspect(_ args: [String]) -> Int32 {
 }
 
 func runSimulate(_ args: [String]) -> Int32 {
-    enum Step { case click(String), wait(Double), next, snapshot(String) }
+    enum Step { case click(String), wait(Double), next, back, snapshot(String) }
     var input: String?, page: String?, scene: String?, disk = false, state: [String: Var] = [:], scale: Double?
     var records: [String] = []
     var steps: [Step] = []
@@ -475,6 +477,7 @@ func runSimulate(_ args: [String]) -> Int32 {
             do { try parseState(value(), into: &state) } catch let e as CLIError { fail(e.message, code: 2) } catch { fail("\(error)") }
         case "--click": steps.append(.click(value()))
         case "--next": steps.append(.next)
+        case "--back": steps.append(.back)
         case "--wait":
             let v = value()
             guard let n = Double(v), n.isFinite, n >= 0, n <= Timeline.maxDuration * 10 else { fail("--wait must be seconds", code: 2) }
@@ -501,13 +504,15 @@ func runSimulate(_ args: [String]) -> Int32 {
         file = try drawing(at: absolute(input), named: input, onDisk: try? Data(contentsOf: absolute(input)), disk: disk,
                            verb: "simulating")
     } catch let e as CLIError { fail(e.message) } catch { fail("\(error)") }
-    var doc = file.pages[0]
+    var start = 0
     if let page {
         guard let p = file.pageIndex(matching: page) else { fail("\(input): no page '\(page)'") }
-        doc = file.pages[p]
+        start = p
     }
+    var started = file
+    started.pages[start] = started.pages[start].starting(with: state)
     var sim: Simulation
-    do { sim = try Simulation(doc.starting(with: state), scene: scene) } catch { fail("\(error)") }
+    do { sim = try Simulation(file: started, page: start, scene: scene) } catch { fail("\(error)") }
     if !records.isEmpty { sim.record() }
     print("start: \(sim.summary)")
     var failures = 0
@@ -523,6 +528,9 @@ func runSimulate(_ args: [String]) -> Int32 {
             case .next:
                 sim.nextScene()
                 print("next: \(sim.summary)")
+            case .back:
+                let did = sim.back()
+                print("back: \(did). \(sim.summary)")
             case .snapshot(let path):
                 let picture = sim.picture
                 guard !picture.elements.isEmpty, let png = Exporter.png(picture, scale: scale ?? 2, background: CGColor(gray: 1, alpha: 1))

@@ -60,7 +60,7 @@ More of the MCP tools, by purpose:
 
 | For | Tools |
 | --- | --- |
-| Pages | `list_pages`, `add_page`, `rename_page` |
+| Pages, and drilling in from one to another | `list_pages`, `add_page`, `rename_page`, `drill_in` |
 | Containers and swimlanes | `add_container` (a titled box that holds shapes and moves them; `lanes` for a swimlane), `parent` on `add_shape` / `update_element` |
 | Theme and palette | `set_theme`; any color argument also takes a palette name (`accent`, `muted`, `danger`, `warning`, `success`, `info`, or the page's own), and shapes colored by name follow the palette when it changes |
 | Stencils (flowchart symbols, icons, imported SVG sets) and pictures | `list_stencils`, `add_stencil`, `add_image` |
@@ -141,8 +141,8 @@ the page can't be clicked; end the steps with a wait so the last click's result 
 `export_svg` take `state: {"down": true}` to draw one state, and `export_animation` takes it as starting values.
 
 `export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page, or with `.png` a still of
-the poster frame. For a drawing people drill into (an overview page whose shapes `link` to a shape on a detail page),
-`pages: "all"` writes every page into one `.html`, where a click on such a shape shows its page and Back goes back,
+the poster frame. For a drawing people drill into (an overview page whose shapes `link` to a shape on a detail page;
+`drill_in` sets each one up, with a page, a title and a way back), `pages: "all"` writes every page into one `.html`, where a click on such a shape shows its page and Back goes back,
 and `pages: "split"` writes a folder with `index.html` for the first page and a linked file for each other page.
 Neither needs an animation. Watch the GIF before calling
 an animation finished: timing that reads well in a description often runs too fast or overlaps.

@@ -225,7 +225,9 @@ makes `url` web links clickable and `link`s jump, across pages in a multi-page P
 the app. A `link` to a shape on another page works in the web players when they have that page: the HTML export of
 every page (`Exporter.player(file:)`, `--all-pages`) shows it, with the player's `history` giving each page an
 address, and the export split a page per file (`Exporter.playerPages`, `--split`, file names from
-`pageFileNames`) gives each page's player a `links` map to the other files.
+`pageFileNames`) gives each page's player a `links` map to the other files. `DottieFile.drillIn` (MCP `drill_in`) sets up one such
+link: a page for the shape, a title it lands on, and a shape leading back. `Simulation(file:)` follows these links
+as the export of every page does, and `back()` returns.
 An element's `click` (a scene name or an `http`, `https` or `mailto` link) and `hover` look are only used by the
 web players (the HTML export and `<dottie-player>`); other links are dropped when a file is read. A symbol with
 `button: true` is a button: its copies always show its `up` scene (else the start), whatever their playback, and
