@@ -92,6 +92,22 @@ test("clicks: scenes by name in any case, safe links only, links to other pages"
   assert.equal(clickTargets(hostile.pages[0], hostile).size, 0);
 });
 
+test("a page exported on its own reaches the others through its links map, never anywhere else", () => {
+  const f = parseDottie(read("edge", "clicks.dottie"));
+  const only = { ...f, pages: [f.pages[0]] };
+  const p = only.pages[0];
+  const details = p.elements.find((e) => e.text === "Details")!;
+  const to = (href: string) => clickTargets(p, only, { [details.link!]: href }).get(details.id) ?? null;
+  assert.equal(clickTargets(p, only).has(details.id), false, "its page isn't in the file");
+  assert.deepEqual(to("details.html"), { href: "details.html" });
+  assert.deepEqual(to("pages/details.html#More"), { href: "pages/details.html#More" });
+  for (const bad of ["javascript:alert(1)//.html", "//evil.example/x.html", "https://evil.example/x.html", "details.htm", "a b.html"]) {
+    assert.equal(to(bad), null, bad);
+  }
+  assert.deepEqual(clickTargets(f.pages[0], f, { [details.link!]: "details.html" }).get(details.id), { page: 1 },
+    "with the page in the file, it is shown in place");
+});
+
 test("links: web addresses open on click and in SVG, other drawings and scripts do nothing", () => {
   const f = parseDottie(read("edge", "links.dottie"));
   const p = f.pages[0];

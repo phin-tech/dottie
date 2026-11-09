@@ -141,7 +141,10 @@ the page can't be clicked; end the steps with a wait so the last click's result 
 `export_svg` take `state: {"down": true}` to draw one state, and `export_animation` takes it as starting values.
 
 `export_animation` writes a GIF, animated PNG, MP4, Lottie JSON or a playable HTML page, or with `.png` a still of
-the poster frame. Watch the GIF before calling
+the poster frame. For a drawing people drill into (an overview page whose shapes `link` to a shape on a detail page),
+`pages: "all"` writes every page into one `.html`, where a click on such a shape shows its page and Back goes back,
+and `pages: "split"` writes a folder with `index.html` for the first page and a linked file for each other page.
+Neither needs an animation. Watch the GIF before calling
 an animation finished: timing that reads well in a description often runs too fast or overlaps.
 
 ## The command line
@@ -155,6 +158,8 @@ dottie render diagram.dottie --clean -p "Page 2"   # a precise look; a page by n
 dottie render flow.mmd -o flow.svg                 # a Mermaid flowchart, laid out and drawn
 dottie inspect diagram.dottie                      # every element's resolved frame and connector route, as JSON
 dottie render diagram.dottie --state down -o down.png   # the page with variable down true
+dottie render diagram.dottie --all-pages -o site.html  # every page, linked, Back goes back
+dottie render diagram.dottie --split -o site/        # a web page per page: site/index.html, site/details.html
 dottie simulate diagram.dottie --click east --wait 2 --snapshot after.png   # play it as the web player would
 dottie simulate diagram.dottie --wait 1 --click east --wait 3 --record east.mp4   # a video of that run
 dottie script-types ./types                        # dottie.d.ts, the types of the scripting API

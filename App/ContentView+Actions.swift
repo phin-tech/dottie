@@ -59,6 +59,7 @@ extension ContentView {
             reorder: { move in edit("Arrange") { $0.reorder(ids, move) } },
             export: { format in exportDocument(format) },
             exportAnimation: { format in exportAnimation(format) },
+            exportWebPages: { oneFile in exportWebPages(oneFile: oneFile) },
             openScriptConsole: { openScriptConsole() },
             runScriptFile: { openScriptConsole(running: $0) },
             pageCount: document.file.pages.count,
@@ -194,22 +195,59 @@ extension ContentView {
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         // Click logic runs in the exported page only if asked (ADR 0007).
-        var allowLogic = false
-        if format == .player, !(model.logic ?? "").isEmpty {
-            let alert = NSAlert()
-            alert.messageText = "Let the exported page run this page's click logic?"
-            alert.informativeText = "Its handlers run in a sealed sandbox with no access to the page, the network or the clock. "
-                + "Without it, clicks do their own Set and Toggle. The engine adds about 850 KB."
-            alert.addButton(withTitle: "Allow")
-            alert.addButton(withTitle: "Don't Allow")
-            allowLogic = alert.runModal() == .alertFirstButtonReturn
-        }
+        let allowLogic = format == .player && !(model.logic ?? "").isEmpty && askToAllowLogic(pages: false)
         Task.detached(priority: .userInitiated) {
             let failure: String?
             do { try format.write(model, to: url, allowLogic: allowLogic); failure = nil } catch { failure = error.localizedDescription }
             await MainActor.run {
                 guard let failure else { return }
                 Alerts.show("Couldn't export the animation", failure)
+            }
+        }
+    }
+
+    /// Asks whether an exported web page may run click logic (ADR 0007).
+    @MainActor
+    private func askToAllowLogic(pages: Bool) -> Bool {
+        let alert = NSAlert()
+        alert.messageText = pages ? "Let the exported pages run their click logic?" : "Let the exported page run this page's click logic?"
+        alert.informativeText = "Its handlers run in a sealed sandbox with no access to the page, the network or the clock. "
+            + "Without it, clicks do their own Set and Toggle. The engine adds about 850 KB."
+        alert.addButton(withTitle: "Allow")
+        alert.addButton(withTitle: "Don't Allow")
+        return alert.runModal() == .alertFirstButtonReturn
+    }
+
+    /// Every page as a web page to click through: one HTML file, or a folder with a file per page.
+    @MainActor
+    private func exportWebPages(oneFile: Bool) {
+        let file = document.file
+        guard file.pages.contains(where: { !$0.elements.isEmpty }) else { NSSound.beep(); return }
+        let name = fileURL?.deletingPathExtension().lastPathComponent ?? "Drawing"
+        let panel = NSSavePanel()
+        if oneFile { panel.allowedContentTypes = [.html] }
+        panel.nameFieldStringValue = oneFile ? "\(name).html" : name
+        panel.canCreateDirectories = true
+        if !oneFile { panel.message = "A folder for the pages: index.html for the first, and a file for each other page." }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let allowLogic = file.pages.contains { !($0.logic ?? "").isEmpty } && askToAllowLogic(pages: true)
+        Task.detached(priority: .userInitiated) {
+            var failure: String?
+            do {
+                if oneFile {
+                    guard let html = Exporter.player(file: file, title: name, allowLogic: allowLogic) else {
+                        throw CocoaError(.fileWriteUnknown)
+                    }
+                    try Data(html.utf8).write(to: url, options: .atomic)
+                } else {
+                    guard let pages = Exporter.playerPages(file, title: name, allowLogic: allowLogic) else { throw CocoaError(.fileWriteUnknown) }
+                    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                    for (page, html) in pages { try Data(html.utf8).write(to: url.appendingPathComponent(page), options: .atomic) }
+                }
+            } catch { failure = error.localizedDescription }
+            await MainActor.run {
+                guard let failure else { return }
+                Alerts.show("Couldn't export the pages", failure)
             }
         }
     }

@@ -95,6 +95,8 @@ struct EditorActions {
     var reorder: (DottieDocument.ZMove) -> Void
     var export: (ExportFormat) -> Void
     var exportAnimation: (AnimationExportFormat) -> Void
+    /// Every page as a web page people click through: one file (`true`) or a folder of one per page.
+    var exportWebPages: (_ oneFile: Bool) -> Void
     var openScriptConsole: () -> Void
     var runScriptFile: (URL) -> Void
     var pageCount: Int

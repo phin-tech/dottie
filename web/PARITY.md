@@ -59,6 +59,6 @@ fixture, so the gap is visible rather than silent.
 | Clicks that set and toggle variables | Supported | [edge/state](../fixtures/edge/state.dottie) | Change what shows without touching the playhead |
 | Looping scenes (`loop` on a marker) | Supported | [edge/state](../fixtures/edge/state.dottie) | No stop on entering, round from the scene's end to its start |
 | Links out of the drawing (`url`) | Supported | [edge/links](../fixtures/edge/links.dottie) | A web or mail `url` opens when clicked if there is no `click`, and SVG export wraps it in `<a>`; a link to another drawing does nothing on the web |
-| Links between shapes and pages | Partial | [edge/clicks](../fixtures/edge/clicks.dottie) | A link to a shape on another page shows that page; one on the same page does nothing. The HTML export holds one page, so it has neither |
+| Links between shapes and pages | Partial | [edge/clicks](../fixtures/edge/clicks.dottie) | A link to a shape on another page shows that page; one on the same page does nothing. The HTML export of one page has neither; with every page (`--all-pages`, `history`) it shows the page at its own address, and split a page per file (`--split`, `links`) it goes to that page's file |
 | Editing | Missing | | |
 | Ticking task boxes in notes | Missing | | Drawn, not clickable |

@@ -929,6 +929,11 @@ actor DottieTools {
                 "preview": prop("number", "Second of the animation to return as a PNG preview"),
                 "allow_logic": prop("boolean", "HTML only: let the page's click logic (set_logic) run in the exported page; it "
                     + "carries the sandboxed engine (about 850 KB). Off by default: clicks then do their own click_set / click_toggle"),
+                "pages": prop("string", "HTML only, for a drawing people drill into: all = every page in one .html, where a "
+                    + "link to a shape on another page shows that page, each page has its own address (#Page) and Back goes "
+                    + "back (`page` is the one to start on); split = out_path is a folder, with index.html for the first page "
+                    + "and a file named after each other page, linked to each other. Pages need no animation for either. "
+                    + "Default: just this page", enum: ["all", "split"]),
                 "state": exportStateProp,
              ], required: ["path", "out_path"])),
         Tool(name: "simulate",
@@ -1063,6 +1068,54 @@ actor DottieTools {
             else { throw ToolFailure(message: "params.\(name) must be a number, boolean or text") }
         }
         return out
+    }
+
+    /// export_animation with `pages`: every page as one web page (`all`), or a folder of them (`split`).
+    private func exportPages(_ a: Args, mode: String) throws -> CallTool.Result {
+        guard mode == "all" || mode == "split" else { throw ToolFailure(message: "'pages' must be all or split") }
+        var file = try load(try fileURL(a))
+        let start = try pageIndex(file, a)
+        file.pages[start] = file.pages[start].starting(with: try a.state())
+        if let r = a.roughness { file.pages = file.pages.map { $0.withRoughness(r) } }
+        guard file.pages.contains(where: { !$0.elements.isEmpty }) else { throw ToolFailure(message: "The drawing is empty") }
+        let allow = a.bool("allow_logic") == true
+        // The tab's title: the drawing's file name.
+        let name = try fileURL(a).deletingPathExtension().lastPathComponent
+        var written: [String] = []
+        if mode == "all" {
+            let out = try fileURL(a, key: "out_path", ext: "html")
+            let startName = (a.string("page") ?? "").isEmpty ? nil : file.pages[start].name
+            guard let html = Exporter.player(file: file, title: name, start: startName, allowLogic: allow) else {
+                throw ToolFailure(message: "Rendering failed")
+            }
+            try FileManager.default.createDirectory(at: out.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(html.utf8).write(to: out, options: .atomic)
+            written = [out.path]
+        } else {
+            let raw = (try a.require("out_path") as NSString).expandingTildeInPath
+            guard raw.hasPrefix("/") else { throw ToolFailure(message: "'out_path' must be an absolute path") }
+            guard !raw.lowercased().hasSuffix(".html") else {
+                throw ToolFailure(message: "With pages: split, out_path is a folder for the pages (index.html and the rest)")
+            }
+            let folder = URL(fileURLWithPath: raw, isDirectory: true)
+            guard let pages = Exporter.playerPages(file, title: name, allowLogic: allow) else { throw ToolFailure(message: "Rendering failed") }
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            for (page, html) in pages {
+                let target = folder.appendingPathComponent(page)
+                try Data(html.utf8).write(to: target, options: .atomic)
+                written.append(target.path)
+            }
+        }
+        let links = file.pages.reduce(0) { $0 + $1.elements.filter { $0.link != nil }.count }
+        var lines = ["Exported \(file.pages.count) page\(file.pages.count == 1 ? "" : "s") (\(file.pages.map(\.name).joined(separator: ", "))) to:"]
+        lines += written.map { "  " + $0 }
+        if links == 0, file.pages.count > 1 {
+            lines.append("No shape links to another page yet: link shapes (link) so people can drill in.")
+        }
+        var content: [Tool.Content] = [.plain(lines.joined(separator: "\n"))]
+        let still = file.pages[start].still
+        if !still.elements.isEmpty, let png = Exporter.png(still, scale: 1) { content.insert(.png(png), at: 0) }
+        return .init(content: content)
     }
 
     private func fileURL(_ args: Args, key: String = "path", ext: String = "dottie") throws -> URL {
@@ -1842,6 +1895,9 @@ actor DottieTools {
             return try animation(name, a)
 
         case "export_animation":
+            if let pages = try a.string("pages") {
+                return try exportPages(a, mode: pages)
+            }
             let file = try load(try fileURL(a))
             var doc = file.pages[try pageIndex(file, a)].starting(with: try a.state())
             if let r = a.roughness { doc = doc.withRoughness(r) }

@@ -36,8 +36,12 @@ export const LOADER = `;(function () {
 `;
 
 export interface CompileOptions {
-  /** Page name or 1-based number; only that page goes in. The first page by default. */
+  /** Page name or 1-based number; only that page goes in. The first page by default. With `allPages`, the page to
+   * start on. */
   page?: string | number;
+  /** Every page goes in, and links between them work: each page shown gets its own address (`#` and its name), so
+   * the browser's Back and Forward go between them (the player's `history`). */
+  allPages?: boolean;
   /** Show this moment (seconds) as a still. */
   at?: number;
   clean?: boolean;
@@ -68,6 +72,10 @@ export function playerAttributes(options: CompileOptions): Record<string, string
   if (options.noLoop) out["no-loop"] = "";
   if (options.label !== undefined) out.label = options.label;
   if (options.logicEngine) out["allow-logic"] = "";
+  if (options.allPages) {
+    out.history = "";
+    if (options.page !== undefined) out.page = String(options.page);
+  }
   return out;
 }
 
@@ -80,28 +88,31 @@ export function compile(source: string | unknown, runtime: string, options: Comp
   const file = parseDottie(raw);   // refuses what isn't a drawing
   const json = raw as { version: number; pages: unknown[]; images?: Record<string, unknown> };
   const i = pageIndex(file, options.page === undefined ? null : String(options.page));
-  const page = json.pages[i];
-  // Only the pictures that page shows.
+  const chosen = options.allPages ? json.pages.map((_, k) => k) : [i];
+  const pages = chosen.map((k) => json.pages[k]);
+  // Only the pictures those pages show.
   const refs = new Set<string>();
-  JSON.stringify(page, (k, v) => { if (k === "ref" && typeof v === "string") refs.add(v); return v; });
+  JSON.stringify(pages, (k, v) => { if (k === "ref" && typeof v === "string") refs.add(v); return v; });
   const images = Object.fromEntries(Object.entries(json.images ?? {}).filter(([k]) => refs.has(k)));
-  const data: Record<string, unknown> = { version: json.version, pages: [page] };
+  const data: Record<string, unknown> = { version: json.version, pages };
   if (Object.keys(images).length) data.images = images;
-  // The bundled fonts that page uses, each face as base64.
+  // The bundled fonts those pages use, each face as base64.
   const fonts: Record<string, Record<string, string>> = {};
-  for (const family of options.fontData ? usedFonts(file.pages[i]) : []) {
+  const families = new Set(chosen.flatMap((k) => (options.fontData ? usedFonts(file.pages[k]) : [])));
+  for (const family of families) {
     for (const face of fontFaces(family)) {
       const b64 = options.fontData!(family, face);
       if (b64) (fonts[family] ??= {})[face] = b64;
     }
   }
+  const logic = chosen.some((k) => file.pages[k].logic);
   // One pass over the template, so a drawing's text that spells out a placeholder is never taken for one.
   const fill: Record<string, () => string> = {
     DOTTIE_DATA: () => scriptJSON(data),
-    DOTTIE_OPTIONS: () => scriptJSON(playerAttributes(file.pages[i].logic ? options : { ...options, logicEngine: undefined })),
+    DOTTIE_OPTIONS: () => scriptJSON(playerAttributes(logic ? options : { ...options, logicEngine: undefined })),
     DOTTIE_FONTS: () => scriptJSON(fonts),
   };
   // With logic, the engine first, so the player finds it on the page (logic-loader.ts).
-  const engine = options.logicEngine && file.pages[i].logic ? options.logicEngine.trimEnd() + "\n" : "";
+  const engine = options.logicEngine && logic ? options.logicEngine.trimEnd() + "\n" : "";
   return engine + runtime.trimEnd() + "\n" + LOADER.replace(/\bDOTTIE_(?:DATA|OPTIONS|FONTS)\b/g, (m) => fill[m]());
 }

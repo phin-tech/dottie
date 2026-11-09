@@ -6,7 +6,7 @@
 3. `dottie render -f svg` of every page at a few moments, clean and as drawn ->
    fixtures/goldens/svg/<group>/<name>-p<page>-t<time>-<clean|sketchy>.svg (the visual reference).
 4. `dottie render -f html` of a few edge fixtures -> fixtures/goldens/html/<name>.html (the exported player, for
-   the browser tests).
+   the browser tests), and edge/clicks with every page: clicks-all.html (--all-pages) and clicks-split/ (--split).
 
 Run with `just goldens`, which builds the dottie tool first. Pass --check to fail instead of writing when
 anything would change (what CI runs on a Mac).
@@ -69,6 +69,10 @@ def generate(out, dottie):
     for name in ["clicks", "links", "symbols", "buttons"]:
         subprocess.run([dottie, "render", out / "edge" / f"{name}.dottie", "-f", "html", "-o", html / f"{name}.html", "--disk"],
                        check=True, capture_output=True)
+    # A drawing of several pages: in one file (links show the page, Back goes back), and a folder of one file each.
+    clicks = out / "edge" / "clicks.dottie"
+    subprocess.run([dottie, "render", clicks, "--all-pages", "-o", html / "clicks-all.html", "--disk"], check=True, capture_output=True)
+    subprocess.run([dottie, "render", clicks, "--split", "-o", html / "clicks-split", "--disk"], check=True, capture_output=True)
 
 
 def main():

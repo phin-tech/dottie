@@ -6,8 +6,9 @@ import { expandingSymbols } from "./symbols.ts";
 
 /** Jump to scene `scene` (an index into the page's markers) and play on to the next; open `url` in a new tab; or,
  * in <dottie-player> only, show page `page` (an index into the file's pages), where the element's link points. Any
- * of them may first `set` and `toggle` page variables (ClickAction.set, .toggle), and a click may do only that. */
-export type Click = ({ scene: number } | { url: string } | { page: number } | { state: true })
+ * of them may first `set` and `toggle` page variables (ClickAction.set, .toggle), and a click may do only that. Or go to
+ * `href`, the exported web page that holds the page a `link` points at, when a drawing is exported one page per file. */
+export type Click = ({ scene: number } | { url: string } | { page: number } | { href: string } | { state: true })
   & { set?: Record<string, ClickValue>; toggle?: string[]; reset?: true; run?: string };
 
 /** The marker called `name`: an exact match, else one that differs only in case. */
@@ -18,8 +19,9 @@ export function sceneNamed(name: string, markers: Marker[]): number {
 
 /** The page's clickable elements and what each click does, by element id. A scene named by no marker, or a link
  * that isn't allowed, makes nothing clickable; an element with no `click` opens its `url` when that is a web link. Given the whole file, an element whose `link` points at an element on
- * another page shows that page (the HTML export holds one page, so it can't). */
-export function clickTargets(page: Page, file?: DottieFile): Map<string, Click> {
+ * another page shows that page. `hrefs` names, by the id of an element a link points at, the web page that shows it
+ * (`<dottie-player links>`): a page exported on its own reaches the others through them. */
+export function clickTargets(page: Page, file?: DottieFile, hrefs?: Record<string, string>): Map<string, Click> {
   const markers = page.timeline?.markers ?? [];
   const out = new Map<string, Click>();
   let pageOf: Map<string, number> | null = null;
@@ -41,10 +43,18 @@ export function clickTargets(page: Page, file?: DottieFile): Map<string, Click> 
         file.pages.forEach((p, i) => { for (const x of p.elements) if (!pageOf!.has(x.id)) pageOf!.set(x.id, i); });
       }
       const target = pageOf.get(e.link);
-      if (target !== undefined && file.pages[target] !== page) out.set(e.id, { page: target });
+      if (target !== undefined && file.pages[target] !== page) { out.set(e.id, { page: target }); continue; }
     }
+    const href = e.link && hrefs && Object.prototype.hasOwnProperty.call(hrefs, e.link) ? pageHref(hrefs[e.link]) : null;
+    if (href) out.set(e.id, { href });
   }
   return out;
+}
+
+/** `href` if it is a page beside this one (a relative `.html` path, maybe with a `#fragment`), else null: no scheme,
+ * so never `javascript:` or another site. */
+export function pageHref(href: unknown): string | null {
+  return typeof href === "string" && /^[A-Za-z0-9._~%/-]+\.html(#[^\s:]*)?$/.test(href) && !href.startsWith("//") ? href : null;
 }
 
 /** `e` as it looks hovered (HoverLook.apply). */

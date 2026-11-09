@@ -19,10 +19,12 @@ USAGE
 OPTIONS
   -o, --output <path>   Where to write it ("-" for stdout); default drawing.js next to the input
   -p, --page <page>     Page name or 1-based number; only that page is included (default the first)
+      --all-pages       Include every page, with links between them working and Back going back (with
+                        --page, the page to start on)
       --at <seconds>    Show that moment as a still
       --clean           Draw precisely instead of sketchy
       --no-controls, --no-autoplay, --no-loop
-      --allow-logic        let the page's click logic run (ADR 0007); it carries the engine (about 850 KB)
+      --allow-logic     let the page's click logic run (ADR 0007); it carries the engine (about 850 KB)
       --label <text>    The player's accessible name
 `;
 
@@ -49,6 +51,7 @@ for (let i = 0; i < args.length; i++) {
       options.at = t;
       break;
     }
+    case "--all-pages": options.allPages = true; break;
     case "--clean": options.clean = true; break;
     case "--no-controls": options.noControls = true; break;
     case "--no-autoplay": options.noAutoplay = true; break;

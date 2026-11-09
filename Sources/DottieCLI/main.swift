@@ -42,6 +42,10 @@ RENDER
       --sketchy         Render sketchy even if the drawing is clean.
       --transparent     No page background (png, apng, svg, html, lottie).
       --allow-logic     html, js: let the page's click logic run (it carries the engine, about 850 KB).
+      --all-pages       html, js: every page in one file, links between them working; each page shown
+                        gets its own address (#Page), so Back goes back. --page is the page to start on.
+      --split           html: every page as a web page of its own, in a folder (-o, or the input's
+                        name): index.html for the first, the rest named after their pages, linked.
       --at <seconds>    For an animated page, the moment to draw (default its poster frame, the end
                         unless set). An html export becomes a still; gif, apng, mp4 and lottie ignore it.
       --state <vars>    Starting values for the page's variables, like down=true,east=false (a bare name
@@ -129,6 +133,10 @@ struct RenderOptions {
     var transparent = false
     /// HTML and js: let the page's click logic run (ADR 0007).
     var allowLogic = false
+    /// HTML and js: every page in one file (`Exporter.player(file:)`).
+    var allPages = false
+    /// HTML: every page as a file of its own, in a folder (`Exporter.playerPages`).
+    var split = false
     var at: Double?
     var lottieMode = Exporter.LottieMode.smooth
     /// Read the file on disk even when the app has it open with unsaved edits.
@@ -190,6 +198,8 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
         case "--sketchy": o.roughness = 1
         case "--transparent": o.transparent = true
         case "--allow-logic": o.allowLogic = true
+        case "--all-pages": o.allPages = true
+        case "--split": o.split = true
         case "--disk": o.disk = true
         case "--state": try parseState(try value(a), into: &o.state)
         case "--lottie-mode":
@@ -215,6 +225,13 @@ func parseRender(_ args: [String]) throws -> RenderOptions {
     if o.output != nil, o.inputs.count > 1 { throw CLIError(message: "-o takes a single input; use --out-dir for several", code: 2) }
     if o.inputs.contains("-"), o.output == nil, o.outDir == nil {
         throw CLIError(message: "reading stdin needs -o (a file, or \"-\" for stdout)", code: 2)
+    }
+    if o.allPages, o.split { throw CLIError(message: "use --all-pages or --split, not both", code: 2) }
+    if o.allPages || o.split, o.at != nil { throw CLIError(message: "--at shows one page; it doesn't go with --all-pages or --split", code: 2) }
+    if o.split {
+        if o.page != nil { throw CLIError(message: "--split writes every page; --page doesn't go with it", code: 2) }
+        if o.output == "-" { throw CLIError(message: "--split writes a folder, not stdout", code: 2) }
+        if let f = o.format, f != .html { throw CLIError(message: "--split writes html", code: 2) }
     }
     return o
 }
@@ -276,12 +293,46 @@ func render(_ doc: DottieDocument, as format: Format, title: String, _ o: Render
     }
 }
 
+/// `file` ready to export every page: `--state` starts the first page shown in it, `--clean` and `--sketchy` apply
+/// to every page.
+func everyPage(_ file: DottieFile, start: Int, _ o: RenderOptions, roughen: Bool = true) throws -> DottieFile {
+    var f = file
+    f.pages[start] = f.pages[start].starting(with: o.state)
+    if roughen, let r = o.roughness { f.pages = f.pages.map { $0.withRoughness(r) } }
+    guard f.pages.contains(where: { !$0.elements.isEmpty }) else { throw CLIError(message: "the drawing is empty; nothing to render") }
+    return f
+}
+
+/// `--all-pages`: every page in one web page or script.
+func renderAll(_ file: DottieFile, start: Int, as format: Format, title: String, _ o: RenderOptions) throws -> Data {
+    let f = try everyPage(file, start: start, o, roughen: format != .js)
+    if format == .js {
+        var options = Exporter.ScriptOptions(clean: o.roughness == 0, allowLogic: o.allowLogic)
+        options.history = true
+        options.page = o.page
+        return Data(try Exporter.script(file: f, options: options).utf8)
+    }
+    guard let page = Exporter.player(file: f, title: title, start: o.page, allowLogic: o.allowLogic) else {
+        throw CLIError(message: "rendering failed")
+    }
+    return Data(page.utf8)
+}
+
+/// `--split`: every page as a web page of its own, by file name.
+func renderPages(_ file: DottieFile, start: Int, title: String, _ o: RenderOptions) throws -> [(name: String, html: String)] {
+    guard let pages = Exporter.playerPages(try everyPage(file, start: start, o), title: title, allowLogic: o.allowLogic) else {
+        throw CLIError(message: "rendering failed")
+    }
+    return pages
+}
+
 func runRender(_ args: [String]) -> Int32 {
     let o: RenderOptions
     do { o = try parseRender(args) } catch let e as CLIError { fail(e.message, code: e.code) } catch { fail("\(error)") }
 
-    var format = o.format
+    var format = o.format ?? (o.split ? .html : nil)
     if format == nil, let out = o.output, out != "-" { format = Format(extension: URL(fileURLWithPath: out).pathExtension) }
+    if o.allPages, let f = format, f != .html, f != .js { fail("--all-pages writes html or js", code: 2) }
     guard let format = format ?? (o.output == nil || o.output == "-" ? .png : nil) else {
         fail("cannot tell the format from '\(o.output ?? "")'; use .png, .svg, .pdf, .html, .mmd, .gif, .apng, .mp4, .js, .json (Lottie) or --format", code: 2)
     }
@@ -318,13 +369,26 @@ func runRender(_ args: [String]) -> Int32 {
                 file = try drawing(at: absolute(input), named: input, onDisk: data, disk: o.disk, verb: "rendering")
             }
             var doc = file.pages[0]
+            var start = 0
             if let spec = o.page {
                 guard let i = file.pageIndex(matching: spec) else {
                     throw CLIError(message: "\(input): no page '\(spec)' (pages: \(file.pages.map(\.name).joined(separator: ", ")))")
                 }
                 doc = file.pages[i]
+                start = i
             }
-            let bytes = try render(doc.starting(with: o.state), as: format, title: name, o)
+            if o.split {
+                let folder = o.output.map(absolute) ?? (o.outDir.map(absolute) ?? directory).appendingPathComponent(name)
+                for (page, html) in try renderPages(file, start: start, title: name, o) {
+                    let target = folder.appendingPathComponent(page)
+                    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                    try Data(html.utf8).write(to: target, options: .atomic)
+                    print(target.path)
+                }
+                continue
+            }
+            let bytes = o.allPages ? try renderAll(file, start: start, as: format, title: name, o)
+                : try render(doc.starting(with: o.state), as: format, title: name, o)
 
             if o.output == "-" {
                 FileHandle.standardOutput.write(bytes)
