@@ -24,3 +24,7 @@ binary = { path = "Contents/Helpers/dottie-cli", name = "dottie" }
 # The download page, apps.phin.tech: `release` (and so `ship`) puts each release's zip there too, with the
 # description above. Betas stay off it, as they stay off the cask.
 [downloads]
+
+# Its page on apps.phin.tech links the manual at dottie.phin.tech, which Dottie builds itself.
+[site]
+docs_url = "https://dottie.phin.tech/"
