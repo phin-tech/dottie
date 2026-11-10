@@ -12,4 +12,4 @@ dependencies = ["app-release"]
 package = false
 
 [tool.uv.sources]
-app-release = { git = "https://git.phin.tech/sam/app-release", tag = "v1.11.0" }
+app-release = { git = "https://git.phin.tech/sam/app-release", tag = "v1.11.1" }
