@@ -411,8 +411,15 @@ public enum DottieScript {
             if let c = f.color { d["color"] = String(format: "#%02x%02x%02x", Int((c.r * 255).rounded()), Int((c.g * 255).rounded()), Int((c.b * 255).rounded())) }
             if let w = f.when { d["when"] = w }
             if f.spread == true { d["spread"] = true }
-            if let v = f.volume { d["volume"] = v }
-            if let list = f.overrides { d["overrides"] = list.map { o -> [String: Any] in o.volume.map { ["when": o.when, "volume": $0] } ?? ["when": o.when] } }
+            if let e = f.volumeExpression { d["volume"] = e } else if let v = f.volume { d["volume"] = v }
+            if let list = f.overrides {
+                d["overrides"] = list.map { o -> [String: Any] in
+                    var x: [String: Any] = ["when": o.when]
+                    if let e = o.volumeExpression { x["volume"] = e } else if let v = o.volume { x["volume"] = v }
+                    if let to = o.to { x["to"] = to.map(\.uuidString) }
+                    return x
+                }
+            }
             return d
         }
 
@@ -886,8 +893,11 @@ public enum DottieScript {
                 let f = try DiagramOps.addFlow(&doc, from: try a.uuid("from"), to: try a.ids("to"), every: a.double("every"),
                                                speed: a.double("speed"), color: try a.color("color"), size: a.double("size"),
                                                when: a.string("when"), spread: a.bool("spread"), volume: a.double("volume"),
+                                               volumeExpression: a.string("volume"),
                                                overrides: try a.list("overrides").map { list in
-                                                   try list.map { FlowOverride(when: try $0.require("when"), volume: $0.double("volume")) }
+                                                   try list.map { FlowOverride(when: try $0.require("when"), volume: $0.double("volume"),
+                                                                               volumeExpression: $0.string("volume"),
+                                                                               to: $0.has("to") ? try $0.ids("to") : nil) }
                                                },
                                                replacing: a.has("id") ? try a.uuid("id") : nil)
                 return Self.describe(f)
@@ -1211,7 +1221,9 @@ public enum DottieScript {
         theme: function (o) { return call("theme", o || {}); },
         logic: function (source) { return call("logic", source === undefined ? {} : { source: source === null ? "" : source }); },
         flow: function (from, to, o) {
-          return call("flow", merge(o, { from: idOf(from), to: (Array.isArray(to) ? to : [to]).map(idOf), id: o && o.id ? idOf(o.id) : undefined }));
+          var list = function (x) { return (Array.isArray(x) ? x : [x]).map(idOf); };
+          var over = o && Array.isArray(o.overrides) ? o.overrides.map(function (x) { return x && x.to !== undefined ? merge(x, { to: list(x.to) }) : x; }) : undefined;
+          return call("flow", merge(o, { from: idOf(from), to: list(to), id: o && o.id ? idOf(o.id) : undefined, overrides: over }));
         },
         flows: function () { return call("flows"); },
         alarm: function (els, o) { return call("alarm", merge(o, { ids: ids(els) })); },
@@ -1482,7 +1494,11 @@ public enum DottieScript {
     queue in front of busy workers). delay on a shape is seconds traffic stays inside it when passing through. \
     Overrides may set capacity and delay too (half the workers down; several holding together: the tightest capacity, \
     the longest delay). A flow's overrides: [{when, volume}] set its volume while a condition holds (a spike: \
-    {when: "spike", volume: 12}). queue: true on a shape makes it where traffic waits: the nearest queue before \
+    {when: "spike", volume: 12}), and [{when, to}] where it goes (a router sending a caller elsewhere; its queue \
+    drains there). On a page with a timeline, time is the timeline's seconds: conditions, a flow's volume (a string \
+    is an expression worked out each frame: "clamp((time - 15) * 180, 0, 3400)") and {...} text read it, so a \
+    scenario unfolds as the page plays, and a condition on time starting or stopping to hold changes it as a click \
+    would; {clock(seconds)} in text shows a time of day (13:05:00). queue: true on a shape makes it where traffic waits: the nearest queue before \
     whatever is full (SQS in front of workers and the table they write to), not right in front of the full thing.
       dottie.metrics({at?, state?, since?})  {elements: {id: {throughput, load?, delay, backlog, depth, inFlight}}, flows: \
     {id: {volume, placed, backlog, backup, transit?}}}: load is throughput over capacity, backlog the rate a queue grows \
@@ -1491,8 +1507,8 @@ public enum DottieScript {
     grows as you watch (the player counts from the last click, exports from the page's start), and when the state \
     changes so there's room again, the queue drains at that room, its messages leaving as packets
       dottie.gauge(target, {metric, x?, y?, near?, width?, height?, style?, max?, warn?, alarm?, label?})  a gauge showing a \
-    metric (throughput, load, delay, backlog, depth, inFlight, transit, backup) of an element or flow as a number, bar or \
-    dial, green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it. near: right|left|above|below \
+    metric (throughput, load, delay, backlog, depth, inFlight, transit, backup) of an element or flow as a number, bar, \
+    dial or slots (a grid of squares, one per unit of max, filled in each flow's color: tasks under a quota), green, amber at warn, red at alarm (load: 0.7 and 0.9); every renderer draws it. near: right|left|above|below \
     places it beside its target (a flow's: its source), clear of other gauges, instead of x and y
       dottie.group(elements, {label, padding?, color?})  a labelled dashed frame behind them: a region, an account, a VPC
       Controls (button, choice, resetButton) take after: an element to sit 12 points to the right of, instead of x \

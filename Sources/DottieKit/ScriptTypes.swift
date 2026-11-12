@@ -352,7 +352,7 @@ extension DottieScript {
         }
 
         type Metric = "throughput" | "load" | "delay" | "backlog" | "depth" | "inFlight" | "transit" | "backup";
-        type GaugeStyle = "number" | "bar" | "dial";
+        type GaugeStyle = "number" | "bar" | "dial" | "slots";
 
         /** The page's metrics in one frame (dottie.metrics): by element id and flow id. */
         interface Metrics {
@@ -756,12 +756,16 @@ extension DottieScript {
             flow(from: Ref, to: Ref | Ref[], options?: { every?: number; speed?: number; color?: Color; size?: number; when?: Condition;
                 /** While the first destination is down, deal packets across every other one that can be reached. */
                 spread?: boolean;
-                /** How much it carries, in the page's own unit (default 1); the biggest flow draws a packet every `every`. */
-                volume?: number;
-                /** Its volume while a condition on variables holds, the last that holds winning (a spike). */
-                overrides?: { when: Condition; volume?: number }[];
+                /** How much it carries, in the page's own unit (default 1); the biggest flow draws a packet every `every`.
+                 * A string is an expression of variables and `time` (the timeline's seconds), worked out each frame: a
+                 * ramp like "clamp((time - 15) * 180, 0, 3400)". */
+                volume?: number | string;
+                /** Its volume, or destinations, while a condition on variables (or `time`) holds, the last that holds
+                 * winning: a spike, or a router sending it elsewhere. Its queue drains to where it goes now. */
+                overrides?: { when: Condition; volume?: number | string; to?: Ref | Ref[] }[];
                 id?: Ref }): FlowInfo;
-            /** A gauge showing a metric of an element or flow: a number, bar or dial, drawn by every renderer. load
+            /** A gauge showing a metric of an element or flow: a number, bar, dial or slots (a grid of squares, one per
+             * unit of max, colored by the flows filling it), drawn by every renderer. load
              * defaults to warn 0.7 and alarm 0.9. */
             gauge(target: Ref, options: { metric: Metric; x?: number; y?: number; near?: "right" | "left" | "above" | "below"; width?: number; height?: number; style?: GaugeStyle;
                 max?: number; warn?: number; alarm?: number; label?: string }): Element;

@@ -16,7 +16,14 @@ extension DiagramOps {
             if let w = e.when { read(w, "\(name(e))'s when") }
             for o in e.overrides ?? [] { read(o.when, "an override on \(name(e))") }
         }
-        for f in doc.flows ?? [] { if let w = f.when { read(w, "a flow's when") } }
+        for f in doc.flows ?? [] {
+            if let w = f.when { read(w, "a flow's when") }
+            if let v = f.volumeExpression { read(v, "a flow's volume") }
+            for o in f.overrides ?? [] {
+                read(o.when, "a flow's override")
+                if let v = o.volumeExpression { read(v, "a flow's override volume") }
+            }
+        }
         return out
     }
 
@@ -34,7 +41,8 @@ extension DiagramOps {
     /// The page's wiring problems, most likely mistakes first; at most `limit`.
     public static func stateWarnings(_ doc: DottieDocument, limit: Int = 8) -> [String] {
         var out: [String] = []
-        let declared = Set((doc.variables ?? [:]).keys)
+        // A page that plays has `time` built in.
+        let declared = Set((doc.variables ?? [:]).keys).union(doc.timeline != nil ? [PageState.time] : [])
         let read = readers(doc), set = setters(doc)
         func similar(_ name: String, in names: [String]) -> String? {
             func plain(_ s: String) -> [Character] { Array(s.lowercased().replacingOccurrences(of: "_", with: "")) }

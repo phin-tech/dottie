@@ -28,7 +28,7 @@ import { type Plan, plan, svgParts, unchanged } from "./svg.ts";
 import { color } from "./svg-util.ts";
 import { planInWorker, plansInWorker } from "./planner.ts";
 import { pageTheme } from "./theme.ts";
-import { applyClick } from "./state.ts";
+import { applyClick, stateValues, timed, timeRegime } from "./state.ts";
 import { posed, posedWithMetrics, posterTime } from "./timeline.ts";
 import type { Var } from "./expression.ts";
 import { logicEngine } from "./logic-loader.ts";
@@ -83,9 +83,31 @@ export class Playback {
   /** What each queue held when the variables last changed, which it drains from (FrameMetrics.carry). */
   carried: Record<string, number> = {};
 
-  /** Seconds since the variables last changed, or null for a still. */
+  /** How fast it plays: 1 is the timeline's own pace. */
+  private pace = 1;
+  /** Which of the page's conditions on `time` held when last drawn (`timeRegime`); null before the first frame. */
+  private regime: string | null = null;
+
+  /** Seconds of the page played since the variables last changed, or null for a still. */
   sinceChange(now = typeof performance === "undefined" ? 0 : performance.now()): number | null {
-    return this.still || typeof performance === "undefined" ? null : (now - this.stateSince) / 1000;
+    return this.still || typeof performance === "undefined" ? null : (now - this.stateSince) / 1000 * this.pace;
+  }
+
+  get speed(): number { return this.pace; }
+  /** Plays `v` times as fast (0.1...16), keeping the time since the state changed. */
+  set speed(v: number) {
+    const next = Math.min(Math.max(Number.isFinite(v) && v > 0 ? v : 1, 0.1), 16);
+    if (typeof performance !== "undefined") {
+      const now = performance.now();
+      this.stateSince = now - (now - this.stateSince) * this.pace / next;
+    }
+    this.pace = next;
+  }
+
+  /** The state changed: what each queue and gauge holds now carries over, and backlog counts from here. */
+  carryOver(state: Record<string, Var> = this.state): void {
+    this.carried = posedWithMetrics(this.page, clampTime(this.last.t), state, this.sinceChange(), this.carried).metrics.carry;
+    this.stateSince = typeof performance === "undefined" ? 0 : performance.now();
   }
   readonly background: RGBA;
   readonly ink: RGBA;
@@ -174,6 +196,11 @@ export class Playback {
   show(i: number): void {
     const n = this.frameCount;
     i = ((i % n) + n) % n;
+    // When a condition on `time` starts or stops holding, the scenario changes as it does when a click changes it
+    // (ADR 0008): queues and gauges carry over from the last frame drawn.
+    const regime = timeRegime(this.page, stateValues(this.page, timed(this.page, this.state, this.plan.times[i])));
+    if (this.regime !== null && regime !== this.regime && !this.still) this.carryOver();
+    this.regime = regime;
     this.drawAt(this.plan.times[i], i);
     this.frame = i;
     this.onFrame?.(i);
@@ -339,7 +366,7 @@ function cleanCopy(page: Page): Page {
 const ElementBase: typeof HTMLElement = typeof HTMLElement === "undefined" ? (class {} as unknown as typeof HTMLElement) : HTMLElement;
 
 export class DottiePlayer extends ElementBase {
-  static observedAttributes = ["src", "page", "at", "clean", "no-controls", "label", "allow-logic", "history", "links"];
+  static observedAttributes = ["src", "page", "at", "clean", "no-controls", "label", "allow-logic", "history", "links", "speed"];
 
   file: DottieFile | null = null;
   playback: Playback | null = null;
@@ -351,6 +378,8 @@ export class DottiePlayer extends ElementBase {
   private time: HTMLOutputElement;
   private sceneLabel: HTMLOutputElement;
   private prev: HTMLButtonElement;
+  private speedButton: HTMLButtonElement;
+  private pace = 1;
   private next: HTMLButtonElement;
   private playing = false;
   private last = 0;
@@ -379,6 +408,7 @@ export class DottiePlayer extends ElementBase {
 <button class="next" aria-label="Next scene" hidden>⏭</button>
 <input class="scrub" type="range" min="0" max="0" value="0" aria-label="Frame">
 <output class="time">0.0s</output>
+<button class="speed" aria-label="Speed">1×</button>
 </div>`;
     const q = <T extends Element>(s: string) => this.root.querySelector(s) as T;
     this.stage = q(".stage");
@@ -396,6 +426,12 @@ export class DottiePlayer extends ElementBase {
     };
     this.scrub.oninput = () => { this.setPlaying(false); this.playback?.show(Number(this.scrub.value)); };
     this.next.onclick = () => this.nextScene();
+    this.speedButton = q(".speed");
+    this.speedButton.onclick = () => {
+      const steps = [0.5, 1, 2, 4, 8];
+      const at = steps.findIndex((s) => s >= this.speed - 1e-9);
+      this.speed = steps[(at + 1) % steps.length];
+    };
     this.prev.onclick = () => this.prevScene();
     this.stage.addEventListener("click", (e) => {
       const b = clickable(e.target);
@@ -428,6 +464,7 @@ export class DottiePlayer extends ElementBase {
       else window.addEventListener("popstate", this.onPopState);
     }
     if (name === "src") void this.load();
+    else if (name === "speed") this.speed = Number(value ?? 1);
     else if (name === "label") this.stage.setAttribute("aria-label", value ?? "");
     else if (this.file) this.mount();
   }
@@ -523,6 +560,7 @@ export class DottiePlayer extends ElementBase {
   private mountPage(file: DottieFile, page: Page, clean: boolean): void {
     const p = new Playback(page, this.stage, { clean, file, hrefs: this.hrefs() });
     p.still = this.hasAttribute("at");
+    p.speed = this.pace;
     this.playback = p;
     if (this.shownPage !== page) {
       const first = this.shownPage === null;
@@ -674,6 +712,16 @@ export class DottiePlayer extends ElementBase {
     });
   }
 
+  /** How fast it plays (the `speed` attribute, and the speed button): 1 is the timeline's pace. */
+  get speed(): number { return this.pace; }
+  set speed(v: number) {
+    this.pace = Math.min(Math.max(Number.isFinite(v) && v > 0 ? v : 1, 0.1), 16);
+    if (this.playback) this.playback.speed = this.pace;
+    const label = (this.pace < 1 ? String(this.pace).replace(/^0/, "") : String(this.pace)) + "×";
+    this.speedButton.textContent = label;
+    this.speedButton.setAttribute("aria-label", `Speed ${label}`);
+  }
+
   /** The page's variables now. */
   get variables(): Record<string, Var> { return { ...(this.playback?.state ?? {}) }; }
 
@@ -684,10 +732,8 @@ export class DottiePlayer extends ElementBase {
     const next = { ...p.state, ...values };
     if (Object.keys(next).every((k) => next[k] === p.state[k])) return;
     // The queues as they stand carry over, so a backlog drains from where it got to.
-    const t = clampTime(p.last.t);
-    p.carried = posedWithMetrics(p.page, t, p.state, p.sinceChange(), p.carried).metrics.carry;
+    p.carryOver();
     p.state = next;
-    p.stateSince = performance.now();
     p.redraw();
     this.dispatchEvent(new CustomEvent("state", { detail: { variables: { ...next } } }));
   }
@@ -727,7 +773,7 @@ export class DottiePlayer extends ElementBase {
     const p = this.playback;
     if (!this.playing || !p) return;
     const step = 1000 / (p.page.timeline?.fps ?? 12);
-    if (this.last) this.acc += Math.min(now - this.last, 1000);
+    if (this.last) this.acc += Math.min(now - this.last, 1000) * this.pace;
     this.last = now;
     let advanced = false;
     while (this.playing && this.acc >= step) {

@@ -6,13 +6,13 @@ import CoreGraphics
 
 /// Shows one metric (ADR 0003). The element it's on is drawn, when the page is posed, as plain paths and a label.
 public struct Gauge: Codable, Equatable, Sendable {
-    public enum Style: String, Codable, Sendable, CaseIterable { case number, bar, dial }
+    public enum Style: String, Codable, Sendable, CaseIterable { case number, bar, dial, slots }
 
     /// One of `PageState.metricNames`.
     public var metric: String
     /// The element or flow it measures.
     public var of: UUID
-    /// The value a full bar or dial stands for; nil is 1 for load, else the target's capacity, else the value.
+    /// The value a full bar or dial, or every square of slots, stands for; nil is 1 for load, else the target's capacity, else the value.
     public var max: Double?
     /// At or past these it turns amber, and red.
     public var warn: Double?
@@ -197,7 +197,7 @@ extension DiagramOps {
     }
 
     /// Adds a gauge showing `metric` of the element or flow `of` (ADR 0003): a clean rectangle that every renderer
-    /// draws as a number, bar or dial. Returns it.
+    /// draws as a number, bar, dial or slots (a grid of squares, one per unit, colored by the flows that fill it). Returns it.
     @discardableResult
     public static func addGauge(_ doc: inout DottieDocument, metric: String, of: UUID, frame: CGRect, style: Gauge.Style? = nil,
                                 max: Double? = nil, warn: Double? = nil, alarm: Double? = nil, label: String? = nil) throws -> Element {

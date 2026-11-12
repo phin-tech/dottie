@@ -1,6 +1,7 @@
 // Conditions and computed values (Expression.swift, ADR 0007), operation for operation, so dottie.js and Dottie
 // agree: numbers and true/false, variable names, metrics (`load(workers)`, or `load` for the element's own),
-// parentheses, `!` and `-`, `* / %`, `+ -`, comparisons, `&&` and `||`, and min, max, abs, floor, ceil, round, clamp.
+// parentheses, `!` and `-`, `* / %`, `+ -`, comparisons, `&&` and `||`, and min, max, abs, floor, ceil, round, clamp,
+// and clock (its number, which text shows as a time of day).
 
 /** A page variable's value: true or false, or a number. */
 export type Var = boolean | number;
@@ -16,7 +17,7 @@ export type Expr =
 
 /** The metrics an expression can read (PageState.metricNames). */
 export const METRIC_NAMES = ["throughput", "load", "delay", "backlog", "depth", "inFlight", "transit", "backup"];
-const FUNCTIONS: Record<string, number | null> = { min: null, max: null, abs: 1, floor: 1, ceil: 1, round: 1, clamp: 3 };
+const FUNCTIONS: Record<string, number | null> = { min: null, max: null, abs: 1, floor: 1, ceil: 1, round: 1, clamp: 3, clock: 1 };
 const MAX_NAME = 64;
 
 /** As a condition reads it: a number holds unless it is 0 (or not a number). */
@@ -64,6 +65,7 @@ export function evaluate(e: Expr, state: Record<string, Var>, metric: MetricRead
         case "floor": return Math.floor(xs[0]);
         case "ceil": return Math.ceil(xs[0]);
         case "round": return Math.floor(xs[0] + 0.5);
+        case "clock": return xs[0];
         default:
           if (xs.some(Number.isNaN)) return NaN;
           return xs[0] < xs[1] ? xs[1] : xs[0] > xs[2] ? xs[2] : xs[0];
@@ -268,6 +270,14 @@ function formatTwo(v: number): string {
   return (v < 0 && n > 0 ? "-" : "") + s;
 }
 
+/** Seconds as a time of day, `13:05:00`, round the clock (PageState.clock); a dash for no number. */
+export function clock(seconds: number): string {
+  if (!Number.isFinite(seconds)) return "–";
+  const s = Math.floor(seconds) % 86400, d = s < 0 ? s + 86400 : s;
+  const two = (n: number) => String(n).padStart(2, "0");
+  return `${two(Math.trunc(d / 3600))}:${two(Math.trunc(d / 60) % 60)}:${two(d % 60)}`;
+}
+
 /** `text` with each `{expression}` that reads only the page's variables replaced by its value (PageState.filling). */
 export function filling(text: string, values: Record<string, Var>): string {
   if (!text.includes("{")) return text;
@@ -279,7 +289,10 @@ export function filling(text: string, values: Record<string, Var>): string {
     const inner = rest.slice(open + 1, close);
     const e = inner.includes("{") ? null : parseExpr(inner);
     const names = e ? exprNames(e) : [];
-    if (e && exprMetrics(e).length === 0 && names.length > 0 && names.every((n) => values[n] !== undefined)) out += describeVar(evaluate(e, values));
+    if (e && exprMetrics(e).length === 0 && names.length > 0 && names.every((n) => values[n] !== undefined)) {
+      const v = evaluate(e, values);
+      out += e.k === "call" && e.fn === "clock" ? clock(num(v)) : describeVar(v);
+    }
     else out += rest.slice(open, close + 1);
     rest = rest.slice(close + 1);
   }

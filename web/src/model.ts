@@ -163,7 +163,7 @@ export interface Gauge {
   max: number | null;
   warn: number | null;
   alarm: number | null;
-  style: "number" | "bar" | "dial" | null;
+  style: "number" | "bar" | "dial" | "slots" | null;
   label: string | null;
 }
 
@@ -247,11 +247,15 @@ export interface Flow {
   when: string | null;
   /** When the first destination can't be reached, deal packets across every other one that can. */
   spread: boolean | null;
-  /** How much it carries (ADR 0003); null is 1. */
-  volume: number | null;
-  /** Its volume while a condition holds, the last that holds winning. */
-  overrides?: { when: string; volume: number | null }[] | null;
+  /** How much it carries (ADR 0003): a number, or an expression of the variables and `time` worked out each frame
+   * (ADR 0008); null is 1. */
+  volume: number | string | null;
+  /** Its volume, and destinations, while a condition holds, the last that holds winning. */
+  overrides?: FlowOverride[] | null;
 }
+
+/** A flow's volume (a number or an expression) and destinations while `when` holds (FlowOverride). */
+export interface FlowOverride { when: string; volume: number | string | null; to?: string[] | null }
 
 /** A drawing defined once on a page and placed by `symbol` elements, with its own timeline (Symbol). */
 export interface Symbol {
@@ -286,7 +290,7 @@ export const KNOWN_FIELDS: Record<string, readonly string[]> = {
   file: ["version", "pages", "images"],
   page: ["id", "name", "layers", "elements", "theme", "customTheme", "logic", "guidesX", "guidesY", "guidesLocked", "timeline", "symbols", "variables", "flows"],
   flow: ["id", "from", "to", "every", "speed", "color", "size", "when", "spread", "volume", "overrides"],
-  flowOverride: ["when", "volume"],
+  flowOverride: ["when", "volume", "to"],
   symbol: ["id", "name", "width", "height", "layers", "elements", "timeline", "button", "params"],
   layer: ["id", "name", "visible", "locked"],
   rgba: ["r", "g", "b", "a"],
@@ -549,7 +553,7 @@ class Reader {
       metric: str(v.metric) ?? "",
       of: typeof v.of === "string" && UUID.test(v.of) ? v.of.toUpperCase() : NO_ID,
       max: finite(v.max), warn: finite(v.warn), alarm: finite(v.alarm),
-      style: style === "number" || style === "bar" || style === "dial" ? style : null,
+      style: style === "number" || style === "bar" || style === "dial" || style === "slots" ? style : null,
       label: str(v.label) ?? null,
     };
   }
@@ -778,17 +782,24 @@ class Reader {
     this.fields(f, "flow");
     const id = (x: unknown): string => (typeof x === "string" && UUID.test(x) ? x.toUpperCase() : NO_ID);
     const finite = (x: unknown): number | null => { const n = num(x); return n !== undefined && Number.isFinite(n) ? n : null; };
+    // A number, or an expression (ADR 0008).
+    const volume = (x: unknown): number | string | null => typeof x === "string" ? x : finite(x);
+    const ids = (x: unknown): string[] | null => Array.isArray(x) && x.every((y) => typeof y === "string")
+      ? (x as string[]).filter((y) => UUID.test(y)).map((y) => y.toUpperCase()) : null;
     return {
       id: id(f.id), from: id(f.from),
-      to: Array.isArray(f.to) && f.to.every((x) => typeof x === "string")
-        ? (f.to as string[]).filter((x) => UUID.test(x)).map((x) => x.toUpperCase()) : [],
+      to: ids(f.to) ?? [],
       every: finite(f.every), speed: finite(f.speed), size: finite(f.size),
       color: isObj(f.color) && ["r", "g", "b", "a"].every((k) => typeof (f.color as Obj)[k] === "number") ? rgba(f.color) ?? null : null,
       when: str(f.when) ?? null,
       spread: f.spread === true ? true : null,
-      volume: finite(f.volume),
+      volume: volume(f.volume),
       overrides: Array.isArray(f.overrides) && f.overrides.length > 0
-        ? f.overrides.filter(isObj).map((o) => { this.fields(o, "flowOverride"); return { when: str(o.when) ?? "", volume: finite(o.volume) }; })
+        ? f.overrides.filter(isObj).map((o) => {
+          this.fields(o, "flowOverride");
+          const to = ids(o.to);
+          return { when: str(o.when) ?? "", volume: volume(o.volume), ...(to && to.length > 0 ? { to } : {}) };
+        })
         : null,
     };
   }

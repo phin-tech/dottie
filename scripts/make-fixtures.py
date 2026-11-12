@@ -875,7 +875,56 @@ def flows():
     qp.extra["flows"] = [{"id": uid(), "from": api2, "to": [table], "every": 0.3, "volume": 2,
                           "overrides": [{"when": "spike", "volume": 5}, {"when": "nope ||", "volume": 99}, {"volume": 7}]}]
     qp.add("rectangle", 200, 200, 120, 60, gauge={"metric": "backlog", "of": sqs, "label": "sqs backlog"})
-    write(EDGE / "flows.dottie", [p, q, c, sp, cap, qp])
+
+    # Time: on a page with a timeline, `time` is the timeline's seconds. At 1s the second flow's volume jumps from 1 to
+    # 6, past what the account's 8 slots hold with the first flow's 3, so it backs up; a `when`, an override and text
+    # read `time` too. Slots gauges show the account's throughput square by square in each flow's color (one per unit
+    # of its capacity), its load (squares in the gauge's own color, the load not split by flow), and a capacity too
+    # big to draw square by square (each square stands for more).
+    tp = Page("Timed")
+    tp.animate(2, fps=10)
+    a1 = tp.add("rectangle", 20, 40, 100, 60, text="rpb")
+    a2 = tp.add("rectangle", 20, 200, 100, 60, text="daily")
+    gate = tp.add("rectangle", 200, 120, 100, 60, text="gate")
+    acct = tp.add("rectangle", 380, 120, 100, 60, text="account", anchor="account", capacity=8,
+                  overrides=[{"when": "time >= 1 && load(account) >= 1", "stroke": rgba(0.86, 0.15, 0.15)}])
+    tp.add("text", 20, 300, 240, 30, text="13:{floor(time * 30 / 10)}{floor(time * 30) % 10} ET")
+    tp.add("rectangle", 300, 300, 120, 30, text="daily run", when="time >= 1")
+    tp.connect(a1, gate); tp.connect(a2, gate); tp.connect(gate, acct)
+    tp.extra = {"flows": [
+        {"id": uid(), "from": a1, "to": [acct], "every": 0.3, "volume": 3, "color": rgba(0.2, 0.4, 0.75)},
+        {"id": uid(), "from": a2, "to": [acct], "every": 0.3, "volume": 1, "color": rgba(0.85, 0.62, 0.15),
+         "overrides": [{"when": "time >= 1", "volume": 6}]},
+    ]}
+    tp.add("rectangle", 540, 20, 200, 120, gauge={"metric": "throughput", "of": acct, "style": "slots", "label": "account tasks"},
+           style=style(roughness=0))
+    tp.add("rectangle", 540, 160, 200, 90, gauge={"metric": "load", "of": acct, "style": "slots", "label": "account load"},
+           style=style(roughness=0))
+    tp.add("rectangle", 540, 270, 200, 90, gauge={"metric": "throughput", "of": acct, "style": "slots", "max": 50000},
+           style=style(roughness=0))
+    # Ramp (ADR 0008): the first flow's volume is an expression of time, so its packets come closer together as it
+    # ramps without those on their way moving; at 1s an override sends the second flow to `spare` instead, and a damaged
+    # expression sends nothing. A clock shows a time of day, and a slots gauge too many squares to draw one a unit.
+    rp = Page("Ramp")
+    rp.animate(2, fps=10)
+    src = rp.add("rectangle", 20, 120, 100, 60, text="src")
+    main = rp.add("rectangle", 300, 40, 100, 60, text="main", capacity=6)
+    spare2 = rp.add("rectangle", 300, 220, 100, 60, text="spare")
+    rp.connect(src, main); rp.connect(src, spare2)
+    rp.extra = {"flows": [
+        {"id": uid(), "from": src, "to": [main], "every": 0.2, "volume": "clamp(time * 4, 1, 6)", "color": rgba(0.2, 0.4, 0.75)},
+        {"id": uid(), "from": src, "to": [main], "every": 0.2, "volume": 2, "color": rgba(0.85, 0.62, 0.15),
+         "overrides": [{"when": "time >= 1", "to": [spare2]}, {"when": "time >= 1.8", "volume": "nope +"}]},
+    ]}
+    rp.add("text", 20, 300, 200, 30, text="{clock(time * 600 + 13 * 3600)}")
+    rp.add("rectangle", 460, 40, 220, 100, gauge={"metric": "throughput", "of": main, "style": "slots", "max": 12000,
+           "label": "a long label for a narrow gauge"}, style=style(roughness=0))
+    # A page's own `time` variable takes the built-in's place.
+    own = Page("Own time")
+    own.animate(2, fps=10)
+    own.extra = {"variables": {"time": 5}}
+    own.add("text", 20, 20, 200, 30, text="time is {time}")
+    write(EDGE / "flows.dottie", [p, q, c, sp, cap, qp, tp, rp, own])
 
 
 def links():

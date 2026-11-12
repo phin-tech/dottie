@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { clickTargets } from "../src/clicks.ts";
 import { parseDottie } from "../src/model.ts";
-import { applyClick, conditionNames, holds } from "../src/state.ts";
+import { applyClick, conditionNames, holds, timeRegime } from "../src/state.ts";
 import { flowRoute } from "../src/flows.ts";
 import { queueKey } from "../src/measure.ts";
 import { posed, posedWithMetrics, still } from "../src/timeline.ts";
@@ -154,4 +154,27 @@ test("queues, flow volume overrides, combined capacities and alarms on an elemen
   assert.equal(posed(qp, 1, { slow: true }).elements.find((e) => e.id === id("worker"))?.capacity, 1);
   assert.equal(frame.elements.find((e) => e.id === id("table"))?.style.stroke.r, 0.86);
   assert.equal(posedWithMetrics(qp, 1, { spike: false }).metrics.flows.get(qp.flows![0].id)?.volume, 2);
+});
+
+test("time (ADR 0008): a ramp's packets keep their places as its rate changes; conditions on time mark the changes", () => {
+  const page = parseDottie(read("edge", "flows.dottie")).pages.find((p) => p.name === "Ramp")!;
+  const ramp = page.flows![0];
+  const at = (t: number) => new Map(posed(page, t, "initial").elements
+    .filter((e) => e.kind === "ellipse" && e.id.startsWith(ramp.id.slice(0, 24))).map((e) => [e.id, e.x] as const));
+  // A packet on its way at 0.70s is 0.05s further on at 0.75s, whatever the rate did meanwhile.
+  const a = at(0.7), b = at(0.75);
+  const shared = [...a.keys()].filter((id) => b.has(id));
+  assert.ok(shared.length >= 3, `${shared.length} packets in both`);
+  const moved = shared.map((id) => b.get(id)! - a.get(id)!);
+  for (const d of moved) assert.ok(Math.abs(d - moved[0]) < 0.5, `moved ${moved.join(", ")}`);
+  // The ramp sends more as it goes; the override sends the second flow to spare at 1s.
+  const m = (t: number) => posedWithMetrics(page, t, "initial").metrics;
+  assert.equal(m(0.5).flows.get(ramp.id)?.volume, 2);
+  assert.equal(m(1.2).flows.get(ramp.id)?.volume, 4.8);
+  const spare = page.elements.find((e) => e.text === "spare")!.id;
+  assert.equal(m(0.5).elements.get(spare)?.throughput, 0);
+  assert.equal(m(1.2).elements.get(spare)?.throughput, 2);
+  assert.equal(timeRegime(page, { time: 0.5 }), "00");
+  assert.equal(timeRegime(page, { time: 1.2 }), "10");
+  assert.equal(posed(page, 1.4, "initial").elements.find((e) => e.text?.startsWith("13:"))?.text, "13:14:00");
 });

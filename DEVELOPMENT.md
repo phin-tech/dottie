@@ -242,7 +242,14 @@ holds. Conditions and computed values are one small expression language (ADR 000
 `web/src/expression.ts`): names, numbers, `!` `-`, `* / %`, `+ -`, comparisons, `&&` `||`, parentheses, metrics and
 `min`/`max`/`abs`/`floor`/`ceil`/`round`/`clamp`, with no loops or code. `fixtures/expressions.json` is a table of
 expressions and their values that both test suites check. Text can show values: `{count}` or `{count * 2}` in a
-label is filled in when the page is posed with its state. A file with number variables, computed clicks or logic is
+label is filled in when the page is posed with its state. On a page with a timeline, the built-in `time` is the timeline's time in seconds
+(ADR 0008; `DottieDocument.timed`, `timed` in `web/src/state.ts`), unless the page has a variable of that name:
+conditions, flows' volumes and text read it, so a scenario can unfold as the page plays (`time >= 20`,
+`{floor(time)}`, `{clock(time * 20 + 13 * 3600)}` for a time of day). A flow's volume, or an override's, can be an
+expression (saved as a string; `Flow.volumeExpression`), and an override can set the flow's `to`. When the conditions on
+`time` that hold change between frames (`timeRegime`), the player and `Simulation.play` carry the queues and gauges over
+as a click does. A time-varying flow places its packets by the count it has sent so far (`sentBy` in `measure.ts`), so
+they don't jump as its rate changes. `<dottie-player speed>` and its speed button play faster or slower. A file with number variables, computed clicks or logic is
 version 3. A page's `logic` is JavaScript defining handlers a click `run`s (ADR 0007, step 2): `web/src/logic.ts`
 runs each in a fresh QuickJS context compiled to WebAssembly (`quickjs-emscripten`), sealed (no `Date`,
 `Math.random`, timers, network or DOM) with a memory and operation budget; `<dottie-player allow-logic>` loads
@@ -273,7 +280,8 @@ sends the posed page only when it changes, and builds packets and gauges as Swif
 room under `capacity`, the rest is backlog at the shape in front of the bottleneck, a shape's `delay` holds packets
 inside it, and the same pass yields the frame's metrics. Then overrides whose condition compares a metric
 (`load(workers) >= 1`) apply their looks, and elements with a `gauge` become plain `.path` elements (frame and label,
-bar or dial), so no renderer draws a gauge itself. The editor (`.all`) leaves both alone.
+bar, dial, or slots: a square per unit of `max`, filled in page order with each flow's color for what it delivers
+through the target, `FrameMetrics.byFlow`), so no renderer draws a gauge itself. The editor (`.all`) leaves both alone.
 A shape with `queue: true` is where backlog waits (the nearest queue before the bottleneck); a flow's `overrides`
 set its volume per state; overrides holding together take the tightest capacity and longest delay; a metric
 comparison with no target means the element's own (`DiagramOps.addAlarm`). `DiagramOps.controlOrigin`,

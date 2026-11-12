@@ -92,8 +92,11 @@ final class SchemaTests: XCTestCase {
             ("click", ClickAction()), ("hover", HoverLook()),
             ("override", StateOverride(when: "a")), ("flow", Flow(from: UUID(), to: [])), ("symbol", Symbol(name: "S", width: 1, height: 1)),
         ]
+        // Saved under another property's name: a flow's volume expression is its `volume`, a string (ADR 0008).
+        let savedAs: [String: Set<String>] = ["flow": ["volumeExpression"]]
         for (def, value) in models {
             let stored = Set(Mirror(reflecting: value).children.compactMap(\.label).map { $0.hasPrefix("_") ? String($0.dropFirst()) : $0 })
+                .subtracting(savedAs[def] ?? [])
             let missing = stored.subtracting(properties(def))
             XCTAssertEqual(missing, [], "\(def): stored properties missing from schema/dottie.schema.json")
         }

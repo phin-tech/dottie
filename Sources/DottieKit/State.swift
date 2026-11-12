@@ -7,6 +7,8 @@ import Foundation
 public enum PageState {
     /// Longest name a variable can have.
     static let maxName = 64
+    /// The built-in name for the timeline's time in seconds, on a page with a timeline (`DottieDocument.timed`).
+    public static let time = "time"
 
     /// Whether `name` can name a variable: a letter or underscore, then letters, digits and underscores.
     public static func isName(_ name: String) -> Bool {
@@ -116,6 +118,35 @@ extension DottieDocument {
         case .initial: return variables ?? [:]
         case .values(let v): return (variables ?? [:]).merging(v) { _, new in new }
         }
+    }
+
+    /// `choice` with the built-in `time` (`PageState.time`) set to `t`, the timeline's time in seconds, so a page that
+    /// plays can change on its own as it goes: a condition `time >= 20`, a flow override, text `{floor(time)}`. Only a
+    /// page with a timeline has it, and a variable of the page's own called `time` takes its place.
+    func timed(_ choice: StateChoice, at t: Double) -> StateChoice {
+        guard timeline != nil, variables?[PageState.time] == nil else { return choice }
+        switch choice {
+        case .all: return .all
+        case .initial: return .values([PageState.time: .number(Timeline.clampTime(t))])
+        case .values(let v):
+            guard v[PageState.time] == nil else { return choice }
+            return .values(v.merging([PageState.time: .number(Timeline.clampTime(t))]) { a, _ in a })
+        }
+    }
+
+    /// Which of the page's conditions that read `time` hold under `choice` at `t`, as a key (timeRegime in
+    /// web/src/state.ts): when it changes as the page plays, the scenario has changed as if clicked (ADR 0008).
+    /// Empty when nothing reads `time`.
+    func timeRegime(_ choice: StateChoice, at t: Double) -> String {
+        guard let values = stateValues(timed(choice, at: t)), values[PageState.time] != nil else { return "" }
+        var out = ""
+        func read(_ c: String?) {
+            guard let c, PageState.names(in: c)?.contains(PageState.time) == true, !PageState.mentionsMetric(c) else { return }
+            out += PageState.holds(c, in: values) ? "1" : "0"
+        }
+        for e in elements { read(e.when); for o in e.overrides ?? [] { read(o.when) } }
+        for f in flows ?? [] { read(f.when); for o in f.overrides ?? [] { read(o.when) } }
+        return out
     }
 
     /// The elements whose `when` doesn't hold under `choice`.

@@ -578,6 +578,8 @@ extension DottieDocument {
     /// With `routes`, the metrics also hold each flow's routes.
     public func posedWithMetrics(at t: Double, state: StateChoice = .initial, since: Double? = nil,
                                  carried: [String: Double] = [:], routes: Bool = false) -> (frame: DottieDocument, metrics: FrameMetrics) {
+        // Conditions, flows' volumes and text can read the timeline's time (`time`).
+        let state = timed(state, at: t)
         let off = stateHidden(state)
         let values = stateValues(state)
         let active = Dictionary(uniqueKeysWithValues: elements.compactMap { e in

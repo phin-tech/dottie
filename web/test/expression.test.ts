@@ -4,13 +4,14 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { evaluate, parseExpr, type Var } from "../src/expression.ts";
+import { evaluate, filling, parseExpr, type Var } from "../src/expression.ts";
 import { applyClick, conditionNames, holds, metricTerm } from "../src/state.ts";
 
 const table = JSON.parse(readFileSync(new URL("../../fixtures/expressions.json", import.meta.url), "utf8")) as {
   cases: { expr: string; state: Record<string, Var>; value: Var }[];
   invalid: string[];
   metrics: { expr: string; state: Record<string, Var>; metrics: Record<string, number>; value: Var }[];
+  fills: { text: string; state: Record<string, Var>; value: string }[];
 };
 
 test("the shared table", () => {
@@ -25,6 +26,7 @@ test("the shared table", () => {
     const e = parseExpr(c.expr)!;
     assert.equal(evaluate(e, c.state, (m, t) => c.metrics[`${m}(${t})`] ?? null), c.value, c.expr);
   }
+  for (const f of table.fills) assert.equal(filling(f.text, f.state), f.value, f.text);
 });
 
 test("old conditions mean what they did", () => {

@@ -10,6 +10,8 @@ final class ExpressionTests: XCTestCase {
         var cases: [Case]
         var invalid: [String]
         var metrics: [Metric]
+        struct Fill: Decodable { var text: String; var state: [String: Var]; var value: String }
+        var fills: [Fill]
     }
 
     private func table() throws -> Table {
@@ -29,6 +31,7 @@ final class ExpressionTests: XCTestCase {
             let e = try XCTUnwrap(Expr.parse(c.expr), c.expr)
             XCTAssertEqual(e.value(c.state) { c.metrics["\($0.metric)(\($0.target))"] }, c.value, c.expr)
         }
+        for f in t.fills { XCTAssertEqual(PageState.filling(f.text, f.state), f.value, f.text) }
     }
 
     func testOldConditionsMeanWhatTheyDid() {
