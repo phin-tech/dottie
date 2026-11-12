@@ -1,5 +1,5 @@
 {
-  "comment": "ADR 0007: the expression language, checked by both test suites (ExpressionTests.swift, expression.test.ts). value null: parses, but the value is whatever the comparison gives (1 < 2 == true is (1 < 2) == true is invalid since comparisons don't chain).",
+  "comment": "ADR 0007: the expression language, checked by both test suites (ExpressionTests.swift, expression.test.ts). value null: parses, but the value is whatever the comparison gives (1 < 2 == true is (1 < 2) == true is invalid since comparisons don't chain). fills: text with {expressions} filled in (clock shows a time of day).",
   "cases": [
     {
       "expr": "down",
@@ -611,6 +611,18 @@
         "neg": -4
       },
       "value": false
+    },
+    {
+      "expr": "clock(count * 2)",
+      "state": {
+        "down": true,
+        "east": false,
+        "count": 3,
+        "stage": 2,
+        "half": 0.5,
+        "neg": -4
+      },
+      "value": 6
     }
   ],
   "invalid": [
@@ -634,7 +646,9 @@
     "load(a(b))",
     "#x",
     "a <> b",
-    "1 < 2 == true"
+    "1 < 2 == true",
+    "clock()",
+    "clock(1, 2)"
   ],
   "metrics": [
     {
@@ -700,6 +714,53 @@
         "load(my anchor)": 0.2
       },
       "value": true
+    }
+  ],
+  "fills": [
+    {
+      "text": "{clock(count * 3600 + 5 * 60 + half * 2)} ET",
+      "state": {
+        "down": true,
+        "east": false,
+        "count": 3,
+        "stage": 2,
+        "half": 0.5,
+        "neg": -4
+      },
+      "value": "03:05:01 ET"
+    },
+    {
+      "text": "{clock(neg)}",
+      "state": {
+        "down": true,
+        "east": false,
+        "count": 3,
+        "stage": 2,
+        "half": 0.5,
+        "neg": -4
+      },
+      "value": "23:59:56"
+    },
+    {
+      "text": "{clock(90000)}",
+      "state": {
+        "x": 1
+      },
+      "value": "{clock(90000)}"
+    },
+    {
+      "text": "{clock(x * 90000)}",
+      "state": {
+        "x": 1
+      },
+      "value": "01:00:00"
+    },
+    {
+      "text": "{clock(x) + 1}",
+      "state": {
+        "x": 1
+      },
+      "value": "2"
     }
   ]
 }

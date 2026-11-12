@@ -42,7 +42,7 @@ function frame(request: string): string {
     if (applied.length === 0 && !g) return;
     let shown = e;
     for (const k of applied) shown = applyOverride(looksOnly(e.overrides![k]), shown);
-    finish.push([e.id, applied, g && shown.gauge ? drawn(gauge(shown, shown.gauge, g.value, page, page.flows ?? [])) : null]);
+    finish.push([e.id, applied, g && shown.gauge ? drawn(gauge(shown, shown.gauge, g.value, page, page.flows ?? [], g)) : null]);
   });
   return JSON.stringify({
     packets: out.packets.map((p) => [p.id, p.x, p.y, p.width, p.layerID]),
@@ -60,6 +60,8 @@ function frame(request: string): string {
  * (`[id, subpaths, stroke, fill or null, width]`). */
 interface Drawn {
   text: string; label: [number, number, number, number]; textColor: RGBA | null; subpaths: PathSubpath[];
+  /** The label's size, when the gauge made it smaller to fit. */
+  fontSize?: number;
   parts: [string, PathSubpath[], RGBA, RGBA | null, number][];
 }
 
@@ -67,6 +69,7 @@ function drawn([back, ...parts]: ReturnType<typeof gauge>): Drawn {
   const l = back.labelRect!;
   return {
     text: back.text ?? "", label: [l.x, l.y, l.width, l.height], textColor: back.style.textColor, subpaths: back.subpaths ?? [],
+    fontSize: back.style.fontSize,
     parts: parts.map((p) => [p.id, p.subpaths ?? [], p.style.stroke, p.style.fill.a > 0 ? p.style.fill : null, p.style.strokeWidth]),
   };
 }

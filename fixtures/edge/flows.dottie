@@ -2442,6 +2442,874 @@
         "slow": false,
         "spike": true
       }
+    },
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "000002C8-0000-4000-8000-0000000002C8",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "rpb",
+          "width": 100,
+          "x": 20,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000002C9-0000-4000-8000-0000000002C9",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "daily",
+          "width": 100,
+          "x": 20,
+          "y": 200
+        },
+        {
+          "height": 60,
+          "id": "000002CA-0000-4000-8000-0000000002CA",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "gate",
+          "width": 100,
+          "x": 200,
+          "y": 120
+        },
+        {
+          "anchor": "account",
+          "capacity": 8,
+          "height": 60,
+          "id": "000002CB-0000-4000-8000-0000000002CB",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "overrides": [
+            {
+              "stroke": {
+                "a": 1,
+                "b": 0.15,
+                "g": 0.15,
+                "r": 0.86
+              },
+              "when": "time >= 1 && load(account) >= 1"
+            }
+          ],
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "account",
+          "width": 100,
+          "x": 380,
+          "y": 120
+        },
+        {
+          "height": 30,
+          "id": "000002CC-0000-4000-8000-0000000002CC",
+          "kind": "text",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "13:{floor(time * 30 / 10)}{floor(time * 30) % 10} ET",
+          "width": 240,
+          "x": 20,
+          "y": 300
+        },
+        {
+          "height": 30,
+          "id": "000002CD-0000-4000-8000-0000000002CD",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 4109647057,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "daily run",
+          "when": "time >= 1",
+          "width": 120,
+          "x": 300,
+          "y": 300
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002CA-0000-4000-8000-0000000002CA",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "000002C8-0000-4000-8000-0000000002C8",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002CE-0000-4000-8000-0000000002CE",
+          "kind": "connector",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 198874155,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002CA-0000-4000-8000-0000000002CA",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "000002C9-0000-4000-8000-0000000002C9",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002CF-0000-4000-8000-0000000002CF",
+          "kind": "connector",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 951240724,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002CB-0000-4000-8000-0000000002CB",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "000002CA-0000-4000-8000-0000000002CA",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002D0-0000-4000-8000-0000000002D0",
+          "kind": "connector",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 3110341368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "gauge": {
+            "label": "account tasks",
+            "metric": "throughput",
+            "of": "000002CB-0000-4000-8000-0000000002CB",
+            "style": "slots"
+          },
+          "height": 120,
+          "id": "000002D3-0000-4000-8000-0000000002D3",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 3437918875,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 200,
+          "x": 540,
+          "y": 20
+        },
+        {
+          "gauge": {
+            "label": "account load",
+            "metric": "load",
+            "of": "000002CB-0000-4000-8000-0000000002CB",
+            "style": "slots"
+          },
+          "height": 90,
+          "id": "000002D4-0000-4000-8000-0000000002D4",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 3880974472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 200,
+          "x": 540,
+          "y": 160
+        },
+        {
+          "gauge": {
+            "max": 50000,
+            "metric": "throughput",
+            "of": "000002CB-0000-4000-8000-0000000002CB",
+            "style": "slots"
+          },
+          "height": 90,
+          "id": "000002D5-0000-4000-8000-0000000002D5",
+          "kind": "rectangle",
+          "layerID": "000002C7-0000-4000-8000-0000000002C7",
+          "seed": 2959719643,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 200,
+          "x": 540,
+          "y": 270
+        }
+      ],
+      "flows": [
+        {
+          "color": {
+            "a": 1,
+            "b": 0.75,
+            "g": 0.4,
+            "r": 0.2
+          },
+          "every": 0.3,
+          "from": "000002C8-0000-4000-8000-0000000002C8",
+          "id": "000002D1-0000-4000-8000-0000000002D1",
+          "to": [
+            "000002CB-0000-4000-8000-0000000002CB"
+          ],
+          "volume": 3
+        },
+        {
+          "color": {
+            "a": 1,
+            "b": 0.15,
+            "g": 0.62,
+            "r": 0.85
+          },
+          "every": 0.3,
+          "from": "000002C9-0000-4000-8000-0000000002C9",
+          "id": "000002D2-0000-4000-8000-0000000002D2",
+          "overrides": [
+            {
+              "volume": 6,
+              "when": "time >= 1"
+            }
+          ],
+          "to": [
+            "000002CB-0000-4000-8000-0000000002CB"
+          ],
+          "volume": 1
+        }
+      ],
+      "id": "000002C6-0000-4000-8000-0000000002C6",
+      "layers": [
+        {
+          "id": "000002C7-0000-4000-8000-0000000002C7",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Timed",
+      "timeline": {
+        "duration": 2,
+        "fps": 10,
+        "tracks": []
+      }
+    },
+    {
+      "elements": [
+        {
+          "height": 60,
+          "id": "000002D8-0000-4000-8000-0000000002D8",
+          "kind": "rectangle",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "src",
+          "width": 100,
+          "x": 20,
+          "y": 120
+        },
+        {
+          "capacity": 6,
+          "height": 60,
+          "id": "000002D9-0000-4000-8000-0000000002D9",
+          "kind": "rectangle",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 1927697874,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "main",
+          "width": 100,
+          "x": 300,
+          "y": 40
+        },
+        {
+          "height": 60,
+          "id": "000002DA-0000-4000-8000-0000000002DA",
+          "kind": "rectangle",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 1614817368,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "spare",
+          "width": 100,
+          "x": 300,
+          "y": 220
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002D9-0000-4000-8000-0000000002D9",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "000002D8-0000-4000-8000-0000000002D8",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002DB-0000-4000-8000-0000000002DB",
+          "kind": "connector",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 2404543604,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "connector": {
+            "end": {
+              "elementID": "000002DA-0000-4000-8000-0000000002DA",
+              "x": 0,
+              "y": 0
+            },
+            "endHead": "arrow",
+            "routing": "straight",
+            "start": {
+              "elementID": "000002D8-0000-4000-8000-0000000002D8",
+              "x": 0,
+              "y": 0
+            },
+            "startHead": "none"
+          },
+          "height": 0,
+          "id": "000002DC-0000-4000-8000-0000000002DC",
+          "kind": "connector",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 821720472,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        {
+          "height": 30,
+          "id": "000002DF-0000-4000-8000-0000000002DF",
+          "kind": "text",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 4109647057,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "{clock(time * 600 + 13 * 3600)}",
+          "width": 200,
+          "x": 20,
+          "y": 300
+        },
+        {
+          "gauge": {
+            "label": "a long label for a narrow gauge",
+            "max": 12000,
+            "metric": "throughput",
+            "of": "000002D9-0000-4000-8000-0000000002D9",
+            "style": "slots"
+          },
+          "height": 100,
+          "id": "000002E0-0000-4000-8000-0000000002E0",
+          "kind": "rectangle",
+          "layerID": "000002D7-0000-4000-8000-0000000002D7",
+          "seed": 198874155,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 0,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "width": 220,
+          "x": 460,
+          "y": 40
+        }
+      ],
+      "flows": [
+        {
+          "color": {
+            "a": 1,
+            "b": 0.75,
+            "g": 0.4,
+            "r": 0.2
+          },
+          "every": 0.2,
+          "from": "000002D8-0000-4000-8000-0000000002D8",
+          "id": "000002DD-0000-4000-8000-0000000002DD",
+          "to": [
+            "000002D9-0000-4000-8000-0000000002D9"
+          ],
+          "volume": "clamp(time * 4, 1, 6)"
+        },
+        {
+          "color": {
+            "a": 1,
+            "b": 0.15,
+            "g": 0.62,
+            "r": 0.85
+          },
+          "every": 0.2,
+          "from": "000002D8-0000-4000-8000-0000000002D8",
+          "id": "000002DE-0000-4000-8000-0000000002DE",
+          "overrides": [
+            {
+              "to": [
+                "000002DA-0000-4000-8000-0000000002DA"
+              ],
+              "when": "time >= 1"
+            },
+            {
+              "volume": "nope +",
+              "when": "time >= 1.8"
+            }
+          ],
+          "to": [
+            "000002D9-0000-4000-8000-0000000002D9"
+          ],
+          "volume": 2
+        }
+      ],
+      "id": "000002D6-0000-4000-8000-0000000002D6",
+      "layers": [
+        {
+          "id": "000002D7-0000-4000-8000-0000000002D7",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Ramp",
+      "timeline": {
+        "duration": 2,
+        "fps": 10,
+        "tracks": []
+      }
+    },
+    {
+      "elements": [
+        {
+          "height": 30,
+          "id": "000002E3-0000-4000-8000-0000000002E3",
+          "kind": "text",
+          "layerID": "000002E2-0000-4000-8000-0000000002E2",
+          "seed": 4003630850,
+          "style": {
+            "bowing": 1,
+            "dash": "solid",
+            "fill": {
+              "a": 0,
+              "b": 0,
+              "g": 0,
+              "r": 0
+            },
+            "fillStyle": "solid",
+            "fontSize": 18,
+            "roughness": 1,
+            "stroke": {
+              "a": 1,
+              "b": 0.13,
+              "g": 0.12,
+              "r": 0.12
+            },
+            "strokeWidth": 2
+          },
+          "text": "time is {time}",
+          "width": 200,
+          "x": 20,
+          "y": 20
+        }
+      ],
+      "id": "000002E1-0000-4000-8000-0000000002E1",
+      "layers": [
+        {
+          "id": "000002E2-0000-4000-8000-0000000002E2",
+          "locked": false,
+          "name": "Layer 1",
+          "visible": true
+        }
+      ],
+      "name": "Own time",
+      "timeline": {
+        "duration": 2,
+        "fps": 10,
+        "tracks": []
+      },
+      "variables": {
+        "time": 5
+      }
     }
   ],
   "version": 2

@@ -71,7 +71,8 @@ public enum Var: Codable, Equatable, Hashable, Sendable, CustomStringConvertible
 
 /// A condition or a computed value, parsed (ADR 0007): numbers and true/false, variable names, metrics
 /// (`load(workers)`, or `load` for the element's own), parentheses, `!` and `-`, `* / %`, `+ -`, comparisons,
-/// `&&` and `||`, and the functions `min`, `max`, `abs`, `floor`, `ceil`, `round` and `clamp`. web/src/expression.ts is
+/// `&&` and `||`, and the functions `min`, `max`, `abs`, `floor`, `ceil`, `round`, `clamp` and `clock` (its number,
+/// which text shows as a time of day). web/src/expression.ts is
 /// the same, operation for operation, so both players agree.
 public indirect enum Expr: Equatable, Sendable {
     case literal(Var)
@@ -84,7 +85,7 @@ public indirect enum Expr: Equatable, Sendable {
     case call(String, [Expr])
 
     /// The functions an expression can call, and how many arguments each takes (nil: one or more).
-    static let functions: [String: Int?] = ["min": nil, "max": nil, "abs": 1, "floor": 1, "ceil": 1, "round": 1, "clamp": 3]
+    static let functions: [String: Int?] = ["min": nil, "max": nil, "abs": 1, "floor": 1, "ceil": 1, "round": 1, "clamp": 3, "clock": 1]
 
     /// `text` parsed, or nil when it isn't an expression.
     public static func parse(_ text: String) -> Expr? {
@@ -118,6 +119,7 @@ public indirect enum Expr: Equatable, Sendable {
             case "floor": return .number(Foundation.floor(xs[0]))
             case "ceil": return .number(Foundation.ceil(xs[0]))
             case "round": return .number(Foundation.floor(xs[0] + 0.5))
+            case "clock": return .number(xs[0])
             default: // clamp
                 if xs.contains(where: \.isNaN) { return .number(.nan) }
                 return .number(xs[0] < xs[1] ? xs[1] : xs[0] > xs[2] ? xs[2] : xs[0])
@@ -373,13 +375,21 @@ extension PageState {
             let inner = String(rest[rest.index(after: open)..<close])
             if !inner.contains("{"), let e = Expr.parse(inner), e.metrics.isEmpty, !e.names.isEmpty,
                e.names.allSatisfy({ values[$0] != nil }) {
-                out += e.value(values).description
+                if case .call("clock", _) = e { out += PageState.clock(e.value(values).number) }
+                else { out += e.value(values).description }
             } else {
                 out += rest[open...close]
             }
             rest = rest[rest.index(after: close)...]
         }
         return out + rest
+    }
+
+    /// Seconds as a time of day, `13:05:00`, round the clock (`{clock(...)}` in text); a dash for no number.
+    public static func clock(_ seconds: Double) -> String {
+        guard seconds.isFinite else { return "–" }
+        let s = Int(Foundation.floor(seconds)) % 86400, d = s < 0 ? s + 86400 : s
+        return String(format: "%02d:%02d:%02d", d / 3600, d / 60 % 60, d % 60)
     }
 
     /// Whether any element's text could show a variable's value.

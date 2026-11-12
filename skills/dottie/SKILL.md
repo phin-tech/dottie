@@ -100,7 +100,11 @@ or the resources `dottie://examples/<name>`. Run one with `run_script` on an emp
    lane), or at the nearest shape marked `queue: true` before it (SQS in front of workers and their table). The
    pile grows while the scenario lasts and drains, as packets, when there's room again. A flow's `overrides:
    [{when: "spike", volume: 12}]` changes its volume per scenario, so a spike is one flow. `add_gauge` shows a metric (load, throughput, backlog, depth, transit, backup, …) as a
-   number, bar or dial.
+   number, bar, dial or `slots` (a square per unit of capacity, in each flow's color: tasks under a quota).
+   On a page with a timeline, conditions, flow volumes and `{…}` text can read `time`, the timeline's seconds, so a
+   scenario unfolds by itself as the page plays: `volume: "clamp((time - 15) * 180, 0, 3400)"` ramps a flow,
+   `{when: "time >= 20", volume: 900}` steps it, an override's `to` reroutes it (its queue drains there), and text
+   `{clock(time * 20 + 13 * 3600)}` shows a time of day.
 3. **States.** `define_state` describes one variable at once: what it takes `down` (faded, traffic goes round it),
    `hide`s, `show`s, `dim`s or `restyle`s (including `cost`, `capacity` and `delay`), connectors whose `send_packet`
    packets `reroute`, and which clicks flip it (`toggled_by`). `add_override` adds one change to one element under

@@ -207,13 +207,99 @@ final class MetricsTests: XCTestCase {
         }
         let frame = doc.posed(at: 1)
         let backs = frame.elements.filter { $0.kind == .path && $0.text != nil }
-        XCTAssertEqual(backs.count, 3)
-        XCTAssertTrue(backs.allSatisfy { $0.text == "load workers\n75%" && $0.gauge == nil })
+        XCTAssertEqual(backs.count, 4)
+        XCTAssertTrue(backs.prefix(3).allSatisfy { $0.text == "load workers\n75%" && $0.gauge == nil })
+        XCTAssertEqual(backs[3].text, "load workers · 75%")   // slots: one line above the squares
         XCTAssertEqual(backs[0].style.textColor, RGBA(hex: "#d97706")!)   // 0.75: past the 0.7 warning
-        XCTAssertEqual(frame.elements.filter { $0.kind == .path }.count, 3 + 2 + 3)   // number; bar track and fill; dial arc, value, needle
+        // number; bar track and fill; dial arc, value, needle; slots' empty squares and the flow's
+        XCTAssertEqual(frame.elements.filter { $0.kind == .path }.count, 4 + 2 + 3 + 2)
         XCTAssertEqual(DottieDocument.formatted("throughput", 12.345), "12.3")
         XCTAssertEqual(DottieDocument.formatted("transit", 0.125), "0.13s")
         XCTAssertEqual(DottieDocument.formatted("load", nil), "–")
         XCTAssertEqual(DottieDocument.number(-0.004, places: 2), "0")
+    }
+
+    func testSlotsAreASquarePerUnitInEachFlowsColor() throws {
+        var (doc, api, _, workers, _) = page()
+        set(&doc, workers) { $0.capacity = 10 }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 3)
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 2)
+        var g = Element(kind: .rectangle, frame: CGRect(x: 600, y: 0, width: 200, height: 120), layerID: doc.layers[0].id)
+        g.gauge = Gauge(metric: "throughput", of: workers, style: .slots, label: "tasks")
+        doc.elements.append(g)
+        let frame = doc.posed(at: 1)
+        XCTAssertEqual(frame.elements.first { $0.id == g.id }?.text, "tasks · 5 / 10")
+        // Ten squares: five empty, then three in the first flow's color and two in the second's.
+        let parts = frame.elements.filter { $0.kind == .path && $0.text == nil }
+        XCTAssertEqual(parts.map { $0.subpaths?.count ?? 0 }, [5, 3, 2])
+    }
+
+    func testTimeIsTheTimelinesSecondsOnAPageThatPlays() throws {
+        var (doc, api, _, workers, _) = page()
+        doc.timeline = Timeline(duration: 10)
+        set(&doc, workers) { $0.capacity = 4 }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 1)
+        doc.flows![0].overrides = [FlowOverride(when: "time >= 5", volume: 3)]
+        var label = Element(kind: .text, frame: CGRect(x: 0, y: 400, width: 200, height: 30), layerID: doc.layers[0].id)
+        label.text = "t = {floor(time)}"
+        label.when = "time >= 2"
+        doc.elements.append(label)
+        XCTAssertNil(doc.posed(at: 1).elements.first { $0.id == label.id })
+        XCTAssertEqual(doc.posed(at: 3.5).elements.first { $0.id == label.id }?.text, "t = 3")
+        XCTAssertEqual(doc.posedWithMetrics(at: 4).metrics.elements[workers]?.throughput, 1)
+        XCTAssertEqual(doc.posedWithMetrics(at: 6).metrics.elements[workers]?.throughput, 3)
+        XCTAssertTrue(DiagramOps.stateWarnings(doc).isEmpty)
+        // A variable of the page's own called time wins.
+        try doc.setVariable("time", to: 9)
+        XCTAssertEqual(doc.posed(at: 3.5).elements.first { $0.id == label.id }?.text, "t = 9")
+    }
+
+    func testAVolumeCanBeAnExpressionAndAnOverrideCanReroute() throws {
+        var (doc, api, _, workers, spare) = page()
+        doc.timeline = Timeline(duration: 10)
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volumeExpression: "clamp(time, 1, 4)",
+                               overrides: [FlowOverride(when: "time >= 6", to: [spare])])
+        XCTAssertThrowsError(try DiagramOps.addFlow(&doc, from: api, to: [workers], volumeExpression: "load(workers) * 2"))
+        XCTAssertEqual(doc.posedWithMetrics(at: 2.5).metrics.elements[workers]?.throughput, 2.5)
+        XCTAssertEqual(doc.posedWithMetrics(at: 5).metrics.elements[workers]?.throughput, 4)
+        XCTAssertEqual(doc.posedWithMetrics(at: 7).metrics.elements[spare]?.throughput, 4)
+        XCTAssertEqual(doc.posedWithMetrics(at: 7).metrics.elements[workers]?.throughput, 0)
+        // Saved as a string where a number would be, and read back the same.
+        let data = try JSONEncoder().encode(doc.flows!)
+        let json = try XCTUnwrap(String(data: data, encoding: .utf8))
+        XCTAssertTrue(json.contains("\"volume\":\"clamp(time, 1, 4)\""), json)
+        XCTAssertEqual(try JSONDecoder().decode([Flow].self, from: data), doc.flows)
+        XCTAssertTrue(DiagramOps.describeFlows(doc)[0].contains("volume clamp(time, 1, 4)"))
+    }
+
+    func testCrossingAConditionOnTimeCarriesTheQueuesOverAsAClickWould() throws {
+        var (doc, api, queue, workers, _) = page()
+        doc.timeline = Timeline(duration: 10)
+        doc.timeline!.fps = 10
+        set(&doc, workers) { $0.capacity = 1 }
+        set(&doc, queue) { $0.queue = true }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 1, overrides: [FlowOverride(when: "time >= 2 && time < 5", volume: 3)])
+        XCTAssertEqual(doc.timeRegime(.initial, at: 1), "0")
+        XCTAssertEqual(doc.timeRegime(.initial, at: 3), "1")
+        var sim = try Simulation(doc)
+        sim.wait(3)
+        // The spike started at 2s: backlog has piled up for a second since, not three.
+        XCTAssertEqual(sim.sinceChange, 1, accuracy: 1e-6)
+        sim.wait(3)
+        // It ended at 5s: what the queue held then carries over and drains.
+        XCTAssertEqual(sim.sinceChange, 1, accuracy: 1e-6)
+        XCTAssertEqual(try XCTUnwrap(sim.carried[DottieDocument.queueKey(shape: queue, flow: doc.flows![0].id)]), 6, accuracy: 0.3)
+    }
+
+    func testSlotsGroupThousandsAndSayWhatASquareIsWhenItIsMore() throws {
+        var (doc, api, _, workers, _) = page()
+        set(&doc, workers) { $0.capacity = 35200 }
+        try DiagramOps.addFlow(&doc, from: api, to: [workers], volume: 1500)
+        var g = Element(kind: .rectangle, frame: CGRect(x: 600, y: 0, width: 300, height: 120), layerID: doc.layers[0].id)
+        g.gauge = Gauge(metric: "throughput", of: workers, style: .slots, label: "pool")
+        doc.elements.append(g)
+        let back = try XCTUnwrap(doc.posed(at: 1).elements.first { $0.id == g.id })
+        XCTAssertEqual(back.text, "pool · 1,500 / 35,200 · 1 □ = 20")
+        XCTAssertLessThan(back.style.fontSize, 18)   // made smaller to fit across
     }
 }

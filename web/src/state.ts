@@ -2,7 +2,7 @@
 // pick which elements a page draws, so a looping diagram can change without its timeline stopping or jumping.
 
 import { evaluate, exprMetrics, exprNames, parseExpr, truthy, type Var } from "./expression.ts";
-import { cloneElement, type ClickAction, type ClickValue, type Element, type Page, type StateOverride } from "./model.ts";
+import { clampTime, cloneElement, type ClickAction, type ClickValue, type Element, type Page, type StateOverride } from "./model.ts";
 
 const MAX_NAME = 64;
 
@@ -56,6 +56,31 @@ export function stateValues(page: Page, choice: StateChoice): Record<string, Var
   if (choice === "all") return null;
   if (choice === "initial") return { ...(page.variables ?? {}) };
   return { ...(page.variables ?? {}), ...choice };
+}
+
+/** The built-in name for the timeline's time in seconds, on a page with a timeline (PageState.time). */
+export const TIME = "time";
+
+/** `choice` with the built-in `time` set to `t`, the timeline's time, so a page that plays can change on its own
+ * (DottieDocument.timed): only on a page with a timeline, and a variable of the page's own called `time` wins. */
+export function timed(page: Page, choice: StateChoice, t: number): StateChoice {
+  if (choice === "all" || !page.timeline || (page.variables ?? {})[TIME] !== undefined) return choice;
+  const v = choice === "initial" ? {} : choice;
+  return v[TIME] !== undefined ? choice : { ...v, [TIME]: clampTime(t) };
+}
+
+/** Which of the page's conditions that read `time` hold with these values, as a key (PageState.timeRegime): when it
+ * changes as the page plays, the scenario has changed as if clicked (ADR 0008). Empty when nothing reads `time`. */
+export function timeRegime(page: Page, values: Record<string, Var> | null): string {
+  if (!values || values[TIME] === undefined) return "";
+  let out = "";
+  const read = (c: string | null | undefined) => {
+    if (!c || !(conditionNames(c) ?? []).includes(TIME) || mentionsMetric(c)) return;
+    out += holds(c, values) ? "1" : "0";
+  };
+  for (const e of page.elements) { read(e.when); for (const o of e.overrides ?? []) read(o.when); }
+  for (const f of page.flows ?? []) { read(f.when); for (const o of f.overrides ?? []) read(o.when); }
+  return out;
 }
 
 /** The ids of the elements whose `when` doesn't hold under `choice`. */

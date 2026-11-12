@@ -543,12 +543,17 @@ actor DottieTools {
                 "spread": prop("boolean", "While the first destination can't be reached, deal packets in turn across every other "
                                + "destination that can (a downed region's traffic shared by the rest), rather than all to the next"),
                 "volume": prop("number", "How much it carries, in the page's own unit (requests a second, messages, trucks a day; "
-                               + "default 1). Illustrative: pick numbers that make the scenario read clearly, not a forecast. Shapes and connectors with a capacity (update_element) limit it; the biggest flow "
+                               + "default 1), or as a string an expression of page variables and `time` (the timeline's seconds) "
+                               + "worked out each frame, a ramp like \"clamp((time - 15) * 180, 0, 3400)\". Illustrative: pick numbers that make the scenario read clearly, not a forecast. Shapes and connectors with a capacity (update_element) limit it; the biggest flow "
                                + "draws a packet every `every`, the rest proportionally fewer"),
                 "overrides": .object(["type": "array", "items": .object(["type": "object", "required": .array(["when"]),
-                    "properties": .object(["when": .object(["type": "string"]), "volume": .object(["type": "number"])])]),
-                    "description": .string("Its volume while a condition on page variables holds, the last that holds winning, e.g. "
-                        + "[{\"when\": \"spike\", \"volume\": 12}]: one flow instead of an extra one per scenario")]),
+                    "properties": .object(["when": .object(["type": "string"]),
+                                           "volume": .object(["type": .array([.string("number"), .string("string")])]),
+                                           "to": .object(["type": "array", "items": .object(["type": "string"])])])]),
+                    "description": .string("Its volume (a number or an expression), or destinations (`to`, shape ids), while a condition "
+                        + "on page variables or `time` holds, the last that holds winning, e.g. [{\"when\": \"spike\", \"volume\": 12}] or "
+                        + "[{\"when\": \"split\", \"to\": [\"<id>\"]}]: one flow instead of an extra one per scenario, and its queue "
+                        + "drains to where it goes now")]),
                 "id": prop("string", "An existing flow's id, to change or remove it"),
                 "remove": prop("boolean", "Remove the flow named by id"),
              ], required: ["path"])),
@@ -610,7 +615,7 @@ actor DottieTools {
                 "color": prop("string", "Hex color (default red)"),
              ], required: ["path", "ids"])),
         Tool(name: "add_gauge",
-             description: "Add a gauge, to present a scenario: a box showing a metric of a shape, connector or flow as a number, a bar or a dial, green, "
+             description: "Add a gauge, to present a scenario: a box showing a metric of a shape, connector or flow as a number, a bar, a dial or slots (a grid of squares, one per unit of max, in the colors of the flows filling it), green, "
                 + "amber at warn and red at alarm (load defaults to 0.7 and 0.9), drawn by every renderer and updated as states "
                 + "change. Metrics come from add_flow traffic and capacities: throughput (volume through it), load (throughput "
                 + "over capacity), delay, backlog (volume waiting at a shape: how fast its queue grows), inFlight (packets on a "
@@ -1484,11 +1489,12 @@ actor DottieTools {
                                                   return c
                                               },
                                               size: a.double("size"), when: a.string("when"), spread: a.bool("spread"),
-                                              volume: a.double("volume"),
+                                              volume: a.double("volume"), volumeExpression: a.string("volume"),
                                               overrides: try a.array("overrides").map { list in
                                                   try list.map { o -> FlowOverride in
                                                       guard let w = o.string("when") else { throw ToolFailure(message: "Each flow override needs 'when'") }
-                                                      return FlowOverride(when: w, volume: o.double("volume"))
+                                                      return FlowOverride(when: w, volume: o.double("volume"), volumeExpression: o.string("volume"),
+                                                                          to: try o.uuids("to"))
                                                   }
                                               },
                                               replacing: a.string("id") == nil ? nil : try a.uuid("id"))
@@ -2056,7 +2062,7 @@ actor DottieTools {
                     ?? CGRect(x: a.double("x") ?? 0, y: a.double("y") ?? 0, width: size.width, height: size.height)
                 e = try DiagramOps.addGauge(&file.pages[p], metric: try a.require("metric"), of: try a.uuid("of"), frame: frame,
                                             style: try a.string("style").map { s in
-                                                guard let v = Gauge.Style(rawValue: s) else { throw ToolFailure(message: "'style' must be number, bar or dial") }
+                                                guard let v = Gauge.Style(rawValue: s) else { throw ToolFailure(message: "'style' must be number, bar, dial or slots") }
                                                 return v
                                             },
                                             max: a.double("max"), warn: a.double("warn"), alarm: a.double("alarm"), label: a.string("label"))

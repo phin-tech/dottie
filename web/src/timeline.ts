@@ -9,7 +9,7 @@ import {
 } from "./model.ts";
 import { Polyline, roundHalfAway, type Point, type Rect } from "./path.ts";
 import { boiled } from "./rng.ts";
-import { activeOverrides, applyOverride, type StateChoice, stateHidden, stateValues } from "./state.ts";
+import { activeOverrides, applyOverride, type StateChoice, stateHidden, stateValues, timed } from "./state.ts";
 import { emptyMetrics, finishing, flowFrame, type FrameMetrics } from "./measure.ts";
 import { mentionsMetric } from "./state.ts";
 import { expandingSymbols } from "./symbols.ts";
@@ -239,6 +239,8 @@ export function posed(page: Page, t: number, state: StateChoice = "initial", sin
  * `carried` is what each queue held when the state last changed (`FrameMetrics.carry` then), which it drains from. */
 export function posedWithMetrics(page: Page, t: number, state: StateChoice = "initial", since: number | null = null,
   carried: Record<string, number> = {}): { frame: Page; metrics: FrameMetrics } {
+  // Conditions, flows' volumes and text can read the timeline's time (`time`).
+  state = timed(page, state, t);
   const off = stateHidden(page, state);
   const values = stateValues(page, state);
   const active = new Map<string, StateOverride[]>();

@@ -173,15 +173,28 @@ public struct Simulation: Sendable {
 
     private mutating func play(_ seconds: Double) {
         guard let tl = doc.timeline, seconds > 0 else { return }
-        if playing { sinceChange += seconds }
-        var steps = Int((seconds * Timeline.clampFPS(tl.fps) + 1e-9).rounded(.down))
+        let fps = Timeline.clampFPS(tl.fps), dt = 1 / fps
+        let wasPlaying = playing, start = sinceChange
+        // When a condition on `time` starts or stops holding, the scenario changes as a click changes it (ADR 0008):
+        // the queues carry over from the frame before, and backlog counts from that step.
+        var crossedAt: Double? = nil
+        var steps = Int((seconds * fps + 1e-9).rounded(.down)), k = 0
         while playing, steps > 0 {
             steps -= 1
             let (next, stop) = step(frame)
             if stop, next == 0, frame + 1 >= frameCount { playing = false; break }
+            k += 1
+            let was = frame
             frame = next
+            let at = Double(k) * dt
+            if doc.timeRegime(.values(state), at: times[was]) != doc.timeRegime(.values(state), at: times[frame]) {
+                let since = crossedAt.map { at - dt - $0 } ?? start + at - dt
+                carried = doc.metrics(at: times[was], state: .values(state), since: since, carried: carried).carry
+                crossedAt = at
+            }
             if stop { playing = false }
         }
+        if wasPlaying { sinceChange = crossedAt.map { seconds - $0 } ?? start + seconds }
     }
 
     /// Plays on to the next scene, as the Next button does.

@@ -6,19 +6,23 @@
 import type { Element, Flow, Gauge, Page, PathSubpath, RGBA, Style } from "./model.ts";
 import { clamp, DEFAULT_COLOR, DEFAULT_EVERY, DEFAULT_SIZE, DEFAULT_SPEED, flowTree, packetID, routeCost, type FlowTree } from "./flows.ts";
 import { Polyline, type Point } from "./path.ts";
-import { applyOverride, holds, looksOnly, mentionsMetric, type MetricTerm } from "./state.ts";
+import { applyOverride, conditionNames, holds, looksOnly, mentionsMetric, TIME, type MetricTerm } from "./state.ts";
 import { tracing } from "./timeline.ts";
 import { indexOf } from "./connector.ts";
-import type { Var } from "./expression.ts";
+import { evaluate, exprMetrics, num, parseExpr, type Var } from "./expression.ts";
 
 /** A connector's or shape's metrics in one frame (ElementMetrics). */
 export interface ElementMetrics { throughput: number; load: number | null; delay: number; backlog: number; inFlight: number; depth: number }
 /** A flow's metrics in one frame (FlowMetrics). */
 export interface FlowMetrics { volume: number; placed: number; backlog: number; backup: number; transit: number | null }
 /** Every metric of one frame (FrameMetrics). */
-export interface FrameMetrics { elements: Map<string, ElementMetrics>; flows: Map<string, FlowMetrics>; carry: Record<string, number> }
+export interface FrameMetrics {
+  elements: Map<string, ElementMetrics>; flows: Map<string, FlowMetrics>; carry: Record<string, number>;
+  /** Per element, the volume each flow delivers through it (not counting what waits), for a slots gauge's colors. */
+  byFlow: Map<string, Map<string, number>>;
+}
 
-export const emptyMetrics = (): FrameMetrics => ({ elements: new Map(), flows: new Map(), carry: {} });
+export const emptyMetrics = (): FrameMetrics => ({ elements: new Map(), flows: new Map(), carry: {}, byFlow: new Map() });
 
 /** `metric` of the element or flow `id`, or null when it has none. */
 export function metricValue(m: FrameMetrics, metric: string, id: string): number | null {
@@ -47,14 +51,60 @@ export function metricValue(m: FrameMetrics, metric: string, id: string): number
 
 const TINY = 1e-9;
 
-const amount = (f: Flow): number => clamp(f.volume, 1, 0, 1e12);
+/** A volume worked out (ADR 0008): a number as it is, 0...1e12 (null or not finite: 1); an expression of the
+ * variables and `time` with these values, 0...1e12 (one that can't be read, reads a metric, or isn't a number: 0). */
+function volumeIn(v: number | string | null, values: Record<string, Var> | null): number {
+  if (typeof v !== "string") return clamp(v, 1, 0, 1e12);
+  const e = parseExpr(v);
+  if (!e || exprMetrics(e).length > 0) return 0;
+  const x = num(evaluate(e, values ?? {}));
+  return Number.isFinite(x) ? Math.min(Math.max(x, 0), 1e12) : 0;
+}
 
-/** The volume a flow carries with these values (Flow.amount(_:)): the last override that holds, else its own. */
+/** The volume a flow carries with these values (null: its own): the last override that holds, else its own. */
 function amountIn(f: Flow, values: Record<string, Var> | null): number {
-  if (values === null || !f.overrides) return amount(f);
-  let v: number | null = null;
-  for (const o of f.overrides) if (o.volume !== null && !mentionsMetric(o.when) && holds(o.when, values)) v = o.volume;
-  return v === null ? amount(f) : Math.min(Math.max(Number.isFinite(v) ? v : 1, 0), 1e12);
+  let v = f.volume;
+  if (values !== null && f.overrides) {
+    for (const o of f.overrides) if (o.volume !== null && !mentionsMetric(o.when) && holds(o.when, values)) v = o.volume;
+  }
+  return volumeIn(v, values);
+}
+
+/** Where a flow goes with these values: the destinations of the last override that holds and sets some, else its own. */
+function targetsIn(f: Flow, values: Record<string, Var> | null): string[] {
+  let to = f.to;
+  if (values !== null && f.overrides) {
+    for (const o of f.overrides) if (o.to && o.to.length > 0 && !mentionsMetric(o.when) && holds(o.when, values)) to = o.to;
+  }
+  return to;
+}
+
+/** Whether a flow's volume can change as `time` passes: an expression, or an override whose condition reads it. */
+function timeVarying(f: Flow): boolean {
+  if (typeof f.volume === "string") return true;
+  return (f.overrides ?? []).some((o) => o.volume !== null && (typeof o.volume === "string" || (conditionNames(o.when) ?? []).includes(TIME)));
+}
+
+/** Seconds between the points at which a time-varying flow's packet count is summed. */
+const STEP = 0.05;
+/** Per flow and values (but `time`), the packets sent by each STEP: `sums[n]` by `n × STEP` seconds. */
+const sent = new Map<string, number[]>();
+
+/** How many packets a flow whose volume changes with `time` has sent by each STEP up to `t`, at `rate(τ)` packets a
+ * second: summed once and kept, so its packets keep their places however its volume changes. */
+function sentBy(key: string, t: number, rate: (tau: number) => number): number[] {
+  let sums = sent.get(key);
+  if (!sums) {
+    if (sent.size > 64) sent.clear();
+    sums = [0];
+    sent.set(key, sums);
+  }
+  const need = Math.ceil(t / STEP) + 1;
+  for (let n = sums.length; n <= need && n < 200000; n++) {
+    // Trapezoids: the rate at both ends of each step.
+    sums.push(sums[n - 1] + (rate((n - 1) * STEP) + rate(n * STEP)) / 2 * STEP);
+  }
+  return sums;
 }
 
 /** A shape's delay as traffic feels it: 0...3600 seconds. */
@@ -97,7 +147,8 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     if (e.kind === "connector" && !e.connector) continue;
     metrics.elements.set(e.id, { throughput: 0, load: null, delay: e.kind !== "connector" ? delayOf(e) : 0, backlog: 0, inFlight: 0, depth: 0 });
   }
-  const list = flows ?? [];
+  // Each flow's destinations as its overrides set them now.
+  const list = (flows ?? []).map((f) => { const to = targetsIn(f, values); return to === f.to ? f : { ...f, to }; });
   // Room left on everything with a capacity.
   const room = new Map<string, number>();
   for (const e of frame.elements) {
@@ -151,11 +202,18 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
   };
   const union = (a: Set<string>, b: Set<string>) => new Set([...a, ...b]);
   const bump = (id: string, f: (m: ElementMetrics) => void) => { const m = metrics.elements.get(id); if (m) f(m); };
+  const deliver = (id: string, flow: string, a: number) => {
+    let m = metrics.byFlow.get(id);
+    if (!m) { m = new Map(); metrics.byFlow.set(id, m); }
+    m.set(flow, (m.get(flow) ?? 0) + a);
+  };
 
   // Flows leaving the same shape take turns; the page's biggest flow draws a packet every `every` seconds.
   const leaving = new Map<string, number>(), turn: number[] = [];
   for (const flow of list) { const n = leaving.get(flow.from) ?? 0; turn.push(n); leaving.set(flow.from, n + 1); }
-  const biggest = list.length > 0 ? Math.max(...list.map(amount)) : 1;
+  // A volume that changes with time is measured at its start, so the page's packets don't change spacing as it plays.
+  const atStart = values !== null && values[TIME] !== undefined ? { ...values, [TIME]: 0 } : values;
+  const biggest = list.length > 0 ? Math.max(...list.map((f) => volumeIn(f.volume, atStart)), TINY) : 1;
   const packets: Element[] = [];
   const waitingBy = new Map<string, [string, number][]>();
   const everyOf = (flow: Flow) =>
@@ -231,7 +289,10 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
 
     // Metrics.
     for (const p of placements) {
-      for (const id of [...p.shapes, ...p.hops.map(([h]) => h)]) bump(id, (m) => { m.throughput += p.amount; });
+      for (const id of [...p.shapes, ...p.hops.map(([h]) => h)]) {
+        bump(id, (m) => { m.throughput += p.amount; });
+        if (!p.waits) deliver(id, flow.id, p.amount);
+      }
       if (!p.waits) fm.placed += p.amount;
     }
     for (const [at, a] of waiting) { bump(at, (m) => { m.backlog += a; }); fm.backlog += a; }
@@ -248,18 +309,49 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
     for (const p of placements) { sum += p.amount / Math.max(volume, TINY); cumulative.push(sum); }
     if (cumulative.length > 0 && Math.abs(cumulative[cumulative.length - 1] - 1) < 1e-9) cumulative[cumulative.length - 1] = 1;
     let transitSum = 0;
+    // A flow whose volume changes as the page plays sends its packets at the rate of the moment (ADR 0008): packet k
+    // leaves when the packets sent since the start reach k, so the ones on their way stay put as the rate changes.
+    let leftAt: ((k: number) => number) | null = null, sentNow = 0;
+    if (values !== null && values[TIME] !== undefined && timeVarying(flow)) {
+      const base = clamp(flow.every, DEFAULT_EVERY, 0.05, 60) * biggest;
+      const rate = (tau: number) => {
+        const v = amountIn(flow, { ...values, [TIME]: tau });
+        return v > TINY ? Math.min(v / base, 20) : 0;
+      };
+      const others = Object.fromEntries(Object.entries(values).filter(([k]) => k !== TIME));
+      const sums = sentBy(JSON.stringify([flow.id, flow.volume, flow.overrides ?? null, base, others]), t, rate);
+      const shift = turn[i] / leaving.get(flow.from)!;
+      const sentAt = (tau: number) => {
+        const n = Math.min(Math.floor(tau / STEP), sums.length - 2), u = (tau - n * STEP) / STEP;
+        return sums[n] + (sums[n + 1] - sums[n]) * u + shift;
+      };
+      sentNow = sentAt(t);
+      // The moment packet k left: found by halving, the count only growing with time.
+      leftAt = (k: number) => {
+        let a = 0, b = t;
+        if (sentAt(0) >= k) return 0;
+        for (let q = 0; q < 40; q++) { const m = (a + b) / 2; if (sentAt(m) >= k) b = m; else a = m; }
+        return b;
+      };
+    }
     placements.forEach((p, r) => {
       const w = way(p.hops, p.shapes);
       if (!w) return;
       const travel = w.length / speed + w.inside.reduce((s, x) => s + x[2], 0);
       if (!p.waits) transitSum += travel * p.amount;
-      const lo = Math.ceil((t - phase - travel) / every);
-      const hi = Math.floor((t - phase) / every);
+      let lo = Math.ceil((t - phase - travel) / every);
+      let hi = Math.floor((t - phase) / every);
+      if (leftAt) {
+        hi = Math.floor(sentNow);
+        // Back from now until a packet left longer ago than the way takes.
+        lo = hi + 1;
+        while (lo > 0 && hi - lo < 3999 && t - leftAt(lo - 1) <= travel) lo--;
+      }
       const below = r === 0 ? 0 : cumulative[r - 1], upTo = cumulative[r];
       const dealt = (c: number, k: number) => Math.floor((k + 1) * c) - Math.floor(k * c);
       for (let k = Math.max(lo, hi - 3999); k <= hi; k++) {
         if (dealt(upTo, k) - dealt(below, k) !== 1) continue;
-        const d = along(w, t - k * every - phase, speed);
+        const d = along(w, leftAt ? t - leftAt(k) : t - k * every - phase, speed);
         if (d === null) continue;
         const s = w.stretches.find(([, a, b]) => d >= a && d <= b);
         if (s) bump(s[0], (m) => { m.inFlight += 1; });
@@ -322,7 +414,10 @@ export function flowFrame(flows: Flow[] | null, frame: Page, t: number, values: 
           depth = Math.max(0, before - total * since);
           if (depth > TINY) {
             for (const [id, v] of trial) room.set(id, v);
-            for (const o of outlets) for (const id of [...o.shapes, ...o.hops.map(([h]) => h)]) bump(id, (m) => { m.throughput += o.rate; });
+            for (const o of outlets) for (const id of [...o.shapes, ...o.hops.map(([h]) => h)]) {
+              bump(id, (m) => { m.throughput += o.rate; });
+              deliver(id, flow.id, o.rate);
+            }
           }
           // The drained traffic: packets leaving the queue along each way while it empties.
           const lasts = before / total;
@@ -395,7 +490,9 @@ export function metricLookup(m: FrameMetrics, frame: Page): (t: MetricTerm, own:
 
 /** What finishing does to one element: which of its overrides that compare metrics hold (their looks apply, in
  * order), and, for a gauge, the reading it shows. */
-export interface Finish { applied: number[]; gauge: { value: number | null } | null }
+export interface Finish { applied: number[]; gauge: Reading | null }
+/** What a gauge shows: its reading (eased), the reading it is easing to, and what each flow brings to its target. */
+export interface Reading { value: number | null; settled?: number | null; shares?: [string, number][] }
 
 /** For each of `elements`, the overrides that compare metrics that hold and the reading a gauge shows (easing, over
  * `GAUGE_EASE` seconds since the state changed, from its reading then, `carried`); with no values ("all", the
@@ -414,14 +511,16 @@ export function finishPlan(elements: Element[], metrics: FrameMetrics, values: R
     // The editor ("all", no values) edits the gauge itself, a rectangle.
     const g = values === null ? null : e.gauge;
     if (!g) { plan.push({ applied, gauge: null }); continue; }
-    let shown = metricValue(metrics, g.metric, g.of);
+    const settled = metricValue(metrics, g.metric, g.of);
+    let shown = settled;
     const then = carried[gaugeKey(e.id)];
     if (shown !== null && then !== undefined && g.metric !== "depth" && g.metric !== "inFlight" && since < GAUGE_EASE) {
       const f = Math.max(0, since / GAUGE_EASE), smooth = f * f * (3 - 2 * f);
       shown = then + (shown - then) * smooth;
     }
     if (shown !== null) readings[gaugeKey(e.id)] = shown;
-    plan.push({ applied, gauge: { value: shown } });
+    const shares = g.style === "slots" ? [...(metrics.byFlow.get(g.of) ?? new Map<string, number>())] : undefined;
+    plan.push({ applied, gauge: { value: shown, settled, shares } });
   }
   return { plan, readings };
 }
@@ -435,7 +534,7 @@ export function finishing(elements: Element[], metrics: FrameMetrics, values: Re
   elements.forEach((e, i) => {
     for (const k of plan[i].applied) e = applyOverride(looksOnly(e.overrides![k]), e);
     const g = plan[i].gauge;
-    if (g && e.gauge) out.push(...gauge(e, e.gauge, g.value, frame, flows)); else out.push(e);
+    if (g && e.gauge) out.push(...gauge(e, e.gauge, g.value, frame, flows, g)); else out.push(e);
   });
   return { elements: out, readings };
 }
@@ -479,7 +578,7 @@ export function formatNumber(v: number, places: number): string {
 }
 
 /** A gauge drawn: its frame as a `.path` carrying the label, then the bar or dial. */
-export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, flows: Flow[]): Element[] {
+export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, flows: Flow[], reading: Reading | null = null): Element[] {
   const target = frame.elements.find((x) => x.id === g.of);
   const full = g.max ?? (g.metric === "load" ? 1 : target?.capacity ?? value ?? 1);
   const fraction = value === null ? 0 : full > 0 ? Math.min(Math.max(value / full, 0), 1) : 0;
@@ -538,6 +637,14 @@ export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, f
     const trackW = w - 2 * inset;
     parts.push(part(1, [box(inset, top, trackW, barH)], GAUGE_TRACK, GAUGE_TRACK, 0.5));
     if (fraction > 0) parts.push(part(2, [box(inset, top, trackW * fraction, barH)], color, color, 0.5));
+  } else if (kind === "slots") {
+    // Load is shown a square per unit of the target's capacity, the reading its share of them.
+    const load = g.metric === "load";
+    const cap = target?.capacity ?? null;
+    const squares = load ? (cap !== null && Number.isFinite(cap) && cap > 0 ? cap : 100) : full;
+    const scale = load ? squares / Math.max(full, TINY) : 1;
+    const scaled = (v: number | null | undefined) => (v === null || v === undefined ? v ?? null : v * scale);
+    slots(w, h, squares, scaled(value), reading && { ...reading, settled: scaled(reading.settled) }, color, flows, box, back, parts, part, g.metric);
   } else {
     back.labelRect = { x: 0, y: 0.54, width: 1, height: 0.46 };
     const radius = Math.min(w * 0.38, h * 0.4), center = { x: w / 2, y: h * 0.5 };
@@ -549,4 +656,108 @@ export function gauge(e: Element, g: Gauge, value: number | null, frame: Page, f
     parts.push(part(3, [{ closed: false, coords: line(center, tip) }], { r: 0.2, g: 0.2, b: 0.2, a: 1 }, null, 2));
   }
   return [back, ...parts];
+}
+
+/** Most squares a slots gauge draws; past that, each stands for more. */
+const MAX_SLOTS = 2400;
+
+/** A slots gauge: a grid of squares, one per unit of `full`, filled in the order of the page's flows with each flow's
+ * color for what it delivers through the target, pale for what the reading is still easing toward, and the gauge's
+ * color for the rest (a metric no flow makes up). The label sits above the grid. */
+function slots(w: number, h: number, full: number, value: number | null, reading: Reading | null, color: RGBA,
+  flows: Flow[], box: (x: number, y: number, bw: number, bh: number) => PathSubpath, back: Element, parts: Element[],
+  part: (k: number, subpaths: PathSubpath[], stroke: RGBA, fill: RGBA | null, width: number) => Element, metric: string): void {
+  // One line above the grid: the name, then the reading out of what the squares stand for (thousands grouped), and
+  // what a square stands for when it's more than one.
+  const [name, reading0] = (back.text ?? "").split("\n");
+  const inset = Math.min(8, w * 0.04);
+  const gw = w - 2 * inset;
+  let unit = 1, n = Math.ceil(full - 1e-9);
+  const band0 = Math.min(back.style.fontSize * 1.5 + 6, h * 0.4);
+  const gh = h - band0 - inset;
+  // One square per unit of `full`, or per as many units as keep the squares at least 3 points across.
+  const fits = (k: number) => Math.min(MAX_SLOTS, Math.floor(gw / 3) * Math.floor(Math.max(gh, 0) / 3)) >= k;
+  // Each step a round number: 2, 5, 10, 20, 50, ...
+  while (full > 0 && !fits(n) && unit < 1e12) {
+    const lead = unit / 10 ** Math.floor(Math.log10(unit) + 1e-9);
+    unit = Math.round(unit * (lead < 1.5 ? 2 : lead < 3 ? 2.5 : 2));
+    n = Math.ceil(full / unit - 1e-9);
+  }
+  n = Math.max(1, n);
+  const shown = metric === "load" ? reading0 ?? "" : grouped(reading0 ?? "") + (value !== null ? " / " + grouped(formatted(metric, full)) : "");
+  back.text = [name, shown].filter((x) => x).join(" · ") + (unit > 1 ? ` · 1 □ = ${grouped(formatNumber(unit, 0))}` : "");
+  // Smaller type when the line wouldn't fit across (about 0.56 of the size a character, Helvetica's average).
+  const across = back.text.length * 0.56 * back.style.fontSize;
+  if (across > w - 12) back.style.fontSize = Math.max(8, Math.floor(((w - 12) / (back.text.length * 0.56)) * 10) / 10);
+  const band = Math.min(back.style.fontSize * 1.5 + 6, h * 0.4);
+  back.labelRect = { x: 0, y: 0, width: 1, height: band / h };
+  if (!(gw > 2 && gh > 2) || !(full > 0)) return;
+  // The largest pitch that fits n squares in the grid.
+  let pitch = Math.sqrt((gw * gh) / n);
+  for (let k = 0; k < 64; k++) {
+    const cols = Math.max(1, Math.floor(gw / pitch));
+    if (Math.ceil(n / cols) * pitch <= gh + 1e-9) break;
+    pitch *= 0.97;
+  }
+  const cols = Math.max(1, Math.floor(gw / pitch));
+  const side = Math.max(1, pitch * 0.78);
+  // Squares fill in a scattered order that is the same every frame, as tasks land wherever a slot is free: the r-th
+  // square filled is `order[r]`, so a growing flow takes new squares and the others keep theirs.
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => scatter(a) - scatter(b) || a - b);
+  const cell = (r: number): PathSubpath => {
+    const i = order[r];
+    return box(inset + (i % cols) * pitch, band0 + Math.trunc(i / cols) * pitch, side, side);
+  };
+  // How many squares each color takes: the flows' shares of the reading, largest remainders first.
+  const fraction = (v: number | null) => (v === null || !Number.isFinite(v) ? 0 : Math.min(Math.max(v / full, 0), 1));
+  const shownN = Math.round(fraction(value) * n), settledN = Math.max(shownN, Math.round(fraction(reading?.settled ?? value) * n));
+  const byFlow = new Map(reading?.shares ?? []);
+  const total = [...byFlow.values()].reduce((a, b) => a + b, 0);
+  const colored: [RGBA, number][] = [];
+  if (total > 0 && (metric === "throughput" || metric === "load")) {
+    const order = flows.filter((f) => (byFlow.get(f.id) ?? 0) > 0);
+    const exact = order.map((f) => (byFlow.get(f.id)! / total) * settledN);
+    const counts = exact.map(Math.floor);
+    let left = settledN - counts.reduce((a, b) => a + b, 0);
+    for (const k of exact.map((x, k) => [x - Math.floor(x), k]).sort((a, b) => b[0] - a[0]).map(([, k]) => k)) {
+      if (left <= 0) break;
+      counts[k] += 1; left -= 1;
+    }
+    order.forEach((f, k) => colored.push([f.color ?? DEFAULT_COLOR, counts[k]]));
+  } else {
+    colored.push([color, settledN]);
+  }
+  // Squares in order: each color's, the last of them pale while the reading eases up to them.
+  const groups = new Map<string, { stroke: RGBA; fill: RGBA; cells: PathSubpath[] }>();
+  const add = (key: string, c: RGBA, i: number) => {
+    let g = groups.get(key);
+    if (!g) { g = { stroke: c, fill: c, cells: [] }; groups.set(key, g); }
+    g.cells.push(cell(i));
+  };
+  let i = 0;
+  // Pale squares are the newest: spread over the colors in proportion, at the end of each color's run.
+  const pale = settledN - shownN;
+  colored.forEach(([c, count], k) => {
+    const paleHere = settledN > 0 ? Math.round((pale * count) / settledN) : 0;
+    for (let q = 0; q < count && i < n; q++, i++) {
+      if (q >= count - paleHere) add("p" + k, { ...c, a: c.a * 0.35 }, i); else add("s" + k, c, i);
+    }
+  });
+  const empty: PathSubpath[] = [];
+  for (; i < n; i++) empty.push(cell(i));
+  let k = 1;
+  if (empty.length > 0) parts.push(part(k++, empty, GAUGE_TRACK, GAUGE_TRACK, 0.5));
+  for (const g of groups.values()) parts.push(part(k++, g.cells, g.stroke, g.fill, 0.5));
+}
+
+/** A square's place in a slots gauge's filling order: a fixed scramble of its index. */
+function scatter(i: number): number {
+  let x = Math.imul(i + 1, 0x9e3779b1);
+  x = Math.imul(x ^ (x >>> 15), 0x85ebca6b);
+  return (x ^ (x >>> 13)) >>> 0;
+}
+
+/** A number's text with its whole part in groups of three: 35200 is 35,200, 1234.5 is 1,234.5. */
+function grouped(s: string): string {
+  return s.replace(/^(-?)(\d+)/, (_, sign: string, whole: string) => sign + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 }

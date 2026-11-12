@@ -96,6 +96,7 @@ final class SimulationEngine: @unchecked Sendable {
         var text: String
         var label: [Double]
         var textColor: RGBA?
+        var fontSize: Double?
         var subpaths: [PathSubpath]
         var parts: [Part]
         struct Part: Decodable {
@@ -135,6 +136,7 @@ final class SimulationEngine: @unchecked Sendable {
                 back.text = g.text
                 if g.label.count == 4 { back.labelRect = NormalizedRect(x: g.label[0], y: g.label[1], width: g.label[2], height: g.label[3]) }
                 if let c = g.textColor { back.style.textColor = c }
+                if let s = g.fontSize, s.isFinite, s > 0 { back.style.fontSize = s }
                 out.append(back)
                 for p in g.parts {
                     var s = Style()

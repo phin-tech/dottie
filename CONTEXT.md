@@ -95,6 +95,12 @@ An element's `when`: an expression over variables (`down`, `east && !west`, `cou
 only while it holds. The expressions are a small language with no loops or code (ADR 0007).
 _Avoid_: rule, predicate, visibility expression
 
+**Time**:
+On a page with a timeline, the built-in name `time`, the timeline's seconds, which conditions, flow volumes and text
+read, so a **scenario** unfolds as the page plays. A condition on it starting or stopping to hold changes the
+scenario as a click does (ADR 0008).
+_Avoid_: clock (that is the `clock()` function, which shows seconds as a time of day), tick
+
 **Logic**:
 A page's JavaScript handlers that a click can **run** (ADR 0007): each gets the variables and the click and
 returns new values, sealed and only where allowed. The only code a drawing carries.
@@ -141,7 +147,7 @@ A number worked out per frame from the flows and state: throughput, load, transi
 _Avoid_: stat, measurement
 
 **Gauge**:
-A rectangle that shows one metric as a number, bar or dial, drawn as plain shapes when the page is posed.
+A rectangle that shows one metric as a number, bar, dial or slots (a grid of squares), drawn as plain shapes when the page is posed.
 _Avoid_: meter, widget, dial (that is one style)
 
 **Simulation**:
