@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 
 [[package]]
@@ -27,7 +27,7 @@ wheels = [
 [[package]]
 name = "app-release"
 version = "1.11.1"
-source = { git = "https://git.phin.tech/sam/app-release?tag=v1.11.1#3bb2622fbc086416a419c09a786757eb3baca3b9" }
+source = { git = "https://git.phin.tech/sam/app-release?tag=v1.11.1#4de54cc618ecb362aed84a0c4ab62af925e33629" }
 dependencies = [
     { name = "bump-my-version" },
     { name = "cyclopts" },
